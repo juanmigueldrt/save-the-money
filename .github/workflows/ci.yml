@@ -17,7 +17,7 @@ jobs:
     name: Secretos (gitleaks)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - name: Buscar secretos en todo el historial
@@ -30,14 +30,14 @@ jobs:
     runs-on: ubuntu-latest
     container: swift:6.0-jammy
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: swift test --package-path Packages/STMCore
 
   supabase:
     name: Supabase (migraciones y RLS)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -48,7 +48,7 @@ jobs:
     name: App (iOS y macOS)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Preparar proyecto
         run: |
           brew install xcodegen
