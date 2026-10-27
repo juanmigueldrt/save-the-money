@@ -5,6 +5,6 @@ updates:
     schedule:
       interval: monthly
   - package-ecosystem: swift
-    directory: /Packages/STMUI
+    directory: /Packages/STMData
     schedule:
       interval: monthly
