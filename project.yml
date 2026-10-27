@@ -20,6 +20,8 @@ packages:
     path: Packages/STMCore
   STMUI:
     path: Packages/STMUI
+  STMData:
+    path: Packages/STMData
 targets:
   SaveTheMoney:
     type: application
@@ -51,6 +53,7 @@ targets:
     dependencies:
       - package: STMCore
       - package: STMUI
+      - package: STMData
   SaveTheMoneyTests:
     type: bundle.unit-test
     supportedDestinations: [iOS, macOS]

@@ -37,20 +37,31 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 }
 
 struct RootView: View {
+    let profile: Profile
+    let household: Household
+
+    @Environment(SessionModel.self) private var session
     @State private var selection: AppSection? = .summary
 
     var body: some View {
+        VStack(spacing: 0) {
+            if session.isDemo { DemoBanner() }
+            content
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
         #if os(iOS)
         TabView(selection: $selection) {
             ForEach(AppSection.phoneTabs) { section in
                 NavigationStack {
-                    SectionPlaceholder(section: section)
+                    screen(for: section)
                 }
                 .tabItem { Label(section == .more ? "Más" : section.title, systemImage: section.systemImage) }
                 .tag(Optional(section))
             }
         }
-        .tint(Palette.ember)
         #else
         NavigationSplitView {
             List(AppSection.allCases, selection: $selection) { section in
@@ -59,17 +70,62 @@ struct RootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
-            SectionPlaceholder(section: selection ?? .summary)
+            screen(for: selection ?? .summary)
         }
-        .tint(Palette.ember)
         #endif
     }
+
+    @ViewBuilder
+    private func screen(for section: AppSection) -> some View {
+        switch section {
+        case .household:
+            HouseholdView(profile: profile, household: household)
+        case .more:
+            #if os(iOS)
+            MoreView(profile: profile, household: household)
+            #else
+            SectionPlaceholder(section: section)
+            #endif
+        default:
+            SectionPlaceholder(section: section)
+        }
+    }
 }
+
+#if os(iOS)
+/// Pestaña Más del iPhone: lo que no cabe en la barra inferior.
+struct MoreView: View {
+    let profile: Profile
+    let household: Household
+
+    var body: some View {
+        List {
+            Section {
+                NavigationLink {
+                    HouseholdView(profile: profile, household: household)
+                } label: {
+                    Label("Hogar: \(household.name)", systemImage: AppSection.household.systemImage)
+                }
+                NavigationLink {
+                    SectionPlaceholder(section: .subscriptions)
+                } label: {
+                    Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
+                }
+            }
+            Section("Datos") {
+                Text("Importar, exportar y borrar datos llegan en la fase 5.")
+                    .font(Typography.body14)
+                    .foregroundStyle(Palette.graphite)
+            }
+        }
+        .navigationTitle("Más opciones")
+    }
+}
+#endif
 
 /// Pantalla provisional de cada sección hasta que llegue su fase.
 struct SectionPlaceholder: View {
     let section: AppSection
-    @Environment(\.appConfig) private var config
 
     var body: some View {
         ScrollView {
@@ -88,11 +144,6 @@ struct SectionPlaceholder: View {
                 Text("Esta pantalla llega en una próxima fase.")
                     .font(Typography.body16)
                     .foregroundStyle(Palette.graphite)
-                if config.isMissingSupabaseKey {
-                    Text("Falta la clave de Supabase: copia Config/Secrets.example.xcconfig a Config/Secrets.xcconfig.")
-                        .font(Typography.small12)
-                        .foregroundStyle(Palette.graphite)
-                }
             }
             .padding(Spacing.s16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -102,5 +153,6 @@ struct SectionPlaceholder: View {
 }
 
 #Preview {
-    RootView()
+    RootView(profile: Profile(username: "ana"), household: Household(name: "Casa de prueba"))
+        .environment(SessionModel(services: .demo()))
 }
