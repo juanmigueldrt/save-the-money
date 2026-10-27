@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  secretos:
+    name: Secretos (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Buscar secretos en todo el historial
+        run: |
+          docker run --rm -v "$PWD:/repo" zricethezav/gitleaks:v8.21.2 \
+            git /repo --config /repo/.gitleaks.toml --redact --verbose
+
+  core:
+    name: STMCore (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.0-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - run: swift test --package-path Packages/STMCore
+
+  supabase:
+    name: Supabase (migraciones y RLS)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - run: supabase db start
+      - run: supabase test db
+
+  apple:
+    name: App (iOS y macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preparar proyecto
+        run: |
+          brew install xcodegen
+          cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
+          xcodegen generate
+      # El runner macos-15 no trae simuladores de iPhone instalados: se compila
+      # para el simulador genérico y las pruebas corren en el Mac (mismo código).
+      - name: Compilar para iPhone (simulador)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project SaveTheMoney.xcodeproj -scheme SaveTheMoney \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Pruebas en Mac
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project SaveTheMoney.xcodeproj -scheme SaveTheMoney \
+            -destination 'platform=macOS,arch=arm64' \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= | xcbeautify

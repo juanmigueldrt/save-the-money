@@ -1,0 +1,31 @@
+# Reglas de gitleaks: las de serie más las claves de Supabase.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "supabase-jwt"
+description = "Clave JWT de Supabase (anon o service_role)"
+regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}'''
+tags = ["supabase", "jwt"]
+
+[[rules]]
+id = "supabase-secret-key"
+description = "Clave secreta nueva de Supabase"
+regex = '''sb_secret_[A-Za-z0-9_-]{20,}'''
+tags = ["supabase"]
+
+[[rules]]
+id = "supabase-access-token"
+description = "Token personal de Supabase"
+regex = '''sbp_[a-f0-9]{40}'''
+tags = ["supabase"]
+
+[[rules]]
+id = "postgres-url-with-password"
+description = "URL de Postgres con contraseña"
+regex = '''postgres(ql)?://[^:\s]+:[^@\s]+@[^\s]+'''
+tags = ["database"]
+
+[allowlist]
+description = "Ejemplos sin valores reales"
+paths = ['''Config/Secrets\.example\.xcconfig''']

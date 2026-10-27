@@ -1,0 +1,38 @@
+# Configuración del Supabase local (`supabase start`). No contiene secretos:
+# el proyecto real se enlaza con `supabase link` y sus claves viven fuera del repo.
+project_id = "save-the-money"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 17
+
+[db.seed]
+enabled = false
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "savethemoney://auth"
+additional_redirect_urls = ["savethemoney://auth"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+enable_signup = true
+enable_anonymous_sign_ins = false
+minimum_password_length = 10
+
+[auth.email]
+# Los usuarios entran con nombre de usuario; el email es sintético
+# (usuario@savethemoney.invalid) y nunca recibe correo, así que no se confirma.
+enable_signup = true
+enable_confirmations = false
+double_confirm_changes = true
