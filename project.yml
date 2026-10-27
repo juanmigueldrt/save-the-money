@@ -1,0 +1,72 @@
+# Proyecto de Xcode generado con XcodeGen: `xcodegen generate`.
+# El .xcodeproj no se sube a git; este archivo es la fuente.
+name: SaveTheMoney
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  createIntermediateGroups: true
+configFiles:
+  Debug: Config/App.xcconfig
+  Release: Config/App.xcconfig
+settings:
+  base:
+    SWIFT_VERSION: "5.10"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+packages:
+  STMCore:
+    path: Packages/STMCore
+  STMUI:
+    path: Packages/STMUI
+targets:
+  SaveTheMoney:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - App/Sources
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: Save the Money
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        CFBundleURLTypes:
+          - CFBundleURLName: savethemoney
+            CFBundleURLSchemes: [savethemoney]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(STM_BUNDLE_ID)
+        CODE_SIGN_STYLE: Automatic
+        ENABLE_HARDENED_RUNTIME: YES
+        TARGETED_DEVICE_FAMILY: "1"
+        SUPPORTS_MACCATALYST: NO
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/SaveTheMoney-macOS.entitlements
+    dependencies:
+      - package: STMCore
+      - package: STMUI
+  SaveTheMoneyTests:
+    type: bundle.unit-test
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - App/Tests
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: SaveTheMoney
+schemes:
+  SaveTheMoney:
+    build:
+      targets:
+        SaveTheMoney: all
+    test:
+      targets:
+        - SaveTheMoneyTests
+      gatherCoverageData: true

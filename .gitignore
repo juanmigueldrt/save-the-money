@@ -1,0 +1,42 @@
+# --- Secretos: nunca se suben -------------------------------------------
+Config/Secrets.xcconfig
+.env
+.env.*
+!.env.example
+*.p12
+*.p8
+*.cer
+*.mobileprovision
+*.provisionprofile
+supabase/.temp/
+supabase/.branches/
+
+# --- Datos reales de usuarios: nunca se suben ---------------------------
+# Los CSV del banco y los PDF/CSV exportados se quedan en el dispositivo.
+# Sólo se permiten CSV inventados dentro de carpetas Fixtures/.
+*.csv
+!**/Fixtures/**/*.csv
+*.pdf
+*.sqlite
+*.sqlite-*
+*.store
+*.dump
+*.backup
+
+# --- Xcode / Swift ------------------------------------------------------
+*.xcodeproj/
+*.xcworkspace/
+!Packages/**/*.xcworkspace/
+DerivedData/
+build/
+.build/
+.swiftpm/
+xcuserdata/
+*.xcresult
+
+# --- Sistema ------------------------------------------------------------
+.DS_Store
+*.swp
+
+# Lo genera XcodeGen a partir de project.yml
+App/Info.plist
