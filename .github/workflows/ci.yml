@@ -54,17 +54,19 @@ jobs:
           brew install xcodegen
           cp Config/Secrets.example.xcconfig Config/Secrets.xcconfig
           xcodegen generate
-      - name: Pruebas en el simulador de iPhone
-        run: |
-          set -o pipefail
-          xcodebuild test \
-            -project SaveTheMoney.xcodeproj -scheme SaveTheMoney \
-            -destination 'platform=iOS Simulator,name=iPhone 16' \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify || exit 1
-      - name: Compilar para Mac
+      # El runner macos-15 no trae simuladores de iPhone instalados: se compila
+      # para el simulador genérico y las pruebas corren en el Mac (mismo código).
+      - name: Compilar para iPhone (simulador)
         run: |
           set -o pipefail
           xcodebuild build \
             -project SaveTheMoney.xcodeproj -scheme SaveTheMoney \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO | xcbeautify
+      - name: Pruebas en Mac
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project SaveTheMoney.xcodeproj -scheme SaveTheMoney \
             -destination 'platform=macOS' \
-            CODE_SIGNING_ALLOWED=NO | xcbeautify || exit 1
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM= | xcbeautify
