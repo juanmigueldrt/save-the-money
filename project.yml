@@ -59,6 +59,9 @@ targets:
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
+        # En Mac el ejecutable vive dentro de Contents/MacOS; XcodeGen pone la ruta de iOS.
+        "TEST_HOST[sdk=macosx*]": $(BUILT_PRODUCTS_DIR)/SaveTheMoney.app/Contents/MacOS/SaveTheMoney
+        "BUNDLE_LOADER[sdk=macosx*]": $(TEST_HOST)
     dependencies:
       - target: SaveTheMoney
 schemes:
