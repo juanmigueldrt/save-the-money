@@ -40,7 +40,9 @@ struct AppRootView: View {
             case .needsHousehold(let profile):
                 HouseholdOnboardingView(profile: profile)
             case .ready(let profile, let household):
-                RootView(profile: profile, household: household)
+                RootView(profile: profile, household: household,
+                         finance: FinanceModel(household: household, service: session.services.finance))
+                    .id(household.id)
             }
         }
         .animation(.default, value: session.state)
