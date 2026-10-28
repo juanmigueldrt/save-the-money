@@ -4,13 +4,14 @@ import STMUI
 
 /// Secciones de la app. En iPhone son pestañas; en Mac, la barra lateral.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case summary, budget, cashFlow, subscriptions, goals, household, more
+    case summary, movements, budget, cashFlow, subscriptions, goals, household, more
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .summary: "Resumen"
+        case .movements: "Movimientos"
         case .budget: "Presupuesto"
         case .cashFlow: "Flujo"
         case .subscriptions: "Suscripciones"
@@ -23,6 +24,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     var systemImage: String {
         switch self {
         case .summary: "house"
+        case .movements: "list.bullet.rectangle"
         case .budget: "chart.pie"
         case .cashFlow: "arrow.left.arrow.right"
         case .subscriptions: "repeat"
@@ -32,7 +34,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Pestañas del iPhone: suscripciones y hogar se abren desde Más opciones.
+    /// Pestañas del iPhone: movimientos se abren desde el resumen; suscripciones y hogar, desde Más opciones.
     static let phoneTabs: [AppSection] = [.summary, .budget, .cashFlow, .goals, .more]
 }
 
@@ -42,12 +44,21 @@ struct RootView: View {
 
     @Environment(SessionModel.self) private var session
     @State private var selection: AppSection? = .summary
+    @State private var finance: FinanceModel
+
+    init(profile: Profile, household: Household, finance: FinanceModel) {
+        self.profile = profile
+        self.household = household
+        _finance = State(initialValue: finance)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             if session.isDemo { DemoBanner() }
             content
         }
+        .environment(finance)
+        .task { await finance.load() }
     }
 
     @ViewBuilder
@@ -70,7 +81,10 @@ struct RootView: View {
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {
-            screen(for: selection ?? .summary)
+            NavigationStack {
+                screen(for: selection ?? .summary)
+            }
+            .id(selection)
         }
         #endif
     }
@@ -78,28 +92,28 @@ struct RootView: View {
     @ViewBuilder
     private func screen(for section: AppSection) -> some View {
         switch section {
+        case .summary:
+            SummaryView()
+        case .movements:
+            MovementsView()
         case .household:
             HouseholdView(profile: profile, household: household)
         case .more:
-            #if os(iOS)
             MoreView(profile: profile, household: household)
-            #else
-            SectionPlaceholder(section: section)
-            #endif
         default:
             SectionPlaceholder(section: section)
         }
     }
 }
 
-#if os(iOS)
-/// Pestaña Más del iPhone: lo que no cabe en la barra inferior.
+/// Más opciones. En iPhone también da paso a lo que no cabe en la barra inferior.
 struct MoreView: View {
     let profile: Profile
     let household: Household
 
     var body: some View {
         List {
+            #if os(iOS)
             Section {
                 NavigationLink {
                     HouseholdView(profile: profile, household: household)
@@ -112,8 +126,14 @@ struct MoreView: View {
                     Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
                 }
             }
+            #endif
             Section("Datos") {
-                Text("Importar, exportar y borrar datos llegan en la fase 5.")
+                NavigationLink {
+                    CSVImportView()
+                } label: {
+                    Label("Importar CSV del banco", systemImage: "square.and.arrow.down")
+                }
+                Text("Exportar y borrar datos llegan en la fase 5.")
                     .font(Typography.body14)
                     .foregroundStyle(Palette.graphite)
             }
@@ -121,7 +141,6 @@ struct MoreView: View {
         .navigationTitle("Más opciones")
     }
 }
-#endif
 
 /// Pantalla provisional de cada sección hasta que llegue su fase.
 struct SectionPlaceholder: View {
@@ -153,6 +172,9 @@ struct SectionPlaceholder: View {
 }
 
 #Preview {
-    RootView(profile: Profile(username: "ana"), household: Household(name: "Casa de prueba"))
-        .environment(SessionModel(services: .demo()))
+    let services = AppServices.demo()
+    let household = Household(name: "Casa de prueba")
+    return RootView(profile: Profile(username: "ana"), household: household,
+                    finance: FinanceModel(household: household, service: services.finance))
+        .environment(SessionModel(services: services))
 }

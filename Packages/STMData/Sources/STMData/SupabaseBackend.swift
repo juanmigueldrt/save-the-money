@@ -5,7 +5,7 @@ import Supabase
 /// Servicios de la app sobre Supabase. Toda la seguridad la pone el servidor
 /// (RLS y funciones); aquí sólo se llama a la API y se traducen los errores.
 public struct SupabaseBackend: AuthService, HouseholdService {
-    private let client: SupabaseClient
+    let client: SupabaseClient
 
     public init(url: URL, anonKey: String) {
         client = SupabaseClient(supabaseURL: url, supabaseKey: anonKey)
@@ -168,7 +168,7 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     /// Ejecuta la llamada y convierte cualquier error en un AppError con mensaje en español.
     /// Nunca se registran datos del usuario: sólo el tipo de error.
     @discardableResult
-    private func mapped<T>(_ operation: () async throws -> T) async throws -> T {
+    func mapped<T>(_ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
         } catch let error as AppError {
@@ -187,6 +187,7 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "P0002": .invalidOrExpiredInvite
         case "23505": message.contains("already a member") ? .alreadyMember : .usernameTaken
         case "28000", "PGRST301": .notSignedIn
+        case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

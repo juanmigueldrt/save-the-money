@@ -3,14 +3,19 @@ import Foundation
 /// Servicios en memoria para el modo demo, las previews y las pruebas.
 /// Imitan las reglas del servidor (códigos de 48 horas, un solo uso, etc.).
 public actor InMemoryBackend: AuthService, HouseholdService {
-    private struct Account { var profile: Profile; var password: String }
+    private struct UserRecord { var profile: Profile; var password: String }
 
-    private var accounts: [UUID: Account] = [:]
+    private var users: [UUID: UserRecord] = [:]
     private var householdsById: [UUID: Household] = [:]
     private var memberships: [Membership] = []
     private var invites: [HouseholdInvite] = []
     private var currentUser: UUID?
-    private let now: @Sendable () -> Date
+    let now: @Sendable () -> Date
+
+    // Finanzas (InMemoryFinance.swift).
+    var financeAccounts: [Account] = []
+    var financeCategories: [BudgetCategory] = []
+    var financeMovements: [Movement] = []
 
     public init(now: @escaping @Sendable () -> Date = { Date() }) {
         self.now = now
@@ -21,18 +26,18 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func currentUserId() async -> UUID? { currentUser }
 
     public func signUp(username: Username, password: String, displayName: String?) async throws -> UUID {
-        guard !accounts.values.contains(where: { $0.profile.username == username.value }) else {
+        guard !users.values.contains(where: { $0.profile.username == username.value }) else {
             throw AppError.usernameTaken
         }
         guard password.count >= SignUpForm.minimumPasswordLength else { throw AppError.weakPassword }
         let profile = Profile(username: username.value, displayName: displayName)
-        accounts[profile.id] = Account(profile: profile, password: password)
+        users[profile.id] = UserRecord(profile: profile, password: password)
         currentUser = profile.id
         return profile.id
     }
 
     public func signIn(username: Username, password: String) async throws -> UUID {
-        guard let account = accounts.values.first(where: { $0.profile.username == username.value }),
+        guard let account = users.values.first(where: { $0.profile.username == username.value }),
               account.password == password else { throw AppError.invalidCredentials }
         currentUser = account.profile.id
         return account.profile.id
@@ -42,25 +47,25 @@ public actor InMemoryBackend: AuthService, HouseholdService {
 
     // MARK: HouseholdService
 
-    private func requireUser() throws -> UUID {
+    func requireUser() throws -> UUID {
         guard let currentUser else { throw AppError.notSignedIn }
         return currentUser
     }
 
-    private func isMember(_ user: UUID, of household: UUID) -> Bool {
+    func isMember(_ user: UUID, of household: UUID) -> Bool {
         memberships.contains { $0.userId == user && $0.householdId == household }
     }
 
     public func myProfile() async throws -> Profile {
         let user = try requireUser()
-        guard let account = accounts[user] else { throw AppError.notSignedIn }
+        guard let account = users[user] else { throw AppError.notSignedIn }
         return account.profile
     }
 
     public func updateProfile(displayName: String?, theme: AppTheme) async throws -> Profile {
         let user = try requireUser()
-        accounts[user]?.profile.displayName = displayName
-        accounts[user]?.profile.theme = theme
+        users[user]?.profile.displayName = displayName
+        users[user]?.profile.theme = theme
         return try await myProfile()
     }
 
@@ -75,8 +80,9 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         let household = Household(name: valid)
         householdsById[household.id] = household
         memberships.append(Membership(householdId: household.id, userId: user, role: .owner))
-        if accounts[user]?.profile.defaultHouseholdId == nil {
-            accounts[user]?.profile.defaultHouseholdId = household.id
+        financeCategories += BudgetCategory.defaults(for: household.id)
+        if users[user]?.profile.defaultHouseholdId == nil {
+            users[user]?.profile.defaultHouseholdId = household.id
         }
         return household
     }
@@ -85,7 +91,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         let user = try requireUser()
         guard isMember(user, of: householdId) else { return [] }
         return memberships.filter { $0.householdId == householdId }.compactMap { membership in
-            accounts[membership.userId].map { HouseholdMember(profile: $0.profile, role: membership.role) }
+            users[membership.userId].map { HouseholdMember(profile: $0.profile, role: membership.role) }
         }
     }
 
@@ -126,8 +132,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         guard !isMember(user, of: household.id) else { throw AppError.alreadyMember }
         memberships.append(Membership(householdId: household.id, userId: user, role: .member))
         invites[index].status = .accepted
-        if accounts[user]?.profile.defaultHouseholdId == nil {
-            accounts[user]?.profile.defaultHouseholdId = household.id
+        if users[user]?.profile.defaultHouseholdId == nil {
+            users[user]?.profile.defaultHouseholdId = household.id
         }
         return household
     }
@@ -135,8 +141,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func leave(householdId: UUID) async throws {
         let user = try requireUser()
         memberships.removeAll { $0.userId == user && $0.householdId == householdId }
-        if accounts[user]?.profile.defaultHouseholdId == householdId {
-            accounts[user]?.profile.defaultHouseholdId = nil
+        if users[user]?.profile.defaultHouseholdId == householdId {
+            users[user]?.profile.defaultHouseholdId = nil
         }
     }
 }
