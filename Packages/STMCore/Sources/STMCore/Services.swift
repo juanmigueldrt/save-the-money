@@ -60,9 +60,20 @@ public protocol FinanceService: Sendable {
     func deleteAccount(_ accountId: UUID) async throws
 
     func categories(in householdId: UUID) async throws -> [BudgetCategory]
+    func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory
+    /// Cambia nombre, grupo e icono; el tipo de una categoría no se cambia.
+    func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory
+    /// Los movimientos de esa categoría se quedan sin categoría; sus límites de presupuesto se borran.
+    func deleteCategory(_ categoryId: UUID) async throws
+
+    /// Borra todo lo apuntado en el hogar (cuentas, movimientos, categorías, presupuestos,
+    /// pagos fijos y metas) y deja las categorías de partida. Miembros e invitaciones no se tocan.
+    func resetHousehold(_ householdId: UUID) async throws
 
     /// Movimientos más recientes primero. Con `accountId`, sólo los de esa cuenta.
     func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement]
+    /// Todos los movimientos del hogar, para exportarlos. El servidor los da por páginas.
+    func allMovements(in householdId: UUID) async throws -> [Movement]
     func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement
     func updateMovement(_ movement: Movement) async throws -> Movement
     func deleteMovement(_ movementId: UUID) async throws

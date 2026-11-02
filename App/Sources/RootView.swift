@@ -122,54 +122,6 @@ struct RootView: View {
     }
 }
 
-/// Más opciones. En iPhone también da paso a lo que no cabe en la barra inferior.
-struct MoreView: View {
-    let profile: Profile
-    let household: Household
-
-    @Environment(PlanningModel.self) private var planning
-    @AppStorage(LocalReminders.enabledKey) private var remindersEnabled = true
-
-    var body: some View {
-        List {
-            #if os(iOS)
-            Section {
-                NavigationLink {
-                    HouseholdView(profile: profile, household: household)
-                } label: {
-                    Label("Hogar: \(household.name)", systemImage: AppSection.household.systemImage)
-                }
-                NavigationLink {
-                    RecurringView()
-                } label: {
-                    Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
-                }
-            }
-            #endif
-            Section {
-                Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
-                    .onChange(of: remindersEnabled) { _, _ in Task { await planning.reschedule() } }
-            } header: {
-                Text("Avisos")
-            } footer: {
-                Text("Los lanza este dispositivo antes de cada cargo, según lo que elijas en cada pago fijo.")
-            }
-            Section("Datos") {
-                NavigationLink {
-                    CSVImportView()
-                } label: {
-                    Label("Importar CSV del banco", systemImage: "square.and.arrow.down")
-                }
-                Text("Exportar y borrar datos llegan en la fase 5.")
-                    .font(Typography.body14)
-                    .foregroundStyle(Palette.graphite)
-            }
-        }
-        .brandBackground()
-        .navigationTitle("Más opciones")
-    }
-}
-
 #Preview {
     let services = AppServices.demo()
     let household = Household(name: "Casa de prueba")

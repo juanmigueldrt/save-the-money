@@ -185,7 +185,10 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     static func appError(postgresCode: String?, message: String) -> AppError {
         switch postgresCode {
         case "P0002": .invalidOrExpiredInvite
-        case "23505": message.contains("already a member") ? .alreadyMember : .usernameTaken
+        case "23505":
+            if message.contains("already a member") { .alreadyMember }
+            else if message.contains("categories_household_name_idx") { .invalidInput("Ya hay una categoría con ese nombre.") }
+            else { .usernameTaken }
         case "28000", "PGRST301": .notSignedIn
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         default: .unknown(postgresCode ?? "postgrest")

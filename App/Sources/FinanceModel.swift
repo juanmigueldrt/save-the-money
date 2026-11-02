@@ -117,6 +117,54 @@ final class FinanceModel {
         return result
     }
 
+    @discardableResult
+    func save(_ category: BudgetCategory) async -> Bool {
+        if let issue = category.issue(among: categories) {
+            error = issue
+            return false
+        }
+        return await perform {
+            if categories.contains(where: { $0.id == category.id }) {
+                _ = try await service.updateCategory(category)
+            } else {
+                _ = try await service.createCategory(category)
+            }
+            categories = try await service.categories(in: household.id)
+        }
+    }
+
+    @discardableResult
+    func delete(_ category: BudgetCategory) async -> Bool {
+        await perform {
+            try await service.deleteCategory(category.id)
+            categories = try await service.categories(in: household.id)
+            try await reloadAll()
+        }
+    }
+
+    /// Cuántos de los movimientos recientes usan esa categoría, para avisar antes de borrarla.
+    func recentUses(of category: BudgetCategory) -> Int {
+        recent.filter { $0.categoryId == category.id }.count
+    }
+
+    /// El CSV con todos los movimientos del hogar, listo para Excel.
+    func exportCSV() async -> Data? {
+        var data: Data?
+        await perform {
+            let all = try await service.allMovements(in: household.id)
+            data = MovementsCSV.data(all, accounts: accounts, categories: categories)
+        }
+        return data
+    }
+
+    /// Borra todo lo apuntado en el hogar y vuelve a cargar.
+    @discardableResult
+    func resetHousehold() async -> Bool {
+        guard await perform({ try await service.resetHousehold(household.id) }) else { return false }
+        await load()
+        return true
+    }
+
     private func reloadAccounts() async throws {
         let service = service, id = household.id
         async let accounts = service.accounts(in: id)

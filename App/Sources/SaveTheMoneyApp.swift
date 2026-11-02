@@ -1,4 +1,5 @@
 import SwiftUI
+import STMCore
 import STMUI
 
 @main
@@ -52,5 +53,17 @@ struct AppRootView: View {
             }
         }
         .animation(.default, value: session.state)
+        .preferredColorScheme(session.theme.colorScheme)
+    }
+}
+
+extension AppTheme {
+    /// nil = lo que diga el sistema.
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: nil
+        case .light: .light
+        case .dark: .dark
+        }
     }
 }
