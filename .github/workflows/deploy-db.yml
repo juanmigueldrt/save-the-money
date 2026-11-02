@@ -28,5 +28,6 @@ jobs:
         with:
           version: 3.0.0
       - run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
-      # Desde la CLI 3.x, db push va contra la base local salvo que se pida --remote.
-      - run: supabase db push --remote
+      # Desde la CLI 3.x, db push va contra la base local salvo --remote, y pide
+      # confirmación salvo --yes (la aprobación del entorno produccion ya la da Jean).
+      - run: supabase db push --remote --yes
