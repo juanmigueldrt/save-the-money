@@ -1,31 +1,30 @@
 import SwiftUI
 import STMUI
 
-/// Botón principal: fondo ember, texto blanco, ocupa todo el ancho.
+/// Botón principal del manual: píldora ember con texto ink (blanco sobre ember no llega a AA)
+/// y la sombra sutil.
 struct PrimaryButtonStyle: ButtonStyle {
     @Environment(\.isEnabled) private var isEnabled
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Typography.body16Medium)
-            .foregroundStyle(.white)
+            .foregroundStyle(Palette.onEmber)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Palette.ember.opacity(isEnabled ? (configuration.isPressed ? 0.8 : 1) : 0.4),
-                        in: RoundedRectangle(cornerRadius: Radius.input, style: .continuous))
+            .background(Palette.ember.opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.4), in: Capsule())
+            .shadow(color: Color(red: 34 / 255, green: 32 / 255, blue: 29 / 255).opacity(0.05), radius: 1, y: 1)
     }
 }
 
-/// Botón secundario: borde y texto en ink.
+/// Botón contorneado del manual: píldora con borde ember de 1,5 px y texto ink.
 struct SecondaryButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(Typography.body16Medium)
             .foregroundStyle(Palette.ink)
             .frame(maxWidth: .infinity, minHeight: 48)
-            .background(
-                RoundedRectangle(cornerRadius: Radius.input, style: .continuous)
-                    .stroke(Palette.smoke, lineWidth: 1)
-            )
+            .background(Capsule().strokeBorder(Palette.ember, lineWidth: 1.5))
+            .contentShape(Capsule())
             .opacity(configuration.isPressed ? 0.7 : 1)
     }
 }

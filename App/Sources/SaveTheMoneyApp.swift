@@ -6,6 +6,8 @@ struct SaveTheMoneyApp: App {
     @State private var session: SessionModel
 
     init() {
+        // Antes de pintar nada, para que todo salga con las fuentes del manual de marca.
+        BrandFonts.register()
         let config = AppConfig.fromBundle()
         _session = State(initialValue: SessionModel(services: .make(config: config)))
     }

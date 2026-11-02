@@ -12,11 +12,9 @@ struct SummaryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s8) {
-                    Text("Saldo total")
-                        .font(Typography.body14Medium)
-                        .foregroundStyle(Palette.graphite)
+                    Eyebrow("Saldo total")
                     Text(finance.totalBalance.formatted())
-                        .font(Typography.title36)
+                        .titleFont(.title36)
                         .foregroundStyle(finance.totalBalance.isNegative ? Palette.red : Palette.ink)
                         .contentTransition(.numericText())
                 }
@@ -25,7 +23,7 @@ struct SummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
                         Text("Cuentas")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         Spacer()
                         Button("Añadir", systemImage: "plus") { addingAccount = true }
@@ -47,7 +45,7 @@ struct SummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
                         Text("Últimos movimientos")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         Spacer()
                         NavigationLink("Ver todos") { MovementsView() }
@@ -203,6 +201,7 @@ struct MovementsView: View {
             }
         }
         .searchable(text: $search, prompt: "Buscar concepto o categoría")
+        .brandBackground()
         .navigationTitle(account?.name ?? "Movimientos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -243,7 +242,7 @@ struct AccountDetailView: View {
                         .font(Typography.body14Medium)
                         .foregroundStyle(Palette.graphite)
                     Text(finance.balance(of: current).formatted())
-                        .font(Typography.title32)
+                        .titleFont(.title32)
                         .foregroundStyle(finance.balance(of: current).isNegative ? Palette.red : Palette.ink)
                 }
                 Spacer()
@@ -310,6 +309,7 @@ struct AccountFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(account == nil ? "Nueva cuenta" : "Editar cuenta")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
@@ -433,6 +433,7 @@ struct MovementFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(movement == nil ? "Nuevo movimiento" : "Editar movimiento")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }

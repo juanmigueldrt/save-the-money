@@ -165,6 +165,7 @@ struct MoreView: View {
                     .foregroundStyle(Palette.graphite)
             }
         }
+        .brandBackground()
         .navigationTitle("Más opciones")
     }
 }

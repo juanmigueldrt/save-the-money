@@ -13,7 +13,7 @@ struct GoalsView: View {
                 if planning.progress.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Sin metas todavía")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         EmptyHint(text: "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.")
                         Button("Crear una meta") { adding = true }
@@ -26,7 +26,7 @@ struct GoalsView: View {
                     if !items.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.s16) {
                             Text(kind == .savings ? "Ahorro" : "Deudas")
-                                .font(Typography.title20)
+                                .titleFont(.title20)
                                 .foregroundStyle(Palette.ink)
                             ForEach(items) { progress in
                                 NavigationLink(value: progress.goal) {
@@ -192,6 +192,7 @@ struct GoalDetailView: View {
                 Section { ErrorText(message: error) }
             }
         }
+        .brandBackground()
         .navigationTitle(goal.trimmedName)
         .toolbar {
             ToolbarItem(placement: .primaryAction) { Button("Editar") { editing = true } }
@@ -259,6 +260,7 @@ struct GoalFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(goal == nil ? "Nueva meta" : "Editar meta")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
@@ -360,6 +362,7 @@ struct ContributionFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(goal.kind == .savings ? "Aportación" : "Pago de la deuda")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }

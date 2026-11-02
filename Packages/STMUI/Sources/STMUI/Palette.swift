@@ -17,6 +17,8 @@ public enum Palette {
     public static let linen = Color(light: 0xEFECEA, dark: 0x141312)
     public static let paper = Color(light: 0xFFFFFF, dark: 0x1F1D1B)
     public static let red = Color(light: 0xE5484D, dark: 0xF2555A)
+    /// Texto sobre ember: siempre ink oscuro (5.66:1). El blanco no llega a AA.
+    public static let onEmber = Color(light: 0x22201D, dark: 0x22201D)
 }
 
 public extension BudgetGroup {

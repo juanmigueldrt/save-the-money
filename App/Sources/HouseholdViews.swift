@@ -19,7 +19,7 @@ struct HouseholdOnboardingView: View {
                 VStack(alignment: .leading, spacing: Spacing.s32) {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         Text("Hola, \(profile.name)")
-                            .font(Typography.title32)
+                            .titleFont(.title32)
                             .foregroundStyle(Palette.ink)
                         Text("Crea tu hogar o únete al de tu pareja con su código.")
                             .font(Typography.body16)
@@ -29,7 +29,7 @@ struct HouseholdOnboardingView: View {
 
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Crear un hogar")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         LabeledField(label: "Nombre del hogar") {
                             TextField("Casa de \(profile.name)", text: $householdName)
@@ -42,7 +42,7 @@ struct HouseholdOnboardingView: View {
 
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Unirme con un código")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         LabeledField(label: "Código de 6 caracteres") {
                             TextField("4K9 Q2X", text: $code)
@@ -127,12 +127,12 @@ struct HouseholdView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 Text(household.name)
-                    .font(Typography.title32)
+                    .titleFont(.title32)
                     .foregroundStyle(Palette.ink)
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Miembros")
-                        .font(Typography.title20)
+                        .titleFont(.title20)
                         .foregroundStyle(Palette.ink)
                     ForEach(members) { member in
                         HStack {
@@ -158,7 +158,7 @@ struct HouseholdView: View {
                 if !invites.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Invitaciones pendientes")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         ForEach(invites) { pending in
                             HStack {
@@ -249,7 +249,7 @@ struct InviteSheet: View {
     var body: some View {
         VStack(spacing: Spacing.s24) {
             Text("Invita a tu pareja")
-                .font(Typography.title32)
+                .titleFont(.title32)
                 .foregroundStyle(Palette.ink)
             Text("Que escanee el QR con la cámara del iPhone o escriba el código al unirse.")
                 .font(Typography.body16)

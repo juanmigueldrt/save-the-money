@@ -15,7 +15,7 @@ struct MonthSwitcher: View {
             Spacer()
             VStack(spacing: 2) {
                 Text(budgets.month.title)
-                    .font(Typography.title20)
+                    .titleFont(.title20)
                     .foregroundStyle(Palette.ink)
                 Text("\(budgets.period.lowerBound.shortText) – \(budgets.period.upperBound.shortText)")
                     .font(Typography.small12)
@@ -77,7 +77,7 @@ struct BudgetView: View {
                     if !lines.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.s16) {
                             Text(group.title)
-                                .font(Typography.title20)
+                                .titleFont(.title20)
                                 .foregroundStyle(Palette.ink)
                             ForEach(lines) { CategoryLineRow(line: $0, tint: group.color) }
                         }
@@ -223,6 +223,7 @@ struct BudgetFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(initial.month.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
