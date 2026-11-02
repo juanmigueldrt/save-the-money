@@ -172,3 +172,55 @@ final class PlanningModelTests: XCTestCase {
         XCTAssertNotNil(planning.goals.first?.completedAt, "al llegar al objetivo se marca como conseguida")
     }
 }
+
+@MainActor
+final class MoreOptionsModelTests: XCTestCase {
+    private func readyHome() async throws -> (AppServices, SessionModel, Household) {
+        let services = AppServices.demo()
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await session.createHousehold(name: "Casa de prueba")
+        guard case .ready(_, let home) = session.state else { throw AppError.unknown("sin hogar") }
+        return (services, session, home)
+    }
+
+    func testThemeIsSavedInProfile() async throws {
+        let (_, session, _) = try await readyHome()
+        XCTAssertEqual(session.theme, .system)
+        try await session.setTheme(.dark)
+        XCTAssertEqual(session.theme, .dark)
+        guard case .ready(let profile, _) = session.state else { return XCTFail("sin sesión") }
+        XCTAssertEqual(profile.theme, .dark)
+        XCTAssertEqual(AppTheme.dark.colorScheme, .dark)
+        XCTAssertNil(AppTheme.system.colorScheme)
+    }
+
+    func testCategoriesExportAndReset() async throws {
+        let (services, _, home) = try await readyHome()
+        let finance = FinanceModel(household: home, service: services.finance)
+        await finance.load()
+        let start = finance.categories.count
+
+        let pets = BudgetCategory(householdId: home.id, name: "Mascotas", kind: .expense, budgetGroup: .needs, icon: "pawprint")
+        let saved = await finance.save(pets)
+        XCTAssertTrue(saved)
+        XCTAssertEqual(finance.categories.count, start + 1)
+        let repeated = await finance.save(BudgetCategory(householdId: home.id, name: "mascotas"))
+        XCTAssertFalse(repeated)
+        XCTAssertNotNil(finance.error)
+
+        _ = await finance.createAccount(AccountDraft(name: "Cuenta común"))
+        let account = try XCTUnwrap(finance.accounts.first)
+        _ = await finance.add(MovementDraft(accountId: account.id, bookedOn: try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 1)),
+                                            amount: Money(minor: -1_500), description: "Pienso"))
+        let csv = try XCTUnwrap(await finance.exportCSV())
+        let text = try XCTUnwrap(String(data: csv.dropFirst(3), encoding: .utf8))
+        XCTAssertTrue(text.contains("01/11/2026;Cuenta común;;Pienso;-15,00;EUR;"))
+
+        let reset = await finance.resetHousehold()
+        XCTAssertTrue(reset)
+        XCTAssertTrue(finance.accounts.isEmpty)
+        XCTAssertTrue(finance.recent.isEmpty)
+        XCTAssertEqual(finance.categories.count, start)
+    }
+}

@@ -80,6 +80,47 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
+        if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
+        return try await mapped {
+            try await client.from("categories")
+                .insert(CategoryRow(category, includeHousehold: true))
+                .select(Self.categoryColumns)
+                .single()
+                .execute()
+                .value
+        }
+    }
+
+    public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
+        if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
+        return try await mapped {
+            try await client.from("categories")
+                .update(CategoryRow(category, includeHousehold: false))
+                .eq("id", value: category.id.uuidString)
+                .select(Self.categoryColumns)
+                .single()
+                .execute()
+                .value
+        }
+    }
+
+    public func deleteCategory(_ categoryId: UUID) async throws {
+        try await mapped {
+            try await client.from("categories")
+                .delete()
+                .eq("id", value: categoryId.uuidString)
+                .execute()
+        }
+    }
+
+    public func resetHousehold(_ householdId: UUID) async throws {
+        try await mapped {
+            try await client.rpc("reset_household", params: ["target_household": householdId.uuidString])
+                .execute()
+        }
+    }
+
     public func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement] {
         try await mapped {
             var query = client.from("transactions")
@@ -94,6 +135,27 @@ extension SupabaseBackend: FinanceService {
                 .limit(limit)
                 .execute()
                 .value
+        }
+    }
+
+    public func allMovements(in householdId: UUID) async throws -> [Movement] {
+        // El servidor devuelve como mucho 1000 filas por petición (max_rows).
+        let pageSize = 1000
+        var all: [Movement] = []
+        while true {
+            let start = all.count
+            let page: [Movement] = try await mapped {
+                try await client.from("transactions")
+                    .select(Self.movementColumns)
+                    .eq("household_id", value: householdId.uuidString)
+                    .order("booked_on")
+                    .order("id")
+                    .range(from: start, to: start + pageSize - 1)
+                    .execute()
+                    .value
+            }
+            all += page
+            if page.count < pageSize { return all }
         }
     }
 
@@ -215,6 +277,35 @@ private struct AccountChanges: Encodable, Sendable {
         // null explícito para poder volver a compartida o desarchivar.
         try c.encode(ownerId, forKey: .ownerId)
         try c.encode(archivedAt, forKey: .archivedAt)
+    }
+}
+
+/// Columnas de una categoría que se pueden escribir. Al insertar va el hogar y el tipo;
+/// al cambiarla, sólo nombre, grupo e icono (es lo que permite el servidor).
+private struct CategoryRow: Encodable, Sendable {
+    var category: BudgetCategory
+    var includeHousehold: Bool
+
+    init(_ category: BudgetCategory, includeHousehold: Bool) {
+        self.category = category
+        self.includeHousehold = includeHousehold
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name, kind, icon
+        case householdId = "household_id"
+        case budgetGroup = "budget_group"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        if includeHousehold {
+            try c.encode(category.householdId, forKey: .householdId)
+            try c.encode(category.kind, forKey: .kind)
+        }
+        try c.encode(category.trimmedName, forKey: .name)
+        try c.encode(category.kind == .expense ? category.budgetGroup : nil, forKey: .budgetGroup)
+        try c.encode(category.icon, forKey: .icon)
     }
 }
 

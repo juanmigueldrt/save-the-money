@@ -25,6 +25,24 @@ final class SessionModel {
 
     var isDemo: Bool { services.isDemo }
 
+    /// Tema elegido en el perfil; antes de entrar, el último que se usó en este dispositivo.
+    var theme: AppTheme {
+        switch state {
+        case .ready(let profile, _), .needsHousehold(let profile): profile.theme
+        case .loading, .signedOut: AppTheme(rawValue: UserDefaults.standard.string(forKey: Self.themeKey) ?? "") ?? .system
+        }
+    }
+
+    static let themeKey = "lastTheme"
+
+    /// Guarda el tema en el perfil (se aplica en todos los dispositivos de esa persona).
+    func setTheme(_ theme: AppTheme) async throws {
+        guard case .ready(let profile, let household) = state else { return }
+        let updated = try await services.households.updateProfile(displayName: profile.displayName, theme: theme)
+        UserDefaults.standard.set(updated.theme.rawValue, forKey: Self.themeKey)
+        state = .ready(updated, household)
+    }
+
     func start() async {
         await refresh()
     }

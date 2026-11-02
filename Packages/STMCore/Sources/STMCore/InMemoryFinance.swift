@@ -56,6 +56,57 @@ extension InMemoryBackend: FinanceService {
         return financeCategories.filter { $0.householdId == householdId }
     }
 
+    public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
+        _ = try requireMember(of: category.householdId)
+        if let issue = category.issue(among: financeCategories) { throw AppError.invalidInput(issue) }
+        var created = BudgetCategory(householdId: category.householdId, name: category.trimmedName, kind: category.kind,
+                                     budgetGroup: category.budgetGroup, icon: category.icon)
+        if created.kind != .expense { created.budgetGroup = nil }
+        financeCategories.append(created)
+        return created
+    }
+
+    public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
+        guard let index = financeCategories.firstIndex(where: { $0.id == category.id }) else { throw AppError.unknown("categoría") }
+        let current = financeCategories[index]
+        _ = try requireMember(of: current.householdId)
+        var updated = current
+        updated.name = category.trimmedName
+        updated.budgetGroup = current.kind == .expense ? category.budgetGroup : nil
+        updated.icon = category.icon
+        if let issue = updated.issue(among: financeCategories) { throw AppError.invalidInput(issue) }
+        financeCategories[index] = updated
+        return updated
+    }
+
+    public func deleteCategory(_ categoryId: UUID) async throws {
+        guard let category = financeCategories.first(where: { $0.id == categoryId }) else { return }
+        _ = try requireMember(of: category.householdId)
+        financeCategories.removeAll { $0.id == categoryId }
+        for index in financeMovements.indices where financeMovements[index].categoryId == categoryId {
+            financeMovements[index].categoryId = nil
+        }
+        for index in recurring.indices where recurring[index].categoryId == categoryId {
+            recurring[index].categoryId = nil
+        }
+        for index in budgets.indices {
+            budgets[index].limits[categoryId] = nil
+        }
+    }
+
+    public func resetHousehold(_ householdId: UUID) async throws {
+        _ = try requireMember(of: householdId)
+        let goalIds = Set(goalList.filter { $0.householdId == householdId }.map(\.id))
+        goalContributions.removeAll { goalIds.contains($0.goalId) }
+        goalList.removeAll { $0.householdId == householdId }
+        recurring.removeAll { $0.householdId == householdId }
+        budgets.removeAll { $0.householdId == householdId }
+        financeMovements.removeAll { $0.householdId == householdId }
+        financeAccounts.removeAll { $0.householdId == householdId }
+        financeCategories.removeAll { $0.householdId == householdId }
+        financeCategories += BudgetCategory.defaults(for: householdId)
+    }
+
     public func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement] {
         _ = try requireMember(of: householdId)
         return financeMovements
@@ -63,6 +114,11 @@ extension InMemoryBackend: FinanceService {
             .sorted { $0.bookedOn > $1.bookedOn }
             .prefix(limit)
             .map { $0 }
+    }
+
+    public func allMovements(in householdId: UUID) async throws -> [Movement] {
+        _ = try requireMember(of: householdId)
+        return financeMovements.filter { $0.householdId == householdId }
     }
 
     private func validated(_ draft: MovementDraft, in householdId: UUID) throws -> Movement {

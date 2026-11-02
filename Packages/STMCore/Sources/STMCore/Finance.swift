@@ -127,6 +127,23 @@ public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable {
         case budgetGroup = "budget_group"
     }
 
+    public static let maxNameLength = 40
+
+    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// Qué falla antes de guardarla, mirando también las demás categorías del hogar.
+    public func issue(among others: [BudgetCategory]) -> String? {
+        if trimmedName.isEmpty { return "Ponle un nombre a la categoría." }
+        if trimmedName.count > Self.maxNameLength { return "El nombre es demasiado largo (máximo \(Self.maxNameLength) letras)." }
+        if kind != .expense && budgetGroup != nil { return "Sólo los gastos van en un grupo del 50/30/20." }
+        let repeated = others.contains {
+            $0.id != id && $0.householdId == householdId && $0.kind == kind
+                && $0.trimmedName.lowercased() == trimmedName.lowercased()
+        }
+        if repeated { return "Ya hay una categoría de \(kind.title.lowercased()) con ese nombre." }
+        return nil
+    }
+
     /// Las mismas que crea el servidor para cada hogar nuevo.
     public static func defaults(for householdId: UUID) -> [BudgetCategory] {
         let rows: [(String, CategoryKind, BudgetGroup?, String)] = [
