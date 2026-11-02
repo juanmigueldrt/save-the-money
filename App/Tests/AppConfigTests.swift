@@ -125,3 +125,50 @@ final class BudgetModelTests: XCTestCase {
         XCTAssertFalse(CashFlow(report: report).isEmpty)
     }
 }
+
+/// Guarda los avisos que se programarían, en vez de lanzarlos.
+private actor RecordingReminders: ReminderScheduling {
+    private(set) var last: [PlannedReminder] = []
+    func replace(with reminders: [PlannedReminder]) async { last = reminders }
+}
+
+@MainActor
+final class PlanningModelTests: XCTestCase {
+    func testRecurringRemindersAndGoalCompletion() async throws {
+        let services = AppServices.demo()
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await session.createHousehold(name: "Casa de prueba")
+        guard case .ready(_, let home) = session.state else { return XCTFail("sin hogar") }
+
+        let today = try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 2))
+        let reminders = RecordingReminders()
+        let planning = PlanningModel(household: home, recurring: services.recurring, goals: services.goals,
+                                     reminders: reminders, today: { today })
+        await planning.load()
+
+        let music = RecurringSeries(householdId: home.id, name: "Música", amount: Money(minor: 999),
+                                    startsOn: try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 5)), remindDaysBefore: 2)
+        let saved = await planning.save(music)
+        XCTAssertTrue(saved)
+        XCTAssertEqual(planning.upcoming.count, 1)
+        XCTAssertEqual(planning.monthlyTotal(of: .subscription).minor, 999)
+        let planned = await reminders.last
+        XCTAssertEqual(planned.first?.fireOn, CalendarDay(year: 2026, month: 11, day: 3))
+
+        var archived = music
+        archived.archivedAt = Date()
+        _ = await planning.save(archived)
+        let afterArchive = await reminders.last
+        XCTAssertTrue(afterArchive.isEmpty, "una serie archivada no avisa")
+
+        let trip = Goal(householdId: home.id, name: "Viaje", target: Money(minor: 50_000))
+        let goalSaved = await planning.save(trip)
+        XCTAssertTrue(goalSaved)
+        let contributed = await planning.contribute(Money(minor: 50_000), to: trip, on: today, note: "  ")
+        XCTAssertTrue(contributed)
+        XCTAssertNil(planning.contributions.first?.note, "una nota en blanco no se guarda")
+        XCTAssertTrue(planning.progress(of: trip).isReached)
+        XCTAssertNotNil(planning.goals.first?.completedAt, "al llegar al objetivo se marca como conseguida")
+    }
+}

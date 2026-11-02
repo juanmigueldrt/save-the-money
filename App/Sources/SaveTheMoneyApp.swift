@@ -42,7 +42,10 @@ struct AppRootView: View {
             case .ready(let profile, let household):
                 RootView(profile: profile, household: household,
                          finance: FinanceModel(household: household, service: session.services.finance),
-                         budgets: BudgetModel(household: household, service: session.services.budgets))
+                         budgets: BudgetModel(household: household, service: session.services.budgets),
+                         planning: PlanningModel(household: household, recurring: session.services.recurring,
+                                                 goals: session.services.goals,
+                                                 reminders: session.isDemo ? NoReminders() : LocalReminders()))
                     .id(household.id)
             }
         }
