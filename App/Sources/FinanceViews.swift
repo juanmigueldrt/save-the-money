@@ -261,18 +261,6 @@ struct AccountDetailView: View {
     }
 }
 
-struct MonthKey: Hashable, Comparable {
-    let year: Int
-    let month: Int
-
-    var title: String {
-        let date = CalendarDay(year: year, month: month, day: 1)?.date() ?? Date()
-        return date.formatted(.dateTime.month(.wide).year().locale(Locale(identifier: "es_ES"))).capitalized
-    }
-
-    static func < (lhs: MonthKey, rhs: MonthKey) -> Bool { (lhs.year, lhs.month) < (rhs.year, rhs.month) }
-}
-
 extension CalendarDay {
     /// "3 oct" para las filas.
     var shortText: String {
