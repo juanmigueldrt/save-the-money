@@ -14,7 +14,7 @@ struct AuthFlowView: View {
                 VStack(spacing: Spacing.s32) {
                     VStack(spacing: Spacing.s8) {
                         Text("Save the Money")
-                            .font(Typography.title36)
+                            .titleFont(.title36)
                             .foregroundStyle(Palette.ink)
                         Text(showingSignUp ? "Crea tu cuenta para empezar." : "Tu presupuesto, compartido en casa.")
                             .font(Typography.body16)
@@ -60,7 +60,7 @@ struct LoginView: View {
             }
             ErrorText(message: error)
             Button(action: submit) {
-                if isWorking { ProgressView().tint(.white) } else { Text("Iniciar sesión") }
+                if isWorking { ProgressView().tint(Palette.onEmber) } else { Text("Iniciar sesión") }
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(username.isEmpty || password.isEmpty || isWorking)
@@ -121,7 +121,7 @@ struct SignUpView: View {
             }
             ErrorText(message: error ?? (triedToSubmit ? form.firstIssue?.message : nil))
             Button(action: submit) {
-                if isWorking { ProgressView().tint(.white) } else { Text("Crear cuenta") }
+                if isWorking { ProgressView().tint(Palette.onEmber) } else { Text("Crear cuenta") }
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(isWorking)

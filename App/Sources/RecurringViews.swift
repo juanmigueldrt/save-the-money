@@ -19,7 +19,7 @@ struct RecurringView: View {
                 if !planning.archivedSeries.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Archivados")
-                            .font(Typography.title20)
+                            .titleFont(.title20)
                             .foregroundStyle(Palette.ink)
                         ForEach(planning.archivedSeries) { item in
                             Button { editing = item } label: { RecurringRow(series: item) }
@@ -46,12 +46,10 @@ struct RecurringView: View {
 
     private var totals: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
-            Text("Al mes")
-                .font(Typography.body14Medium)
-                .foregroundStyle(Palette.graphite)
+            Eyebrow("Pagos fijos al mes")
             let fixed = planning.monthlyTotal(of: .subscription) + planning.monthlyTotal(of: .essential)
             Text(fixed.formatted())
-                .font(Typography.title36)
+                .titleFont(.title36)
                 .foregroundStyle(Palette.ink)
                 .contentTransition(.numericText())
             HStack(spacing: Spacing.s16) {
@@ -74,7 +72,7 @@ struct RecurringView: View {
     private var upcomingCard: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Text("Próximos 30 días")
-                .font(Typography.title20)
+                .titleFont(.title20)
                 .foregroundStyle(Palette.ink)
             if planning.upcoming.isEmpty {
                 EmptyHint(text: "No hay cargos en los próximos 30 días.")
@@ -102,7 +100,7 @@ struct RecurringView: View {
     private func kindCard(_ kind: RecurringKind) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Text(kind.pluralTitle)
-                .font(Typography.title20)
+                .titleFont(.title20)
                 .foregroundStyle(Palette.ink)
             let items = planning.series(of: kind)
             if items.isEmpty {
@@ -233,6 +231,7 @@ struct RecurringFormView: View {
                 }
             }
             .formStyle(.grouped)
+            .brandBackground()
             .navigationTitle(series == nil ? "Nuevo pago fijo" : "Editar pago fijo")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }

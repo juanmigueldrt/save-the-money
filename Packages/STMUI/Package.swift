@@ -13,6 +13,11 @@ let package = Package(
         .package(path: "../STMCore"),
     ],
     targets: [
-        .target(name: "STMUI", dependencies: ["STMCore"]),
+        .target(
+            name: "STMUI",
+            dependencies: ["STMCore"],
+            // Source Serif 4 e Inter (licencia SIL OFL 1.1, textos al lado de cada fuente).
+            resources: [.copy("Fonts")]
+        ),
     ]
 )

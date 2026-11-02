@@ -80,6 +80,7 @@ struct CSVImportView: View {
             }
         }
         .formStyle(.grouped)
+        .brandBackground()
         .navigationTitle("Importar CSV")
         .fileImporter(isPresented: $choosingFile,
                       allowedContentTypes: [.commaSeparatedText, .tabSeparatedText, .plainText, .text]) { picked in
