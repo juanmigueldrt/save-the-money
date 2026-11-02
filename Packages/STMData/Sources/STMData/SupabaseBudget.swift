@@ -45,15 +45,25 @@ extension SupabaseBackend: BudgetService {
     }
 
     public func movements(in householdId: UUID, from: CalendarDay, through: CalendarDay) async throws -> [Movement] {
-        try await mapped {
-            try await client.from("transactions")
-                .select(Self.periodColumns)
-                .eq("household_id", value: householdId.uuidString)
-                .gte("booked_on", value: from.iso)
-                .lte("booked_on", value: through.iso)
-                .order("booked_on", ascending: false)
-                .execute()
-                .value
+        // El servidor devuelve como mucho 1000 filas por petición (max_rows): se pide por páginas.
+        let pageSize = 1000
+        var all: [Movement] = []
+        while true {
+            let start = all.count
+            let page: [Movement] = try await mapped {
+                try await client.from("transactions")
+                    .select(Self.periodColumns)
+                    .eq("household_id", value: householdId.uuidString)
+                    .gte("booked_on", value: from.iso)
+                    .lte("booked_on", value: through.iso)
+                    .order("booked_on", ascending: false)
+                    .order("id")
+                    .range(from: start, to: start + pageSize - 1)
+                    .execute()
+                    .value
+            }
+            all += page
+            if page.count < pageSize { return all }
         }
     }
 }

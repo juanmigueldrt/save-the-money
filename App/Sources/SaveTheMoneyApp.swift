@@ -45,10 +45,13 @@ struct AppRootView: View {
             case .ready(let profile, let household):
                 RootView(profile: profile, household: household,
                          finance: FinanceModel(household: household, service: session.services.finance),
-                         budgets: BudgetModel(household: household, service: session.services.budgets),
+                         budgets: BudgetModel(household: household, service: session.services.budgets,
+                                              alerts: session.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts()),
                          planning: PlanningModel(household: household, recurring: session.services.recurring,
                                                  goals: session.services.goals,
-                                                 reminders: session.isDemo ? NoReminders() : LocalReminders()))
+                                                 reminders: session.isDemo ? NoReminders() : LocalReminders()),
+                         tracking: TrackingModel(household: household, finance: session.services.finance,
+                                                 budgets: session.services.budgets, scores: session.services.creditScores))
                     .id(household.id)
             }
         }

@@ -105,12 +105,12 @@ final class BudgetModelTests: XCTestCase {
         _ = await finance.add(MovementDraft(accountId: account.id, categoryId: rent.id, bookedOn: today,
                                             amount: Money(minor: -70_000), description: "Alquiler"))
 
-        let october = BudgetModel(household: home, service: services.budgets, today: CalendarDay(year: 2026, month: 10, day: 5)!)
+        let october = BudgetModel(household: home, service: services.budgets, today: { CalendarDay(year: 2026, month: 10, day: 5)! })
         await october.load()
         let savedOctober = await october.save(Budget(householdId: home.id, month: october.month, expectedIncome: Money(minor: 200_000)))
         XCTAssertTrue(savedOctober)
 
-        let budgets = BudgetModel(household: home, service: services.budgets, today: today)
+        let budgets = BudgetModel(household: home, service: services.budgets, today: { today })
         await budgets.load()
         XCTAssertNil(budgets.budget)
         XCTAssertEqual(budgets.proposal?.month, MonthKey(year: 2026, month: 10), "propone el del mes anterior")
@@ -223,5 +223,44 @@ final class MoreOptionsModelTests: XCTestCase {
         XCTAssertTrue(finance.accounts.isEmpty)
         XCTAssertTrue(finance.recent.isEmpty)
         XCTAssertEqual(finance.categories.count, start)
+    }
+}
+
+@MainActor
+final class TrackingModelTests: XCTestCase {
+    func testNetWorthScoresAndReports() async throws {
+        let services = AppServices.demo()
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await session.createHousehold(name: "Casa de prueba")
+        guard case .ready(_, let home) = session.state else { return XCTFail("sin hogar") }
+        let today = try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 20))
+
+        let finance = FinanceModel(household: home, service: services.finance)
+        await finance.load()
+        _ = await finance.createAccount(AccountDraft(name: "Cuenta común", openingBalance: Money(minor: 100_000)))
+        let account = try XCTUnwrap(finance.accounts.first)
+        let food = try XCTUnwrap(finance.categories.first { $0.name == "Supermercado" })
+        _ = await finance.add(MovementDraft(accountId: account.id, categoryId: food.id,
+                                            bookedOn: try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 3)),
+                                            amount: Money(minor: -4_000), description: "Compra"))
+
+        let tracking = TrackingModel(household: home, finance: services.finance, budgets: services.budgets,
+                                     scores: services.creditScores, today: { today })
+        await tracking.loadHistory()
+        let history = tracking.history(accounts: finance.accounts, months: 2)
+        XCTAssertEqual(history.map(\.net.minor), [100_000, 96_000])
+
+        let added = await tracking.add(CreditScore(score: 720, recordedOn: today))
+        XCTAssertTrue(added)
+        XCTAssertEqual(tracking.latestScore?.score, 720)
+        let invalid = await tracking.add(CreditScore(score: 2_000))
+        XCTAssertFalse(invalid)
+
+        tracking.period = .thisMonth
+        await tracking.loadReport()
+        let report = tracking.report(categories: finance.categories)
+        XCTAssertEqual(report.total, Money(minor: 4_000))
+        XCTAssertEqual(report.byCategory.first?.title, "Supermercado")
     }
 }

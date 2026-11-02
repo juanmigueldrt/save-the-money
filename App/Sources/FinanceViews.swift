@@ -11,14 +11,30 @@ struct SummaryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                VStack(alignment: .leading, spacing: Spacing.s8) {
-                    Eyebrow("Saldo total")
-                    Text(finance.totalBalance.formatted())
-                        .titleFont(.title36)
-                        .foregroundStyle(finance.totalBalance.isNegative ? Palette.red : Palette.ink)
-                        .contentTransition(.numericText())
+                NavigationLink {
+                    NetWorthView()
+                } label: {
+                    VStack(alignment: .leading, spacing: Spacing.s8) {
+                        HStack {
+                            Eyebrow("Patrimonio neto")
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(Typography.small12)
+                                .foregroundStyle(Palette.graphite)
+                        }
+                        Text(finance.totalBalance.formatted())
+                            .titleFont(.title36)
+                            .foregroundStyle(finance.totalBalance.isNegative ? Palette.red : Palette.ink)
+                            .contentTransition(.numericText())
+                        Text("Lo que tienes menos lo que debes. Toca para ver cómo evoluciona.")
+                            .font(Typography.small12)
+                            .foregroundStyle(Palette.graphite)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .card()
                 }
-                .card()
+                .buttonStyle(.plain)
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
@@ -514,6 +530,15 @@ extension View {
     func decimalInput() -> some View {
         #if os(iOS)
         self.keyboardType(.decimalPad)
+        #else
+        self
+        #endif
+    }
+
+    /// Teclado de números enteros en iPhone.
+    func numberInput() -> some View {
+        #if os(iOS)
+        self.keyboardType(.numberPad)
         #else
         self
         #endif

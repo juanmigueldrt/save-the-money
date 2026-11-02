@@ -43,3 +43,40 @@ struct LocalReminders: ReminderScheduling {
         }
     }
 }
+
+/// Avisa de que una categoría o grupo del presupuesto llega al 80 % o se pasa.
+protocol BudgetAlerting: Sendable {
+    func notify(_ alerts: [BudgetAlert]) async
+}
+
+struct NoBudgetAlerts: BudgetAlerting {
+    func notify(_ alerts: [BudgetAlert]) async {}
+}
+
+/// Avisos inmediatos en el dispositivo. Cada aviso (mes, categoría y umbral) sale una sola vez.
+struct LocalBudgetAlerts: BudgetAlerting {
+    static let enabledKey = "budgetAlertsEnabled"
+    static let sentKey = "budgetAlertsSent"
+
+    func notify(_ alerts: [BudgetAlert]) async {
+        let defaults = UserDefaults.standard
+        guard defaults.object(forKey: Self.enabledKey) as? Bool ?? true else { return }
+        var sent = Set(defaults.stringArray(forKey: Self.sentKey) ?? [])
+        let fresh = alerts.filter { !sent.contains($0.id) }
+        guard !fresh.isEmpty else { return }
+        let center = UNUserNotificationCenter.current()
+        let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        guard granted else { return }
+        for alert in fresh {
+            let content = UNMutableNotificationContent()
+            content.title = alert.title
+            content.body = alert.body
+            content.sound = .default
+            try? await center.add(UNNotificationRequest(identifier: alert.id, content: content, trigger: nil))
+            sent.insert(alert.id)
+        }
+        // Sólo se guardan los de los últimos meses para que la lista no crezca sin fin.
+        let recent = sent.sorted().suffix(300)
+        defaults.set(Array(recent), forKey: Self.sentKey)
+    }
+}

@@ -20,6 +20,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var recurring: [RecurringSeries] = []
     var goalList: [Goal] = []
     var goalContributions: [GoalContribution] = []
+    var scoresByUser: [UUID: [CreditScore]] = [:]
 
     public init(now: @escaping @Sendable () -> Date = { Date() }) {
         self.now = now
