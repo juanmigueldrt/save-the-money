@@ -213,7 +213,8 @@ final class MoreOptionsModelTests: XCTestCase {
         let account = try XCTUnwrap(finance.accounts.first)
         _ = await finance.add(MovementDraft(accountId: account.id, bookedOn: try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 1)),
                                             amount: Money(minor: -1_500), description: "Pienso"))
-        let csv = try XCTUnwrap(await finance.exportCSV())
+        let exported = await finance.exportCSV()
+        let csv = try XCTUnwrap(exported)
         let text = try XCTUnwrap(String(data: csv.dropFirst(3), encoding: .utf8))
         XCTAssertTrue(text.contains("01/11/2026;Cuenta común;;Pienso;-15,00;EUR;"))
 
