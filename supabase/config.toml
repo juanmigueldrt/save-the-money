@@ -33,6 +33,6 @@ minimum_password_length = 10
 [auth.email]
 # Los usuarios entran con nombre de usuario; el email es sintético
 # (usuario@savethemoney.invalid) y nunca recibe correo, así que no se confirma.
-enable_signup = true
+enabled = true
 enable_confirmations = false
 double_confirm_changes = true

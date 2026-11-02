@@ -80,3 +80,23 @@ public protocol BudgetService: Sendable {
     /// Todos los movimientos del hogar entre dos días, ambos incluidos.
     func movements(in householdId: UUID, from: CalendarDay, through: CalendarDay) async throws -> [Movement]
 }
+
+/// Pagos recurrentes del hogar: suscripciones, gastos esenciales e ingresos fijos.
+public protocol RecurringService: Sendable {
+    func recurringSeries(in householdId: UUID) async throws -> [RecurringSeries]
+    func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries
+    func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries
+    func deleteRecurring(_ seriesId: UUID) async throws
+}
+
+/// Metas de ahorro y de deudas, con sus aportaciones.
+public protocol GoalService: Sendable {
+    func goals(in householdId: UUID) async throws -> [Goal]
+    func createGoal(_ goal: Goal) async throws -> Goal
+    func updateGoal(_ goal: Goal) async throws -> Goal
+    func deleteGoal(_ goalId: UUID) async throws
+    /// Todas las aportaciones a las metas del hogar, las más recientes primero.
+    func contributions(in householdId: UUID) async throws -> [GoalContribution]
+    func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution
+    func deleteContribution(_ contributionId: UUID) async throws
+}

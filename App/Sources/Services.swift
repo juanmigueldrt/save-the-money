@@ -9,19 +9,24 @@ struct AppServices: Sendable {
     let households: any HouseholdService
     let finance: any FinanceService
     let budgets: any BudgetService
+    let recurring: any RecurringService
+    let goals: any GoalService
     let isDemo: Bool
 
     static func make(config: AppConfig) -> AppServices {
         if config.isMissingSupabaseKey {
             let backend = InMemoryBackend()
-            return AppServices(auth: backend, households: backend, finance: backend, budgets: backend, isDemo: true)
+            return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
+                           recurring: backend, goals: backend, isDemo: true)
         }
         let backend = SupabaseBackend(url: config.supabaseURL, anonKey: config.supabaseAnonKey)
-        return AppServices(auth: backend, households: backend, finance: backend, budgets: backend, isDemo: false)
+        return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
+                           recurring: backend, goals: backend, isDemo: false)
     }
 
     static func demo() -> AppServices {
         let backend = InMemoryBackend()
-        return AppServices(auth: backend, households: backend, finance: backend, budgets: backend, isDemo: true)
+        return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
+                           recurring: backend, goals: backend, isDemo: true)
     }
 }

@@ -14,7 +14,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .movements: "Movimientos"
         case .budget: "Presupuesto"
         case .cashFlow: "Flujo"
-        case .subscriptions: "Suscripciones"
+        case .subscriptions: "Pagos fijos"
         case .goals: "Metas"
         case .household: "Hogar"
         case .more: "Más opciones"
@@ -46,12 +46,14 @@ struct RootView: View {
     @State private var selection: AppSection? = .summary
     @State private var finance: FinanceModel
     @State private var budgets: BudgetModel
+    @State private var planning: PlanningModel
 
-    init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel) {
+    init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel) {
         self.profile = profile
         self.household = household
         _finance = State(initialValue: finance)
         _budgets = State(initialValue: budgets)
+        _planning = State(initialValue: planning)
     }
 
     var body: some View {
@@ -61,7 +63,10 @@ struct RootView: View {
         }
         .environment(finance)
         .environment(budgets)
+        .environment(planning)
         .task { await finance.load() }
+        // También reprograma los avisos de pagos cada vez que se abre la app.
+        .task { await planning.load() }
         // El presupuesto y el flujo se recalculan cuando cambian los movimientos.
         .task(id: finance.recent) { await budgets.load() }
     }
@@ -105,12 +110,14 @@ struct RootView: View {
             BudgetView()
         case .cashFlow:
             CashFlowView()
+        case .subscriptions:
+            RecurringView()
+        case .goals:
+            GoalsView()
         case .household:
             HouseholdView(profile: profile, household: household)
         case .more:
             MoreView(profile: profile, household: household)
-        default:
-            SectionPlaceholder(section: section)
         }
     }
 }
@@ -119,6 +126,9 @@ struct RootView: View {
 struct MoreView: View {
     let profile: Profile
     let household: Household
+
+    @Environment(PlanningModel.self) private var planning
+    @AppStorage(LocalReminders.enabledKey) private var remindersEnabled = true
 
     var body: some View {
         List {
@@ -130,12 +140,20 @@ struct MoreView: View {
                     Label("Hogar: \(household.name)", systemImage: AppSection.household.systemImage)
                 }
                 NavigationLink {
-                    SectionPlaceholder(section: .subscriptions)
+                    RecurringView()
                 } label: {
                     Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
                 }
             }
             #endif
+            Section {
+                Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
+                    .onChange(of: remindersEnabled) { _, _ in Task { await planning.reschedule() } }
+            } header: {
+                Text("Avisos")
+            } footer: {
+                Text("Los lanza este dispositivo antes de cada cargo, según lo que elijas en cada pago fijo.")
+            }
             Section("Datos") {
                 NavigationLink {
                     CSVImportView()
@@ -151,32 +169,12 @@ struct MoreView: View {
     }
 }
 
-/// Pantalla provisional de cada sección hasta que llegue su fase.
-struct SectionPlaceholder: View {
-    let section: AppSection
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.s16) {
-                Text(section.title)
-                    .font(Typography.title32)
-                    .foregroundStyle(Palette.ink)
-                Text("Esta pantalla llega en una próxima fase.")
-                    .font(Typography.body16)
-                    .foregroundStyle(Palette.graphite)
-            }
-            .padding(Spacing.s16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .background(Palette.linen)
-    }
-}
-
 #Preview {
     let services = AppServices.demo()
     let household = Household(name: "Casa de prueba")
     return RootView(profile: Profile(username: "ana"), household: household,
                     finance: FinanceModel(household: household, service: services.finance),
-                    budgets: BudgetModel(household: household, service: services.budgets))
+                    budgets: BudgetModel(household: household, service: services.budgets),
+                    planning: PlanningModel(household: household, recurring: services.recurring, goals: services.goals))
         .environment(SessionModel(services: services))
 }
