@@ -11,6 +11,7 @@ struct MoreView: View {
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
     @AppStorage(LocalReminders.enabledKey) private var remindersEnabled = true
+    @AppStorage(LocalBudgetAlerts.enabledKey) private var budgetAlertsEnabled = true
     @State private var themeError: String?
     @State private var csvFile: URL?
     @State private var isExporting = false
@@ -32,6 +33,19 @@ struct MoreView: View {
                     Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
                 }
             }
+            Section("Seguimiento") {
+                ForEach([AppSection.netWorth, .reports, .creditScore]) { section in
+                    NavigationLink {
+                        switch section {
+                        case .netWorth: NetWorthView()
+                        case .reports: ReportsView()
+                        default: CreditScoreView()
+                        }
+                    } label: {
+                        Label(section.title, systemImage: section.systemImage)
+                    }
+                }
+            }
             #endif
 
             Section {
@@ -49,10 +63,11 @@ struct MoreView: View {
             Section {
                 Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
                     .onChange(of: remindersEnabled) { _, _ in Task { await planning.reschedule() } }
+                Toggle("Avisos de límites del presupuesto", isOn: $budgetAlertsEnabled)
             } header: {
                 Text("Avisos")
             } footer: {
-                Text("Los lanza este dispositivo antes de cada cargo, según lo que elijas en cada pago fijo.")
+                Text("Los lanza este dispositivo: antes de cada pago fijo y cuando una categoría o grupo del presupuesto llega al 80 % o se pasa.")
             }
 
             Section("Categorías") {

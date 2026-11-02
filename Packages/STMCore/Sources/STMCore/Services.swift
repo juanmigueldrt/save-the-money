@@ -111,3 +111,11 @@ public protocol GoalService: Sendable {
     func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution
     func deleteContribution(_ contributionId: UUID) async throws
 }
+
+/// Score crediticio de quien tiene la sesión abierta. No se comparte con el hogar.
+public protocol CreditScoreService: Sendable {
+    /// Los más recientes primero.
+    func creditScores() async throws -> [CreditScore]
+    func addCreditScore(_ score: CreditScore) async throws -> CreditScore
+    func deleteCreditScore(_ scoreId: UUID) async throws
+}

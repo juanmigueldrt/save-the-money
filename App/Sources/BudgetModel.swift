@@ -9,6 +9,8 @@ import STMCore
 final class BudgetModel {
     let household: Household
     private let service: any BudgetService
+    private let alerts: any BudgetAlerting
+    private let today: () -> CalendarDay
 
     private(set) var month: MonthKey
     /// El presupuesto guardado de este mes.
@@ -19,10 +21,23 @@ final class BudgetModel {
     private(set) var isLoading = false
     var error: String?
 
-    init(household: Household, service: any BudgetService, today: CalendarDay = CalendarDay()) {
+    init(household: Household, service: any BudgetService, alerts: any BudgetAlerting = NoBudgetAlerts(),
+         today: @escaping () -> CalendarDay = { CalendarDay() }) {
         self.household = household
         self.service = service
-        month = MonthKey.containing(today, startDay: household.monthStartDay)
+        self.alerts = alerts
+        self.today = today
+        month = MonthKey.containing(today(), startDay: household.monthStartDay)
+    }
+
+    /// Avisa de los límites del mes en curso que se acercan o se pasan.
+    func checkAlerts(categories: [BudgetCategory]) async {
+        guard budget != nil, period.contains(today()) else { return }
+        await alerts.notify(BudgetAlertPlanner.alerts(for: report(categories: categories)))
+    }
+
+    func flex(categories: [BudgetCategory], series: [RecurringSeries]) -> FlexBudget {
+        FlexBudget(report: report(categories: categories), series: series, today: today())
     }
 
     var period: ClosedRange<CalendarDay> { month.period(startDay: household.monthStartDay) }

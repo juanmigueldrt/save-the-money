@@ -35,15 +35,37 @@ struct MonthSwitcher: View {
 
 /// Presupuesto del mes: los tres semicírculos 50/30/20 y los límites por categoría.
 struct BudgetView: View {
+    enum Mode: String, CaseIterable {
+        case template, flexible
+
+        var title: String {
+            switch self {
+            case .template: "50/30/20"
+            case .flexible: "Flexible"
+            }
+        }
+    }
+
     @Environment(BudgetModel.self) private var budgets
     @Environment(FinanceModel.self) private var finance
+    @Environment(PlanningModel.self) private var planning
     @State private var editing = false
+    @AppStorage("budgetMode") private var mode: Mode = .template
 
     var body: some View {
         let report = budgets.report(categories: finance.categories)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 MonthSwitcher()
+
+                Picker("Tipo de presupuesto", selection: $mode) {
+                    ForEach(Mode.allCases, id: \.self) { Text($0.title).tag($0) }
+                }
+                .pickerStyle(.segmented)
+
+                if mode == .flexible {
+                    FlexBudgetCard(flex: budgets.flex(categories: finance.categories, series: planning.series))
+                }
 
                 if budgets.budget == nil {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
@@ -58,19 +80,21 @@ struct BudgetView: View {
                     .card()
                 }
 
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    HStack(alignment: .top, spacing: Spacing.s16) {
-                        ForEach(report.groups, id: \.group) { SemicircleGauge(progress: $0) }
+                if mode == .template {
+                    VStack(alignment: .leading, spacing: Spacing.s16) {
+                        HStack(alignment: .top, spacing: Spacing.s16) {
+                            ForEach(report.groups, id: \.group) { SemicircleGauge(progress: $0) }
+                        }
+                        Divider()
+                        SummaryLine(title: "Ingresos del mes", amount: report.income)
+                        SummaryLine(title: budgets.budget == nil ? "Base del reparto (ingresos reales)" : "Ingresos previstos",
+                                    amount: report.base)
+                        SummaryLine(title: "Gastado", amount: report.totalSpent)
+                        SummaryLine(title: report.remaining.isNegative ? "Gastado de más" : "Te queda",
+                                    amount: report.remaining, highlight: true)
                     }
-                    Divider()
-                    SummaryLine(title: "Ingresos del mes", amount: report.income)
-                    SummaryLine(title: budgets.budget == nil ? "Base del reparto (ingresos reales)" : "Ingresos previstos",
-                                amount: report.base)
-                    SummaryLine(title: "Gastado", amount: report.totalSpent)
-                    SummaryLine(title: report.remaining.isNegative ? "Gastado de más" : "Te queda",
-                                amount: report.remaining, highlight: true)
+                    .card()
                 }
-                .card()
 
                 ForEach(BudgetGroup.allCases, id: \.self) { group in
                     let lines = report.lines(in: group)

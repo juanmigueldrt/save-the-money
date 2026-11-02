@@ -4,7 +4,7 @@ import STMUI
 
 /// Secciones de la app. En iPhone son pestañas; en Mac, la barra lateral.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case summary, movements, budget, cashFlow, subscriptions, goals, household, more
+    case summary, movements, budget, cashFlow, netWorth, reports, subscriptions, goals, creditScore, household, more
 
     var id: String { rawValue }
 
@@ -14,6 +14,9 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .movements: "Movimientos"
         case .budget: "Presupuesto"
         case .cashFlow: "Flujo"
+        case .netWorth: "Patrimonio"
+        case .reports: "Informes"
+        case .creditScore: "Score crediticio"
         case .subscriptions: "Pagos fijos"
         case .goals: "Metas"
         case .household: "Hogar"
@@ -27,6 +30,9 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .movements: "list.bullet.rectangle"
         case .budget: "chart.pie"
         case .cashFlow: "arrow.left.arrow.right"
+        case .netWorth: "chart.line.uptrend.xyaxis"
+        case .reports: "chart.bar.doc.horizontal"
+        case .creditScore: "gauge.with.dots.needle.67percent"
         case .subscriptions: "repeat"
         case .goals: "flag"
         case .household: "person.2"
@@ -34,7 +40,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    /// Pestañas del iPhone: movimientos se abren desde el resumen; suscripciones y hogar, desde Más opciones.
+    /// Pestañas del iPhone: movimientos y patrimonio se abren desde el resumen; el resto, desde Más opciones.
     static let phoneTabs: [AppSection] = [.summary, .budget, .cashFlow, .goals, .more]
 }
 
@@ -47,13 +53,16 @@ struct RootView: View {
     @State private var finance: FinanceModel
     @State private var budgets: BudgetModel
     @State private var planning: PlanningModel
+    @State private var tracking: TrackingModel
 
-    init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel) {
+    init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel,
+         tracking: TrackingModel) {
         self.profile = profile
         self.household = household
         _finance = State(initialValue: finance)
         _budgets = State(initialValue: budgets)
         _planning = State(initialValue: planning)
+        _tracking = State(initialValue: tracking)
     }
 
     var body: some View {
@@ -64,11 +73,16 @@ struct RootView: View {
         .environment(finance)
         .environment(budgets)
         .environment(planning)
+        .environment(tracking)
         .task { await finance.load() }
         // También reprograma los avisos de pagos cada vez que se abre la app.
         .task { await planning.load() }
         // El presupuesto y el flujo se recalculan cuando cambian los movimientos.
-        .task(id: finance.recent) { await budgets.load() }
+        // y avisa si algún límite del mes llega al 80 % o se pasa.
+        .task(id: finance.recent) {
+            await budgets.load()
+            await budgets.checkAlerts(categories: finance.categories)
+        }
     }
 
     @ViewBuilder
@@ -110,6 +124,12 @@ struct RootView: View {
             BudgetView()
         case .cashFlow:
             CashFlowView()
+        case .netWorth:
+            NetWorthView()
+        case .reports:
+            ReportsView()
+        case .creditScore:
+            CreditScoreView()
         case .subscriptions:
             RecurringView()
         case .goals:
@@ -128,6 +148,8 @@ struct RootView: View {
     return RootView(profile: Profile(username: "ana"), household: household,
                     finance: FinanceModel(household: household, service: services.finance),
                     budgets: BudgetModel(household: household, service: services.budgets),
-                    planning: PlanningModel(household: household, recurring: services.recurring, goals: services.goals))
+                    planning: PlanningModel(household: household, recurring: services.recurring, goals: services.goals),
+                    tracking: TrackingModel(household: household, finance: services.finance, budgets: services.budgets,
+                                            scores: services.creditScores))
         .environment(SessionModel(services: services))
 }
