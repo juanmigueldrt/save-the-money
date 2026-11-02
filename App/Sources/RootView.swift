@@ -45,11 +45,13 @@ struct RootView: View {
     @Environment(SessionModel.self) private var session
     @State private var selection: AppSection? = .summary
     @State private var finance: FinanceModel
+    @State private var budgets: BudgetModel
 
-    init(profile: Profile, household: Household, finance: FinanceModel) {
+    init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel) {
         self.profile = profile
         self.household = household
         _finance = State(initialValue: finance)
+        _budgets = State(initialValue: budgets)
     }
 
     var body: some View {
@@ -58,7 +60,10 @@ struct RootView: View {
             content
         }
         .environment(finance)
+        .environment(budgets)
         .task { await finance.load() }
+        // El presupuesto y el flujo se recalculan cuando cambian los movimientos.
+        .task(id: finance.recent) { await budgets.load() }
     }
 
     @ViewBuilder
@@ -96,6 +101,10 @@ struct RootView: View {
             SummaryView()
         case .movements:
             MovementsView()
+        case .budget:
+            BudgetView()
+        case .cashFlow:
+            CashFlowView()
         case .household:
             HouseholdView(profile: profile, household: household)
         case .more:
@@ -152,14 +161,6 @@ struct SectionPlaceholder: View {
                 Text(section.title)
                     .font(Typography.title32)
                     .foregroundStyle(Palette.ink)
-                if section == .budget {
-                    HStack(spacing: Spacing.s16) {
-                        ForEach(BudgetGroup.allCases, id: \.self) { group in
-                            SemicircleGauge(progress: GroupProgress(group: group, allocated: Money(minor: 100_000), spent: .zero))
-                        }
-                    }
-                    .card()
-                }
                 Text("Esta pantalla llega en una próxima fase.")
                     .font(Typography.body16)
                     .foregroundStyle(Palette.graphite)
@@ -175,6 +176,7 @@ struct SectionPlaceholder: View {
     let services = AppServices.demo()
     let household = Household(name: "Casa de prueba")
     return RootView(profile: Profile(username: "ana"), household: household,
-                    finance: FinanceModel(household: household, service: services.finance))
+                    finance: FinanceModel(household: household, service: services.finance),
+                    budgets: BudgetModel(household: household, service: services.budgets))
         .environment(SessionModel(services: services))
 }

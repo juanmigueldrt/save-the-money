@@ -69,3 +69,14 @@ public protocol FinanceService: Sendable {
     /// Guarda los movimientos de un CSV. Los que ya estaban (misma huella) se ignoran.
     func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult
 }
+
+/// Presupuesto mensual y los movimientos de un periodo para calcularlo.
+public protocol BudgetService: Sendable {
+    /// El presupuesto de ese mes, o nil si aún no se ha hecho.
+    func budget(for month: MonthKey, in householdId: UUID) async throws -> Budget?
+    /// El último presupuesto anterior a ese mes, para proponerlo como punto de partida.
+    func latestBudget(before month: MonthKey, in householdId: UUID) async throws -> Budget?
+    func saveBudget(_ budget: Budget) async throws -> Budget
+    /// Todos los movimientos del hogar entre dos días, ambos incluidos.
+    func movements(in householdId: UUID, from: CalendarDay, through: CalendarDay) async throws -> [Movement]
+}

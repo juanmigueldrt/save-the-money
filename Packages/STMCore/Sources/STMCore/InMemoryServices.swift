@@ -16,6 +16,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var financeAccounts: [Account] = []
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
+    var budgets: [Budget] = []
 
     public init(now: @escaping @Sendable () -> Date = { Date() }) {
         self.now = now

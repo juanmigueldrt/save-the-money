@@ -41,7 +41,8 @@ struct AppRootView: View {
                 HouseholdOnboardingView(profile: profile)
             case .ready(let profile, let household):
                 RootView(profile: profile, household: household,
-                         finance: FinanceModel(household: household, service: session.services.finance))
+                         finance: FinanceModel(household: household, service: session.services.finance),
+                         budgets: BudgetModel(household: household, service: session.services.budgets))
                     .id(household.id)
             }
         }
