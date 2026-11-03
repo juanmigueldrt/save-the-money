@@ -32,6 +32,20 @@ struct MoreView: View {
                 } label: {
                     Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)
                 }
+                NavigationLink {
+                    InvestmentsView()
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(AppSection.investments.title)
+                            Text("Cartera y aportaciones automáticas")
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
+                        }
+                    } icon: {
+                        Image(systemName: AppSection.investments.systemImage)
+                    }
+                }
             }
             Section("Seguimiento") {
                 ForEach([AppSection.netWorth, .reports, .creditScore]) { section in

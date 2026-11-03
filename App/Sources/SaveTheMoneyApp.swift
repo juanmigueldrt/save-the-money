@@ -62,7 +62,10 @@ struct AppRootView: View {
                                                  goals: session.services.goals,
                                                  reminders: session.isDemo ? NoReminders() : LocalReminders()),
                          tracking: TrackingModel(household: household, finance: session.services.finance,
-                                                 budgets: session.services.budgets, scores: session.services.creditScores))
+                                                 budgets: session.services.budgets, scores: session.services.creditScores),
+                         investments: InvestmentModel(household: household, service: session.services.investments,
+                                                      households: session.services.households,
+                                                      reminders: session.isDemo ? NoReminders() : LocalReminders()))
                     .id(household.id)
             }
         }

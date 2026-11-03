@@ -53,6 +53,8 @@ struct AppCommands: Commands {
                     Button(section.title) { actions?.show(section) }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
                 }
+                Button(AppSection.investments.title) { actions?.show(.investments) }
+                    .keyboardShortcut("0")
                 Divider()
                 Button(AppSection.household.title) { actions?.show(.household) }
                 Button(AppSection.more.title) { actions?.show(.more) }

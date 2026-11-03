@@ -4,7 +4,7 @@ import STMUI
 
 /// Secciones de la app. En iPhone son pestañas; en Mac, la barra lateral.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case summary, movements, budget, cashFlow, netWorth, reports, subscriptions, goals, creditScore, household, more
+    case summary, movements, budget, cashFlow, netWorth, reports, subscriptions, goals, investments, creditScore, household, more
 
     var id: String { rawValue }
 
@@ -19,6 +19,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .creditScore: "Score crediticio"
         case .subscriptions: "Pagos fijos"
         case .goals: "Metas"
+        case .investments: "Inversiones"
         case .household: "Hogar"
         case .more: "Más opciones"
         }
@@ -35,6 +36,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         case .creditScore: "gauge.with.dots.needle.67percent"
         case .subscriptions: "repeat"
         case .goals: "flag"
+        case .investments: "chart.line.uptrend.xyaxis.circle"
         case .household: "person.2"
         case .more: "ellipsis.circle"
         }
@@ -47,7 +49,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
         ("Dinero", [.summary, .movements, .budget, .cashFlow]),
         ("Seguimiento", [.netWorth, .reports, .creditScore]),
-        ("Planificación", [.subscriptions, .goals]),
+        ("Planificación", [.subscriptions, .goals, .investments]),
         ("Hogar", [.household, .more]),
     ]
 }
@@ -67,18 +69,20 @@ struct RootView: View {
     @State private var budgets: BudgetModel
     @State private var planning: PlanningModel
     @State private var tracking: TrackingModel
+    @State private var investments: InvestmentModel
     @State private var addingMovement = false
     @State private var addingAccount = false
     @State private var importingCSV = false
 
     init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel,
-         tracking: TrackingModel) {
+         tracking: TrackingModel, investments: InvestmentModel) {
         self.profile = profile
         self.household = household
         _finance = State(initialValue: finance)
         _budgets = State(initialValue: budgets)
         _planning = State(initialValue: planning)
         _tracking = State(initialValue: tracking)
+        _investments = State(initialValue: investments)
     }
 
     var body: some View {
@@ -108,9 +112,12 @@ struct RootView: View {
         .environment(budgets)
         .environment(planning)
         .environment(tracking)
+        .environment(investments)
         .task { await finance.load() }
         // También reprograma los avisos de pagos cada vez que se abre la app.
         .task { await planning.load() }
+        // Reprograma también los avisos de las aportaciones automáticas.
+        .task { await investments.load() }
         // El presupuesto y el flujo se recalculan cuando cambian los movimientos.
         // y avisa si algún límite del mes llega al 80 % o se pasa.
         .task(id: finance.recent) {
@@ -129,6 +136,7 @@ struct RootView: View {
                     await finance.load()
                     await planning.load()
                     await budgets.load()
+                    await investments.load()
                 }
             },
             show: { section in
@@ -145,15 +153,16 @@ struct RootView: View {
     @ViewBuilder
     private var content: some View {
         #if os(iOS)
-        TabView(selection: $selection) {
-            ForEach(AppSection.phoneTabs) { section in
-                NavigationStack {
-                    screen(for: section)
-                }
-                .tabItem { Label(section == .more ? "Más" : section.title, systemImage: section.systemImage) }
-                .tag(Optional(section))
-            }
+        #if DEBUG
+        // Capturas de una pantalla que no es pestaña (p. ej. inversiones): se abre sola.
+        if let section = ScreenshotMode.section, !AppSection.phoneTabs.contains(section) {
+            NavigationStack { screen(for: section) }
+        } else {
+            tabs
         }
+        #else
+        tabs
+        #endif
         #else
         NavigationSplitView {
             List(selection: $selection) {
@@ -176,6 +185,20 @@ struct RootView: View {
         #endif
     }
 
+    #if os(iOS)
+    private var tabs: some View {
+        TabView(selection: $selection) {
+            ForEach(AppSection.phoneTabs) { section in
+                NavigationStack {
+                    screen(for: section)
+                }
+                .tabItem { Label(section == .more ? "Más" : section.title, systemImage: section.systemImage) }
+                .tag(Optional(section))
+            }
+        }
+    }
+    #endif
+
     @ViewBuilder
     private func screen(for section: AppSection) -> some View {
         switch section {
@@ -197,6 +220,8 @@ struct RootView: View {
             RecurringView()
         case .goals:
             GoalsView()
+        case .investments:
+            InvestmentsView()
         case .household:
             HouseholdView(profile: profile, household: household)
         case .more:
@@ -213,6 +238,8 @@ struct RootView: View {
                     budgets: BudgetModel(household: household, service: services.budgets),
                     planning: PlanningModel(household: household, recurring: services.recurring, goals: services.goals),
                     tracking: TrackingModel(household: household, finance: services.finance, budgets: services.budgets,
-                                            scores: services.creditScores))
+                                            scores: services.creditScores),
+                    investments: InvestmentModel(household: household, service: services.investments,
+                                                 households: services.households))
         .environment(SessionModel(services: services))
 }
