@@ -36,7 +36,7 @@ struct BillsReportView: View {
                     .font(Typography.footnote)
                     .foregroundStyle(Palette.labelSecondary)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Pagos del mes")

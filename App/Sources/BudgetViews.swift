@@ -118,7 +118,7 @@ struct BudgetView: View {
 
                 ErrorText(message: budgets.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Presupuesto")
@@ -326,7 +326,7 @@ struct CashFlowView: View {
                 .card()
                 ErrorText(message: budgets.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Flujo de caja")

@@ -68,7 +68,7 @@ struct NetWorthView: View {
                     .foregroundStyle(Palette.labelSecondary)
                 ErrorText(message: tracking.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Patrimonio")
@@ -213,7 +213,7 @@ struct CreditScoreView: View {
                     .foregroundStyle(Palette.labelSecondary)
                 ErrorText(message: tracking.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Score crediticio")
@@ -379,7 +379,7 @@ struct ReportsView: View {
 
                 ErrorText(message: tracking.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Informes")
