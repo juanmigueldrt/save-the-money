@@ -46,5 +46,6 @@ swift test --package-path Packages/STMCore
 
 ## Fuentes
 
-El diseño usa Source Serif 4 e Inter (licencia OFL). Mientras no estén incluidas
-en la app, se usan las fuentes del sistema equivalentes.
+El diseño sigue el manual "Estilo Monarch" v2. Los títulos usan Source Serif 4
+(licencia SIL OFL 1.1), incluida en `Packages/STMUI/Sources/STMUI/Fonts`; el resto
+del texto usa la fuente del sistema (SF Pro) con Dynamic Type.

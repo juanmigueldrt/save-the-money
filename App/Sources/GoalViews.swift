@@ -13,8 +13,8 @@ struct GoalsView: View {
                 if planning.progress.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Sin metas todavía")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         EmptyHint(text: "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.")
                         Button("Crear una meta") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
@@ -26,8 +26,8 @@ struct GoalsView: View {
                     if !items.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.s16) {
                             Text(kind == .savings ? "Ahorro" : "Deudas")
-                                .titleFont(.title20)
-                                .foregroundStyle(Palette.ink)
+                                .titleFont(.title2)
+                                .foregroundStyle(Palette.label)
                             ForEach(items) { progress in
                                 NavigationLink(value: progress.goal) {
                                     GoalCard(progress: progress)
@@ -41,7 +41,7 @@ struct GoalsView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Metas")
         .navigationDestination(for: Goal.self) { GoalDetailView(goalId: $0.id) }
         .toolbar {
@@ -62,20 +62,20 @@ struct GoalCard: View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             HStack {
                 Label(progress.goal.trimmedName, systemImage: progress.goal.icon ?? progress.goal.kind.systemImage)
-                    .font(Typography.body16Medium)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.headline)
+                    .foregroundStyle(Palette.label)
                 Spacer()
                 Text("\(Int((progress.fraction * 100).rounded())) %")
-                    .font(Typography.body14Medium)
-                    .foregroundStyle(progress.isReached ? Palette.ember : Palette.graphite)
+                    .font(Typography.subheadlineEmphasis)
+                    .foregroundStyle(progress.isReached ? Palette.positiveText : Palette.labelSecondary)
             }
             ProgressBar(fraction: progress.fraction)
             Text(GoalText.amounts(progress))
-                .font(Typography.body14)
-                .foregroundStyle(Palette.ink)
+                .font(Typography.subheadline)
+                .foregroundStyle(Palette.label)
             Text(GoalText.projection(progress))
-                .font(Typography.small12)
-                .foregroundStyle(progress.isOnTrack == false ? Palette.red : Palette.graphite)
+                .font(Typography.footnote)
+                .foregroundStyle(progress.isOnTrack == false ? Palette.negativeText : Palette.labelSecondary)
         }
         .card()
         .accessibilityElement(children: .combine)
@@ -88,8 +88,8 @@ struct ProgressBar: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .leading) {
-                Capsule().fill(Palette.linen)
-                Capsule().fill(Palette.ember)
+                Capsule().fill(Palette.bgGrouped)
+                Capsule().fill(Palette.accent)
                     .frame(width: max(0, proxy.size.width * fraction))
             }
         }
@@ -142,7 +142,7 @@ struct GoalDetailView: View {
                     .padding(Spacing.s16)
             }
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
     }
 
     private func content(_ goal: Goal) -> some View {
@@ -162,23 +162,23 @@ struct GoalDetailView: View {
                 let items = planning.contributions(of: goal)
                 if items.isEmpty {
                     Text("Todavía no hay aportaciones.")
-                        .foregroundStyle(Palette.graphite)
+                        .foregroundStyle(Palette.labelSecondary)
                 }
                 ForEach(items) { item in
                     HStack {
                         VStack(alignment: .leading, spacing: Spacing.s8) {
                             Text(item.madeOn.shortText)
-                                .font(Typography.body14Medium)
+                                .font(Typography.subheadlineEmphasis)
                             if let note = item.note {
                                 Text(note)
-                                    .font(Typography.small12)
-                                    .foregroundStyle(Palette.graphite)
+                                    .font(Typography.footnote)
+                                    .foregroundStyle(Palette.labelSecondary)
                             }
                         }
                         Spacer()
                         Text(item.amount.formatted())
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(item.amount.isNegative ? Palette.red : Palette.ink)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(item.amount.isNegative ? Palette.negativeText : Palette.label)
                     }
                     .swipeActions {
                         Button("Borrar", role: .destructive) { Task { await planning.delete(item) } }

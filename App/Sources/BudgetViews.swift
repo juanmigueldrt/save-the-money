@@ -15,11 +15,11 @@ struct MonthSwitcher: View {
             Spacer()
             VStack(spacing: 2) {
                 Text(budgets.month.title)
-                    .titleFont(.title20)
-                    .foregroundStyle(Palette.ink)
+                    .titleFont(.title2)
+                    .foregroundStyle(Palette.label)
                 Text("\(budgets.period.lowerBound.shortText) – \(budgets.period.upperBound.shortText)")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             Spacer()
             Button("Mes siguiente", systemImage: "chevron.right") {
@@ -28,7 +28,7 @@ struct MonthSwitcher: View {
             .labelStyle(.iconOnly)
         }
         .buttonStyle(.plain)
-        .foregroundStyle(Palette.ink)
+        .foregroundStyle(Palette.label)
         .card()
     }
 }
@@ -72,8 +72,8 @@ struct BudgetView: View {
                         Text(budgets.proposal == nil
                              ? "Aún no hay presupuesto para este mes. Mientras tanto, se reparten los ingresos reales con 50/30/20."
                              : "Aún no hay presupuesto para este mes. Puedes partir del de \(budgets.proposal!.month.title.lowercased()).")
-                            .font(Typography.body14)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                         Button("Crear presupuesto") { editing = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -101,8 +101,8 @@ struct BudgetView: View {
                     if !lines.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.s16) {
                             Text(group.title)
-                                .titleFont(.title20)
-                                .foregroundStyle(Palette.ink)
+                                .titleFont(.title2)
+                                .foregroundStyle(Palette.label)
                             ForEach(lines) { CategoryLineRow(line: $0, tint: group.color) }
                         }
                         .card()
@@ -113,8 +113,8 @@ struct BudgetView: View {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         SummaryLine(title: "Gastos sin categoría", amount: report.uncategorized)
                         Text("Ponles categoría en Movimientos para que cuenten en su grupo.")
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     .card()
                 }
@@ -123,7 +123,7 @@ struct BudgetView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Presupuesto")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -143,12 +143,12 @@ struct SummaryLine: View {
     var body: some View {
         HStack {
             Text(title)
-                .font(highlight ? Typography.body16Medium : Typography.body14)
-                .foregroundStyle(highlight ? Palette.ink : Palette.graphite)
+                .font(highlight ? Typography.headline : Typography.subheadline)
+                .foregroundStyle(highlight ? Palette.label : Palette.labelSecondary)
             Spacer()
             Text(amount.formatted())
-                .font(highlight ? Typography.body16Medium : Typography.body14Medium)
-                .foregroundStyle(amount.isNegative && highlight ? Palette.red : Palette.ink)
+                .font(highlight ? Typography.headline : Typography.subheadlineEmphasis)
+                .foregroundStyle(amount.isNegative && highlight ? Palette.negativeText : Palette.label)
         }
         .accessibilityElement(children: .combine)
     }
@@ -163,8 +163,8 @@ struct CategoryLineRow: View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             HStack {
                 Label(line.category.name, systemImage: line.category.icon ?? "tag")
-                    .font(Typography.body14Medium)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.subheadlineEmphasis)
+                    .foregroundStyle(Palette.label)
                 Spacer()
                 Group {
                     if let limit = line.limit {
@@ -173,14 +173,14 @@ struct CategoryLineRow: View {
                         Text(line.spent.formatted())
                     }
                 }
-                .font(Typography.body14)
-                .foregroundStyle(line.isOver ? Palette.red : Palette.graphite)
+                .font(Typography.subheadline)
+                .foregroundStyle(line.isOver ? Palette.negativeText : Palette.labelSecondary)
             }
             if let fraction = line.fraction {
                 GeometryReader { proxy in
                     ZStack(alignment: .leading) {
-                        Capsule().fill(Palette.linen)
-                        Capsule().fill(line.isOver ? Palette.red : tint)
+                        Capsule().fill(Palette.bgGrouped)
+                        Capsule().fill(line.isOver ? Palette.negative : tint)
                             .frame(width: proxy.size.width * fraction)
                     }
                 }
@@ -226,7 +226,7 @@ struct BudgetFormView: View {
                     Text("Reparto")
                 } footer: {
                     Text(total == 100 ? "Suma 100 %." : "Ahora suma \(total) %. Tiene que sumar 100 %.")
-                        .foregroundStyle(total == 100 ? Palette.graphite : Palette.red)
+                        .foregroundStyle(total == 100 ? Palette.labelSecondary : Palette.negativeText)
                 }
                 ForEach(BudgetGroup.allCases, id: \.self) { group in
                     Section("Límites de \(group.title.lowercased()) (opcional)") {
@@ -331,7 +331,7 @@ struct CashFlowView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Flujo de caja")
         .refreshable { await budgets.load() }
     }
@@ -352,20 +352,20 @@ struct SankeyDiagram: View {
                 Canvas { context, _ in
                     context.translateBy(x: labelWidth, y: 0)
                     for band in layout.bands {
-                        context.fill(path(for: band), with: .color((colors[band.to] ?? Palette.smoke).opacity(0.28)))
+                        context.fill(path(for: band), with: .color((colors[band.to] ?? Palette.labelTertiary).opacity(0.28)))
                     }
                     for node in flow.nodes {
                         guard let rect = layout.nodes[node.id] else { continue }
                         context.fill(Path(roundedRect: CGRect(x: rect.x, y: rect.y, width: rect.width, height: max(rect.height, 1)),
                                           cornerRadius: 2),
-                                     with: .color(colors[node.id] ?? Palette.ink))
+                                     with: .color(colors[node.id] ?? Palette.label))
                     }
                 }
                 ForEach(flow.nodes) { node in
                     if let rect = layout.nodes[node.id] {
                         label(for: node)
                             .frame(width: labelWidth - 8, alignment: node.column == 0 ? .trailing : .leading)
-                            .background(node.column == 1 ? Palette.paper.opacity(0.85) : .clear)
+                            .background(node.column == 1 ? Palette.bgGrouped2.opacity(0.85) : .clear)
                             .position(x: labelX(node: node, rect: rect, inner: inner, labelWidth: labelWidth), y: rect.midY)
                     }
                 }
@@ -386,12 +386,12 @@ struct SankeyDiagram: View {
     private func label(for node: CashFlow.Node) -> some View {
         VStack(alignment: node.column == 0 ? .trailing : .leading, spacing: 0) {
             Text(node.title)
-                .font(Typography.small12.weight(.medium))
-                .foregroundStyle(Palette.ink)
+                .font(Typography.footnote.weight(.medium))
+                .foregroundStyle(Palette.label)
                 .lineLimit(1)
             Text(Money(minor: Int(node.value.rounded())).formatted())
-                .font(Typography.small12)
-                .foregroundStyle(Palette.graphite)
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
                 .lineLimit(1)
         }
         .minimumScaleFactor(0.8)
@@ -414,12 +414,12 @@ struct SankeyDiagram: View {
 
     private func color(for role: CashFlow.Role) -> Color {
         switch role {
-        case .income: Palette.ember
-        case .fromBalance: Palette.red
+        case .income: Palette.accent
+        case .fromBalance: Palette.negative
         case .group(let group): group.color
-        case .category(let group): group?.color ?? Palette.smoke
-        case .uncategorized: Palette.smoke
-        case .unspent: Palette.stone
+        case .category(let group): group?.color ?? Palette.labelTertiary
+        case .uncategorized: Palette.labelTertiary
+        case .unspent: Palette.separator
         }
     }
 

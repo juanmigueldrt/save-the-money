@@ -5,12 +5,13 @@ import SwiftUI
 import UIKit
 #endif
 
-/// Fuentes del manual de marca "Estilo Monarch": Source Serif 4 (sustituto de
-/// Copernicus) para titulares e Inter (sustituto de ABC Oracle) para el texto.
-/// Van dentro de la app, así que se ven igual en todos los dispositivos.
+/// Fuentes del manual "Estilo Monarch" v2: Source Serif 4 (sustituto de
+/// Copernicus) para los títulos, dentro de la app para que se vea igual en todos
+/// los dispositivos. El texto usa la fuente del sistema (SF Pro), como pide el manual.
 public enum BrandFonts {
     public static let serifFamily = "Source Serif 4"
-    public static let sansFamily = "Inter"
+    /// Peso de los títulos serif: 400 (la v1 usaba 350).
+    public static let serifWeight: CGFloat = 400
 
     @MainActor private static var registered = false
 
@@ -20,7 +21,7 @@ public enum BrandFonts {
     public static func register() {
         guard !registered else { return }
         registered = true
-        for name in ["SourceSerif4", "Inter"] {
+        for name in ["SourceSerif4"] {
             guard let url = Bundle.module.url(forResource: name, withExtension: "ttf", subdirectory: "Fonts") else { continue }
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
@@ -29,7 +30,7 @@ public enum BrandFonts {
         #endif
     }
 
-    /// Una fuente variable a un peso exacto (el manual pide 350 para los titulares).
+    /// Una fuente variable a un peso exacto.
     static func variable(_ family: String, size: CGFloat, weight: CGFloat) -> CTFont {
         let wght = 0x7767_6874 // 'wght'
         let attributes: [CFString: Any] = [
@@ -41,17 +42,16 @@ public enum BrandFonts {
     }
 
     #if canImport(UIKit)
-    /// Títulos de navegación en serif 350, como los titulares del manual.
+    /// Large Title en serif 34/41 a 400; el título pequeño sigue en headline del
+    /// sistema (17/600), como en las HIG. Las barras son de vidrio del sistema.
     @MainActor
     private static func styleNavigationBars() {
-        let ink = UIColor(Palette.ink)
-        let large = variable(serifFamily, size: 34, weight: 350) as UIFont
-        let inline = variable(serifFamily, size: 18, weight: 400) as UIFont
+        let label = UIColor(Palette.label)
+        let large = variable(serifFamily, size: 34, weight: serifWeight) as UIFont
         let appearance = UINavigationBar.appearance()
         appearance.largeTitleTextAttributes = [.font: UIFontMetrics(forTextStyle: .largeTitle).scaledFont(for: large),
-                                               .foregroundColor: ink, .kern: -1.2]
-        appearance.titleTextAttributes = [.font: UIFontMetrics(forTextStyle: .headline).scaledFont(for: inline),
-                                          .foregroundColor: ink]
+                                               .foregroundColor: label, .kern: -0.6]
+        appearance.titleTextAttributes = [.foregroundColor: label]
     }
     #endif
 }

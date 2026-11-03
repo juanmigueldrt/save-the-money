@@ -19,18 +19,18 @@ struct HouseholdOnboardingView: View {
                 VStack(alignment: .leading, spacing: Spacing.s32) {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         Text("Hola, \(profile.name)")
-                            .titleFont(.title32)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title1)
+                            .foregroundStyle(Palette.label)
                         Text("Crea tu hogar o únete al de tu pareja con su código.")
-                            .font(Typography.body16)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.body)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     .padding(.top, Spacing.s40)
 
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Crear un hogar")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         LabeledField(label: "Nombre del hogar") {
                             TextField("Casa de \(profile.name)", text: $householdName)
                         }
@@ -42,8 +42,8 @@ struct HouseholdOnboardingView: View {
 
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Unirme con un código")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         LabeledField(label: "Código de 6 caracteres") {
                             TextField("4K9 Q2X", text: $code)
                                 .plainIdentifierInput()
@@ -58,8 +58,8 @@ struct HouseholdOnboardingView: View {
                     ErrorText(message: error)
 
                     Button("Cerrar sesión") { Task { await session.signOut() } }
-                        .font(Typography.body14Medium)
-                        .foregroundStyle(Palette.graphite)
+                        .font(Typography.subheadlineEmphasis)
+                        .foregroundStyle(Palette.labelSecondary)
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
                 }
@@ -68,7 +68,7 @@ struct HouseholdOnboardingView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .onAppear {
             if let pending = session.pendingInvite { code = pending.display }
         }
@@ -127,27 +127,27 @@ struct HouseholdView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 Text(household.name)
-                    .titleFont(.title32)
-                    .foregroundStyle(Palette.ink)
+                    .titleFont(.title1)
+                    .foregroundStyle(Palette.label)
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Miembros")
-                        .titleFont(.title20)
-                        .foregroundStyle(Palette.ink)
+                        .titleFont(.title2)
+                        .foregroundStyle(Palette.label)
                     ForEach(members) { member in
                         HStack {
                             Text(member.profile.name)
-                                .font(Typography.body16Medium)
-                                .foregroundStyle(Palette.ink)
+                                .font(Typography.headline)
+                                .foregroundStyle(Palette.label)
                             if member.profile.id == profile.id {
                                 Text("(tú)")
-                                    .font(Typography.body14)
-                                    .foregroundStyle(Palette.graphite)
+                                    .font(Typography.subheadline)
+                                    .foregroundStyle(Palette.labelSecondary)
                             }
                             Spacer()
                             Text(member.role.title)
-                                .font(Typography.small12)
-                                .foregroundStyle(Palette.graphite)
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
                         }
                     }
                     Button("Invitar a tu pareja", action: invite)
@@ -158,20 +158,20 @@ struct HouseholdView: View {
                 if !invites.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Invitaciones pendientes")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         ForEach(invites) { pending in
                             HStack {
                                 Text(pending.inviteCode?.display ?? pending.code)
-                                    .font(Typography.body16Medium.monospaced())
-                                    .foregroundStyle(Palette.ink)
+                                    .font(Typography.headline.monospaced())
+                                    .foregroundStyle(Palette.label)
                                 Spacer()
                                 Text("Caduca \(pending.expiresAt.formatted(.relative(presentation: .named)))")
-                                    .font(Typography.small12)
-                                    .foregroundStyle(Palette.graphite)
+                                    .font(Typography.footnote)
+                                    .foregroundStyle(Palette.labelSecondary)
                                 Button("Anular") { revoke(pending) }
-                                    .font(Typography.body14Medium)
-                                    .foregroundStyle(Palette.red)
+                                    .font(Typography.subheadlineEmphasis)
+                                    .foregroundStyle(Palette.negativeText)
                                     .buttonStyle(.plain)
                             }
                         }
@@ -194,7 +194,7 @@ struct HouseholdView: View {
             .frame(maxWidth: 720, alignment: .leading)
             .frame(maxWidth: .infinity)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .task(id: household.id) { await load() }
         .sheet(item: $shownInvite, onDismiss: { Task { await load() } }) { invite in
             InviteSheet(invite: invite, householdName: household.name)
@@ -249,11 +249,11 @@ struct InviteSheet: View {
     var body: some View {
         VStack(spacing: Spacing.s24) {
             Text("Invita a tu pareja")
-                .titleFont(.title32)
-                .foregroundStyle(Palette.ink)
+                .titleFont(.title1)
+                .foregroundStyle(Palette.label)
             Text("Que escanee el QR con la cámara del iPhone o escriba el código al unirse.")
-                .font(Typography.body16)
-                .foregroundStyle(Palette.graphite)
+                .font(Typography.body)
+                .foregroundStyle(Palette.labelSecondary)
                 .multilineTextAlignment(.center)
 
             if let code = invite.inviteCode {
@@ -263,13 +263,13 @@ struct InviteSheet: View {
                     .background(Color.white, in: RoundedRectangle(cornerRadius: Radius.card))
 
                 Text(code.display)
-                    .font(Typography.title36.monospaced())
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.largeTitle.monospaced())
+                    .foregroundStyle(Palette.label)
                     .textSelection(.enabled)
 
                 Text("Caduca \(invite.expiresAt.formatted(.relative(presentation: .named))) y sirve una sola vez.")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
 
                 ShareLink(item: code.link,
                           message: Text("Únete a \(householdName) en Save the Money con el código \(code.display)")) {
@@ -283,7 +283,7 @@ struct InviteSheet: View {
         }
         .padding(Spacing.s24)
         .formWidth()
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
     }
 }
 

@@ -37,12 +37,12 @@ struct BillsReportView: View {
                 }
                 ErrorText(message: error)
                 Text("Salen los cargos de suscripciones y gastos esenciales que tienes en Pagos fijos. El PDF se crea en este dispositivo.")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Pagos del mes")
         .onChange(of: monthOffset) { _, _ in pdf = nil }
         .onChange(of: planning.series) { _, _ in pdf = nil }
@@ -67,12 +67,12 @@ struct BillsSummary: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Eyebrow("Pagos de \(bills.month.title.lowercased())")
             Text(bills.total.formatted())
-                .titleFont(.title36)
-                .foregroundStyle(Palette.ink)
+                .titleFont(.largeTitle)
+                .foregroundStyle(Palette.label)
             if MonthKey(today) == bills.month {
                 Text("Quedan \(bills.pending(from: today).formatted()) por pagar")
-                    .font(Typography.body14)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.subheadline)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             if bills.lines.isEmpty {
                 EmptyHint(text: "No hay pagos fijos este mes. Añádelos en Pagos fijos.")
@@ -81,16 +81,16 @@ struct BillsSummary: View {
                 HStack(alignment: .firstTextBaseline) {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         Text(line.name)
-                            .font(Typography.body16Medium)
-                            .foregroundStyle(Palette.ink)
+                            .font(Typography.headline)
+                            .foregroundStyle(Palette.label)
                         Text([line.due.longTitle, line.accountName].compactMap { $0 }.joined(separator: " · "))
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     Spacer()
                     Text(line.amount.formatted())
-                        .font(Typography.body14Medium)
-                        .foregroundStyle(line.due < today ? Palette.graphite : Palette.ink)
+                        .font(Typography.subheadlineEmphasis)
+                        .foregroundStyle(line.due < today ? Palette.labelSecondary : Palette.label)
                 }
                 .accessibilityElement(children: .combine)
             }
@@ -112,17 +112,17 @@ struct BillsPDFPage: View {
             VStack(alignment: .leading, spacing: Spacing.s8) {
                 Eyebrow(householdName)
                 Text("Pagos de \(bills.month.title.lowercased())")
-                    .titleFont(.title32)
-                    .foregroundStyle(Palette.ink)
+                    .titleFont(.title1)
+                    .foregroundStyle(Palette.label)
                 Text("Total: \(bills.total.formatted())")
-                    .font(Typography.body16Medium)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.headline)
+                    .foregroundStyle(Palette.label)
             }
 
             VStack(spacing: 0) {
                 row(day: "Día", name: "Concepto", account: "Cuenta", amount: "Importe", paid: "Pagado", header: true)
                 ForEach(bills.lines) { line in
-                    Divider().overlay(Palette.stone)
+                    Divider().overlay(Palette.separator)
                     row(day: line.due.longTitle, name: line.name, account: line.accountName ?? "",
                         amount: line.amount.formatted(), paid: "☐", header: false)
                 }
@@ -132,11 +132,11 @@ struct BillsPDFPage: View {
                 ForEach([RecurringKind.subscription, .essential], id: \.self) { kind in
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         Text(kind.pluralTitle)
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                         Text(bills.total(of: kind).formatted())
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(Palette.ink)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -144,8 +144,8 @@ struct BillsPDFPage: View {
 
             Spacer(minLength: 0)
             Text("Creado con Save the Money el \(today.longTitle) de \(String(today.year)).")
-                .font(Typography.small12)
-                .foregroundStyle(Palette.graphite)
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
         }
         .padding(Spacing.s40)
         .frame(width: Self.width, alignment: .topLeading)
@@ -162,8 +162,8 @@ struct BillsPDFPage: View {
             Text(amount).frame(width: 84, alignment: .trailing)
             Text(paid).frame(width: 48, alignment: .center)
         }
-        .font(header ? Typography.small12.weight(.medium) : Typography.body14)
-        .foregroundStyle(header ? Palette.graphite : Palette.ink)
+        .font(header ? Typography.footnote.weight(.medium) : Typography.subheadline)
+        .foregroundStyle(header ? Palette.labelSecondary : Palette.label)
         .lineLimit(2)
         .padding(.vertical, Spacing.s8)
     }

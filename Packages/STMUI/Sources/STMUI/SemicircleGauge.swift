@@ -13,30 +13,30 @@ public struct SemicircleGauge: View {
     }
 
     private var tint: Color {
-        progress.isOver ? Palette.red : progress.group.color
+        progress.isOver ? Palette.negative : progress.group.color
     }
 
     public var body: some View {
         VStack(spacing: Spacing.s8) {
             ZStack(alignment: .bottom) {
                 SemicircleArc(fraction: 1)
-                    .stroke(Palette.linen, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(Palette.bgGrouped, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 SemicircleArc(fraction: progress.fraction)
                     .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 VStack(spacing: 0) {
                     Text(progress.spent.formatted())
-                        .font(Typography.body16Medium)
-                        .foregroundStyle(Palette.ink)
+                        .font(Typography.headline)
+                        .foregroundStyle(Palette.label)
                     Text("de \(progress.allocated.formatted())")
-                        .font(Typography.small12)
-                        .foregroundStyle(Palette.graphite)
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
                 }
             }
             .padding(lineWidth / 2)
             .aspectRatio(2, contentMode: .fit)
             Text(progress.group.title)
-                .font(Typography.body14Medium)
-                .foregroundStyle(Palette.ink)
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.label)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(progress.group.title): \(progress.spent.formatted()) gastados de \(progress.allocated.formatted())")

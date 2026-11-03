@@ -17,7 +17,7 @@ struct SaveTheMoneyApp: App {
         WindowGroup {
             AppRootView()
                 .environment(session)
-                .tint(Palette.ember)
+                .tint(Palette.accent)
                 .task { await session.start() }
                 .onOpenURL { session.handle(url: $0) }
         }
@@ -37,7 +37,7 @@ struct AppRootView: View {
             case .loading:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Palette.linen)
+                    .background(Palette.bgGrouped)
             case .signedOut:
                 AuthFlowView()
             case .needsHousehold(let profile):
