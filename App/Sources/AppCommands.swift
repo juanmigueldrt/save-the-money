@@ -52,14 +52,14 @@ struct AppCommands: Commands {
                 ForEach(Array(Self.shortcutSections.enumerated()), id: \.element) { index, section in
                     Button(section.title) { actions?.show(section) }
                         .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
-            }
-            Divider()
-            Button(AppSection.household.title) { actions?.show(.household) }
-            Button(AppSection.more.title) { actions?.show(.more) }
-                .keyboardShortcut(",", modifiers: [.command, .option])
-            Divider()
-            Button("Actualizar") { actions?.refresh() }
-                .keyboardShortcut("r")
+                }
+                Divider()
+                Button(AppSection.household.title) { actions?.show(.household) }
+                Button(AppSection.more.title) { actions?.show(.more) }
+                    .keyboardShortcut(",", modifiers: [.command, .option])
+                Divider()
+                Button("Actualizar") { actions?.refresh() }
+                    .keyboardShortcut("r")
             }
             .disabled(actions == nil)
         }
