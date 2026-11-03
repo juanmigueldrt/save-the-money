@@ -32,7 +32,7 @@ final class FinanceTests: XCTestCase {
         XCTAssertNotNil(MovementDraft(accountId: UUID(), bookedOn: day, amount: .zero, description: "Algo").issue)
         XCTAssertNil(MovementDraft(accountId: UUID(), bookedOn: day, amount: Money(minor: -1), description: "Algo").issue)
         XCTAssertNotNil(AccountDraft(name: " ").issue)
-        XCTAssertEqual(BudgetCategory.defaults(for: UUID()).count, 17, "las mismas que siembra el servidor")
+        XCTAssertEqual(BudgetCategory.defaults(for: UUID()).count, 20, "las mismas que siembra el servidor")
     }
 
     func testOtherHouseholdsAreInvisible() async throws {
@@ -55,6 +55,6 @@ final class FinanceTests: XCTestCase {
             XCTFail("no se apunta en una cuenta de otro hogar")
         } catch {}
         let categories = try await backend.categories(in: other.id)
-        XCTAssertEqual(categories.count, 17)
+        XCTAssertEqual(categories.count, 20)
     }
 }

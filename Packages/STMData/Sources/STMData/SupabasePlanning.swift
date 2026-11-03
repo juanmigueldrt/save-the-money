@@ -5,7 +5,7 @@ import Supabase
 /// Pagos recurrentes y metas sobre Supabase. El RLS decide qué se ve; las
 /// claves foráneas compuestas impiden mezclar filas de hogares distintos.
 extension SupabaseBackend: RecurringService, GoalService {
-    private static let seriesColumns = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at"
+    private static let seriesColumns = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges"
     private static let goalColumns = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
     private static let contributionColumns = "id,household_id,goal_id,amount_minor,made_on,note"
 

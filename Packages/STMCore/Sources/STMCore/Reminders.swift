@@ -46,6 +46,8 @@ public enum ReminderPlanner {
 
     static func body(for series: RecurringSeries, due: CalendarDay) -> String {
         let verb = series.kind == .income ? "Se ingresan" : "Se cobran"
-        return "\(verb) \(series.amount.formatted()) el \(due.longTitle)."
+        let price = series.amount(on: due)
+        let change = series.introEndsOn == due ? " Es el último cargo con precio de oferta; después serán \(series.amount.formatted())." : ""
+        return "\(verb) \(price.formatted()) el \(due.longTitle).\(change)"
     }
 }
