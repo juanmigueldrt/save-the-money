@@ -278,4 +278,30 @@ final class InvestmentTests: XCTestCase {
         XCTAssertTrue(afterReset.isEmpty)
         XCTAssertTrue(tradesAfter.isEmpty)
     }
+
+    func testParsingTypedNumbers() {
+        XCTAssertEqual(Decimal(parsing: "12,5"), dec("12.5"))
+        XCTAssertEqual(Decimal(parsing: " 12.5 € "), dec("12.5"))
+        XCTAssertEqual(Decimal(parsing: "1.234,56"), dec("1234.56"))
+        XCTAssertEqual(Decimal(parsing: "1,234.56"), dec("1234.56"))
+        XCTAssertEqual(Decimal(parsing: "0,2 %"), dec("0.2"))
+        XCTAssertNil(Decimal(parsing: ""))
+        XCTAssertNil(Decimal(parsing: "-3"))
+        XCTAssertNil(Decimal(parsing: "1,2,3"))
+        XCTAssertNil(Decimal(parsing: "doce"))
+    }
+
+    func testPlanReminders() {
+        let holding = fund("Fondo global")
+        let plan = InvestmentPlan(householdId: home, holdingId: holding.id, amount: Money(minor: 15_000),
+                                  startsOn: day(2026, 11, 5), remindDaysBefore: 1)
+        var paused = plan
+        paused = InvestmentPlan(householdId: home, holdingId: holding.id, amount: Money(minor: 1_000),
+                                startsOn: day(2026, 11, 4), pausedAt: Date())
+        let reminders = ReminderPlanner.plan([plan, paused], holdings: [holding], today: day(2026, 11, 3))
+        XCTAssertEqual(reminders.map(\.fireOn), [day(2026, 11, 4), day(2026, 12, 4)])
+        XCTAssertEqual(reminders.first?.title, "Mañana: aportación a Fondo global")
+        XCTAssertTrue(reminders.allSatisfy { $0.id.hasPrefix(ReminderPlanner.investmentPrefix) })
+        XCTAssertTrue(reminders.first?.body.contains("5 de noviembre") ?? false)
+    }
 }

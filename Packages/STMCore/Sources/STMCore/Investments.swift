@@ -732,3 +732,56 @@ extension Array where Element == InvestmentPlan {
         return (live.filter { !$0.isPaused }.count, live.filter(\.isPaused).count)
     }
 }
+
+// MARK: - Texto
+
+extension Decimal {
+    /// Lee un número escrito a mano: "12,5", "12.5", "1.234,56" o "1,234.56". Nil si no se entiende o es negativo.
+    public init?(parsing text: String) {
+        var s = text.replacingOccurrences(of: "€", with: "").replacingOccurrences(of: "%", with: "")
+            .filter { !$0.isWhitespace }
+        guard !s.isEmpty else { return nil }
+        if let comma = s.lastIndex(of: ","), let dot = s.lastIndex(of: ".") {
+            // El último separador es el decimal; el otro, de miles.
+            s = comma > dot ? s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
+                            : s.replacingOccurrences(of: ",", with: "")
+        } else {
+            s = s.replacingOccurrences(of: ",", with: ".")
+        }
+        guard s.filter({ $0 == "." }).count <= 1, s.allSatisfy({ $0 == "." || ("0"..."9").contains($0) }),
+              let value = Decimal(string: s, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        self = value
+    }
+}
+
+// MARK: - Avisos de aportaciones
+
+extension ReminderPlanner {
+    /// Prefijo de los avisos de aportaciones, distinto del de los pagos fijos.
+    public static let investmentPrefix = "stm.investment."
+
+    /// Avisos de las próximas aportaciones de los planes activos que tienen aviso.
+    /// Como mucho `limit` (los pagos fijos usan 50 de los 64 que permite iOS).
+    public static func plan(_ plans: [InvestmentPlan], holdings: [Holding], today: CalendarDay, horizonDays: Int = 45,
+                            limit: Int = 10, hour: Int = 9) -> [PlannedReminder] {
+        let end = today.adding(days: horizonDays)
+        let names = Dictionary(uniqueKeysWithValues: holdings.map { ($0.id, $0.trimmedName) })
+        var result: [PlannedReminder] = []
+        for plan in plans where plan.isActive(on: today) {
+            guard let before = plan.remindDaysBefore, let name = names[plan.holdingId] else { continue }
+            for due in plan.occurrences(from: today, through: end.adding(days: before)) {
+                let fire = due.adding(days: -before)
+                guard fire >= today, fire <= end else { continue }
+                let when = switch before {
+                case 0: "Hoy"
+                case 1: "Mañana"
+                default: "En \(before) días"
+                }
+                result.append(PlannedReminder(id: "\(investmentPrefix)\(plan.id.uuidString).\(due.iso)", fireOn: fire,
+                                              hour: hour, title: "\(when): aportación a \(name)",
+                                              body: "Toca invertir \(plan.amount.formatted()) el \(due.longTitle). Abre la app para confirmar la compra."))
+            }
+        }
+        return Array(result.sorted { $0.fireOn != $1.fireOn ? $0.fireOn < $1.fireOn : $0.id < $1.id }.prefix(limit))
+    }
+}
