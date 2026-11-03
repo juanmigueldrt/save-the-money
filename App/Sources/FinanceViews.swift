@@ -36,49 +36,51 @@ struct SummaryView: View {
                 }
                 .buttonStyle(.plain)
 
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    HStack {
-                        Text("Cuentas")
-                            .titleFont(.title2)
-                            .foregroundStyle(Palette.label)
-                        Spacer()
-                        Button("Añadir", systemImage: "plus") { addingAccount = true }
-                            .labelStyle(.titleAndIcon)
-                            .font(Typography.subheadlineEmphasis)
-                    }
-                    if finance.activeAccounts.isEmpty {
-                        EmptyHint(text: "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
-                    }
-                    ForEach(finance.activeAccounts) { account in
-                        NavigationLink(value: account) {
-                            AccountRow(account: account, balance: finance.balance(of: account))
+                AdaptiveColumns {
+                    VStack(alignment: .leading, spacing: Spacing.s16) {
+                        HStack {
+                            Text("Cuentas")
+                                .titleFont(.title2)
+                                .foregroundStyle(Palette.label)
+                            Spacer()
+                            Button("Añadir", systemImage: "plus") { addingAccount = true }
+                                .labelStyle(.titleAndIcon)
+                                .font(Typography.subheadlineEmphasis)
                         }
-                        .buttonStyle(.plain)
+                        if finance.activeAccounts.isEmpty {
+                            EmptyHint(text: "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
+                        }
+                        ForEach(finance.activeAccounts) { account in
+                            NavigationLink(value: account) {
+                                AccountRow(account: account, balance: finance.balance(of: account))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
+                    .card()
+                } trailing: {
+                    VStack(alignment: .leading, spacing: Spacing.s16) {
+                        HStack {
+                            Text("Últimos movimientos")
+                                .titleFont(.title2)
+                                .foregroundStyle(Palette.label)
+                            Spacer()
+                            NavigationLink("Ver todos") { MovementsView() }
+                                .font(Typography.subheadlineEmphasis)
+                        }
+                        if finance.recent.isEmpty {
+                            EmptyHint(text: "Todavía no hay movimientos.")
+                        }
+                        ForEach(finance.recent.prefix(8)) { movement in
+                            MovementRow(movement: movement, showsAccount: true)
+                        }
+                    }
+                    .card()
                 }
-                .card()
-
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    HStack {
-                        Text("Últimos movimientos")
-                            .titleFont(.title2)
-                            .foregroundStyle(Palette.label)
-                        Spacer()
-                        NavigationLink("Ver todos") { MovementsView() }
-                            .font(Typography.subheadlineEmphasis)
-                    }
-                    if finance.recent.isEmpty {
-                        EmptyHint(text: "Todavía no hay movimientos.")
-                    }
-                    ForEach(finance.recent.prefix(8)) { movement in
-                        MovementRow(movement: movement, showsAccount: true)
-                    }
-                }
-                .card()
 
                 ErrorText(message: finance.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Resumen")

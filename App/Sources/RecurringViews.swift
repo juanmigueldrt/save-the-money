@@ -30,7 +30,7 @@ struct RecurringView: View {
                 }
                 ErrorText(message: planning.error)
             }
-            .padding(Spacing.s16)
+            .pageLayout()
         }
         .background(Palette.bgGrouped)
         .navigationTitle("Pagos fijos")

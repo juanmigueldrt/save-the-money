@@ -42,6 +42,14 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     /// Pestañas del iPhone: movimientos y patrimonio se abren desde el resumen; el resto, desde Más opciones.
     static let phoneTabs: [AppSection] = [.summary, .budget, .cashFlow, .goals, .more]
+
+    /// Barra lateral de Mac, agrupada como en el diseño.
+    static let sidebarGroups: [(title: String, sections: [AppSection])] = [
+        ("Dinero", [.summary, .movements, .budget, .cashFlow]),
+        ("Seguimiento", [.netWorth, .reports, .creditScore]),
+        ("Planificación", [.subscriptions, .goals]),
+        ("Hogar", [.household, .more]),
+    ]
 }
 
 struct RootView: View {
@@ -148,9 +156,15 @@ struct RootView: View {
         }
         #else
         NavigationSplitView {
-            List(AppSection.allCases, selection: $selection) { section in
-                Label(section.title, systemImage: section.systemImage)
-                    .tag(section)
+            List(selection: $selection) {
+                ForEach(AppSection.sidebarGroups, id: \.title) { group in
+                    Section(group.title) {
+                        ForEach(group.sections) { section in
+                            Label(section.title, systemImage: section.systemImage)
+                                .tag(section)
+                        }
+                    }
+                }
             }
             .navigationSplitViewColumnWidth(min: 200, ideal: 220)
         } detail: {

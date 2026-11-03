@@ -92,8 +92,40 @@ extension View {
         #endif
     }
 
+    /// Márgenes de página del manual (16 en iPhone, 20 en ventanas anchas) y un
+    /// ancho máximo de 1200 para que en Mac las tarjetas no se estiren de lado a lado.
+    func pageLayout() -> some View {
+        #if os(macOS)
+        padding(Spacing.s20)
+            .frame(maxWidth: 1200, alignment: .leading)
+            .frame(maxWidth: .infinity)
+        #else
+        padding(Spacing.s16)
+        #endif
+    }
+
     /// Ancho cómodo para formularios en Mac y iPad.
     func formWidth() -> some View {
         frame(maxWidth: 420)
+    }
+}
+
+/// Dos columnas cuando caben (Mac, iPad en horizontal) y una sola en iPhone.
+struct AdaptiveColumns<Leading: View, Trailing: View>: View {
+    var spacing: CGFloat = Spacing.s24
+    @ViewBuilder var leading: Leading
+    @ViewBuilder var trailing: Trailing
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: Spacing.s16) {
+                leading.frame(minWidth: 380, maxWidth: .infinity, alignment: .topLeading)
+                trailing.frame(minWidth: 380, maxWidth: .infinity, alignment: .topLeading)
+            }
+            VStack(alignment: .leading, spacing: spacing) {
+                leading
+                trailing
+            }
+        }
     }
 }
