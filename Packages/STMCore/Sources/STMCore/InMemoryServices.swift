@@ -21,6 +21,10 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var goalList: [Goal] = []
     var goalContributions: [GoalContribution] = []
     var scoresByUser: [UUID: [CreditScore]] = [:]
+    var holdingList: [Holding] = []
+    var holdingPriceList: [HoldingPrice] = []
+    var tradeList: [InvestmentTrade] = []
+    var planList: [InvestmentPlan] = []
 
     public init(now: @escaping @Sendable () -> Date = { Date() }) {
         self.now = now
