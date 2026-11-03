@@ -58,10 +58,7 @@ struct BudgetView: View {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 MonthSwitcher()
 
-                Picker("Tipo de presupuesto", selection: $mode) {
-                    ForEach(Mode.allCases, id: \.self) { Text($0.title).tag($0) }
-                }
-                .pickerStyle(.segmented)
+                CapsuleSegmented("Tipo de presupuesto", selection: $mode, options: Mode.allCases) { $0.title }
 
                 if mode == .flexible {
                     FlexBudgetCard(flex: budgets.flex(categories: finance.categories, series: planning.series))

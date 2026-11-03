@@ -74,7 +74,9 @@ public struct Money: Hashable, Codable, Sendable {
         formatter.numberStyle = .currency
         formatter.locale = locale
         formatter.currencyCode = currency
-        return formatter.string(from: decimal as NSDecimalNumber) ?? "\(decimal) \(currency)"
+        let text = formatter.string(from: decimal as NSDecimalNumber) ?? "\(decimal) \(currency)"
+        // Signo menos tipográfico (U+2212), como pide el manual, en vez del guion.
+        return text.replacingOccurrences(of: "-", with: "\u{2212}")
     }
 }
 
