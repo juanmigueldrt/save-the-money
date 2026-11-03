@@ -35,20 +35,23 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("Nuevo movimiento") { actions?.newMovement() }
-                .keyboardShortcut("n")
-            Button("Nueva cuenta") { actions?.newAccount() }
-                .keyboardShortcut("n", modifiers: [.command, .shift])
-            Divider()
-            Button("Importar CSV del banco…") { actions?.importCSV() }
-                .keyboardShortcut("i")
+            Group {
+                Button("Nuevo movimiento") { actions?.newMovement() }
+                    .keyboardShortcut("n")
+                Button("Nueva cuenta") { actions?.newAccount() }
+                    .keyboardShortcut("n", modifiers: [.command, .shift])
+                Divider()
+                Button("Importar CSV del banco…") { actions?.importCSV() }
+                    .keyboardShortcut("i")
+            }
+            .disabled(actions == nil)
         }
-        .disabled(actions == nil)
 
         CommandMenu("Ir") {
-            ForEach(Array(Self.shortcutSections.enumerated()), id: \.element) { index, section in
-                Button(section.title) { actions?.show(section) }
-                    .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
+            Group {
+                ForEach(Array(Self.shortcutSections.enumerated()), id: \.element) { index, section in
+                    Button(section.title) { actions?.show(section) }
+                        .keyboardShortcut(KeyEquivalent(Character("\(index + 1)")))
             }
             Divider()
             Button(AppSection.household.title) { actions?.show(.household) }
@@ -57,7 +60,8 @@ struct AppCommands: Commands {
             Divider()
             Button("Actualizar") { actions?.refresh() }
                 .keyboardShortcut("r")
+            }
+            .disabled(actions == nil)
         }
-        .disabled(actions == nil)
     }
 }
