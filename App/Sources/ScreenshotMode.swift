@@ -67,6 +67,8 @@ enum ScreenshotMode {
         let buys: [(Holding, Int, String, String)] = [
             (world, -6, "20", "10.00"), (world, -4, "15", "10.80"), (world, -2, "15", "11.40"),
             (bonds, -5, "100", "5.00"), (coin, -3, "0.5", "180.00"),
+            // Compras de los planes, después de que empezaran.
+            (world, -1, "13", "11.90"), (bonds, 0, "12", "5.06"),
         ]
         for (holding, months, quantity, price) in buys {
             _ = try await service.addTrade(InvestmentTrade(householdId: household, holdingId: holding.id,
@@ -74,7 +76,7 @@ enum ScreenshotMode {
                                                            quantity: Decimal(string: quantity)!, price: Decimal(string: price)!))
         }
         let prices: [(Holding, Int, String)] = [
-            (world, -60, "10.40"), (world, -30, "11.10"), (world, -10, "11.90"), (world, 0, "12.35"),
+            (world, -75, "11.20"), (world, -40, "11.60"), (world, -15, "12.05"), (world, 0, "12.35"),
             (bonds, -60, "5.02"), (bonds, 0, "5.06"),
             (coin, -45, "205.00"), (coin, -15, "170.00"), (coin, 0, "196.00"),
         ]

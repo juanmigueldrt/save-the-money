@@ -1097,8 +1097,8 @@ struct PlanCard: View {
                            plan.isPaused ? "En pausa" : plan.nextDue(onOrAfter: investments.day)?.longTitle ?? "Terminado")
                 }
                 GridRow {
-                    figure("Invertido hasta hoy", plan.invested(trades: investments.trades, through: investments.day).formatted())
-                    figure("Rentabilidad", position?.gainFraction.map(InvestmentText.percent) ?? "—",
+                    figure("Invertido con el plan", plan.invested(trades: investments.trades, through: investments.day).formatted())
+                    figure("Rentabilidad del activo", position?.gainFraction.map(InvestmentText.percent) ?? "—",
                            color: position.map { InvestmentText.gainColor($0.gain) } ?? Palette.label)
                 }
             }
