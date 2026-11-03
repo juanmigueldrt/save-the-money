@@ -96,6 +96,11 @@ extension InMemoryBackend: FinanceService {
 
     public func resetHousehold(_ householdId: UUID) async throws {
         _ = try requireMember(of: householdId)
+        let holdingIds = Set(holdingList.filter { $0.householdId == householdId }.map(\.id))
+        holdingPriceList.removeAll { holdingIds.contains($0.holdingId) }
+        tradeList.removeAll { holdingIds.contains($0.holdingId) }
+        planList.removeAll { holdingIds.contains($0.holdingId) }
+        holdingList.removeAll { $0.householdId == householdId }
         let goalIds = Set(goalList.filter { $0.householdId == householdId }.map(\.id))
         goalContributions.removeAll { goalIds.contains($0.goalId) }
         goalList.removeAll { $0.householdId == householdId }

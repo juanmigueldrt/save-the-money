@@ -119,3 +119,28 @@ public protocol CreditScoreService: Sendable {
     func addCreditScore(_ score: CreditScore) async throws -> CreditScore
     func deleteCreditScore(_ scoreId: UUID) async throws
 }
+
+/// Inversiones del hogar. Los precios se apuntan a mano; no hay cotizaciones de terceros.
+public protocol InvestmentService: Sendable {
+    func holdings(in householdId: UUID) async throws -> [Holding]
+    func createHolding(_ holding: Holding) async throws -> Holding
+    func updateHolding(_ holding: Holding) async throws -> Holding
+    /// Borra el activo con sus precios, operaciones y planes.
+    func deleteHolding(_ holdingId: UUID) async throws
+
+    /// Precios apuntados de todos los activos del hogar, por fecha.
+    func holdingPrices(in householdId: UUID) async throws -> [HoldingPrice]
+    /// Apunta el precio de un día (sustituye el de ese día si ya había) y, si es el
+    /// más reciente, lo pone como precio actual del activo.
+    func recordPrice(_ price: Decimal, on day: CalendarDay, for holdingId: UUID) async throws -> Holding
+
+    /// Compras y ventas de todos los activos del hogar, por fecha.
+    func trades(in householdId: UUID) async throws -> [InvestmentTrade]
+    func addTrade(_ trade: InvestmentTrade) async throws -> InvestmentTrade
+    func deleteTrade(_ tradeId: UUID) async throws
+
+    func investmentPlans(in householdId: UUID) async throws -> [InvestmentPlan]
+    func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan
+    func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan
+    func deletePlan(_ planId: UUID) async throws
+}

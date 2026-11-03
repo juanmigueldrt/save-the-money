@@ -130,7 +130,7 @@ extension SupabaseBackend: RecurringService, GoalService {
 }
 
 /// Las columnas editables de una fila más su hogar, para insertarla.
-private struct NewRow<Fields: Encodable & Sendable>: Encodable, Sendable {
+struct NewRow<Fields: Encodable & Sendable>: Encodable, Sendable {
     var householdId: UUID
     var fields: Fields
 
