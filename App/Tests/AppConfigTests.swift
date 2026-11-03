@@ -60,7 +60,7 @@ final class FinanceModelTests: XCTestCase {
 
         let finance = FinanceModel(household: home, service: services.finance)
         await finance.load()
-        XCTAssertEqual(finance.categories.count, 17)
+        XCTAssertEqual(finance.categories.count, 20)
 
         let created = await finance.createAccount(AccountDraft(name: "Corriente", openingBalance: Money(minor: 10_000)))
         XCTAssertTrue(created)
