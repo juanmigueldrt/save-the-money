@@ -119,8 +119,10 @@ struct AccountRow: View {
             .layoutPriority(1)
             Spacer()
             Text(balance.formatted())
-                .font(Typography.headline)
+                .font(Typography.headline.monospacedDigit())
                 .foregroundStyle(balance.isNegative ? Palette.negativeText : Palette.label)
+                .lineLimit(1)
+                .fixedSize()
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
