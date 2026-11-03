@@ -4,12 +4,13 @@ import UserNotifications
 
 /// Programa los avisos de pagos en el dispositivo.
 protocol ReminderScheduling: Sendable {
-    func replace(with reminders: [PlannedReminder]) async
+    /// Sustituye los avisos pendientes que empiezan por `prefix` (pagos fijos o aportaciones).
+    func replace(with reminders: [PlannedReminder], prefix: String) async
 }
 
 /// Para previews y pruebas: no avisa de nada.
 struct NoReminders: ReminderScheduling {
-    func replace(with reminders: [PlannedReminder]) async {}
+    func replace(with reminders: [PlannedReminder], prefix: String) async {}
 }
 
 /// Avisos locales con UserNotifications. No hace falta cuenta de pago de Apple ni
@@ -18,10 +19,10 @@ struct NoReminders: ReminderScheduling {
 struct LocalReminders: ReminderScheduling {
     static let enabledKey = "remindersEnabled"
 
-    func replace(with reminders: [PlannedReminder]) async {
+    func replace(with reminders: [PlannedReminder], prefix: String) async {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
-        let ours = pending.map(\.identifier).filter { $0.hasPrefix(ReminderPlanner.prefix) }
+        let ours = pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
         center.removePendingNotificationRequests(withIdentifiers: ours)
 
         guard UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true, !reminders.isEmpty else { return }

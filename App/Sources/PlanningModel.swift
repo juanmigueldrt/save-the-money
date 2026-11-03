@@ -88,7 +88,7 @@ final class PlanningModel {
     }
 
     func reschedule() async {
-        await reminders.replace(with: ReminderPlanner.plan(series, today: today()))
+        await reminders.replace(with: ReminderPlanner.plan(series, today: today()), prefix: ReminderPlanner.prefix)
     }
 
     // MARK: Metas

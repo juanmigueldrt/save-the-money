@@ -22,6 +22,8 @@ struct SaveTheMoneyApp: App {
             AppRootView()
                 .environment(session)
                 .tint(Palette.accent)
+                // La app está en español: fechas, meses de los gráficos y selectores, aunque el dispositivo no lo esté.
+                .environment(\.locale, Locale(identifier: "es_ES"))
                 .task {
                     #if DEBUG
                     if ScreenshotMode.isActive { await ScreenshotMode.prepare(session); return }
@@ -62,7 +64,10 @@ struct AppRootView: View {
                                                  goals: session.services.goals,
                                                  reminders: session.isDemo ? NoReminders() : LocalReminders()),
                          tracking: TrackingModel(household: household, finance: session.services.finance,
-                                                 budgets: session.services.budgets, scores: session.services.creditScores))
+                                                 budgets: session.services.budgets, scores: session.services.creditScores),
+                         investments: InvestmentModel(household: household, service: session.services.investments,
+                                                      households: session.services.households,
+                                                      reminders: session.isDemo ? NoReminders() : LocalReminders()))
                     .id(household.id)
             }
         }

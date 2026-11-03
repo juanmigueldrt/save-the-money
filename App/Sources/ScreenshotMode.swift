@@ -48,10 +48,48 @@ enum ScreenshotMode {
             }
             _ = try await services.budgets.saveBudget(
                 Budget(householdId: household.id, month: MonthKey(today), expectedIncome: Money(minor: 210_000)))
+            try await prepareInvestments(services.investments, household: household.id, account: account.id, today: today)
         } catch {
             // Si algo falla, la app queda en la pantalla de entrar, como sin este modo.
         }
         await session.refresh()
+    }
+
+    /// Dos fondos inventados con unos meses de compras y precios, y dos planes (uno en pausa).
+    private static func prepareInvestments(_ service: any InvestmentService, household: UUID, account: UUID,
+                                           today: CalendarDay) async throws {
+        let world = try await service.createHolding(Holding(householdId: household, name: "Fondo indexado mundial",
+                                                            kind: .fund, feeRate: Decimal(string: "0.1")!))
+        let bonds = try await service.createHolding(Holding(householdId: household, name: "Fondo de renta fija",
+                                                            kind: .bond))
+        let coin = try await service.createHolding(Holding(householdId: household, name: "Moneda digital", symbol: "MD",
+                                                           kind: .crypto, feeRate: 1))
+        let buys: [(Holding, Int, String, String)] = [
+            (world, -6, "20", "10.00"), (world, -4, "15", "10.80"), (world, -2, "15", "11.40"),
+            (bonds, -5, "100", "5.00"), (coin, -3, "0.5", "180.00"),
+            // Compras de los planes, después de que empezaran.
+            (world, -1, "13", "11.90"), (bonds, 0, "12", "5.06"),
+        ]
+        for (holding, months, quantity, price) in buys {
+            _ = try await service.addTrade(InvestmentTrade(householdId: household, holdingId: holding.id,
+                                                           tradedOn: today.adding(months: months),
+                                                           quantity: Decimal(string: quantity)!, price: Decimal(string: price)!))
+        }
+        let prices: [(Holding, Int, String)] = [
+            (world, -75, "11.20"), (world, -40, "11.60"), (world, -15, "12.05"), (world, 0, "12.35"),
+            (bonds, -60, "5.02"), (bonds, 0, "5.06"),
+            (coin, -45, "205.00"), (coin, -15, "170.00"), (coin, 0, "196.00"),
+        ]
+        for (holding, days, price) in prices {
+            _ = try await service.recordPrice(Decimal(string: price)!, on: today.adding(days: days), for: holding.id)
+        }
+        _ = try await service.createPlan(InvestmentPlan(householdId: household, holdingId: world.id, accountId: account,
+                                                        amount: Money(minor: 15_000), startsOn: today.adding(months: -5)))
+        _ = try await service.createPlan(InvestmentPlan(householdId: household, holdingId: bonds.id, accountId: account,
+                                                        amount: Money(minor: 6_000), recurrence: Recurrence(every: 2, unit: .week),
+                                                        startsOn: today.adding(days: -9)))
+        _ = try await service.createPlan(InvestmentPlan(householdId: household, holdingId: coin.id, amount: Money(minor: 2_500),
+                                                        startsOn: today.adding(months: -2), pausedAt: Date()))
     }
 }
 #endif
