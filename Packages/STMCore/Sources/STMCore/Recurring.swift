@@ -150,11 +150,15 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
     /// Días de antelación del aviso; nil, sin aviso.
     public var remindDaysBefore: Int?
     public var archivedAt: Date?
+    /// Precio de oferta de los primeros cargos (p. ej. 3 meses a 6,99 € y luego `amount`).
+    public var introAmount: Money?
+    /// Cuántos cargos, desde el primero, van al precio de oferta.
+    public var introCharges: Int?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: RecurringKind = .subscription,
                 amount: Money, accountId: UUID? = nil, categoryId: UUID? = nil,
                 recurrence: Recurrence = .monthly, startsOn: CalendarDay, endsOn: CalendarDay? = nil,
-                remindDaysBefore: Int? = 1, archivedAt: Date? = nil) {
+                remindDaysBefore: Int? = 1, archivedAt: Date? = nil, introAmount: Money? = nil, introCharges: Int? = nil) {
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -167,9 +171,42 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
         self.endsOn = endsOn
         self.remindDaysBefore = remindDaysBefore
         self.archivedAt = archivedAt
+        self.introAmount = introAmount
+        self.introCharges = introCharges
     }
 
     public var isArchived: Bool { archivedAt != nil }
+    public var hasIntro: Bool { introAmount != nil && (introCharges ?? 0) > 0 }
+
+    /// Lo que se cobra en el cargo número `n` (0 es el primero): la oferta o el precio normal.
+    public func amount(forCharge n: Int) -> Money {
+        if let introAmount, let introCharges, n < introCharges { return introAmount }
+        return amount
+    }
+
+    /// Lo que se cobra en un día de cargo concreto.
+    public func amount(on due: CalendarDay) -> Money {
+        guard hasIntro else { return amount }
+        return amount(forCharge: max(0, occurrences(from: startsOn, through: due).count - 1))
+    }
+
+    /// Día del último cargo con precio de oferta, si hay oferta.
+    public var introEndsOn: CalendarDay? {
+        guard hasIntro, let introCharges else { return nil }
+        return recurrence.occurrence(introCharges - 1, from: startsOn)
+    }
+
+    /// La oferta sigue para el cargo de ese día o después.
+    public func isIntro(on due: CalendarDay) -> Bool {
+        introEndsOn.map { due <= $0 } ?? false
+    }
+
+    /// Lo que supone al mes desde ese día: con la oferta si el próximo cargo aún va a precio de oferta.
+    public func monthlyAmount(on day: CalendarDay) -> Money {
+        guard hasIntro, let next = nextDue(onOrAfter: day), isIntro(on: next), let introAmount else { return monthlyAmount }
+        return Money(minor: Int((Double(introAmount.minor) * recurrence.perYear / 12).rounded()), currency: amount.currency)
+    }
+
     public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// Negativo para gastos, positivo para ingresos.
@@ -187,6 +224,9 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
         if !(1...52).contains(recurrence.every) { return "La frecuencia no es válida." }
         if let endsOn, endsOn < startsOn { return "No puede terminar antes de empezar." }
         if let days = remindDaysBefore, !(0...14).contains(days) { return "El aviso puede ser de 0 a 14 días antes." }
+        if (introAmount == nil) != (introCharges == nil) { return "Indica el precio de oferta y cuántos cargos dura." }
+        if let introAmount, introAmount.minor <= 0 { return "El precio de oferta tiene que ser mayor que cero." }
+        if let introCharges, !(1...36).contains(introCharges) { return "La oferta puede durar de 1 a 36 cargos." }
         return nil
     }
 
@@ -237,6 +277,12 @@ public struct UpcomingCharge: Hashable, Sendable, Identifiable {
     public var due: CalendarDay
 
     public var id: String { "\(series.id.uuidString)-\(due.iso)" }
+
+    /// Lo que se cobra ese día (con la oferta, si toca), siempre en positivo.
+    public var amount: Money { series.amount(on: due) }
+    /// Negativo para gastos, positivo para ingresos.
+    public var signedAmount: Money { series.kind == .income ? amount : -amount }
+    public var isIntro: Bool { series.isIntro(on: due) }
 }
 
 extension Array where Element == RecurringSeries {
@@ -257,7 +303,7 @@ extension Array where Element == RecurringSeries {
     /// Lo que suman al mes las series activas de ese tipo.
     public func monthlyTotal(of kind: RecurringKind, on day: CalendarDay) -> Money {
         filter { !$0.isArchived && $0.kind == kind && ($0.endsOn.map { $0 >= day } ?? true) }
-            .reduce(Money.zero) { $0 + $1.monthlyAmount }
+            .reduce(Money.zero) { $0 + $1.monthlyAmount(on: day) }
     }
 }
 
@@ -274,6 +320,8 @@ extension RecurringSeries {
         case endsOn = "ends_on"
         case remindDaysBefore = "remind_days_before"
         case archivedAt = "archived_at"
+        case introAmountMinor = "intro_amount_minor"
+        case introCharges = "intro_charges"
     }
 
     public init(from decoder: Decoder) throws {
@@ -290,6 +338,8 @@ extension RecurringSeries {
         endsOn = try c.decodeIfPresent(CalendarDay.self, forKey: .endsOn)
         remindDaysBefore = try c.decodeIfPresent(Int.self, forKey: .remindDaysBefore)
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        introAmount = try c.decodeIfPresent(Int.self, forKey: .introAmountMinor).map { Money(minor: $0) }
+        introCharges = try c.decodeIfPresent(Int.self, forKey: .introCharges)
     }
 
     /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).
@@ -306,5 +356,7 @@ extension RecurringSeries {
         try c.encode(endsOn, forKey: .endsOn)
         try c.encode(remindDaysBefore, forKey: .remindDaysBefore)
         try c.encode(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encode(introAmount?.minor, forKey: .introAmountMinor)
+        try c.encode(introCharges, forKey: .introCharges)
     }
 }

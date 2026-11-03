@@ -90,7 +90,7 @@ public struct MonthlyBills: Hashable, Sendable {
         var lines: [Line] = []
         for item in series where !item.isArchived && item.kind != .income {
             for due in item.occurrences(from: first, through: last) {
-                lines.append(Line(name: item.trimmedName, kind: item.kind, due: due, amount: item.amount,
+                lines.append(Line(name: item.trimmedName, kind: item.kind, due: due, amount: item.amount(on: due),
                                   accountName: item.accountId.flatMap { accountNames[$0] },
                                   id: "\(item.id.uuidString)-\(due.iso)"))
             }

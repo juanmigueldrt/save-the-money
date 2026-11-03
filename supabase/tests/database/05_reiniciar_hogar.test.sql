@@ -51,7 +51,7 @@ select id, 'Plataforma de vídeo', 1299, '2026-11-05' from hogar_ana;
 insert into public.goals (household_id, name, target_minor) select id, 'Vacaciones', 100000 from hogar_ana;
 insert into public.budgets (household_id, month) select id, '2026-11-01' from hogar_ana;
 
-select is((select count(*)::int from public.categories), 18, 'Ana tiene las 17 de partida más la suya');
+select is((select count(*)::int from public.categories), 21, 'Ana tiene las 20 de partida más la suya');
 
 -- Carla no puede vaciar el hogar de Ana -----------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');
@@ -71,7 +71,7 @@ select is((select count(*)::int from public.accounts), 0, 'ya no hay cuentas');
 select is((select count(*)::int from public.transactions), 0, 'ni movimientos');
 select is((select count(*)::int from public.recurring_series) + (select count(*)::int from public.goals)
           + (select count(*)::int from public.budgets), 0, 'ni pagos fijos, metas o presupuestos');
-select is((select count(*)::int from public.categories), 17, 'vuelven las 17 categorías de partida');
+select is((select count(*)::int from public.categories), 20, 'vuelven las 20 categorías de partida');
 select is((select count(*)::int from public.household_members), 1, 'Ana sigue en su hogar');
 
 -- Lo de Carla sigue ahí.

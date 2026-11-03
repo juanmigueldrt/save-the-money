@@ -166,4 +166,38 @@ final class PlanningTests: XCTestCase {
         let mine = try await backend.recurringSeries(in: other.id)
         XCTAssertTrue(mine.isEmpty)
     }
+
+    func testIntroPrice() throws {
+        // 3 meses a 6,99 € y luego 11,99 €. Datos inventados.
+        var video = RecurringSeries(householdId: UUID(), name: "Plataforma de vídeo", amount: Money(minor: 1199),
+                                    startsOn: day(2026, 11, 5), introAmount: Money(minor: 699), introCharges: 3)
+        XCTAssertNil(video.issue)
+        XCTAssertEqual(video.amount(on: day(2026, 11, 5)), Money(minor: 699))
+        XCTAssertEqual(video.amount(on: day(2027, 1, 5)), Money(minor: 699))
+        XCTAssertEqual(video.amount(on: day(2027, 2, 5)), Money(minor: 1199))
+        XCTAssertEqual(video.introEndsOn, day(2027, 1, 5))
+        XCTAssertEqual(video.monthlyAmount(on: day(2026, 12, 1)), Money(minor: 699))
+        XCTAssertEqual(video.monthlyAmount(on: day(2027, 1, 6)), Money(minor: 1199))
+        XCTAssertEqual([video].monthlyTotal(of: .subscription, on: day(2027, 1, 6)), Money(minor: 1199))
+
+        let charges = [video].upcoming(from: day(2026, 12, 20), days: 60)
+        XCTAssertEqual(charges.map(\.amount), [Money(minor: 699), Money(minor: 1199)])
+        XCTAssertEqual(charges.map(\.isIntro), [true, false])
+        XCTAssertEqual(charges.first?.signedAmount, Money(minor: -699))
+
+        let bills = MonthlyBills(series: [video], month: MonthKey(year: 2027, month: 2))
+        XCTAssertEqual(bills.total, Money(minor: 1199))
+
+        let reminders = ReminderPlanner.plan([video], today: day(2027, 1, 1))
+        XCTAssertTrue(reminders.first?.body.contains("último cargo con precio de oferta") ?? false)
+
+        let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(video)) as! [String: Any]
+        XCTAssertEqual(encoded["intro_amount_minor"] as? Int, 699)
+        XCTAssertEqual(encoded["intro_charges"] as? Int, 3)
+
+        video.introCharges = nil
+        XCTAssertNotNil(video.issue, "precio de oferta sin duración")
+        video.introCharges = 40
+        XCTAssertNotNil(video.issue)
+    }
 }

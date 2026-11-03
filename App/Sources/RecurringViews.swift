@@ -84,10 +84,10 @@ struct RecurringView: View {
                         .foregroundStyle(Palette.label)
                     Spacer()
                     VStack(alignment: .trailing, spacing: Spacing.s8) {
-                        Text(charge.series.signedAmount.formatted())
+                        Text(charge.signedAmount.formatted())
                             .font(Typography.subheadlineEmphasis)
                             .foregroundStyle(Palette.label)
-                        Text(charge.due.shortText)
+                        Text(charge.isIntro ? "\(charge.due.shortText) · oferta" : charge.due.shortText)
                             .font(Typography.footnote)
                             .foregroundStyle(Palette.labelSecondary)
                     }
@@ -139,18 +139,34 @@ struct RecurringRow: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             Spacer()
-            Text(series.amount.formatted())
-                .font(Typography.subheadlineEmphasis)
-                .foregroundStyle(Palette.label)
+            VStack(alignment: .trailing, spacing: Spacing.s8) {
+                Text(currentAmount.formatted())
+                    .font(Typography.subheadlineEmphasis)
+                    .foregroundStyle(Palette.label)
+                if currentAmount != series.amount {
+                    Text("luego \(series.amount.formatted())")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+            }
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
+    }
+
+    /// Lo que se paga en el próximo cargo: el precio de oferta mientras dure.
+    private var currentAmount: Money {
+        guard !series.isArchived, let next = series.nextDue(onOrAfter: CalendarDay()) else { return series.amount }
+        return series.amount(on: next)
     }
 
     private var detail: String {
         var parts = [series.recurrence.title]
         if !series.isArchived, let next = series.nextDue(onOrAfter: CalendarDay()) {
             parts.append("próximo: \(next.shortText)")
+            if series.isIntro(on: next), let end = series.introEndsOn {
+                parts.append("oferta hasta \(end.shortText)")
+            }
         }
         if series.remindDaysBefore != nil { parts.append("con aviso") }
         return parts.joined(separator: " · ")
@@ -173,6 +189,9 @@ struct RecurringFormView: View {
     @State private var endsOn = Date()
     @State private var accountId: UUID?
     @State private var categoryId: UUID?
+    @State private var hasIntro = false
+    @State private var introAmount = ""
+    @State private var introCharges = 3
     @State private var reminds = true
     @State private var remindDays = 1
     @State private var error: String?
@@ -196,6 +215,20 @@ struct RecurringFormView: View {
                     Toggle("Tiene fecha de fin", isOn: $hasEnd)
                     if hasEnd {
                         DatePicker("Último cargo", selection: $endsOn, in: startsOn..., displayedComponents: .date)
+                    }
+                }
+                if kind != .income {
+                    Section {
+                        Toggle("Precio de oferta al principio", isOn: $hasIntro)
+                        if hasIntro {
+                            TextField("Precio de oferta, p. ej. 6,99", text: $introAmount)
+                                .decimalInput()
+                            Stepper(introText, value: $introCharges, in: 1...36)
+                        }
+                    } footer: {
+                        Text(hasIntro
+                             ? "Los primeros cargos desde el primer cargo van con el precio de oferta; después, el importe de arriba."
+                             : "Por ejemplo, 3 meses a 6,99 y luego 11,99.")
                     }
                 }
                 Section {
@@ -258,6 +291,10 @@ struct RecurringFormView: View {
         Recurrence.common.contains(recurrence) ? Recurrence.common : Recurrence.common + [recurrence]
     }
 
+    private var introText: String {
+        introCharges == 1 ? "Durante 1 cargo" : "Durante \(introCharges) cargos"
+    }
+
     private var remindText: String {
         switch remindDays {
         case 0: "El mismo día"
@@ -279,6 +316,9 @@ struct RecurringFormView: View {
         reminds = series.remindDaysBefore != nil
         remindDays = series.remindDaysBefore ?? 1
         categoryId = series.categoryId
+        hasIntro = series.hasIntro
+        introAmount = series.introAmount?.plainText ?? ""
+        introCharges = series.introCharges ?? 3
     }
 
     private func build() -> RecurringSeries? {
@@ -297,6 +337,17 @@ struct RecurringFormView: View {
         item.accountId = accountId
         item.categoryId = categoryId
         item.remindDaysBefore = reminds ? remindDays : nil
+        if hasIntro && kind != .income {
+            guard let intro = Money(parsing: introAmount), intro.minor > 0 else {
+                error = "El precio de oferta no es válido."
+                return nil
+            }
+            item.introAmount = intro
+            item.introCharges = introCharges
+        } else {
+            item.introAmount = nil
+            item.introCharges = nil
+        }
         return item
     }
 

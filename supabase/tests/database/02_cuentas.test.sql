@@ -46,7 +46,7 @@ select is(
 );
 select is(
   (select count(*)::int from public.categories where household_id = (select id from hogar_ana)),
-  17, 'cada hogar nuevo recibe sus categorías'
+  20, 'cada hogar nuevo recibe sus categorías'
 );
 
 -- Ana crea una cuenta y un movimiento ------------------------------------------------
@@ -117,7 +117,7 @@ select is((select count(*)::int from public.transactions), 0, 'Carla no ve movim
 select is((select count(*)::int from public.account_balances), 0, 'Carla no ve saldos ajenos');
 select is(
   (select count(*)::int from public.categories),
-  17, 'Carla sólo ve las categorías de su hogar'
+  20, 'Carla sólo ve las categorías de su hogar'
 );
 select throws_ok(
   $$ insert into public.accounts (household_id, name) select id, 'Intrusa' from hogar_ana $$,
