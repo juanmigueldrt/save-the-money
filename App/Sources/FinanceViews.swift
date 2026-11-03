@@ -112,11 +112,15 @@ struct AccountRow: View {
                 Text(account.isShared ? "\(account.kind.title) · compartida" : account.kind.title)
                     .font(Typography.footnote)
                     .foregroundStyle(Palette.labelSecondary)
+                    .lineLimit(1)
             }
+            .layoutPriority(1)
             Spacer()
             Text(balance.formatted())
-                .font(Typography.headline)
+                .font(Typography.headline.monospacedDigit())
                 .foregroundStyle(balance.isNegative ? Palette.negativeText : Palette.label)
+                .lineLimit(1)
+                .fixedSize()
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)

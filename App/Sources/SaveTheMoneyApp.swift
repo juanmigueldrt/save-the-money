@@ -30,8 +30,10 @@ struct SaveTheMoneyApp: App {
                 }
                 .onOpenURL { session.handle(url: $0) }
         }
+        .commands { AppCommands() }
         #if os(macOS)
         .defaultSize(width: 1280, height: 800)
+        .windowResizability(.contentMinSize)
         #endif
     }
 }

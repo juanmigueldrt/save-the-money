@@ -42,4 +42,10 @@ final class MoneyTests: XCTestCase {
         XCTAssertTrue(text.contains("1234,56") || text.contains("1.234,56"), text)
         XCTAssertTrue(text.contains("€"), text)
     }
+
+    func testNegativeUsesTypographicMinus() {
+        let text = Money(minor: -8_450).formatted()
+        XCTAssertTrue(text.contains("\u{2212}"), text)
+        XCTAssertFalse(text.contains("-"), text)
+    }
 }

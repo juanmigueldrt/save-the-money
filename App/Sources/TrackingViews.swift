@@ -311,10 +311,7 @@ struct ReportsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
-                    Picker("Qué", selection: $tracking.kind) {
-                        ForEach(SpendingReport.Kind.allCases, id: \.self) { Text($0.title).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
+                    CapsuleSegmented("Qué", selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
                     HStack {
                         Picker("Periodo", selection: $tracking.period) {
                             ForEach(ReportPeriod.allCases) { Text($0.title).tag($0) }

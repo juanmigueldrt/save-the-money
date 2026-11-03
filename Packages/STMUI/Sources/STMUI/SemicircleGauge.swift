@@ -18,25 +18,32 @@ public struct SemicircleGauge: View {
 
     public var body: some View {
         VStack(spacing: Spacing.s8) {
+            // El arco va solo y las cifras debajo: en tres columnas de iPhone no caben dentro.
             ZStack(alignment: .bottom) {
                 SemicircleArc(fraction: 1)
-                    .stroke(Palette.bgGrouped, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+                    .stroke(Palette.fill, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 SemicircleArc(fraction: progress.fraction)
                     .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                VStack(spacing: 0) {
-                    Text(progress.spent.formatted())
-                        .font(Typography.headline)
-                        .foregroundStyle(Palette.label)
-                    Text("de \(progress.allocated.formatted())")
-                        .font(Typography.footnote)
-                        .foregroundStyle(Palette.labelSecondary)
-                }
+                Text("\(Int((progress.fraction * 100).rounded())) %")
+                    .font(Typography.subheadlineEmphasis.monospacedDigit())
+                    .foregroundStyle(Palette.label)
             }
             .padding(lineWidth / 2)
             .aspectRatio(2, contentMode: .fit)
-            Text(progress.group.title)
-                .font(Typography.subheadlineEmphasis)
-                .foregroundStyle(Palette.label)
+            VStack(spacing: 2) {
+                Text(progress.group.title)
+                    .font(Typography.subheadlineEmphasis)
+                    .foregroundStyle(Palette.label)
+                Text(progress.spent.formatted())
+                    .font(Typography.footnote.monospacedDigit())
+                    .foregroundStyle(Palette.label)
+                Text("de \(progress.allocated.formatted())")
+                    .font(Typography.caption1.monospacedDigit())
+                    .foregroundStyle(Palette.labelSecondary)
+            }
+            .multilineTextAlignment(.center)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(progress.group.title): \(progress.spent.formatted()) gastados de \(progress.allocated.formatted())")

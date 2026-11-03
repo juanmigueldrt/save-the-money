@@ -59,6 +59,9 @@ struct RootView: View {
     @State private var budgets: BudgetModel
     @State private var planning: PlanningModel
     @State private var tracking: TrackingModel
+    @State private var addingMovement = false
+    @State private var addingAccount = false
+    @State private var importingCSV = false
 
     init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel,
          tracking: TrackingModel) {
@@ -75,6 +78,24 @@ struct RootView: View {
             if session.isDemo { DemoBanner() }
             content
         }
+        #if os(macOS)
+        .frame(minWidth: 900, minHeight: 600)
+        #endif
+        // Las hojas de los menús van dentro de los .environment para recibir los modelos.
+        .sheet(isPresented: $addingMovement) { MovementFormView(movement: nil, accountId: nil) }
+        .sheet(isPresented: $addingAccount) { AccountFormView(account: nil) }
+        .sheet(isPresented: $importingCSV) {
+            NavigationStack {
+                CSVImportView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) { Button("Cerrar") { importingCSV = false } }
+                    }
+            }
+            #if os(macOS)
+            .frame(minWidth: 560, minHeight: 520)
+            #endif
+        }
+        .focusedSceneValue(\.appActions, actions)
         .environment(finance)
         .environment(budgets)
         .environment(planning)
@@ -88,6 +109,29 @@ struct RootView: View {
             await budgets.load()
             await budgets.checkAlerts(categories: finance.categories)
         }
+    }
+
+    private var actions: AppActions {
+        AppActions(
+            newMovement: { addingMovement = true },
+            newAccount: { addingAccount = true },
+            importCSV: { importingCSV = true },
+            refresh: {
+                Task {
+                    await finance.load()
+                    await planning.load()
+                    await budgets.load()
+                }
+            },
+            show: { section in
+                #if os(iOS)
+                // En iPhone solo se puede saltar a las pestañas; lo demás está dentro de Más.
+                if AppSection.phoneTabs.contains(section) { selection = section }
+                #else
+                selection = section
+                #endif
+            }
+        )
     }
 
     @ViewBuilder

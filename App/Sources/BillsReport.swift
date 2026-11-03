@@ -16,11 +16,7 @@ struct BillsReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                Picker("Mes", selection: $monthOffset) {
-                    Text("Este mes").tag(0)
-                    Text("El mes que viene").tag(1)
-                }
-                .pickerStyle(.segmented)
+                CapsuleSegmented("Mes", selection: $monthOffset, options: [0, 1]) { $0 == 0 ? "Este mes" : "El mes que viene" }
 
                 BillsSummary(bills: bills, today: CalendarDay())
                     .card()
