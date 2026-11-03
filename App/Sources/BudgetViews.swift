@@ -320,7 +320,7 @@ struct CashFlowView: View {
                         EmptyHint(text: "No hay movimientos este mes. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
                     } else {
                         SankeyDiagram(flow: flow)
-                            .frame(height: max(320, CGFloat(flow.nodes.filter { $0.column == 2 }.count) * 34))
+                            .chartHeight(max(320, CGFloat(flow.nodes.filter { $0.column == 2 }.count) * 34))
                     }
                 }
                 .card()

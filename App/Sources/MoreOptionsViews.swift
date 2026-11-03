@@ -210,7 +210,7 @@ struct CategoriesView: View {
         .navigationTitle("Categorías")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nueva categoría", systemImage: "plus.circle.fill") { adding = true }
+                Button("Nueva categoría", systemImage: "plus") { adding = true }
             }
         }
         .sheet(isPresented: $adding) { CategoryFormView(category: nil) }

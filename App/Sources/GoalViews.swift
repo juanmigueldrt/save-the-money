@@ -46,7 +46,7 @@ struct GoalsView: View {
         .navigationDestination(for: Goal.self) { GoalDetailView(goalId: $0.id) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nueva meta", systemImage: "plus.circle.fill") { adding = true }
+                Button("Nueva meta", systemImage: "plus") { adding = true }
             }
         }
         .refreshable { await planning.load() }
