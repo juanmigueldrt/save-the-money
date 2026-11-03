@@ -100,7 +100,7 @@ struct MoreView: View {
             Section {
                 Button(role: .destructive) { resetting = true } label: {
                     Label("Borrar datos y empezar de cero", systemImage: "trash")
-                        .foregroundStyle(Palette.red)
+                        .foregroundStyle(Palette.negativeText)
                 }
             } footer: {
                 Text("Borra las cuentas, movimientos, presupuestos, pagos fijos y metas de todo el hogar.")
@@ -221,11 +221,11 @@ struct CategoriesView: View {
         Button { editing = category } label: {
             HStack(spacing: Spacing.s16) {
                 Image(systemName: category.icon ?? "tag")
-                    .foregroundStyle(Palette.ember)
+                    .foregroundStyle(Palette.accentText)
                     .frame(width: 28)
                 Text(category.name)
-                    .font(Typography.body16)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.body)
+                    .foregroundStyle(Palette.label)
                 Spacer()
             }
             .contentShape(Rectangle())
@@ -279,8 +279,8 @@ struct CategoryFormView: View {
                             Button { icon = symbol } label: {
                                 Image(systemName: symbol)
                                     .frame(width: 44, height: 44)
-                                    .foregroundStyle(icon == symbol ? Palette.onEmber : Palette.ink)
-                                    .background(icon == symbol ? Palette.ember : Palette.stone.opacity(0.5),
+                                    .foregroundStyle(icon == symbol ? Palette.onAccent : Palette.label)
+                                    .background(icon == symbol ? Palette.accent : Palette.fill,
                                                 in: RoundedRectangle(cornerRadius: Radius.input))
                             }
                             .buttonStyle(.plain)
@@ -368,14 +368,14 @@ struct ResetHouseholdView: View {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Eyebrow("Empezar de cero")
                         Text("Se borrará todo lo apuntado en «\(household.name)»")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         Text("Cuentas, movimientos, categorías propias, presupuestos, pagos fijos y metas, para todas las personas del hogar. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan.")
-                            .font(Typography.body14)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                         Text("No se puede deshacer. Si quieres guardar una copia, exporta antes el CSV.")
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(Palette.red)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.negativeText)
                     }
                     .card()
 
@@ -389,14 +389,14 @@ struct ResetHouseholdView: View {
                     Button {
                         Task { await reset() }
                     } label: {
-                        if isWorking { ProgressView().tint(Palette.onEmber) } else { Text("Borrar todo") }
+                        if isWorking { ProgressView().tint(Palette.onAccent) } else { Text("Borrar todo") }
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(!isConfirmed || isWorking)
                 }
                 .padding(Spacing.s16)
             }
-            .background(Palette.linen)
+            .background(Palette.bgGrouped)
             .navigationTitle("Borrar datos")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }

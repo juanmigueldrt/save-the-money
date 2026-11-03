@@ -14,11 +14,11 @@ struct AuthFlowView: View {
                 VStack(spacing: Spacing.s32) {
                     VStack(spacing: Spacing.s8) {
                         Text("Save the Money")
-                            .titleFont(.title36)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.largeTitle)
+                            .foregroundStyle(Palette.label)
                         Text(showingSignUp ? "Crea tu cuenta para empezar." : "Tu presupuesto, compartido en casa.")
-                            .font(Typography.body16)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.body)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     .padding(.top, Spacing.s64)
 
@@ -33,7 +33,7 @@ struct AuthFlowView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
     }
 }
 
@@ -60,14 +60,14 @@ struct LoginView: View {
             }
             ErrorText(message: error)
             Button(action: submit) {
-                if isWorking { ProgressView().tint(Palette.onEmber) } else { Text("Iniciar sesión") }
+                if isWorking { ProgressView().tint(Palette.onAccent) } else { Text("Iniciar sesión") }
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(username.isEmpty || password.isEmpty || isWorking)
 
             Button("¿No tienes cuenta? Crear una", action: onShowSignUp)
-                .font(Typography.body14Medium)
-                .foregroundStyle(Palette.ember)
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.accentText)
                 .buttonStyle(.plain)
         }
     }
@@ -121,14 +121,14 @@ struct SignUpView: View {
             }
             ErrorText(message: error ?? (triedToSubmit ? form.firstIssue?.message : nil))
             Button(action: submit) {
-                if isWorking { ProgressView().tint(Palette.onEmber) } else { Text("Crear cuenta") }
+                if isWorking { ProgressView().tint(Palette.onAccent) } else { Text("Crear cuenta") }
             }
             .buttonStyle(PrimaryButtonStyle())
             .disabled(isWorking)
 
             Button("Ya tengo cuenta", action: onShowLogin)
-                .font(Typography.body14Medium)
-                .foregroundStyle(Palette.ember)
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.accentText)
                 .buttonStyle(.plain)
         }
     }

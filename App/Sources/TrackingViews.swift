@@ -18,8 +18,8 @@ struct NetWorthView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Eyebrow("Patrimonio neto")
                     Text(now.net.formatted())
-                        .titleFont(.title36)
-                        .foregroundStyle(now.net.isNegative ? Palette.red : Palette.ink)
+                        .titleFont(.largeTitle)
+                        .foregroundStyle(now.net.isNegative ? Palette.negativeText : Palette.label)
                         .contentTransition(.numericText())
                     HStack(spacing: Spacing.s16) {
                         figure("Lo que tienes", now.assets)
@@ -27,26 +27,26 @@ struct NetWorthView: View {
                     }
                     if let change = change(in: history) {
                         Text(change)
-                            .font(Typography.body14)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                 }
                 .card()
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Últimos 12 meses")
-                        .titleFont(.title20)
-                        .foregroundStyle(Palette.ink)
+                        .titleFont(.title2)
+                        .foregroundStyle(Palette.label)
                     if finance.accounts.isEmpty {
                         EmptyHint(text: "Añade tus cuentas para ver cómo evoluciona tu patrimonio.")
                     } else {
                         Chart(history) { point in
                             AreaMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
                                      y: .value("Patrimonio", point.net.decimal))
-                                .foregroundStyle(Palette.ember.opacity(0.12))
+                                .foregroundStyle(Palette.accent.opacity(0.12))
                             LineMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
                                      y: .value("Patrimonio", point.net.decimal))
-                                .foregroundStyle(Palette.ember)
+                                .foregroundStyle(Palette.accent)
                                 .lineStyle(StrokeStyle(lineWidth: 2))
                         }
                         .chartXAxis {
@@ -64,13 +64,13 @@ struct NetWorthView: View {
                 accountsCard(title: "Lo que debes", accounts: finance.activeAccounts.filter { finance.balance(of: $0).isNegative })
 
                 Text("Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan.")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
                 ErrorText(message: tracking.error)
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Patrimonio")
         .task(id: finance.recent) { await tracking.loadHistory() }
         .refreshable {
@@ -82,11 +82,11 @@ struct NetWorthView: View {
     private func figure(_ title: String, _ amount: Money) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
             Text(title)
-                .font(Typography.small12)
-                .foregroundStyle(Palette.graphite)
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
             Text(amount.formatted())
-                .font(Typography.body16Medium)
-                .foregroundStyle(Palette.ink)
+                .font(Typography.headline)
+                .foregroundStyle(Palette.label)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
@@ -105,8 +105,8 @@ struct NetWorthView: View {
         if !accounts.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.s16) {
                 Text(title)
-                    .titleFont(.title20)
-                    .foregroundStyle(Palette.ink)
+                    .titleFont(.title2)
+                    .foregroundStyle(Palette.label)
                 ForEach(accounts) { account in
                     AccountRow(account: account, balance: finance.balance(of: account))
                 }
@@ -131,24 +131,24 @@ struct CreditScoreView: View {
                         Eyebrow("Tu score crediticio")
                         HStack(alignment: .firstTextBaseline, spacing: Spacing.s8) {
                             Text("\(latest.score)")
-                                .titleFont(.title36)
-                                .foregroundStyle(Palette.ink)
+                                .titleFont(.largeTitle)
+                                .foregroundStyle(Palette.label)
                             Text("de \(latest.maxScore)")
-                                .font(Typography.body14)
-                                .foregroundStyle(Palette.graphite)
+                                .font(Typography.subheadline)
+                                .foregroundStyle(Palette.labelSecondary)
                             Spacer()
                             Text(latest.rating.title)
-                                .font(Typography.body14Medium)
-                                .foregroundStyle(Palette.onEmber)
+                                .font(Typography.subheadlineEmphasis)
+                                .foregroundStyle(Palette.onAccent)
                                 .padding(.horizontal, Spacing.s16)
                                 .padding(.vertical, Spacing.s8)
-                                .background(Palette.ember, in: Capsule())
+                                .background(Palette.accent, in: Capsule())
                         }
                         ProgressBar(fraction: latest.fraction)
                         Text([latest.trimmedProvider, latest.recordedOn.longTitle + " de " + String(latest.recordedOn.year)]
                             .compactMap { $0 }.joined(separator: " · "))
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     .card()
                     .accessibilityElement(children: .combine)
@@ -156,8 +156,8 @@ struct CreditScoreView: View {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Eyebrow("Tu score crediticio")
                         Text("Apunta el score que te da tu banco o tu proveedor para ver cómo evoluciona.")
-                            .font(Typography.body14)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                         Button("Apuntar mi score") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -167,13 +167,13 @@ struct CreditScoreView: View {
                 if tracking.creditScores.count >= 2 {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Evolución")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         Chart(tracking.creditScores.reversed()) { item in
                             LineMark(x: .value("Fecha", item.recordedOn.date()), y: .value("Score", item.score))
-                                .foregroundStyle(Palette.ember)
+                                .foregroundStyle(Palette.accent)
                             PointMark(x: .value("Fecha", item.recordedOn.date()), y: .value("Score", item.score))
-                                .foregroundStyle(Palette.ember)
+                                .foregroundStyle(Palette.accent)
                         }
                         .frame(height: 180)
                         .accessibilityLabel("Gráfico de la evolución del score")
@@ -184,24 +184,24 @@ struct CreditScoreView: View {
                 if !tracking.creditScores.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Historial")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         ForEach(tracking.creditScores) { item in
                             HStack {
                                 VStack(alignment: .leading, spacing: Spacing.s8) {
                                     Text("\(item.score) de \(item.maxScore) · \(item.rating.title)")
-                                        .font(Typography.body16Medium)
-                                        .foregroundStyle(Palette.ink)
+                                        .font(Typography.headline)
+                                        .foregroundStyle(Palette.label)
                                     Text([item.recordedOn.shortText, item.trimmedProvider, item.note].compactMap { $0 }
                                         .joined(separator: " · "))
-                                        .font(Typography.small12)
-                                        .foregroundStyle(Palette.graphite)
+                                        .font(Typography.footnote)
+                                        .foregroundStyle(Palette.labelSecondary)
                                 }
                                 Spacer()
                                 Button("Borrar", systemImage: "trash") { deleting = item }
                                     .labelStyle(.iconOnly)
                                     .buttonStyle(.plain)
-                                    .foregroundStyle(Palette.graphite)
+                                    .foregroundStyle(Palette.labelSecondary)
                             }
                         }
                     }
@@ -209,13 +209,13 @@ struct CreditScoreView: View {
                 }
 
                 Text("Sólo lo ves tú: no se comparte con el resto del hogar. Los tramos son orientativos.")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
                 ErrorText(message: tracking.error)
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Score crediticio")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -328,17 +328,17 @@ struct ReportsView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Eyebrow("\(tracking.kind.title) · \(tracking.period.title.lowercased())")
                     Text(report.total.formatted())
-                        .titleFont(.title36)
-                        .foregroundStyle(Palette.ink)
+                        .titleFont(.largeTitle)
+                        .foregroundStyle(Palette.label)
                         .contentTransition(.numericText())
                     if report.byMonth.count > 1 {
                         Text("Media de \(report.averagePerMonth.formatted()) al mes")
-                            .font(Typography.body14)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                         Chart(report.byMonth) { item in
                             BarMark(x: .value("Mes", item.month.firstDay.date(), unit: .month),
                                     y: .value("Importe", item.amount.decimal))
-                                .foregroundStyle(Palette.ember)
+                                .foregroundStyle(Palette.accent)
                                 .cornerRadius(4)
                         }
                         .chartXAxis {
@@ -354,8 +354,8 @@ struct ReportsView: View {
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Por categoría")
-                        .titleFont(.title20)
-                        .foregroundStyle(Palette.ink)
+                        .titleFont(.title2)
+                        .foregroundStyle(Palette.label)
                     if report.byCategory.isEmpty {
                         EmptyHint(text: tracking.isLoading ? "Cargando…" : "No hay movimientos en este periodo.")
                     }
@@ -363,17 +363,17 @@ struct ReportsView: View {
                         VStack(alignment: .leading, spacing: Spacing.s8) {
                             HStack {
                                 Label(row.title, systemImage: row.icon ?? "tag")
-                                    .font(Typography.body14Medium)
-                                    .foregroundStyle(Palette.ink)
+                                    .font(Typography.subheadlineEmphasis)
+                                    .foregroundStyle(Palette.label)
                                 Spacer()
                                 Text(row.amount.formatted())
-                                    .font(Typography.body14Medium)
-                                    .foregroundStyle(Palette.ink)
+                                    .font(Typography.subheadlineEmphasis)
+                                    .foregroundStyle(Palette.label)
                             }
                             ProgressBar(fraction: row.share)
                             Text("\(Int((row.share * 100).rounded())) % · \(row.count) movimientos")
-                                .font(Typography.small12)
-                                .foregroundStyle(Palette.graphite)
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
                         }
                         .accessibilityElement(children: .combine)
                     }
@@ -384,7 +384,7 @@ struct ReportsView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Informes")
         .task(id: tracking.period) { await tracking.loadReport() }
         .refreshable { await tracking.loadReport() }
@@ -412,7 +412,7 @@ struct ReportsView: View {
         } label: {
             Label(tracking.categoryFilter.isEmpty ? "Todas" : "\(tracking.categoryFilter.count) categorías",
                   systemImage: "line.3.horizontal.decrease.circle")
-                .font(Typography.body14Medium)
+                .font(Typography.subheadlineEmphasis)
         }
     }
 }
@@ -427,14 +427,14 @@ struct FlexBudgetCard: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Eyebrow(flex.isOver ? "Gastado de más en lo flexible" : "Te queda para lo flexible")
             Text(Money(minor: abs(flex.remaining.minor)).formatted())
-                .titleFont(.title36)
-                .foregroundStyle(flex.isOver ? Palette.red : Palette.ink)
+                .titleFont(.largeTitle)
+                .foregroundStyle(flex.isOver ? Palette.negativeText : Palette.label)
                 .contentTransition(.numericText())
             ProgressBar(fraction: flex.fraction)
             if let perDay = flex.perDay {
                 Text("Unos \(perDay.formatted()) al día durante \(flex.daysLeft) días")
-                    .font(Typography.body14)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.subheadline)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             Divider()
             SummaryLine(title: "Ingresos previstos", amount: flex.income)
@@ -444,8 +444,8 @@ struct FlexBudgetCard: View {
             SummaryLine(title: "Gastado en lo flexible", amount: flex.flexibleSpent)
             SummaryLine(title: "Gastado en pagos fijos", amount: flex.fixedSpent)
             Text("Lo flexible es todo lo que no son pagos fijos ni ahorro: compra, ocio, restaurantes… Los gastos cuyas categorías usan tus pagos fijos cuentan como fijos.")
-                .font(Typography.small12)
-                .foregroundStyle(Palette.graphite)
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
         }
         .card()
     }

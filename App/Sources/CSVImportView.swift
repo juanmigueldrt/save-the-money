@@ -63,7 +63,7 @@ struct CSVImportView: View {
             if let result {
                 Section {
                     Label(resultText(result), systemImage: "checkmark.circle.fill")
-                        .foregroundStyle(Palette.ink)
+                        .foregroundStyle(Palette.label)
                 }
             }
 
@@ -213,32 +213,32 @@ private struct PreviewSection: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(draft.description)
-                                .font(Typography.body14)
+                                .font(Typography.subheadline)
                                 .lineLimit(1)
                             Text(draft.bookedOn.shortText)
-                                .font(Typography.small12)
-                                .foregroundStyle(Palette.graphite)
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
                         }
                         Spacer()
                         Text(draft.amount.formatted())
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(draft.amount.isNegative ? Palette.ink : Palette.ember)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(draft.amount.isNegative ? Palette.label : Palette.positiveText)
                     }
                 }
             }
             let valid = rows.count - problems.count
             if valid > 10 {
                 Text("… y \(valid - 10) más")
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
         }
         if !problems.isEmpty {
             Section("Filas que no se importarán (\(problems.count))") {
                 ForEach(problems.prefix(10)) { row in
                     Text("Fila \(row.line): \(row.issue ?? "")")
-                        .font(Typography.small12)
-                        .foregroundStyle(Palette.red)
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.negativeText)
                 }
             }
         }

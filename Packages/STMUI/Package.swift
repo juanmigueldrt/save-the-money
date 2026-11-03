@@ -16,7 +16,7 @@ let package = Package(
         .target(
             name: "STMUI",
             dependencies: ["STMCore"],
-            // Source Serif 4 e Inter (licencia SIL OFL 1.1, textos al lado de cada fuente).
+            // Source Serif 4 (licencia SIL OFL 1.1, texto al lado de la fuente).
             resources: [.copy("Fonts")]
         ),
     ]

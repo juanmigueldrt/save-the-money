@@ -19,16 +19,16 @@ struct SummaryView: View {
                             Eyebrow("Patrimonio neto")
                             Spacer()
                             Image(systemName: "chevron.right")
-                                .font(Typography.small12)
-                                .foregroundStyle(Palette.graphite)
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
                         }
                         Text(finance.totalBalance.formatted())
-                            .titleFont(.title36)
-                            .foregroundStyle(finance.totalBalance.isNegative ? Palette.red : Palette.ink)
+                            .titleFont(.largeTitle)
+                            .foregroundStyle(finance.totalBalance.isNegative ? Palette.negativeText : Palette.label)
                             .contentTransition(.numericText())
                         Text("Lo que tienes menos lo que debes. Toca para ver cómo evoluciona.")
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
@@ -39,12 +39,12 @@ struct SummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
                         Text("Cuentas")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         Spacer()
                         Button("Añadir", systemImage: "plus") { addingAccount = true }
                             .labelStyle(.titleAndIcon)
-                            .font(Typography.body14Medium)
+                            .font(Typography.subheadlineEmphasis)
                     }
                     if finance.activeAccounts.isEmpty {
                         EmptyHint(text: "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
@@ -61,11 +61,11 @@ struct SummaryView: View {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
                         Text("Últimos movimientos")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         Spacer()
                         NavigationLink("Ver todos") { MovementsView() }
-                            .font(Typography.body14Medium)
+                            .font(Typography.subheadlineEmphasis)
                     }
                     if finance.recent.isEmpty {
                         EmptyHint(text: "Todavía no hay movimientos.")
@@ -80,7 +80,7 @@ struct SummaryView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Resumen")
         .navigationDestination(for: Account.self) { AccountDetailView(account: $0) }
         .toolbar {
@@ -103,20 +103,20 @@ struct AccountRow: View {
         HStack(spacing: Spacing.s16) {
             Image(systemName: account.kind.systemImage)
                 .frame(width: 32, height: 32)
-                .foregroundStyle(Palette.ink)
-                .background(Palette.linen, in: RoundedRectangle(cornerRadius: Radius.input))
+                .foregroundStyle(Palette.label)
+                .background(Palette.bgGrouped, in: RoundedRectangle(cornerRadius: Radius.input))
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.name)
-                    .font(Typography.body16Medium)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.headline)
+                    .foregroundStyle(Palette.label)
                 Text(account.isShared ? "\(account.kind.title) · compartida" : account.kind.title)
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             Spacer()
             Text(balance.formatted())
-                .font(Typography.body16Medium)
-                .foregroundStyle(balance.isNegative ? Palette.red : Palette.ink)
+                .font(Typography.headline)
+                .foregroundStyle(balance.isNegative ? Palette.negativeText : Palette.label)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
@@ -140,18 +140,18 @@ struct MovementRow: View {
         HStack(spacing: Spacing.s16) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(movement.description)
-                    .font(Typography.body16)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.body)
+                    .foregroundStyle(Palette.label)
                     .lineLimit(1)
                 Text(subtitle)
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
                     .lineLimit(1)
             }
             Spacer()
             Text(movement.amount.formatted())
-                .font(Typography.body16Medium)
-                .foregroundStyle(movement.isExpense ? Palette.ink : Palette.ember)
+                .font(Typography.headline)
+                .foregroundStyle(movement.isExpense ? Palette.label : Palette.positiveText)
         }
         .accessibilityElement(children: .combine)
     }
@@ -163,8 +163,8 @@ struct EmptyHint: View {
 
     var body: some View {
         Text(text)
-            .font(Typography.body14)
-            .foregroundStyle(Palette.graphite)
+            .font(Typography.subheadline)
+            .foregroundStyle(Palette.labelSecondary)
     }
 }
 
@@ -255,16 +255,16 @@ struct AccountDetailView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Saldo")
-                        .font(Typography.body14Medium)
-                        .foregroundStyle(Palette.graphite)
+                        .font(Typography.subheadlineEmphasis)
+                        .foregroundStyle(Palette.labelSecondary)
                     Text(finance.balance(of: current).formatted())
-                        .titleFont(.title32)
-                        .foregroundStyle(finance.balance(of: current).isNegative ? Palette.red : Palette.ink)
+                        .titleFont(.title1)
+                        .foregroundStyle(finance.balance(of: current).isNegative ? Palette.negativeText : Palette.label)
                 }
                 Spacer()
             }
             .padding(Spacing.s16)
-            .background(Palette.paper)
+            .background(Palette.bgGrouped2)
             MovementsView(account: current)
         }
         .toolbar {

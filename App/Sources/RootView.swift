@@ -49,7 +49,12 @@ struct RootView: View {
     let household: Household
 
     @Environment(SessionModel.self) private var session
-    @State private var selection: AppSection? = .summary
+    @State private var selection: AppSection? = {
+        #if DEBUG
+        if let section = ScreenshotMode.section { return section }
+        #endif
+        return .summary
+    }()
     @State private var finance: FinanceModel
     @State private var budgets: BudgetModel
     @State private var planning: PlanningModel

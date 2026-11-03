@@ -10,15 +10,24 @@ struct SaveTheMoneyApp: App {
         // Antes de pintar nada, para que todo salga con las fuentes del manual de marca.
         BrandFonts.register()
         let config = AppConfig.fromBundle()
-        _session = State(initialValue: SessionModel(services: .make(config: config)))
+        var services = AppServices.make(config: config)
+        #if DEBUG
+        if ScreenshotMode.isActive { services = .demo() }
+        #endif
+        _session = State(initialValue: SessionModel(services: services))
     }
 
     var body: some Scene {
         WindowGroup {
             AppRootView()
                 .environment(session)
-                .tint(Palette.ember)
-                .task { await session.start() }
+                .tint(Palette.accent)
+                .task {
+                    #if DEBUG
+                    if ScreenshotMode.isActive { await ScreenshotMode.prepare(session); return }
+                    #endif
+                    await session.start()
+                }
                 .onOpenURL { session.handle(url: $0) }
         }
         #if os(macOS)
@@ -37,7 +46,7 @@ struct AppRootView: View {
             case .loading:
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Palette.linen)
+                    .background(Palette.bgGrouped)
             case .signedOut:
                 AuthFlowView()
             case .needsHousehold(let profile):

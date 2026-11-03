@@ -19,8 +19,8 @@ struct RecurringView: View {
                 if !planning.archivedSeries.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Archivados")
-                            .titleFont(.title20)
-                            .foregroundStyle(Palette.ink)
+                            .titleFont(.title2)
+                            .foregroundStyle(Palette.label)
                         ForEach(planning.archivedSeries) { item in
                             Button { editing = item } label: { RecurringRow(series: item) }
                                 .buttonStyle(.plain)
@@ -32,7 +32,7 @@ struct RecurringView: View {
             }
             .padding(Spacing.s16)
         }
-        .background(Palette.linen)
+        .background(Palette.bgGrouped)
         .navigationTitle("Pagos fijos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -49,18 +49,18 @@ struct RecurringView: View {
             Eyebrow("Pagos fijos al mes")
             let fixed = planning.monthlyTotal(of: .subscription) + planning.monthlyTotal(of: .essential)
             Text(fixed.formatted())
-                .titleFont(.title36)
-                .foregroundStyle(Palette.ink)
+                .titleFont(.largeTitle)
+                .foregroundStyle(Palette.label)
                 .contentTransition(.numericText())
             HStack(spacing: Spacing.s16) {
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         Text(kind.pluralTitle)
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                         Text(planning.monthlyTotal(of: kind).formatted())
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(Palette.ink)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -72,24 +72,24 @@ struct RecurringView: View {
     private var upcomingCard: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Text("Próximos 30 días")
-                .titleFont(.title20)
-                .foregroundStyle(Palette.ink)
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
             if planning.upcoming.isEmpty {
                 EmptyHint(text: "No hay cargos en los próximos 30 días.")
             }
             ForEach(planning.upcoming.prefix(12)) { charge in
                 HStack {
                     Label(charge.series.trimmedName, systemImage: charge.series.kind.systemImage)
-                        .font(Typography.body14Medium)
-                        .foregroundStyle(Palette.ink)
+                        .font(Typography.subheadlineEmphasis)
+                        .foregroundStyle(Palette.label)
                     Spacer()
                     VStack(alignment: .trailing, spacing: Spacing.s8) {
                         Text(charge.series.signedAmount.formatted())
-                            .font(Typography.body14Medium)
-                            .foregroundStyle(Palette.ink)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
                         Text(charge.due.shortText)
-                            .font(Typography.small12)
-                            .foregroundStyle(Palette.graphite)
+                            .font(Typography.footnote)
+                            .foregroundStyle(Palette.labelSecondary)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -100,8 +100,8 @@ struct RecurringView: View {
     private func kindCard(_ kind: RecurringKind) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             Text(kind.pluralTitle)
-                .titleFont(.title20)
-                .foregroundStyle(Palette.ink)
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
             let items = planning.series(of: kind)
             if items.isEmpty {
                 EmptyHint(text: hint(for: kind))
@@ -128,20 +128,20 @@ struct RecurringRow: View {
     var body: some View {
         HStack(spacing: Spacing.s16) {
             Image(systemName: series.kind.systemImage)
-                .foregroundStyle(Palette.ember)
+                .foregroundStyle(Palette.accentText)
                 .frame(width: 28)
             VStack(alignment: .leading, spacing: Spacing.s8) {
                 Text(series.trimmedName)
-                    .font(Typography.body16Medium)
-                    .foregroundStyle(Palette.ink)
+                    .font(Typography.headline)
+                    .foregroundStyle(Palette.label)
                 Text(detail)
-                    .font(Typography.small12)
-                    .foregroundStyle(Palette.graphite)
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
             Spacer()
             Text(series.amount.formatted())
-                .font(Typography.body14Medium)
-                .foregroundStyle(Palette.ink)
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.label)
         }
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
