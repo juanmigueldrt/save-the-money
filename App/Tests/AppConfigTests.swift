@@ -129,7 +129,7 @@ final class BudgetModelTests: XCTestCase {
 /// Guarda los avisos que se programarían, en vez de lanzarlos.
 private actor RecordingReminders: ReminderScheduling {
     private(set) var last: [PlannedReminder] = []
-    func replace(with reminders: [PlannedReminder]) async { last = reminders }
+    func replace(with reminders: [PlannedReminder], prefix: String) async { last = reminders }
 }
 
 @MainActor

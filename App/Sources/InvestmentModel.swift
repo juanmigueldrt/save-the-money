@@ -74,7 +74,7 @@ final class InvestmentModel {
         isLoading = true
         defer { isLoading = false }
         let service = service, households = households, id = household.id
-        await perform {
+        _ = await perform {
             async let holdings = service.holdings(in: id)
             async let prices = service.holdingPrices(in: id)
             async let trades = service.trades(in: id)
