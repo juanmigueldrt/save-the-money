@@ -36,7 +36,7 @@ struct RecurringView: View {
         .navigationTitle("Pagos fijos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nuevo pago fijo", systemImage: "plus.circle.fill") { adding = true }
+                Button("Nuevo pago fijo", systemImage: "plus") { adding = true }
             }
         }
         .refreshable { await planning.load() }

@@ -104,6 +104,16 @@ extension View {
         #endif
     }
 
+    /// Alto de un gráfico: el dado en iPhone y más alto en Mac, donde la página es
+    /// mucho más ancha y un gráfico bajo se ve aplastado.
+    func chartHeight(_ phone: CGFloat) -> some View {
+        #if os(macOS)
+        frame(height: max(phone * 1.6, 300))
+        #else
+        frame(height: phone)
+        #endif
+    }
+
     /// Ancho cómodo para formularios en Mac y iPad.
     func formWidth() -> some View {
         frame(maxWidth: 420)

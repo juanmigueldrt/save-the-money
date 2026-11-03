@@ -54,7 +54,7 @@ struct NetWorthView: View {
                                 AxisValueLabel(format: .dateTime.month(.abbreviated))
                             }
                         }
-                        .frame(height: 200)
+                        .chartHeight(200)
                         .accessibilityLabel("Gráfico del patrimonio neto de los últimos 12 meses")
                     }
                 }
@@ -175,7 +175,7 @@ struct CreditScoreView: View {
                             PointMark(x: .value("Fecha", item.recordedOn.date()), y: .value("Score", item.score))
                                 .foregroundStyle(Palette.accent)
                         }
-                        .frame(height: 180)
+                        .chartHeight(180)
                         .accessibilityLabel("Gráfico de la evolución del score")
                     }
                     .card()
@@ -219,7 +219,7 @@ struct CreditScoreView: View {
         .navigationTitle("Score crediticio")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Apuntar score", systemImage: "plus.circle.fill") { adding = true }
+                Button("Apuntar score", systemImage: "plus") { adding = true }
             }
         }
         .task { await tracking.loadScores() }
@@ -343,7 +343,7 @@ struct ReportsView: View {
                                 AxisValueLabel(format: .dateTime.month(.narrow))
                             }
                         }
-                        .frame(height: 180)
+                        .chartHeight(180)
                         .accessibilityLabel("Gráfico por meses")
                     }
                 }

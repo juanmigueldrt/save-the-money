@@ -87,7 +87,7 @@ struct SummaryView: View {
         .navigationDestination(for: Account.self) { AccountDetailView(account: $0) }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nuevo movimiento", systemImage: "plus.circle.fill") { addingMovement = true }
+                Button("Nuevo movimiento", systemImage: "plus") { addingMovement = true }
                     .disabled(finance.activeAccounts.isEmpty)
             }
         }
@@ -227,7 +227,7 @@ struct MovementsView: View {
         .navigationTitle(account?.name ?? "Movimientos")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Nuevo movimiento", systemImage: "plus.circle.fill") { adding = true }
+                Button("Nuevo movimiento", systemImage: "plus") { adding = true }
                     .disabled(finance.activeAccounts.isEmpty)
             }
         }
