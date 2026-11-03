@@ -1,14 +1,16 @@
 -- Fase 7: inversiones.
 --
--- Activos (fondos, ETF, acciones...), las compras y ventas de cada uno y los planes de
--- inversión periódica. Los precios se apuntan a mano (lo decidió Jean el 2026-11-03):
+-- Activos (fondos, ETF, acciones...), el histórico de sus precios, las compras y ventas
+-- de cada uno y los planes de aportación automática. Los precios se apuntan a mano (lo decidió Jean el 2026-11-03):
 -- no hay ningún servicio de cotizaciones ni claves de terceros.
 -- Como las cuentas, todo se ve dentro del hogar y sólo lo tocan sus miembros (RLS);
 -- owner_id dice de quién es un activo, igual que en accounts.
 
 -- Tipos ---------------------------------------------------------------------
 
-create type public.investment_kind as enum ('fund', 'etf', 'stock', 'bond', 'crypto', 'pension', 'other');
+create type public.investment_kind as enum ('fund', 'etf', 'stock', 'bond', 'crypto', 'pension', 'cash', 'other');
+-- Clase de activo para el gráfico de distribución (renta variable, renta fija, cripto, liquidez).
+create type public.asset_class as enum ('equity', 'fixed_income', 'crypto', 'cash', 'other');
 create type public.trade_side as enum ('buy', 'sell');
 
 -- Activos ---------------------------------------------------------------------
@@ -20,6 +22,7 @@ create table public.holdings (
   -- Ticker o ISIN, opcional y sólo para reconocerlo.
   symbol text check (char_length(trim(symbol)) between 1 and 20),
   kind public.investment_kind not null default 'fund',
+  asset_class public.asset_class not null default 'equity',
   currency char(3) not null default 'EUR' check (currency ~ '^[A-Z]{3}$'),
   -- Cuenta del bróker o del banco donde está, si se quiere enlazar.
   account_id uuid,
@@ -28,6 +31,8 @@ create table public.holdings (
   -- Último precio por participación, apuntado a mano, en unidades de la moneda.
   price numeric(18, 6) not null default 0 check (price >= 0),
   price_on date,
+  -- Comisión de compra del bróker, en % del importe (0,20 = 0,20 %).
+  fee_rate numeric(5, 3) not null default 0 check (fee_rate between 0 and 10),
   note text check (char_length(note) <= 200),
   archived_at timestamptz,
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
@@ -40,6 +45,24 @@ create table public.holdings (
 create index holdings_household_id_idx on public.holdings (household_id);
 create index holdings_account_id_idx on public.holdings (account_id);
 create index holdings_owner_id_idx on public.holdings (owner_id);
+
+-- Histórico de precios ----------------------------------------------------------
+-- Cada vez que se apunta un precio a mano se guarda aquí, para el gráfico de evolución.
+
+create table public.holding_prices (
+  id uuid primary key default gen_random_uuid(),
+  household_id uuid not null,
+  holding_id uuid not null,
+  priced_on date not null,
+  price numeric(18, 6) not null check (price >= 0),
+  created_by uuid references auth.users (id) on delete set null default auth.uid(),
+  created_at timestamptz not null default now(),
+  foreign key (holding_id, household_id) references public.holdings (id, household_id) on delete cascade,
+  -- Un precio por día; apuntar otro el mismo día lo sustituye.
+  unique (holding_id, priced_on)
+);
+
+create index holding_prices_household_id_idx on public.holding_prices (household_id);
 
 -- Compras y ventas --------------------------------------------------------------
 
@@ -64,12 +87,15 @@ create table public.investment_trades (
 create index investment_trades_holding_traded_idx on public.investment_trades (holding_id, traded_on desc);
 create index investment_trades_household_id_idx on public.investment_trades (household_id);
 
--- Planes de inversión periódica ---------------------------------------------------
+-- Aportaciones automáticas ----------------------------------------------------------
+-- El plan no compra nada solo: avisa y propone la compra, que se confirma en la app.
 
 create table public.investment_plans (
   id uuid primary key default gen_random_uuid(),
   household_id uuid not null,
   holding_id uuid not null,
+  -- Cuenta de la que sale el dinero, si se quiere enlazar.
+  account_id uuid,
   -- Lo que se invierte cada vez, en céntimos.
   amount_minor bigint not null check (amount_minor > 0),
   every smallint not null default 1 check (every between 1 and 52),
@@ -79,16 +105,20 @@ create table public.investment_plans (
   -- Rentabilidad anual supuesta para la proyección, en %.
   expected_annual_return numeric(5, 2) not null default 5 check (expected_annual_return between -50 and 50),
   remind_days_before smallint default 1 check (remind_days_before between 0 and 14),
+  -- En pausa: no avisa ni cuenta en el total mensual, pero no se borra.
+  paused_at timestamptz,
   archived_at timestamptz,
   created_by uuid references auth.users (id) on delete set null default auth.uid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   check (ends_on is null or ends_on >= starts_on),
-  foreign key (holding_id, household_id) references public.holdings (id, household_id) on delete cascade
+  foreign key (holding_id, household_id) references public.holdings (id, household_id) on delete cascade,
+  foreign key (account_id, household_id) references public.accounts (id, household_id) on delete set null (account_id)
 );
 
 create index investment_plans_holding_id_idx on public.investment_plans (holding_id);
 create index investment_plans_household_id_idx on public.investment_plans (household_id);
+create index investment_plans_account_id_idx on public.investment_plans (account_id);
 
 create trigger holdings_touch before update on public.holdings
   for each row execute function private.touch_updated_at();
@@ -102,24 +132,33 @@ create trigger investment_plans_touch before update on public.investment_plans
 alter table public.holdings enable row level security;
 alter table public.investment_trades enable row level security;
 alter table public.investment_plans enable row level security;
+alter table public.holding_prices enable row level security;
 
-revoke all on public.holdings, public.investment_trades, public.investment_plans from anon, authenticated;
+revoke all on public.holdings, public.holding_prices, public.investment_trades, public.investment_plans
+  from anon, authenticated;
 
 -- household_id, holding_id y created_by no se pueden cambiar después de crear la fila.
 grant select,
-  insert (household_id, name, symbol, kind, currency, account_id, owner_id, price, price_on, note, archived_at),
-  update (name, symbol, kind, account_id, owner_id, price, price_on, note, archived_at),
+  insert (household_id, name, symbol, kind, asset_class, currency, account_id, owner_id, price, price_on, fee_rate,
+          note, archived_at),
+  update (name, symbol, kind, asset_class, account_id, owner_id, price, price_on, fee_rate, note, archived_at),
   delete
   on public.holdings to authenticated;
+grant select,
+  insert (household_id, holding_id, priced_on, price),
+  update (price),
+  delete
+  on public.holding_prices to authenticated;
 grant select,
   insert (household_id, holding_id, traded_on, side, quantity, price, fee_minor, note),
   update (traded_on, side, quantity, price, fee_minor, note),
   delete
   on public.investment_trades to authenticated;
 grant select,
-  insert (household_id, holding_id, amount_minor, every, unit, starts_on, ends_on, expected_annual_return,
-          remind_days_before, archived_at),
-  update (amount_minor, every, unit, starts_on, ends_on, expected_annual_return, remind_days_before, archived_at),
+  insert (household_id, holding_id, account_id, amount_minor, every, unit, starts_on, ends_on, expected_annual_return,
+          remind_days_before, paused_at, archived_at),
+  update (account_id, amount_minor, every, unit, starts_on, ends_on, expected_annual_return, remind_days_before,
+          paused_at, archived_at),
   delete
   on public.investment_plans to authenticated;
 
@@ -144,6 +183,20 @@ create policy holdings_update on public.holdings
     ))
   );
 create policy holdings_delete on public.holdings
+  for delete to authenticated
+  using ((select private.is_member(household_id)));
+
+create policy holding_prices_select on public.holding_prices
+  for select to authenticated
+  using ((select private.is_member(household_id)));
+create policy holding_prices_insert on public.holding_prices
+  for insert to authenticated
+  with check ((select private.is_member(household_id)));
+create policy holding_prices_update on public.holding_prices
+  for update to authenticated
+  using ((select private.is_member(household_id)))
+  with check ((select private.is_member(household_id)));
+create policy holding_prices_delete on public.holding_prices
   for delete to authenticated
   using ((select private.is_member(household_id)));
 
@@ -188,7 +241,7 @@ begin
     raise exception 'no eres miembro de ese hogar' using errcode = '42501';
   end if;
 
-  delete from public.holdings where household_id = target_household;         -- y sus operaciones y planes
+  delete from public.holdings where household_id = target_household;         -- y sus precios, operaciones y planes
   delete from public.goals where household_id = target_household;            -- y sus aportaciones
   delete from public.recurring_series where household_id = target_household;
   delete from public.budgets where household_id = target_household;          -- y sus líneas

@@ -2,7 +2,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(16);
+select plan(19);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('00000000-0000-0000-0000-00000000000a', 'ana@savethemoney.invalid', '{"username":"ana"}'),
@@ -59,6 +59,16 @@ select lives_ok(
      select (select id from hogar_ana), (select id from ids where name = 'fondo'), 10000, '2026-11-05', 6.5 $$,
   'Ana crea un plan de 100 € al mes'
 );
+select lives_ok(
+  $$ insert into public.holding_prices (household_id, holding_id, priced_on, price)
+     select (select id from hogar_ana), (select id from ids where name = 'fondo'), '2026-11-01', 12.345678 $$,
+  'Ana guarda el precio en el histórico'
+);
+select throws_ok(
+  $$ insert into public.holding_prices (household_id, holding_id, priced_on, price)
+     select (select id from hogar_ana), (select id from ids where name = 'fondo'), '2026-11-01', 12.5 $$,
+  '23505', null, 'sólo un precio por día y activo'
+);
 select throws_ok(
   $$ insert into public.investment_trades (household_id, holding_id, traded_on, quantity, price)
      select (select id from hogar_ana), (select id from ids where name = 'fondo'), '2026-10-02', 0, 11 $$,
@@ -87,6 +97,7 @@ select throws_ok(
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');
 select is((select count(*)::int from public.holdings), 0, 'Carla no ve activos de otro hogar');
 select is((select count(*)::int from public.investment_trades), 0, 'Carla no ve operaciones de otro hogar');
+select is((select count(*)::int from public.holding_prices), 0, 'Carla no ve precios de otro hogar');
 select throws_ok(
   $$ insert into public.holdings (household_id, name) select id, 'Intruso' from hogar_ana $$,
   '42501', null, 'Carla no puede crear activos en otro hogar'
