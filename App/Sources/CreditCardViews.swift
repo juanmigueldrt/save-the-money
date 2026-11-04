@@ -38,6 +38,7 @@ struct CreditCardsView: View {
                         if let summary = cards.summary(for: account) {
                             NavigationLink { CreditCardDetailView(account: account) } label: {
                                 CardOverview(name: account.name, summary: summary)
+                                    .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
                             .card()
@@ -175,8 +176,10 @@ enum CardText {
             parts.append(mode.isRevolving ? "cuota \(payment.purchases.formatted())" : "compras \(payment.purchases.formatted())")
         }
         if payment.installments.minor > 0 { parts.append("aplazados \(payment.installments.formatted())") }
-        if payment.interest.minor > 0 { parts.append("intereses \(payment.interest.formatted())") }
-        return parts.isEmpty ? "Sin cargos" : parts.joined(separator: " · ")
+        guard !parts.isEmpty else { return "Sin cargos" }
+        let text = parts.joined(separator: " · ")
+        // Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces.
+        return payment.interest.minor > 0 ? "\(text) (incluye \(payment.interest.formatted()) de intereses)" : text
     }
 }
 
@@ -299,6 +302,11 @@ struct CreditCardDetailView: View {
                     .disabled(cards.deferrable(in: account).isEmpty)
             }
             let plans = cards.installments.filter { $0.accountId == account.id }
+            if !plans.isEmpty, cards.deferrable(in: account).isEmpty {
+                Text("Para aplazar otra compra tiene que ser de 50 € o más y del extracto abierto.")
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
+            }
             if plans.isEmpty {
                 EmptyHint(text: "Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al \(CardText.percent(summary.terms.installmentRate)) TIN. La cuota se suma a cada cargo.")
             }
