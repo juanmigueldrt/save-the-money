@@ -28,6 +28,20 @@ struct MoreView: View {
                     Label("Hogar: \(household.name)", systemImage: AppSection.household.systemImage)
                 }
                 NavigationLink {
+                    CreditCardsView()
+                } label: {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(AppSection.creditCards.title)
+                            Text("Próximo cargo, límite y compras a plazos")
+                                .font(Typography.footnote)
+                                .foregroundStyle(Palette.labelSecondary)
+                        }
+                    } icon: {
+                        Image(systemName: AppSection.creditCards.systemImage)
+                    }
+                }
+                NavigationLink {
                     RecurringView()
                 } label: {
                     Label(AppSection.subscriptions.title, systemImage: AppSection.subscriptions.systemImage)

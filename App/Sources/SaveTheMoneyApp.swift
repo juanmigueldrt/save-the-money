@@ -67,7 +67,11 @@ struct AppRootView: View {
                                                  budgets: session.services.budgets, scores: session.services.creditScores),
                          investments: InvestmentModel(household: household, service: session.services.investments,
                                                       households: session.services.households,
-                                                      reminders: session.isDemo ? NoReminders() : LocalReminders()))
+                                                      reminders: session.isDemo ? NoReminders() : LocalReminders()),
+                         cards: CreditCardModel(household: household, service: session.services.creditCards,
+                                                finance: session.services.finance,
+                                                reminders: session.isDemo ? NoReminders() : LocalReminders(),
+                                                alerts: session.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts()))
                     .id(household.id)
             }
         }

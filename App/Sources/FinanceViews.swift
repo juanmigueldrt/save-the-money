@@ -271,6 +271,20 @@ struct AccountDetailView: View {
             }
             .padding(Spacing.s16)
             .background(Palette.bgGrouped2)
+            if current.kind == .creditCard {
+                NavigationLink {
+                    CreditCardDetailView(account: current)
+                } label: {
+                    Label("Próximo cargo, límite y aplazados", systemImage: "creditcard")
+                        .font(Typography.subheadlineEmphasis)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, Spacing.s16)
+                        .padding(.vertical, Spacing.s12)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Palette.accentText)
+                .background(Palette.bgGrouped2)
+            }
             MovementsView(account: current)
         }
         .toolbar {
@@ -294,6 +308,8 @@ extension CalendarDay {
 /// Crear o editar una cuenta.
 struct AccountFormView: View {
     let account: Account?
+    /// Tipo con el que empieza una cuenta nueva (p. ej. tarjeta, desde la pantalla de tarjetas).
+    var initialKind: AccountKind = .checking
 
     @Environment(FinanceModel.self) private var finance
     @Environment(SessionModel.self) private var session
@@ -350,7 +366,10 @@ struct AccountFormView: View {
     }
 
     private func fill() {
-        guard let account else { return }
+        guard let account else {
+            kind = initialKind
+            return
+        }
         name = account.name
         kind = account.kind
         openingBalance = account.openingBalance.minor == 0 ? "" : account.openingBalance.plainText
