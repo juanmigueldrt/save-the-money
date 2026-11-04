@@ -382,6 +382,7 @@ struct ResetHouseholdView: View {
 
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
+    @Environment(InvestmentModel.self) private var investments
     @Environment(\.dismiss) private var dismiss
     @State private var confirmation = ""
     @State private var isWorking = false
@@ -398,7 +399,7 @@ struct ResetHouseholdView: View {
                         Text("Se borrará todo lo apuntado en «\(household.name)»")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        Text("Cuentas, movimientos, categorías propias, presupuestos, pagos fijos y metas, para todas las personas del hogar. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan.")
+                        Text("Cuentas, tarjetas, movimientos, categorías propias, presupuestos, pagos fijos, metas e inversiones, para todas las personas del hogar. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan.")
                             .font(Typography.subheadline)
                             .foregroundStyle(Palette.labelSecondary)
                         Text("No se puede deshacer. Si quieres guardar una copia, exporta antes el CSV.")
@@ -447,6 +448,8 @@ struct ResetHouseholdView: View {
         }
         // Recarga los pagos fijos y metas (y con ellos, los avisos del dispositivo).
         await planning.load()
+        // El presupuesto y las tarjetas se recargan solos al cambiar los movimientos.
+        await investments.load()
         dismiss()
     }
 }
