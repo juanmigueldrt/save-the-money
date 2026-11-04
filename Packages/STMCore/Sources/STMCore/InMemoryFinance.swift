@@ -48,7 +48,13 @@ extension InMemoryBackend: FinanceService {
         guard let account = financeAccounts.first(where: { $0.id == accountId }) else { return }
         _ = try requireMember(of: account.householdId)
         financeAccounts.removeAll { $0.id == accountId }
+        let gone = Set(financeMovements.filter { $0.accountId == accountId }.map(\.id))
         financeMovements.removeAll { $0.accountId == accountId }
+        creditCardList.removeAll { $0.accountId == accountId }
+        installmentList.removeAll { $0.accountId == accountId || gone.contains($0.movementId) }
+        for index in creditCardList.indices where creditCardList[index].payFromAccountId == accountId {
+            creditCardList[index].payFromAccountId = nil
+        }
     }
 
     public func categories(in householdId: UUID) async throws -> [BudgetCategory] {
@@ -101,6 +107,8 @@ extension InMemoryBackend: FinanceService {
         tradeList.removeAll { holdingIds.contains($0.holdingId) }
         planList.removeAll { holdingIds.contains($0.holdingId) }
         holdingList.removeAll { $0.householdId == householdId }
+        creditCardList.removeAll { $0.householdId == householdId }
+        installmentList.removeAll { $0.householdId == householdId }
         let goalIds = Set(goalList.filter { $0.householdId == householdId }.map(\.id))
         goalContributions.removeAll { goalIds.contains($0.goalId) }
         goalList.removeAll { $0.householdId == householdId }
@@ -167,6 +175,7 @@ extension InMemoryBackend: FinanceService {
         guard let movement = financeMovements.first(where: { $0.id == movementId }) else { return }
         _ = try requireMember(of: movement.householdId)
         financeMovements.removeAll { $0.id == movementId }
+        installmentList.removeAll { $0.movementId == movementId }
     }
 
     public func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult {

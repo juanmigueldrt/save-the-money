@@ -4,7 +4,7 @@ import STMUI
 
 /// Secciones de la app. En iPhone son pestañas; en Mac, la barra lateral.
 enum AppSection: String, CaseIterable, Identifiable, Hashable {
-    case summary, movements, budget, cashFlow, netWorth, reports, subscriptions, goals, investments, creditScore, household, more
+    case summary, movements, creditCards, budget, cashFlow, netWorth, reports, subscriptions, goals, investments, creditScore, household, more
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .summary: "Resumen"
         case .movements: "Movimientos"
+        case .creditCards: "Tarjetas"
         case .budget: "Presupuesto"
         case .cashFlow: "Flujo"
         case .netWorth: "Patrimonio"
@@ -29,6 +30,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
         switch self {
         case .summary: "house"
         case .movements: "list.bullet.rectangle"
+        case .creditCards: "creditcard"
         case .budget: "chart.pie"
         case .cashFlow: "arrow.left.arrow.right"
         case .netWorth: "chart.line.uptrend.xyaxis"
@@ -47,7 +49,7 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     /// Barra lateral de Mac, agrupada como en el diseño.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
-        ("Dinero", [.summary, .movements, .budget, .cashFlow]),
+        ("Dinero", [.summary, .movements, .creditCards, .budget, .cashFlow]),
         ("Seguimiento", [.netWorth, .reports, .creditScore]),
         ("Planificación", [.subscriptions, .goals, .investments]),
         ("Hogar", [.household, .more]),
@@ -70,12 +72,13 @@ struct RootView: View {
     @State private var planning: PlanningModel
     @State private var tracking: TrackingModel
     @State private var investments: InvestmentModel
+    @State private var cards: CreditCardModel
     @State private var addingMovement = false
     @State private var addingAccount = false
     @State private var importingCSV = false
 
     init(profile: Profile, household: Household, finance: FinanceModel, budgets: BudgetModel, planning: PlanningModel,
-         tracking: TrackingModel, investments: InvestmentModel) {
+         tracking: TrackingModel, investments: InvestmentModel, cards: CreditCardModel) {
         self.profile = profile
         self.household = household
         _finance = State(initialValue: finance)
@@ -83,6 +86,7 @@ struct RootView: View {
         _planning = State(initialValue: planning)
         _tracking = State(initialValue: tracking)
         _investments = State(initialValue: investments)
+        _cards = State(initialValue: cards)
     }
 
     var body: some View {
@@ -113,6 +117,7 @@ struct RootView: View {
         .environment(planning)
         .environment(tracking)
         .environment(investments)
+        .environment(cards)
         .task { await finance.load() }
         // También reprograma los avisos de pagos cada vez que se abre la app.
         .task { await planning.load() }
@@ -123,6 +128,8 @@ struct RootView: View {
         .task(id: finance.recent) {
             await budgets.load()
             await budgets.checkAlerts(categories: finance.categories)
+            // Las tarjetas: próximo cargo, avisos antes del cargo y del límite.
+            await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
         }
     }
 
@@ -206,6 +213,8 @@ struct RootView: View {
             SummaryView()
         case .movements:
             MovementsView()
+        case .creditCards:
+            CreditCardsView()
         case .budget:
             BudgetView()
         case .cashFlow:
@@ -240,6 +249,7 @@ struct RootView: View {
                     tracking: TrackingModel(household: household, finance: services.finance, budgets: services.budgets,
                                             scores: services.creditScores),
                     investments: InvestmentModel(household: household, service: services.investments,
-                                                 households: services.households))
+                                                 households: services.households),
+                    cards: CreditCardModel(household: household, service: services.creditCards, finance: services.finance))
         .environment(SessionModel(services: services))
 }

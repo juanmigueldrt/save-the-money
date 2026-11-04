@@ -264,3 +264,59 @@ final class TrackingModelTests: XCTestCase {
         XCTAssertEqual(report.byCategory.first?.title, "Supermercado")
     }
 }
+
+private actor RecordingAlerts: BudgetAlerting {
+    private(set) var sent: [BudgetAlert] = []
+    func notify(_ alerts: [BudgetAlert]) async { sent += alerts }
+}
+
+@MainActor
+final class CreditCardModelTests: XCTestCase {
+    func testCardSummaryRemindersAndInstallment() async throws {
+        let services = AppServices.demo()
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await session.createHousehold(name: "Casa de prueba")
+        guard case .ready(_, let home) = session.state else { return XCTFail("sin hogar") }
+        let today = try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 4))
+
+        let finance = FinanceModel(household: home, service: services.finance)
+        await finance.load()
+        _ = await finance.createAccount(AccountDraft(name: "Cuenta común", openingBalance: Money(minor: 10_000)))
+        _ = await finance.createAccount(AccountDraft(name: "Tarjeta", kind: .creditCard))
+        let checking = try XCTUnwrap(finance.accounts.first { $0.kind == .checking })
+        let card = try XCTUnwrap(finance.accounts.first { $0.kind == .creditCard })
+        _ = await finance.add(MovementDraft(accountId: card.id, bookedOn: try XCTUnwrap(CalendarDay(year: 2026, month: 10, day: 10)),
+                                            amount: Money(minor: -250_000), description: "Compra grande"))
+        _ = await finance.add(MovementDraft(accountId: card.id, bookedOn: try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 2)),
+                                            amount: Money(minor: -6_000), description: "Compra a plazos"))
+
+        let reminders = RecordingReminders()
+        let alerts = RecordingAlerts()
+        let cards = CreditCardModel(household: home, service: services.creditCards, finance: services.finance,
+                                    reminders: reminders, alerts: alerts, today: { today })
+        await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+        XCTAssertNil(cards.summary(for: card), "sin condiciones no hay cálculo")
+
+        let saved = await cards.save(CreditCardTerms(accountId: card.id, householdId: home.id, creditLimit: Money(minor: 300_000),
+                                                     payFromAccountId: checking.id))
+        XCTAssertTrue(saved)
+        let summary = try XCTUnwrap(cards.summary(for: card))
+        XCTAssertEqual(summary.next?.amount, Money(minor: 250_000))
+        XCTAssertTrue(summary.isOverAlert)
+        let sentAlerts = await alerts.sent
+        XCTAssertEqual(sentAlerts.count, 1)
+        let planned = await reminders.last
+        XCTAssertTrue(planned.contains { $0.body.contains("sólo hay") }, "avisa si la cuenta de pago no llega")
+
+        let purchase = try XCTUnwrap(cards.deferrable(in: card).first)
+        let deferred = await cards.deferPurchase(purchase, months: 3, in: card)
+        XCTAssertTrue(deferred)
+        XCTAssertTrue(cards.deferrable(in: card).isEmpty)
+        XCTAssertEqual(cards.summary(for: card)?.spentThisCycle, .zero)
+        XCTAssertGreaterThan(cards.summary(for: card)?.payments[1].installments.minor ?? 0, 2_000)
+
+        let invalid = await cards.save(CreditCardTerms(accountId: card.id, householdId: home.id, creditLimit: .zero))
+        XCTAssertFalse(invalid)
+    }
+}

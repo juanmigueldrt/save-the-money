@@ -49,10 +49,42 @@ enum ScreenshotMode {
             _ = try await services.budgets.saveBudget(
                 Budget(householdId: household.id, month: MonthKey(today), expectedIncome: Money(minor: 210_000)))
             try await prepareInvestments(services.investments, household: household.id, account: account.id, today: today)
+            try await prepareCard(services, household: household.id, payFrom: account.id,
+                                  shopping: first(.expense, .wants), today: today)
         } catch {
             // Si algo falla, la app queda en la pantalla de entrar, como sin este modo.
         }
         await session.refresh()
+    }
+
+    /// Una tarjeta inventada con el mes pasado por pagar, compras de este mes y una compra aplazada.
+    private static func prepareCard(_ services: AppServices, household: UUID, payFrom: UUID, shopping: UUID?,
+                                    today: CalendarDay) async throws {
+        let card = try await services.finance.createAccount(AccountDraft(name: "Tarjeta de crédito", kind: .creditCard),
+                                                            in: household)
+        _ = try await services.creditCards.saveCreditCard(
+            CreditCardTerms(accountId: card.id, householdId: household, creditLimit: Money(minor: 300_000),
+                            payFromAccountId: payFrom))
+        let lastMonth = MonthKey(today).adding(months: -1).firstDay
+        let thisMonth = MonthKey(today).firstDay
+        let purchases: [(CalendarDay, Int, String)] = [
+            (lastMonth.adding(days: 4), -6_480, "Gasolinera"),
+            (lastMonth.adding(days: 11), -12_990, "Tienda de deportes"),
+            (lastMonth.adding(days: 19), -4_250, "Restaurante"),
+            (thisMonth, -3_120, "Supermercado"),
+            (thisMonth, -45_000, "Ordenador portátil"),
+        ]
+        var laptop: Movement?
+        for (day, amount, text) in purchases {
+            let movement = try await services.finance.addMovement(
+                MovementDraft(accountId: card.id, categoryId: shopping, bookedOn: min(day, today), amount: Money(minor: amount),
+                              description: text), in: household)
+            if amount == -45_000 { laptop = movement }
+        }
+        if let laptop {
+            _ = try await services.creditCards.saveInstallment(
+                CardInstallment(householdId: household, accountId: card.id, movementId: laptop.id, months: 6))
+        }
     }
 
     /// Dos fondos inventados con unos meses de compras y precios, y dos planes (uno en pausa).

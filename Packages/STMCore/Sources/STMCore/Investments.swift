@@ -27,7 +27,7 @@ extension Money {
 }
 
 /// Lee un `numeric` de Postgres: PostgREST lo envía como número, pero se acepta también como texto.
-private func decodeNumeric<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ key: K) throws -> Decimal {
+func decodeNumeric<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ key: K) throws -> Decimal {
     if let text = try? c.decode(String.self, forKey: key) {
         guard let value = Decimal(string: text, locale: Locale(identifier: "en_US_POSIX")) else {
             throw DecodingError.dataCorruptedError(forKey: key, in: c, debugDescription: "número no válido")

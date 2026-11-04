@@ -55,6 +55,8 @@ struct AppCommands: Commands {
                 }
                 Button(AppSection.investments.title) { actions?.show(.investments) }
                     .keyboardShortcut("0")
+                Button(AppSection.creditCards.title) { actions?.show(.creditCards) }
+                    .keyboardShortcut("0", modifiers: [.command, .option])
                 Divider()
                 Button(AppSection.household.title) { actions?.show(.household) }
                 Button(AppSection.more.title) { actions?.show(.more) }

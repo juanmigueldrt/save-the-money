@@ -13,6 +13,7 @@ struct AppServices: Sendable {
     let goals: any GoalService
     let creditScores: any CreditScoreService
     let investments: any InvestmentService
+    let creditCards: any CreditCardService
     let isDemo: Bool
 
     static func make(config: AppConfig) -> AppServices {
@@ -20,18 +21,18 @@ struct AppServices: Sendable {
             let backend = InMemoryBackend()
             return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
                            recurring: backend, goals: backend, creditScores: backend,
-                           investments: backend, isDemo: true)
+                           investments: backend, creditCards: backend, isDemo: true)
         }
         let backend = SupabaseBackend(url: config.supabaseURL, anonKey: config.supabaseAnonKey)
         return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
                            recurring: backend, goals: backend, creditScores: backend,
-                           investments: backend, isDemo: false)
+                           investments: backend, creditCards: backend, isDemo: false)
     }
 
     static func demo() -> AppServices {
         let backend = InMemoryBackend()
         return AppServices(auth: backend, households: backend, finance: backend, budgets: backend,
                            recurring: backend, goals: backend, creditScores: backend,
-                           investments: backend, isDemo: true)
+                           investments: backend, creditCards: backend, isDemo: true)
     }
 }
