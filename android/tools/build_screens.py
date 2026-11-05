@@ -29,6 +29,18 @@ def paints(lst):
     return out
 
 
+# Rellenos de instancias que perdieron el vínculo a su variable en el diseño:
+# se vuelven a enlazar por (nombre de capa, color claro) para que el tema oscuro los cambie.
+UNBOUND = {
+    ("Barra superior", "FFEFECEA"): "VariableID:1:38",  # superficie
+    ("Indicador", "FFFF9D7A"): "VariableID:1:24",  # contenedor secundario
+    ("Pista", "FFAA3700"): "VariableID:1:18",  # interruptor encendido: primario
+    ("Tirador", "FFFFFFFF"): "VariableID:1:19",  # sobre primario
+    ("Pista", "FFDED9D5"): "VariableID:1:47",  # interruptor apagado: contenedor más alto
+    ("Tirador", "FF7B7672"): "VariableID:1:48",  # contorno
+}
+
+
 def r2(v):
     return round(v, 2)
 
@@ -46,6 +58,10 @@ def node(n, parent_abs):
         "h": r2(ab["height"]),
     }
     f = paints(n.get("fills"))
+    for p in f:
+        p.setdefault("v", UNBOUND.get((n["name"], p["c"])))
+        if p["v"] is None:
+            del p["v"]
     if f:
         o["f"] = f
     s = paints(n.get("strokes"))

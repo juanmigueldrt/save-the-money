@@ -36,7 +36,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        setContent { App(design) }
+        // Para capturas y pruebas: adb shell am start -n …/.MainActivity --ei pantalla 14
+        val start = intent.getIntExtra("pantalla", 1).coerceIn(1, design.screens.size)
+        setContent { App(design, start) }
     }
 }
 
@@ -44,10 +46,10 @@ private const val DESIGN_W = 412f
 private const val DESIGN_H = 917f
 
 @Composable
-fun App(design: Design) {
+fun App(design: Design, start: Int = 1) {
     val dark = isSystemInDarkTheme()
     val palette = remember(dark) { Palette(if (dark) design.dark else design.light) }
-    var stack by rememberSaveable { mutableStateOf(listOf(1)) }
+    var stack by rememberSaveable { mutableStateOf(listOf(start)) }
 
     fun handle(action: Action) {
         stack = when (action) {

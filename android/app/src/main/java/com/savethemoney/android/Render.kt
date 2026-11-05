@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.platform.LocalDensity
@@ -43,6 +44,9 @@ import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 
 @OptIn(ExperimentalTextApi::class)
@@ -61,9 +65,9 @@ class Palette(private val values: Map<String, Long>) {
     }
 }
 
-private fun roundRect(n: DNode, size: Size, inset: Float): RoundRect {
+private fun DrawScope.roundRect(n: DNode, size: Size, inset: Float): RoundRect {
     val r = n.radii
-    fun cr(v: Float) = (v - inset).coerceIn(0f, minOf(size.width, size.height) / 2).let { CornerRadius(it, it) }
+    fun cr(v: Float) = (v.dp.toPx() - inset).coerceIn(0f, minOf(size.width, size.height) / 2).let { CornerRadius(it, it) }
     return RoundRect(
         inset, inset, size.width - inset, size.height - inset,
         cr(r?.get(0) ?: 0f), cr(r?.get(1) ?: 0f), cr(r?.get(2) ?: 0f), cr(r?.get(3) ?: 0f),
@@ -76,14 +80,22 @@ private fun shapeOf(n: DNode): Shape =
 private fun DrawScope.drawShadows(n: DNode) {
     n.shadows.forEach { s ->
         val spread = s.spread.dp.toPx()
-        val rect = roundRect(n, size, -spread)
+        val r = roundRect(n, size, -spread)
+        val dx = s.x.dp.toPx()
+        val dy = s.y.dp.toPx()
         drawIntoCanvas { canvas ->
             val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 color = Color(s.argb.toInt()).toArgb()
                 if (s.blur > 0) maskFilter = BlurMaskFilter(s.blur.dp.toPx() * 0.866f, BlurMaskFilter.Blur.NORMAL)
             }
-            val path = Path().apply { addRoundRect(rect.translate(Offset(s.x.dp.toPx(), s.y.dp.toPx()))) }
-            canvas.nativeCanvas.drawPath((path as androidx.compose.ui.graphics.AndroidPath).internalPath, paint)
+            val radii = floatArrayOf(
+                r.topLeftCornerRadius.x, r.topLeftCornerRadius.y, r.topRightCornerRadius.x, r.topRightCornerRadius.y,
+                r.bottomRightCornerRadius.x, r.bottomRightCornerRadius.y, r.bottomLeftCornerRadius.x, r.bottomLeftCornerRadius.y,
+            )
+            val path = android.graphics.Path().apply {
+                addRoundRect(r.left + dx, r.top + dy, r.right + dx, r.bottom + dy, radii, android.graphics.Path.Direction.CW)
+            }
+            canvas.nativeCanvas.drawPath(path, paint)
         }
     }
 }
@@ -140,7 +152,7 @@ fun DesignNode(n: DNode, pal: Palette, onAction: (Action) -> Unit) {
         }
     }
     n.action?.let { action ->
-        mod = mod.clip(shape).clickable(indication = ripple(), interactionSource = null) { onAction(action) }
+        mod = mod.clickable(indication = ripple(), interactionSource = null) { onAction(action) }
     }
     mod = mod.drawWithContent {
         drawContent()
@@ -180,9 +192,19 @@ private fun DesignText(n: DNode, t: DText, pal: Palette) {
         )
     }
     if (t.autoResize == 'W') {
-        val align = when (t.align) { 'C' -> Alignment.TopCenter; 'R' -> Alignment.TopEnd; else -> Alignment.TopStart }
-        Text(t.text, Modifier.wrapContentSize(align, unbounded = true), style = style, softWrap = false)
+        // Texto que abraza: se mide sin límite y se ancla según su alineación, aunque mida algo más que en el diseño.
+        Text(
+            t.text,
+            Modifier.layout { m, c ->
+                val p = m.measure(Constraints())
+                layout(c.maxWidth, c.maxHeight) {
+                    val x = when (t.align) { 'C' -> (c.maxWidth - p.width) / 2; 'R' -> c.maxWidth - p.width; else -> 0 }
+                    p.place(x, 0)
+                }
+            },
+            style = style, softWrap = false, overflow = TextOverflow.Visible,
+        )
     } else {
-        Text(t.text, Modifier.width(n.w.dp), style = style)
+        Text(t.text, Modifier.width(n.w.dp), style = style, overflow = TextOverflow.Visible)
     }
 }
