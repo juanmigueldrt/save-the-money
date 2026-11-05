@@ -42,5 +42,4 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20250517")
 }
