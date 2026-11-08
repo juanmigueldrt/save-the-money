@@ -30,6 +30,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // -Pentrega: APK reducido con R8 (el de 37 MB no se puede enviar al móvil).
+            isMinifyEnabled = project.hasProperty("entrega")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
