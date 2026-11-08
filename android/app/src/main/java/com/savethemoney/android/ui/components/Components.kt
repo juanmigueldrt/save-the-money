@@ -54,6 +54,7 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -659,6 +660,9 @@ fun BoxScope.Scrim(onDismiss: () -> Unit) {
 /** «Hoja inferior» modal con asa, título y subtítulo. */
 @Composable
 fun BoxScope.BottomSheet(title: String?, subtitle: String? = null, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
+    // La hoja no se pinta sobre el teclado: si sigue abierto, la tapa.
+    val focus = LocalFocusManager.current
+    LaunchedEffect(Unit) { focus.clearFocus() }
     Scrim(onDismiss)
     val shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     Column(

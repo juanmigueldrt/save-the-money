@@ -47,6 +47,7 @@ class FinanceModel(
     val planning = PlanningModel(household, service, notifier, today)
     val cards = CreditCardModel(household, service, notifier, today)
     val tracking = TrackingModel(household, service, today)
+    val investments = InvestmentModel(household, service, notifier, today)
 
     var accounts by mutableStateOf(emptyList<Account>())
         private set
@@ -117,6 +118,7 @@ class FinanceModel(
             budgets.load()
             budgets.checkAlerts(categories)
             cards.load(accounts, balances, categories)
+            investments.load()
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {

@@ -232,6 +232,22 @@ interface FinanceService {
     suspend fun saveInstallment(installment: CardInstallment): CardInstallment
     suspend fun deleteInstallment(installmentId: String)
 
+    suspend fun holdings(householdId: String): List<Holding>
+    suspend fun createHolding(holding: Holding): Holding
+    suspend fun updateHolding(holding: Holding): Holding
+    suspend fun deleteHolding(holdingId: String)
+    suspend fun holdingPrices(householdId: String): List<HoldingPrice>
+
+    /** Apunta el precio de un día (sustituye al de ese día) y devuelve el activo; uno antiguo no cambia el actual. */
+    suspend fun recordPrice(price: java.math.BigDecimal, day: LocalDate, holdingId: String): Holding
+    suspend fun trades(householdId: String): List<InvestmentTrade>
+    suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade
+    suspend fun deleteTrade(tradeId: String)
+    suspend fun investmentPlans(householdId: String): List<InvestmentPlan>
+    suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan
+    suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan
+    suspend fun deletePlan(planId: String)
+
     /** Los del usuario con sesión, del más reciente al más antiguo. */
     suspend fun creditScores(): List<CreditScore>
     suspend fun addCreditScore(score: CreditScore): CreditScore
@@ -270,6 +286,10 @@ class InMemoryFinance : FinanceService {
         contributions.removeAll { it.householdId == householdId }
         cards.removeAll { it.householdId == householdId }
         installments.removeAll { it.householdId == householdId }
+        holdings.removeAll { it.householdId == householdId }
+        prices.removeAll { it.householdId == householdId }
+        trades.removeAll { it.householdId == householdId }
+        plans.removeAll { it.householdId == householdId }
     }
 
     override suspend fun accounts(householdId: String) = accounts.filter { it.householdId == householdId }
@@ -455,6 +475,68 @@ class InMemoryFinance : FinanceService {
     override suspend fun deleteInstallment(installmentId: String) {
         installments.removeAll { it.id == installmentId }
     }
+
+    private val holdings = mutableListOf<Holding>()
+    private val prices = mutableListOf<HoldingPrice>()
+    private val trades = mutableListOf<InvestmentTrade>()
+    private val plans = mutableListOf<InvestmentPlan>()
+
+    override suspend fun holdings(householdId: String) = holdings.filter { it.householdId == householdId }.sortedBy { it.trimmedName }
+
+    override suspend fun createHolding(holding: Holding): Holding {
+        holding.issue?.let(::fail)
+        return holding.copy(id = id(), name = holding.trimmedName, symbol = holding.trimmedSymbol).also { holdings += it }
+    }
+
+    override suspend fun updateHolding(holding: Holding): Holding {
+        holding.issue?.let(::fail)
+        val saved = holding.copy(name = holding.trimmedName, symbol = holding.trimmedSymbol)
+        holdings[holdings.indexOfFirst { it.id == holding.id }] = saved
+        return saved
+    }
+
+    override suspend fun deleteHolding(holdingId: String) {
+        holdings.removeAll { it.id == holdingId }
+        prices.removeAll { it.holdingId == holdingId }
+        trades.removeAll { it.holdingId == holdingId }
+        plans.removeAll { it.holdingId == holdingId }
+    }
+
+    override suspend fun holdingPrices(householdId: String) = prices.filter { it.householdId == householdId }.sortedBy { it.pricedOn }
+
+    override suspend fun recordPrice(price: java.math.BigDecimal, day: LocalDate, holdingId: String): Holding {
+        if (price.signum() < 0) fail("El precio no puede ser negativo.")
+        val index = holdings.indexOfFirst { it.id == holdingId }
+        val holding = holdings[index]
+        prices.removeAll { it.holdingId == holdingId && it.day == day }
+        prices += HoldingPrice(id(), holding.householdId, holdingId, day.toString(), price)
+        if (holding.priceDay?.isAfter(day) == true) return holding
+        return holding.copy(price = price, priceOn = day.toString()).also { holdings[index] = it }
+    }
+
+    override suspend fun trades(householdId: String) = trades.filter { it.householdId == householdId }.sortedBy { it.tradedOn }
+
+    override suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade {
+        trade.issue(trades.filter { it.holdingId == trade.holdingId })?.let(::fail)
+        return trade.copy(id = id()).also { trades += it }
+    }
+
+    override suspend fun deleteTrade(tradeId: String) { trades.removeAll { it.id == tradeId } }
+
+    override suspend fun investmentPlans(householdId: String) = plans.filter { it.householdId == householdId }.sortedBy { it.startsOn }
+
+    override suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan {
+        plan.issue?.let(::fail)
+        return plan.copy(id = id()).also { plans += it }
+    }
+
+    override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan {
+        plan.issue?.let(::fail)
+        plans[plans.indexOfFirst { it.id == plan.id }] = plan
+        return plan
+    }
+
+    override suspend fun deletePlan(planId: String) { plans.removeAll { it.id == planId } }
 
     private val scores = mutableListOf<CreditScore>()
 

@@ -7,11 +7,14 @@ import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
+import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -345,6 +348,159 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         Unit
     }
 
+    override suspend fun holdings(householdId: String): List<Holding> = backend.mapped {
+        client.from("holdings").select(Columns.raw(HOLDING)) {
+            filter { eq("household_id", householdId) }
+            order("name", Order.ASCENDING)
+        }.decodeList()
+    }
+
+    private fun Holding.columns() = buildJsonObject {
+        put("name", trimmedName)
+        put("symbol", trimmedSymbol)
+        put("kind", Json.encodeToJsonElement(kind))
+        put("asset_class", Json.encodeToJsonElement(assetClass))
+        put("account_id", accountId)
+        put("owner_id", ownerId)
+        put("price", price.toPlainString())
+        put("price_on", priceOn)
+        put("fee_rate", feeRate.toPlainString())
+        put("note", note)
+        put("archived_at", archivedAt)
+    }
+
+    override suspend fun createHolding(holding: Holding): Holding = backend.mapped {
+        holding.issue?.let(::fail)
+        val row = JsonObject(holding.columns() + ("household_id" to JsonPrimitive(holding.householdId)))
+        client.from("holdings").insert(row) { select(Columns.raw(HOLDING)) }.decodeSingle()
+    }
+
+    override suspend fun updateHolding(holding: Holding): Holding = backend.mapped {
+        holding.issue?.let(::fail)
+        client.from("holdings").update(holding.columns()) {
+            select(Columns.raw(HOLDING))
+            filter { eq("id", holding.id) }
+        }.decodeSingle()
+    }
+
+    override suspend fun deleteHolding(holdingId: String) = backend.mapped<Unit> {
+        client.from("holdings").delete { filter { eq("id", holdingId) } }
+    }
+
+    override suspend fun holdingPrices(householdId: String): List<HoldingPrice> =
+        allRows("holding_prices", PRICE, householdId, "priced_on")
+
+    override suspend fun recordPrice(price: BigDecimal, day: LocalDate, holdingId: String): Holding = backend.mapped {
+        if (price.signum() < 0) fail("El precio no puede ser negativo.")
+        val holding = client.from("holdings").select(Columns.raw(HOLDING)) { filter { eq("id", holdingId) } }.decodeSingle<Holding>()
+        // No se usa upsert: haría UPDATE de columnas que no se pueden cambiar (hogar, activo, día).
+        val updated = client.from("holding_prices").update(buildJsonObject { put("price", price.toPlainString()) }) {
+            select(Columns.raw(PRICE))
+            filter {
+                eq("holding_id", holdingId)
+                eq("priced_on", day.toString())
+            }
+        }.decodeList<HoldingPrice>()
+        if (updated.isEmpty()) {
+            client.from("holding_prices").insert(buildJsonObject {
+                put("household_id", holding.householdId)
+                put("holding_id", holdingId)
+                put("priced_on", day.toString())
+                put("price", price.toPlainString())
+            })
+        }
+        if (holding.priceDay?.isAfter(day) == true) return@mapped holding
+        client.from("holdings").update(buildJsonObject {
+            put("price", price.toPlainString())
+            put("price_on", day.toString())
+        }) {
+            select(Columns.raw(HOLDING))
+            filter { eq("id", holdingId) }
+        }.decodeSingle()
+    }
+
+    override suspend fun trades(householdId: String): List<InvestmentTrade> =
+        allRows("investment_trades", TRADE, householdId, "traded_on")
+
+    override suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade = backend.mapped {
+        if (trade.side == TradeSide.Sell) {
+            val others = client.from("investment_trades").select(Columns.raw(TRADE)) { filter { eq("holding_id", trade.holdingId) } }.decodeList<InvestmentTrade>()
+            trade.issue(others)?.let(::fail)
+        } else {
+            trade.issue?.let(::fail)
+        }
+        val row = buildJsonObject {
+            put("household_id", trade.householdId)
+            put("holding_id", trade.holdingId)
+            put("traded_on", trade.tradedOn)
+            put("side", Json.encodeToJsonElement(trade.side))
+            put("quantity", trade.quantity.toPlainString())
+            put("price", trade.price.toPlainString())
+            put("fee_minor", trade.feeMinor)
+            put("note", trade.note)
+        }
+        client.from("investment_trades").insert(row) { select(Columns.raw(TRADE)) }.decodeSingle()
+    }
+
+    override suspend fun deleteTrade(tradeId: String) = backend.mapped<Unit> {
+        client.from("investment_trades").delete { filter { eq("id", tradeId) } }
+    }
+
+    override suspend fun investmentPlans(householdId: String): List<InvestmentPlan> = backend.mapped {
+        client.from("investment_plans").select(Columns.raw(PLAN)) {
+            filter { eq("household_id", householdId) }
+            order("starts_on", Order.ASCENDING)
+        }.decodeList()
+    }
+
+    private fun InvestmentPlan.columns() = buildJsonObject {
+        put("account_id", accountId)
+        put("amount_minor", amountMinor)
+        put("every", every)
+        put("unit", Json.encodeToJsonElement(unit))
+        put("starts_on", startsOn)
+        put("ends_on", endsOn)
+        put("expected_annual_return", expectedAnnualReturn.toPlainString())
+        put("remind_days_before", remindDaysBefore)
+        put("paused_at", pausedAt)
+        put("archived_at", archivedAt)
+    }
+
+    override suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
+        plan.issue?.let(::fail)
+        val row = JsonObject(plan.columns() + mapOf("household_id" to JsonPrimitive(plan.householdId), "holding_id" to JsonPrimitive(plan.holdingId)))
+        client.from("investment_plans").insert(row) { select(Columns.raw(PLAN)) }.decodeSingle()
+    }
+
+    override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
+        plan.issue?.let(::fail)
+        client.from("investment_plans").update(plan.columns()) {
+            select(Columns.raw(PLAN))
+            filter { eq("id", plan.id) }
+        }.decodeSingle()
+    }
+
+    override suspend fun deletePlan(planId: String) = backend.mapped<Unit> {
+        client.from("investment_plans").delete { filter { eq("id", planId) } }
+    }
+
+    /** Todas las filas del hogar, de 1000 en 1000 (el máximo que devuelve el servidor por petición). */
+    private suspend inline fun <reified Row : Any> allRows(table: String, columns: String, householdId: String, orderBy: String): List<Row> = backend.mapped {
+        val all = mutableListOf<Row>()
+        while (true) {
+            val start = all.size.toLong()
+            val page = client.from(table).select(Columns.raw(columns)) {
+                filter { eq("household_id", householdId) }
+                order(orderBy, Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(start, start + 999)
+            }.decodeList<Row>()
+            all += page
+            if (page.size < 1000) break
+        }
+        all
+    }
+
     private companion object {
         const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges"
         const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
@@ -362,6 +518,10 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
 private const val CARD = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode," +
     "fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent"
+private const val HOLDING = "id,household_id,name,symbol,kind,asset_class,currency,account_id,owner_id,price,price_on,fee_rate,note,archived_at"
+private const val PRICE = "id,household_id,holding_id,priced_on,price"
+private const val TRADE = "id,household_id,holding_id,traded_on,side,quantity,price,fee_minor,note"
+private const val PLAN = "id,household_id,holding_id,account_id,amount_minor,every,unit,starts_on,ends_on,expected_annual_return,remind_days_before,paused_at,archived_at"
 private const val SCORE = "id,score,max_score,provider,recorded_on,note"
 private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate"
 

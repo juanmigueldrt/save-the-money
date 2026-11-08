@@ -342,13 +342,13 @@ fun Pantalla16(nav: Nav) {
 }
 
 /** Puntos de 0 a 1 para el gráfico: de la cifra más baja a la más alta del periodo. */
-private fun normalizar(valores: List<Long>): List<Float> {
+internal fun normalizar(valores: List<Long>): List<Float> {
     val min = valores.minOrNull() ?: return emptyList()
     val max = valores.max()
     return valores.map { if (max == min) 0.5f else (it - min).toFloat() / (max - min) }
 }
 
-private fun euros(minor: Long, signed: Boolean = false) = Money.format(minor, decimals = minor % 100 != 0L, signed = signed)
+internal fun euros(minor: Long, signed: Boolean = false) = Money.format(minor, decimals = minor % 100 != 0L, signed = signed)
 
 /** 17 Patrimonio neto: cifra, variación, evolución por periodo y lista de activos y deudas. */
 @Composable

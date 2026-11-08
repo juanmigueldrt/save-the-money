@@ -112,7 +112,7 @@ import java.util.UUID
 
 /** 25 Inversiones: cartera con evolución, reparto y posiciones. */
 @Composable
-fun Pantalla25(nav: Nav) {
+internal fun Diseno25(nav: Nav) {
     val c = Stm.colors
     var range by remember { mutableIntStateOf(2) }
     StmScreen(
@@ -169,7 +169,7 @@ fun Pantalla25(nav: Nav) {
 
 /** 26 Comprar activo: precio, evolución, posición y compra por importe o participaciones. */
 @Composable
-fun Pantalla26(nav: Nav) {
+internal fun Diseno26(nav: Nav) {
     val c = Stm.colors
     var mode by remember { mutableIntStateOf(0) }
     var amount by remember { mutableStateOf("300,00") }
@@ -221,7 +221,7 @@ fun Pantalla26(nav: Nav) {
 
 /** 27 Inversiones recurrentes: calendario del mes con los días de aportación y planes activos. */
 @Composable
-fun Pantalla27(nav: Nav) {
+internal fun Diseno27(nav: Nav) {
     val c = Stm.colors
     var world by remember { mutableStateOf(true) }
     var bonds by remember { mutableStateOf(false) }
@@ -743,7 +743,7 @@ private fun MasHeader() {
 
 /** Barra superior mediana (112 dp): fila de 60 con atrás y acciones, y título de 28 debajo. */
 @Composable
-private fun MediumTopBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit) {
+internal fun MediumTopBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit) {
     Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         IconBtn(StmIcons.arrowBack, onBack, contentDescription = "Atrás")
         Spacer(Modifier.weight(1f))
@@ -757,7 +757,7 @@ private fun MediumTopBar(title: String, onBack: () -> Unit, actions: @Composable
  * redondeados (el compartido reparte el ancho a partes iguales).
  */
 @Composable
-private fun HugSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+internal fun HugSegmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     val c = Stm.colors
     val shape = RoundedCornerShape(20.dp)
     Row(Modifier.height(40.dp).clip(shape).border(1.dp, c.outline, shape)) {
@@ -785,7 +785,7 @@ private fun HugSegmented(options: List<String>, selected: Int, onSelect: (Int) -
 
 /** Elemento de leyenda: punto de 8 y texto. */
 @Composable
-private fun Legend(color: Color, text: String) {
+internal fun Legend(color: Color, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(8.dp))
@@ -795,7 +795,7 @@ private fun Legend(color: Color, text: String) {
 
 /** Dato de la posición: etiqueta a la izquierda y valor a la derecha. */
 @Composable
-private fun DataRow(label: String, value: String, valueColor: Color = Stm.colors.onSurface) {
+internal fun DataRow(label: String, value: String, valueColor: Color = Stm.colors.onSurface) {
     Row(Modifier.fillMaxWidth()) {
         Text(label, Modifier.weight(1f), style = StmType.bodyMedium, color = Stm.colors.onSurfaceVariant)
         Text(value, style = StmType.labelLarge, color = valueColor)
@@ -804,7 +804,7 @@ private fun DataRow(label: String, value: String, valueColor: Color = Stm.colors
 
 /** Campo con borde y sufijo de unidad (€, %); etiqueta sobre el borde en el color de la tarjeta. */
 @Composable
-private fun SuffixField(label: String, value: String, onValueChange: (String) -> Unit, suffix: String, modifier: Modifier) {
+internal fun SuffixField(label: String, value: String, onValueChange: (String) -> Unit, suffix: String, modifier: Modifier) {
     val c = Stm.colors
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(4.dp)

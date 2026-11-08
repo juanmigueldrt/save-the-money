@@ -357,7 +357,7 @@ object ReminderPlanner {
         return "$verb ${Money.format(series.amountOn(due))} el ${due.dayOfMonth} de ${MESES[due.monthValue - 1]}.$change"
     }
 
-    private val MESES = listOf("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
+    internal val MESES = listOf("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 }
 
 /** Aviso de que una categoría o grupo llega al 80 % o se pasa; el id es estable por mes y umbral. */
