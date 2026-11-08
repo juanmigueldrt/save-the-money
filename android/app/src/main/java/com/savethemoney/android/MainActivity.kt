@@ -22,6 +22,7 @@ import androidx.lifecycle.lifecycleScope
 import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.Backend
+import com.savethemoney.android.data.Budget
 import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.CategoryKind
@@ -42,6 +43,7 @@ import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmTheme
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.YearMonth
 
 class MainActivity : ComponentActivity() {
     private lateinit var session: Session
@@ -168,4 +170,7 @@ private suspend fun seedSample(backend: Backend, finance: FinanceService) {
         MovementDraft(main.id, cat("Nómina"), CAPTURE_DAY.minusDays(4), 215000, "Nómina"),
     )
     sample.forEach { finance.addMovement(it, home.id) }
+    finance.saveBudget(
+        Budget(home.id, YearMonth.from(CAPTURE_DAY), expectedIncome = 240_000, limits = mapOf(comida.id to 45_000, categories.first { it.name == "Ocio" }.id to 20_000)),
+    )
 }

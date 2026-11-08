@@ -28,6 +28,8 @@ data class MovementForm(val movement: Movement? = null, val accountId: String? =
 
 /** Cuentas, saldos, categorías y movimientos del hogar abierto (FinanceModel de iOS). */
 class FinanceModel(val household: Household, private val service: FinanceService, val today: () -> LocalDate = LocalDate::now) {
+    val budgets = BudgetModel(household, service, today)
+
     var accounts by mutableStateOf(emptyList<Account>())
         private set
     var balances by mutableStateOf(emptyMap<String, Long>())

@@ -3,6 +3,7 @@ package com.savethemoney.android.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
+import java.time.YearMonth
 import java.util.UUID
 
 // Finance.swift y FinanceService de STMCore, con los mismos nombres de columna que Supabase.
@@ -196,6 +197,13 @@ interface FinanceService {
 
     /** Guarda varios de golpe. Los que ya estaban (misma huella en la cuenta) se ignoran. */
     suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult
+
+    suspend fun budget(householdId: String, month: YearMonth): Budget?
+
+    /** El último presupuesto anterior a [month], para proponerlo. */
+    suspend fun latestBudget(householdId: String, month: YearMonth): Budget?
+    suspend fun saveBudget(budget: Budget): Budget
+    suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement>
 }
 
 /**
@@ -301,4 +309,22 @@ class InMemoryFinance : FinanceService {
         }
         return ImportResult(inserted, duplicates)
     }
+
+    private val budgets = mutableListOf<Budget>()
+
+    override suspend fun budget(householdId: String, month: YearMonth) =
+        budgets.firstOrNull { it.householdId == householdId && it.month == month }
+
+    override suspend fun latestBudget(householdId: String, month: YearMonth) =
+        budgets.filter { it.householdId == householdId && it.month < month }.maxByOrNull { it.month }
+
+    override suspend fun saveBudget(budget: Budget): Budget {
+        budget.issue?.let(::fail)
+        budgets.removeAll { it.householdId == budget.householdId && it.month == budget.month }
+        budgets += budget
+        return budget
+    }
+
+    override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate) =
+        movements.filter { it.householdId == householdId && it.day in from..through }
 }

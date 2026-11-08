@@ -6,6 +6,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,8 +22,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -36,11 +43,25 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.BudgetGroup
+import com.savethemoney.android.data.BudgetTemplate
+import com.savethemoney.android.data.CashFlow
+import com.savethemoney.android.data.CategoryKind
+import com.savethemoney.android.data.CategoryLine
+import com.savethemoney.android.data.Money
+import com.savethemoney.android.data.SankeyLayout
+import com.savethemoney.android.ui.BudgetModel
+import com.savethemoney.android.ui.Fechas
+import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
@@ -58,61 +79,107 @@ import com.savethemoney.android.ui.components.NavBar
 import com.savethemoney.android.ui.components.Pill
 import com.savethemoney.android.ui.components.Progress
 import com.savethemoney.android.ui.components.Segmented
+import com.savethemoney.android.ui.components.SelectorSheet
 import com.savethemoney.android.ui.components.SemicircleGauge
 import com.savethemoney.android.ui.components.Slice
+import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmIcon
 import com.savethemoney.android.ui.components.StmScreen
 import com.savethemoney.android.ui.components.Tab
 import com.savethemoney.android.ui.components.TopBar
 import com.savethemoney.android.ui.components.tap
+import com.savethemoney.android.ui.iconoCategoria
 import com.savethemoney.android.ui.icons.StmIcons
+import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import kotlinx.coroutines.launch
+import java.time.LocalDate
+import java.time.YearMonth
+import java.time.temporal.ChronoUnit
+import kotlin.math.roundToLong
 
 /** 14 Presupuesto: semicírculo 50/30/20 con leyenda y avance por categoría. */
 @Composable
 fun Pantalla14(nav: Nav) {
     val c = Stm.colors
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val budgets = finance.budgets
+    val scope = rememberCoroutineScope()
+    var eligiendo by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { budgets.load() }
+    val report = budgets.report(finance.categories)
+    val template = (budgets.budget ?: budgets.proposal)?.template ?: BudgetTemplate.FiftyThirtyTwenty
+    val hoy = finance.today()
+    // Cada grupo ocupa lo gastado sobre lo repartido; si no hay base, se reparte el arco entre lo gastado.
+    val total = maxOf(report.base, report.groups.sumOf { it.spent }).coerceAtLeast(1).toFloat()
+    val restantes = if (hoy in budgets.period) ChronoUnit.DAYS.between(hoy, budgets.period.endInclusive) else null
+    val lineas = report.lines.filter { it.category.budgetGroup != null }
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null) {
                 IconBtn(StmIcons.edit, { nav.go(15) }, contentDescription = "Editar presupuesto")
-                IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones")
+                IconBtn(StmIcons.moreVert, { eligiendo = true }, contentDescription = "Más opciones")
             }
-            LargeTitle("Presupuesto", "Noviembre · plantilla 50/30/20")
+            LargeTitle("Presupuesto", "${tituloMes(budgets.month, hoy)} · plantilla ${template.needs}/${template.wants}/${template.savings}")
         },
         bottomBar = { NavBar(Tab.Presupuesto, nav::tab) },
+        snackbar = budgets.error?.let { e -> { Snackbar(e) } },
+        overlay = if (eligiendo) {
+            { SelectorMes(budgets, hoy, { eligiendo = false }) { m -> scope.launch { budgets.show(m) } } }
+        } else null,
     ) {
+        if (budgets.budget == null) {
+            StmCard {
+                Text(
+                    budgets.proposal?.let { "Aún no hay presupuesto para este mes. Puedes partir del de ${Fechas.mes(it.month.atDay(1))}." }
+                        ?: "Aún no hay presupuesto para este mes. Mientras tanto, se reparten los ingresos reales con 50/30/20.",
+                    style = StmType.bodyMedium, color = c.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                Btn("Crear presupuesto", { nav.go(15) })
+            }
+            Spacer(Modifier.height(16.dp))
+        }
         StmCard {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Box(Modifier.size(300.dp, 158.dp)) {
-                    // Tramos medidos en el diseño: 0–60,2°, 62,2–99,8° y 101,8–122,4° (hueco de 2°).
-                    SemicircleGauge(
-                        listOf(Slice(62.2f / 180, c.primary), Slice(39.6f / 180, c.tertiary), Slice(22.6f / 180, c.secondary)),
-                        width = 300.dp, thickness = 24.dp,
-                    )
+                    SemicircleGauge(report.groups.map { Slice(it.spent.coerceAtLeast(0) / total, colorGrupo(it.group)) }, width = 300.dp, thickness = 24.dp)
                     Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("1.284 €", style = StmType.displaySmall, color = c.onSurface)
-                        Text("de 2.400 € · quedan 25 días", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                        Text(Money.format(report.totalSpent, decimals = false), style = StmType.displaySmall, color = c.onSurface)
+                        Text(
+                            "de ${Money.format(report.base, decimals = false)}" + if (restantes != null) " · quedan $restantes días" else "",
+                            style = StmType.bodySmall, color = c.onSurfaceVariant,
+                        )
                     }
                 }
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    LegendItem(c.primary, "Necesidades 50 %")
-                    LegendItem(c.tertiary, "Deseos 30 %")
-                    LegendItem(c.secondary, "Ahorro 20 %")
+                    BudgetGroup.entries.forEach { LegendItem(colorGrupo(it), "${it.title} ${template.percentage(it)} %") }
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
-        StmCard {
-            // La barra ocupa % × (348 − 14) dp en el diseño, no el ancho entero.
-            CategoryLine(StmIcons.shoppingCart, "Comida", "312 de 450 €", "69%", 0.69f * 334 / 348) { nav.go(5) }
+        if (lineas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
-            CategoryLine(StmIcons.theaterComedy, "Ocio", "38 € por encima", "119%", 334.08f / 348, over = true) { nav.go(5) }
+            StmCard {
+                lineas.forEachIndexed { i, line ->
+                    if (i > 0) Spacer(Modifier.height(16.dp))
+                    CategoryLine(line) { nav.go(5) }
+                }
+            }
+        }
+        if (report.uncategorized > 0) {
             Spacer(Modifier.height(16.dp))
-            CategoryLine(StmIcons.directionsCar, "Transporte", "96 de 180 €", "53%", 0.53f * 334 / 348) { nav.go(5) }
+            StmCard(onClick = { nav.go(5) }) {
+                Row(Modifier.fillMaxWidth()) {
+                    Text("Gastos sin categoría", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Text(Money.format(report.uncategorized), style = StmType.labelLarge, color = c.onSurface)
+                }
+                Spacer(Modifier.height(4.dp))
+                Text("Ponles categoría en Movimientos para que cuenten en su grupo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            }
         }
     }
 }
@@ -121,14 +188,38 @@ fun Pantalla14(nav: Nav) {
 @Composable
 fun Pantalla15(nav: Nav) {
     val c = Stm.colors
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val budgets = finance.budgets
+    val action = rememberAction()
+    val inicial = budgets.draft
     var mode by remember { mutableIntStateOf(0) }
-    var income by remember { mutableStateOf("3.200,00") }
+    var income by remember(inicial) { mutableStateOf(if (inicial.expectedIncome == 0L) "" else Money.input(inicial.expectedIncome)) }
+    var template by remember(inicial) { mutableStateOf(inicial.template) }
+    val limites = remember(inicial) { mutableStateMapOf<String, String>().apply { inicial.limits.forEach { (k, v) -> put(k, Money.input(v)) } } }
+    val base = Money.parse(income)?.coerceAtLeast(0) ?: 0
+    val reparto = template.allocate(base)
+    val gastos = finance.categories(CategoryKind.Expense)
+    val guardar = {
+        action.run {
+            val expected = if (income.isBlank()) 0L else Money.parse(income)?.takeIf { it >= 0 }
+                ?: throw AppError.InvalidInput("Los ingresos previstos no son un importe válido.")
+            val parsed = limites.filterValues { it.isNotBlank() }.mapValues { (id, text) ->
+                Money.parse(text)?.takeIf { it >= 0 }
+                    ?: throw AppError.InvalidInput("El límite de ${finance.category(id)?.name ?: "una categoría"} no es un importe válido.")
+            }.filterValues { it > 0 }
+            budgets.save(inicial.copy(expectedIncome = expected, template = template, limits = parsed))
+            nav.back()
+        }
+    }
+    LaunchedEffect(Unit) { if (budgets.budget == null && budgets.proposal == null) budgets.load() }
     StmScreen(
         topBar = {
-            TopBar("Presupuesto de noviembre", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", nav::back, kind = BtnKind.Text)
+            TopBar("Presupuesto de ${Fechas.mes(inicial.month.atDay(1))}", navIcon = StmIcons.close, onNav = nav::back) {
+                Btn("Guardar", guardar, kind = BtnKind.Text, enabled = !action.busy)
             }
         },
+        snackbar = action.error?.let { e -> { Snackbar(e) } },
     ) {
         Spacer(Modifier.height(8.dp))
         Segmented(listOf("Por categorías", "Flexible"), mode, { mode = it })
@@ -137,23 +228,35 @@ fun Pantalla15(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         StmCard(color = c.surfaceContainerHighest) {
             Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Reparto 50/30/20", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
-                SmallTonalBtn("Aplicar", nav::back)
+                Text("Reparto ${template.needs}/${template.wants}/${template.savings}", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                SmallTonalBtn("Aplicar") { template = BudgetTemplate.FiftyThirtyTwenty }
             }
             Spacer(Modifier.height(8.dp))
-            Text("1.600 € necesidades · 960 € deseos · 640 € ahorro", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            Text(
+                BudgetGroup.entries.joinToString(" · ") { "${Money.format(reparto[it] ?: 0, decimals = false)} ${it.title.lowercase()}" },
+                style = StmType.bodyMedium, color = c.onSurfaceVariant,
+            )
         }
         Spacer(Modifier.height(16.dp))
-        ListCard {
-            ListHeader("Necesidades")
-            ListItem("Vivienda", leading = { LeadIcon(StmIcons.home) }, trailing = { Amount("900 €") })
-            Divider()
-            ListItem("Comida", leading = { LeadIcon(StmIcons.shoppingCart) }, trailing = { Amount("450 €") })
-            ListHeader("Deseos")
-            ListItem(
-                "Ocio", leading = { LeadIcon(StmIcons.theaterComedy, c.tertiaryContainer, c.onTertiaryContainer) },
-                trailing = { Amount("200 €") },
-            )
+        if (mode == 0) {
+            ListCard {
+                BudgetGroup.entries.forEach { group ->
+                    val filas = gastos.filter { it.budgetGroup == group }
+                    if (filas.isNotEmpty()) {
+                        ListHeader(group.title)
+                        filas.forEachIndexed { i, category ->
+                            if (i > 0) Divider()
+                            ListItem(
+                                category.name,
+                                leading = { LeadIconGrupo(iconoCategoria(category), group) },
+                                trailing = { CampoLimite(category.name, limites[category.id].orEmpty()) { limites[category.id] = it } },
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            Text("El reparto flexible aparecerá cuando estén los pagos fijos.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
         }
     }
 }
@@ -162,27 +265,49 @@ fun Pantalla15(nav: Nav) {
 @Composable
 fun Pantalla16(nav: Nav) {
     val c = Stm.colors
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val budgets = finance.budgets
+    val scope = rememberCoroutineScope()
     var period by remember { mutableIntStateOf(0) }
+    var eligiendo by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { budgets.load() }
+    val months = listOf(1, 3, 12)[period]
+    val report = budgets.report(finance.categories, months)
+    val flow = CashFlow(report)
+    val hoy = finance.today()
+    val titulo = if (months == 1) tituloMes(budgets.month, hoy) else "${tituloMes(budgets.month.minusMonths(months - 1L), hoy)} – ${tituloMes(budgets.month, hoy)}"
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null) {
-                IconBtn(StmIcons.calendarMonth, null, contentDescription = "Elegir mes")
+                IconBtn(StmIcons.calendarMonth, { eligiendo = true }, contentDescription = "Elegir mes")
             }
-            LargeTitle("Flujo de caja", "Noviembre")
+            LargeTitle("Flujo de caja", titulo)
         },
         bottomBar = { NavBar(Tab.Flujo, nav::tab) },
+        snackbar = budgets.error?.let { e -> { Snackbar(e) } },
+        overlay = if (eligiendo) {
+            { SelectorMes(budgets, hoy, { eligiendo = false }) { m -> scope.launch { budgets.show(m) } } }
+        } else null,
     ) {
         SegmentedWrap(listOf("Mes", "Trimestre", "Año"), period) { period = it }
         Spacer(Modifier.height(16.dp))
         StmCard {
             Text("De dónde viene y a dónde va", style = StmType.titleMedium, color = c.onSurface)
             Spacer(Modifier.height(12.dp))
-            Sankey()
+            if (flow.isEmpty) {
+                Text(
+                    "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.",
+                    style = StmType.bodyMedium, color = c.onSurfaceVariant,
+                )
+            } else {
+                Sankey(flow)
+            }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FlowStat("Entra", "+3.200 €", c.success, Modifier.weight(1f)) { nav.go(5) }
-            FlowStat("Sale", "−2.560 €", c.onSurface, Modifier.weight(1f)) { nav.go(5) }
+            FlowStat("Entra", Money.format(report.income, decimals = false, signed = true), c.success, Modifier.weight(1f)) { nav.go(5) }
+            FlowStat("Sale", Money.format(-report.totalSpent, decimals = false), c.onSurface, Modifier.weight(1f)) { nav.go(5) }
         }
     }
 }
@@ -345,28 +470,76 @@ private fun LegendItem(color: Color, label: String) {
 
 /** «Línea» de categoría: icono, nombre, detalle, porcentaje y progreso; en rojo si se pasa. */
 @Composable
-private fun CategoryLine(
-    icon: ImageVector,
-    name: String,
-    detail: String,
-    percent: String,
-    fraction: Float,
-    over: Boolean = false,
-    onClick: () -> Unit,
-) {
+private fun CategoryLine(line: CategoryLine, onClick: () -> Unit) {
     val c = Stm.colors
+    val icon = iconoCategoria(line.category)
+    val limit = line.limit
+    val detail = when {
+        limit == null -> Money.format(line.spent, decimals = false)
+        line.isOver -> "${Money.format(line.spent - limit, decimals = false)} por encima"
+        else -> "${Money.format(line.spent, decimals = false, symbol = false)} de ${Money.format(limit, decimals = false)}"
+    }
     Column(Modifier.fillMaxWidth().tap(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (over) LeadIcon(icon, c.errorContainer, c.onErrorContainer) else LeadIcon(icon)
+            if (line.isOver) LeadIcon(icon, c.errorContainer, c.onErrorContainer) else LeadIcon(icon)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(name, style = StmType.bodyLarge, color = c.onSurface)
-                Text(detail, style = StmType.bodySmall, color = if (over) c.error else c.onSurfaceVariant)
+                Text(line.category.name, style = StmType.bodyLarge, color = c.onSurface)
+                Text(detail, style = StmType.bodySmall, color = if (line.isOver) c.error else c.onSurfaceVariant)
             }
-            Text(percent, style = StmType.labelLarge, color = c.onSurface)
+            if (limit != null && limit > 0) Text("${line.spent * 100 / limit}%", style = StmType.labelLarge, color = c.onSurface)
         }
-        Spacer(Modifier.height(8.dp))
-        if (over) Progress(fraction, color = c.error, track = c.errorContainer) else Progress(fraction)
+        // La barra ocupa % × (348 − 14) dp en el diseño, no el ancho entero.
+        line.fraction?.let { f ->
+            Spacer(Modifier.height(8.dp))
+            if (line.isOver) Progress(f * 334 / 348, color = c.error, track = c.errorContainer) else Progress(f * 334 / 348)
+        }
+    }
+}
+
+@Composable
+private fun colorGrupo(group: BudgetGroup): Color = when (group) {
+    BudgetGroup.Needs -> Stm.colors.primary
+    BudgetGroup.Wants -> Stm.colors.tertiary
+    BudgetGroup.Savings -> Stm.colors.secondary
+}
+
+@Composable
+private fun LeadIconGrupo(icon: ImageVector, group: BudgetGroup) {
+    val c = Stm.colors
+    when (group) {
+        BudgetGroup.Wants -> LeadIcon(icon, c.tertiaryContainer, c.onTertiaryContainer)
+        else -> LeadIcon(icon)
+    }
+}
+
+/** "Noviembre", y el año si no es el actual. */
+private fun tituloMes(month: YearMonth, hoy: LocalDate): String =
+    Fechas.mesTitulo(month.atDay(1)) + if (month.year != hoy.year) " de ${month.year}" else ""
+
+@Composable
+private fun BoxScope.SelectorMes(budgets: BudgetModel, hoy: LocalDate, cerrar: () -> Unit, elegir: (YearMonth) -> Unit) {
+    SelectorSheet("Elegir mes", budgets.months().map { m -> tituloMes(m, hoy) to { cerrar(); elegir(m) } }, onDismiss = cerrar)
+}
+
+/** Importe editable de una fila: gris y alineado a la derecha, como el importe del diseño. */
+@Composable
+private fun CampoLimite(categoria: String, value: String, onChange: (String) -> Unit) {
+    val c = Stm.colors
+    val style = StmType.bodyMediumTight.copy(color = c.onSurfaceVariant, textAlign = TextAlign.End)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        BasicTextField(
+            value, onChange, Modifier.width(88.dp).semantics { contentDescription = "Límite de $categoria" },
+            textStyle = style, singleLine = true, cursorBrush = SolidColor(c.primary),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+            decorationBox = { inner ->
+                Box(contentAlignment = Alignment.CenterEnd) {
+                    if (value.isEmpty()) Text("Sin límite", style = style)
+                    inner()
+                }
+            },
+        )
+        if (value.isNotEmpty()) Text(" €", style = style)
     }
 }
 
@@ -429,71 +602,70 @@ private fun SegmentedWrap(options: List<String>, selected: Int, onSelect: (Int) 
     }
 }
 
-/** Banda del diagrama: de [x0] a [x0] + 151, de la franja [s0]–[s1] a [d0]–[d1] (dp). */
-private class SankeyBand(val x0: Float, val s0: Float, val s1: Float, val d0: Float, val d1: Float, val color: Color)
-
-/** Nodo del diagrama: barra de 10 dp con esquinas de 2 (dp). */
-private class SankeyNode(val x: Float, val y: Float, val h: Float, val color: Color)
-
-/** «Sankey» de 300 dp: ingresos → grupos 50/30/20 → categorías, con las medidas del diseño. */
+/** «Sankey»: ingresos → grupos 50/30/20 → categorías, con las medidas del diseño. */
 @Composable
-private fun Sankey() {
+private fun Sankey(flow: CashFlow) {
     val c = Stm.colors
-    val bands = listOf(
-        SankeyBand(18f, 16f, 150f, 2f, 136f, c.primary),
-        SankeyBand(18f, 150f, 230.4f, 150f, 230.4f, c.tertiary),
-        SankeyBand(18f, 230.4f, 284f, 244.4f, 298f, c.secondary),
-        SankeyBand(179f, 2f, 77.375f, 2f, 69.5f, c.primary),
-        SankeyBand(179f, 77.38f, 115.068f, 77.505f, 111.255f, c.primary),
-        SankeyBand(179f, 115.06f, 135.998f, 119.248f, 137.998f, c.primary),
-        SankeyBand(179f, 150f, 185.175f, 146f, 177.5f, c.tertiary),
-        SankeyBand(179f, 185.18f, 213.655f, 185.505f, 211.005f, c.tertiary),
-        SankeyBand(179f, 213.65f, 230.4f, 219f, 234f, c.tertiary),
-        SankeyBand(179f, 244.4f, 277.9f, 242f, 272f, c.secondary),
-        SankeyBand(179f, 277.9f, 298f, 280f, 298f, c.secondary),
-    )
-    val nodes = listOf(
-        SankeyNode(169f, 2f, 134f, c.primary), SankeyNode(169f, 150f, 80.4f, c.tertiary), SankeyNode(169f, 244.4f, 53.6f, c.secondary),
-        SankeyNode(330f, 2f, 67.5f, c.primary), SankeyNode(330f, 77.5f, 33.75f, c.primary), SankeyNode(330f, 119.25f, 18.75f, c.primary),
-        SankeyNode(330f, 146f, 31.5f, c.tertiary), SankeyNode(330f, 185.5f, 25.5f, c.tertiary), SankeyNode(330f, 219f, 15f, c.tertiary),
-        SankeyNode(330f, 242f, 30f, c.secondary), SankeyNode(330f, 280f, 18f, c.secondary),
-    )
-    Box(Modifier.fillMaxWidth().height(300.dp)) {
+    val alto = maxOf(300, flow.nodes.count { it.column == 2 } * 34)
+    val colores = flow.nodes.associate { node ->
+        node.id to when (val r = node.role) {
+            CashFlow.Role.Income -> c.success
+            CashFlow.Role.FromBalance -> c.error
+            CashFlow.Role.Uncategorized -> c.outline
+            CashFlow.Role.Unspent -> c.outlineVariant
+            is CashFlow.Role.Group -> colorGrupo(r.group)
+        }
+    }
+    // El diseño deja 8 dp a cada lado: nodos en x = 8, 169 y 330 con 348 de ancho.
+    BoxWithConstraints(Modifier.fillMaxWidth().height(alto.dp)) {
+        val layout = remember(flow.nodes, maxWidth) { SankeyLayout(flow, maxWidth.value - 16.0, alto.toDouble(), gap = 10.0) }
         Canvas(Modifier.matchParentSize()) {
             val u = 1.dp.toPx()
-            fun node(n: SankeyNode) = drawRoundRect(n.color, Offset(n.x * u, n.y * u), Size(10 * u, n.h * u), CornerRadius(2 * u))
-            node(SankeyNode(8f, 16f, 268f, c.success))
-            bands.forEach { b ->
-                val x0 = b.x0 * u
-                val x1 = (b.x0 + 151f) * u
+            val inicio = 8 * u
+            layout.bands.forEach { b ->
+                val x0 = inicio + b.sourceX.toFloat() * u
+                val x1 = inicio + b.targetX.toFloat() * u
                 val mid = (x0 + x1) / 2
+                val s0 = b.sourceTop.toFloat() * u
+                val d0 = b.targetTop.toFloat() * u
+                val t = b.thickness.toFloat() * u
                 val path = Path().apply {
-                    moveTo(x0, b.s0 * u)
-                    cubicTo(mid, b.s0 * u, mid, b.d0 * u, x1, b.d0 * u)
-                    lineTo(x1, b.d1 * u)
-                    cubicTo(mid, b.d1 * u, mid, b.s1 * u, x0, b.s1 * u)
+                    moveTo(x0, s0)
+                    cubicTo(mid, s0, mid, d0, x1, d0)
+                    lineTo(x1, d0 + t)
+                    cubicTo(mid, d0 + t, mid, s0 + t, x0, s0 + t)
                     close()
                 }
-                drawPath(path, b.color.copy(alpha = 0.28f))
+                drawPath(path, (colores[b.to] ?: c.outline).copy(alpha = 0.28f))
             }
-            nodes.forEach { node(it) }
+            flow.nodes.forEach { n ->
+                val r = layout.nodes[n.id] ?: return@forEach
+                drawRoundRect(
+                    colores[n.id] ?: c.outline, Offset(inicio + r.x.toFloat() * u, r.y.toFloat() * u),
+                    Size(r.width.toFloat() * u, maxOf(r.height.toFloat() * u, u)), CornerRadius(2 * u),
+                )
+            }
         }
-        Column(Modifier.offset(22.dp, 22.dp).clip(RoundedCornerShape(4.dp)).background(c.surfaceContainerLowest).padding(horizontal = 4.dp)) {
-            Text("Ingresos", style = StmType.labelSmall, color = c.onSurface)
-            Text("3.200 €", style = StmType.labelSmall, color = c.onSurface)
+        // Si dos nodos quedan muy juntos, la etiqueta baja para no pisar la anterior.
+        (0..2).forEach { columna ->
+            var ultimo = -100f
+            flow.nodes.filter { it.column == columna }.forEach { n ->
+                val r = layout.nodes[n.id] ?: return@forEach
+                val importe = Money.format(n.value.roundToLong(), decimals = false)
+                val y = maxOf(if (columna == 0) r.y.toFloat() + 6 else r.midY.toFloat() - 8, ultimo + if (columna == 0) 32 else 16)
+                ultimo = y
+                when (columna) {
+                    0 -> Column(
+                        Modifier.offset((r.x + 22).dp, y.dp).clip(RoundedCornerShape(4.dp)).background(c.surfaceContainerLowest).padding(horizontal = 4.dp),
+                    ) {
+                        Text(n.title, style = StmType.labelSmall, color = c.onSurface, maxLines = 1)
+                        Text(importe, style = StmType.labelSmall, color = c.onSurface, maxLines = 1)
+                    }
+                    1 -> SankeyLabel("${n.title} · $importe", r.x.toFloat() + 4, y, chip = true)
+                    else -> SankeyLabel(n.title, r.x.toFloat() + 4, y)
+                }
+            }
         }
-        // Las etiquetas de grupo acaban en x = 165; las de categoría, en x = 326.
-        SankeyLabel("Necesidades · 1.600 €", 165f, 61f, chip = true)
-        SankeyLabel("Deseos · 960 €", 165f, 182.19f, chip = true)
-        SankeyLabel("Ahorro · 640 €", 165f, 263.19f, chip = true)
-        SankeyLabel("Vivienda", 326f, 27.25f)
-        SankeyLabel("Comida", 326f, 85.88f)
-        SankeyLabel("Transporte", 326f, 120.12f)
-        SankeyLabel("Ocio", 326f, 153.25f)
-        SankeyLabel("Compras", 326f, 189.75f)
-        SankeyLabel("Suscripciones", 326f, 218f)
-        SankeyLabel("Fondo de emergencia", 326f, 248.5f)
-        SankeyLabel("Inversión", 326f, 280.5f)
     }
 }
 

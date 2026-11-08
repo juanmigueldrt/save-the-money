@@ -1,10 +1,17 @@
 package com.savethemoney.android.data
 
 import io.github.jan.supabase.postgrest.from
+import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.addJsonObject
+import java.time.LocalDate
+import java.time.YearMonth
 
 /** Cuentas, categorías y movimientos sobre Supabase. El RLS del servidor decide qué se ve. */
 class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
@@ -120,7 +127,73 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         ImportResult(inserted, drafts.size - inserted)
     }
 
+    override suspend fun budget(householdId: String, month: YearMonth): Budget? = backend.mapped {
+        client.from("budgets").select(Columns.raw(BUDGET)) {
+            filter {
+                eq("household_id", householdId)
+                eq("month", month.atDay(1).toString())
+            }
+            limit(1)
+        }.decodeList<BudgetRow>().firstOrNull()?.budget
+    }
+
+    override suspend fun latestBudget(householdId: String, month: YearMonth): Budget? = backend.mapped {
+        client.from("budgets").select(Columns.raw(BUDGET)) {
+            filter {
+                eq("household_id", householdId)
+                lt("month", month.atDay(1).toString())
+            }
+            order("month", Order.DESCENDING)
+            limit(1)
+        }.decodeList<BudgetRow>().firstOrNull()?.budget
+    }
+
+    /** save_budget hace presupuesto y límites en una sola transacción con los permisos de quien llama. */
+    override suspend fun saveBudget(budget: Budget): Budget = backend.mapped {
+        budget.issue?.let(::fail)
+        client.postgrest.rpc("save_budget", buildJsonObject {
+            put("target_household", budget.householdId)
+            put("target_month", budget.month.atDay(1).toString())
+            put("expected_income", budget.expectedIncome)
+            put("needs", budget.template.needs)
+            put("wants", budget.template.wants)
+            put("savings", budget.template.savings)
+            putJsonArray("lines") {
+                budget.limits.filterValues { it > 0 }.toSortedMap().forEach { (category, limit) ->
+                    addJsonObject {
+                        put("category_id", category)
+                        put("limit_minor", limit)
+                    }
+                }
+            }
+        })
+        budget(budget.householdId, budget.month) ?: budget
+    }
+
+    /** El servidor devuelve como mucho 1000 filas por petición (max_rows): se pide por páginas. */
+    override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement> = backend.mapped {
+        val all = mutableListOf<Movement>()
+        while (true) {
+            val start = all.size.toLong()
+            val page = client.from("transactions").select(Columns.raw(MOVEMENT)) {
+                filter {
+                    eq("household_id", householdId)
+                    gte("booked_on", from.toString())
+                    lte("booked_on", through.toString())
+                }
+                order("booked_on", Order.DESCENDING)
+                order("id", Order.ASCENDING)
+                range(start, start + PAGE - 1)
+            }.decodeList<Movement>()
+            all += page
+            if (page.size < PAGE) break
+        }
+        all
+    }
+
     private companion object {
+        const val BUDGET = "household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
+        const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
         const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash"
@@ -132,6 +205,24 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
 // Filas que se envían. Nunca llevan id ni created_by: el servidor no deja escribirlos.
 // Los opcionales van como null explícito: todas las filas de un lote deben llevar las mismas claves.
+
+@Serializable
+private data class BudgetRow(
+    @SerialName("household_id") val householdId: String,
+    val month: String,
+    @SerialName("expected_income_minor") val expectedIncome: Long,
+    @SerialName("needs_pct") val needs: Int,
+    @SerialName("wants_pct") val wants: Int,
+    @SerialName("savings_pct") val savings: Int,
+    @SerialName("budget_lines") val lines: List<Line>,
+) {
+    @Serializable
+    data class Line(@SerialName("category_id") val categoryId: String, @SerialName("limit_minor") val limit: Long)
+
+    val budget: Budget? get() = if (needs + wants + savings != 100) null else Budget(
+        householdId, YearMonth.parse(month.take(7)), expectedIncome, BudgetTemplate(needs, wants, savings), lines.associate { it.categoryId to it.limit },
+    )
+}
 
 @Serializable
 private data class BalanceRow(@SerialName("account_id") val accountId: String, @SerialName("balance_minor") val balanceMinor: Long)
