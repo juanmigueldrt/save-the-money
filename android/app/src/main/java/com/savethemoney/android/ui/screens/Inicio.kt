@@ -53,6 +53,7 @@ fun Pantalla04(nav: Nav) {
     val total = finance.totalBalance
     val inicioMes = total - finance.netThisMonth
     val variacion = if (inicioMes > 0) finance.netThisMonth * 1000 / inicioMes else null
+    val proximo = finance.planning.nextExpense
     val anadir = { nav.go(if (cuentas.isEmpty()) 9 else 7) }
     StmScreen(
         topBar = {
@@ -88,9 +89,18 @@ fun Pantalla04(nav: Nav) {
                 if (session.capture) "de 2.400 € previstos" else "este mes", Modifier.weight(1f),
             ) { nav.tab(Tab.Presupuesto) }
             Stat(
-                "Próximo cargo", if (session.capture) "312 €" else "—",
-                if (session.capture) "Visa · 1 dic" else "Próximamente", Modifier.weight(1f),
-            ) { nav.go(11) }
+                "Próximo cargo", when {
+                    session.capture -> "312 €"
+                    proximo != null -> Money.format(proximo.amount, decimals = false)
+                    else -> "—"
+                },
+                when {
+                    session.capture -> "Visa · 1 dic"
+                    proximo != null -> "${proximo.series.trimmedName} · ${Fechas.corto(proximo.due)}"
+                    else -> "Sin cargos a la vista"
+                },
+                Modifier.weight(1f),
+            ) { nav.go(if (session.capture) 11 else 20) }
         }
         Spacer(Modifier.height(16.dp))
         SectionHeader("Últimos movimientos", "Ver todo") { nav.go(5) }

@@ -9,6 +9,8 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.addJsonObject
 import java.time.LocalDate
 import java.time.YearMonth
@@ -191,7 +193,88 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         all
     }
 
+    // MARK: pagos fijos y metas. household_id solo al insertar: el servidor no deja cambiarlo después.
+
+    private fun withHousehold(columns: JsonObject, householdId: String) = JsonObject(columns + ("household_id" to JsonPrimitive(householdId)))
+
+    override suspend fun recurringSeries(householdId: String): List<RecurringSeries> = backend.mapped {
+        client.from("recurring_series").select(Columns.raw(SERIES)) {
+            filter { eq("household_id", householdId) }
+            order("name", Order.ASCENDING)
+        }.decodeList()
+    }
+
+    override suspend fun createRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
+        series.issue?.let(::fail)
+        client.from("recurring_series").insert(withHousehold(series.columns(), series.householdId)) { select(Columns.raw(SERIES)) }.decodeSingle()
+    }
+
+    override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
+        series.issue?.let(::fail)
+        client.from("recurring_series").update(series.columns()) {
+            select(Columns.raw(SERIES))
+            filter { eq("id", series.id) }
+        }.decodeSingle()
+    }
+
+    override suspend fun deleteRecurring(seriesId: String) = backend.mapped {
+        client.from("recurring_series").delete { filter { eq("id", seriesId) } }
+        Unit
+    }
+
+    override suspend fun goals(householdId: String): List<Goal> = backend.mapped {
+        client.from("goals").select(Columns.raw(GOAL)) {
+            filter { eq("household_id", householdId) }
+            order("created_at", Order.ASCENDING)
+        }.decodeList()
+    }
+
+    override suspend fun createGoal(goal: Goal): Goal = backend.mapped {
+        goal.issue?.let(::fail)
+        client.from("goals").insert(withHousehold(goal.columns(), goal.householdId)) { select(Columns.raw(GOAL)) }.decodeSingle()
+    }
+
+    override suspend fun updateGoal(goal: Goal): Goal = backend.mapped {
+        goal.issue?.let(::fail)
+        client.from("goals").update(goal.columns()) {
+            select(Columns.raw(GOAL))
+            filter { eq("id", goal.id) }
+        }.decodeSingle()
+    }
+
+    override suspend fun deleteGoal(goalId: String) = backend.mapped {
+        client.from("goals").delete { filter { eq("id", goalId) } }
+        Unit
+    }
+
+    override suspend fun contributions(householdId: String): List<GoalContribution> = backend.mapped {
+        client.from("goal_contributions").select(Columns.raw(CONTRIBUTION)) {
+            filter { eq("household_id", householdId) }
+            order("made_on", Order.DESCENDING)
+        }.decodeList()
+    }
+
+    override suspend fun addContribution(contribution: GoalContribution): GoalContribution = backend.mapped {
+        contribution.issue?.let(::fail)
+        val row = buildJsonObject {
+            put("household_id", contribution.householdId)
+            put("goal_id", contribution.goalId)
+            put("amount_minor", contribution.amountMinor)
+            put("made_on", contribution.madeOn)
+            put("note", contribution.note)
+        }
+        client.from("goal_contributions").insert(row) { select(Columns.raw(CONTRIBUTION)) }.decodeSingle()
+    }
+
+    override suspend fun deleteContribution(contributionId: String) = backend.mapped {
+        client.from("goal_contributions").delete { filter { eq("id", contributionId) } }
+        Unit
+    }
+
     private companion object {
+        const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges"
+        const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
+        const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
         const val BUDGET = "household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
         const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at"
@@ -201,6 +284,38 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500
     }
+}
+
+/** Columnas editables, con los nulos explícitos para poder borrar un valor. */
+private fun RecurringSeries.columns() = buildJsonObject {
+    put("name", trimmedName)
+    put("kind", RECURRING_KIND.getValue(kind))
+    put("amount_minor", amountMinor)
+    put("account_id", accountId)
+    put("category_id", categoryId)
+    put("every", every)
+    put("unit", unit.name.lowercase())
+    put("starts_on", startsOn)
+    put("ends_on", endsOn)
+    put("remind_days_before", remindDaysBefore)
+    put("archived_at", archivedAt)
+    put("intro_amount_minor", introMinor)
+    put("intro_charges", introCharges)
+}
+
+private val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
+
+private fun Goal.columns() = buildJsonObject {
+    put("name", trimmedName)
+    put("kind", kind.name.lowercase())
+    put("target_minor", targetMinor)
+    put("starting_minor", startingMinor)
+    put("monthly_plan_minor", monthlyPlanMinor)
+    put("target_on", targetOn)
+    put("account_id", accountId)
+    put("icon", icon)
+    put("completed_at", completedAt)
+    put("archived_at", archivedAt)
 }
 
 // Filas que se envían. Nunca llevan id ni created_by: el servidor no deja escribirlos.

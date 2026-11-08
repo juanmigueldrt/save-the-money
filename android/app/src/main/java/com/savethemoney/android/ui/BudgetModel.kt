@@ -7,9 +7,11 @@ import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Budget
 import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetReport
+import com.savethemoney.android.data.BudgetAlertPlanner
 import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.Movement
+import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.data.monthContaining
 import com.savethemoney.android.data.period
 import kotlinx.coroutines.CancellationException
@@ -19,7 +21,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 
 /** Presupuesto y flujo del mes elegido; las dos pantallas miran el mismo mes (BudgetModel de iOS). */
-class BudgetModel(private val household: Household, private val service: FinanceService, private val today: () -> LocalDate) {
+class BudgetModel(private val household: Household, private val service: FinanceService, private val notifier: Notifier, private val today: () -> LocalDate) {
     var month by mutableStateOf(monthContaining(today(), household.monthStartDay))
         private set
     var budget by mutableStateOf<Budget?>(null)
@@ -43,6 +45,11 @@ class BudgetModel(private val household: Household, private val service: Finance
 
     /** Meses que ofrece el selector, del más reciente al más antiguo. */
     fun months(): List<YearMonth> = (0L..12L).map { monthContaining(today(), household.monthStartDay).plusMonths(1 - it) }
+
+    /** Avisa de los límites del mes en curso que se acercan o se pasan. */
+    fun checkAlerts(categories: List<BudgetCategory>) {
+        if (budget != null && today() in period) notifier.budgetAlerts(BudgetAlertPlanner.alerts(report(categories), month))
+    }
 
     suspend fun show(next: YearMonth) {
         month = next

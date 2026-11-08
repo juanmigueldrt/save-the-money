@@ -57,6 +57,7 @@ import com.savethemoney.android.data.BudgetTemplate
 import com.savethemoney.android.data.CashFlow
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.CategoryLine
+import com.savethemoney.android.data.FlexBudget
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.SankeyLayout
 import com.savethemoney.android.ui.BudgetModel
@@ -256,7 +257,25 @@ fun Pantalla15(nav: Nav) {
                 }
             }
         } else {
-            Text("El reparto flexible aparecerá cuando estén los pagos fijos.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            val flex = FlexBudget(budgets.report(finance.categories), finance.planning.series, finance.today())
+            ListCard {
+                ListHeader("Flexible")
+                ListItem("Entra", trailingText = Money.format(flex.income))
+                Divider()
+                ListItem("Pagos fijos", trailingText = Money.format(-flex.fixed))
+                Divider()
+                ListItem("Ahorro", trailingText = Money.format(-flex.savings))
+                Divider()
+                ListItem("Para todo lo demás", trailingText = Money.format(flex.flexible))
+                Divider()
+                ListItem("Gastado", trailingText = Money.format(flex.flexibleSpent))
+                Divider()
+                ListItem(
+                    if (flex.remaining < 0) "Gastado de más" else "Queda",
+                    flex.perDay?.let { "${Money.format(it)} al día" },
+                    trailingText = Money.format(flex.remaining),
+                )
+            }
         }
     }
 }

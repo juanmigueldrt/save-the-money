@@ -1,6 +1,9 @@
 package com.savethemoney.android
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -18,6 +21,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.lifecycleScope
 import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AccountKind
@@ -30,10 +34,18 @@ import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.InMemoryBackend
 import com.savethemoney.android.data.InMemoryFinance
 import com.savethemoney.android.data.InviteCode
+import com.savethemoney.android.data.Goal
+import com.savethemoney.android.data.GoalContribution
+import com.savethemoney.android.data.GoalKind
 import com.savethemoney.android.data.MovementDraft
+import com.savethemoney.android.data.NoNotifier
+import com.savethemoney.android.data.Recurrence
+import com.savethemoney.android.data.RecurringKind
+import com.savethemoney.android.data.RecurringSeries
 import com.savethemoney.android.data.SupabaseBackend
 import com.savethemoney.android.data.SupabaseFinance
 import com.savethemoney.android.data.Username
+import com.savethemoney.android.ui.LocalNotifier
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Session
@@ -96,7 +108,7 @@ class StmApp : android.app.Application() {
             finance = SupabaseFinance(remote)
         }
         val today: () -> LocalDate = if (capture) ({ CAPTURE_DAY }) else LocalDate::now
-        Session(backend, finance, isDemo = demo, capture = capture, today = today).also { session = it }
+        Session(backend, finance, isDemo = demo, capture = capture, today = today, notifier = if (capture) NoNotifier else LocalNotifier(this)).also { session = it }
     }
 }
 
@@ -120,6 +132,15 @@ fun App(capture: Int? = null) {
                 is Session.State.NeedsHousehold -> nav.reset(3)
                 is Session.State.Ready -> if (nav.current in 1..3) nav.reset(4)
             }
+        }
+    }
+    // Se pide el permiso cuando hay algo de lo que avisar, no al abrir la app.
+    val activity = LocalContext.current as ComponentActivity
+    val hayAvisos = capture == null && session.finance?.planning?.activeSeries.orEmpty().any { it.remindDaysBefore != null }
+    LaunchedEffect(hayAvisos) {
+        val permiso = Manifest.permission.POST_NOTIFICATIONS
+        if (hayAvisos && Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(permiso) != PackageManager.PERMISSION_GRANTED) {
+            activity.requestPermissions(arrayOf(permiso), 1)
         }
     }
     if (session.state == Session.State.Loading) {
@@ -170,6 +191,19 @@ private suspend fun seedSample(backend: Backend, finance: FinanceService) {
         MovementDraft(main.id, cat("Nómina"), CAPTURE_DAY.minusDays(4), 215000, "Nómina"),
     )
     sample.forEach { finance.addMovement(it, home.id) }
+    val serie = RecurringSeries("", home.id, "", amountMinor = 0, startsOn = "", remindDaysBefore = 2)
+    listOf(
+        serie.copy(name = "Alquiler", kind = RecurringKind.Essential, amountMinor = 85_000, startsOn = "2026-12-01"),
+        serie.copy(name = "Streaming", amountMinor = 1_299, startsOn = "2026-12-08", introMinor = 599, introCharges = 3),
+        serie.copy(name = "Gimnasio", amountMinor = 3_990, startsOn = "2026-12-10"),
+        serie.copy(name = "Agua", kind = RecurringKind.Essential, amountMinor = 4_210, startsOn = "2026-12-15", every = 2),
+        serie.copy(name = "Nómina", kind = RecurringKind.Income, amountMinor = 215_000, startsOn = "2026-12-01"),
+    ).forEach { finance.createRecurring(it) }
+    val fondo = finance.createGoal(Goal("", home.id, "Fondo de emergencia", targetMinor = 600_000, startingMinor = 315_000, monthlyPlanMinor = 30_000))
+    finance.createGoal(Goal("", home.id, "Viaje a Lisboa", targetMinor = 120_000, startingMinor = 78_000, targetOn = "2027-06-30"))
+    finance.createGoal(Goal("", home.id, "Préstamo del coche", GoalKind.Debt, targetMinor = 900_000, startingMinor = 410_000, monthlyPlanMinor = 27_300))
+    finance.addContribution(GoalContribution("", home.id, fondo.id, 30_000, "2026-11-01", "Mensual"))
+    finance.addContribution(GoalContribution("", home.id, fondo.id, 15_000, "2026-10-15", "Extra"))
     finance.saveBudget(
         Budget(home.id, YearMonth.from(CAPTURE_DAY), expectedIncome = 240_000, limits = mapOf(comida.id to 45_000, categories.first { it.name == "Ocio" }.id to 20_000)),
     )

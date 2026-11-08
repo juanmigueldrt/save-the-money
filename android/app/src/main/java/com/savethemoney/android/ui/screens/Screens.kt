@@ -18,6 +18,8 @@ fun ScreenFor(number: Int, nav: Nav) {
         25 -> Pantalla25(nav); 26 -> Pantalla26(nav); 27 -> Pantalla27(nav); 28 -> Pantalla28(nav)
         29 -> Pantalla29(nav); 30 -> Pantalla30(nav); 31 -> Pantalla31(nav); 32 -> Pantalla32(nav)
         33 -> Pantalla33(nav); 34 -> Pantalla34(nav)
+        // Fuera del diseño: el formulario de aportar a una meta.
+        35 -> Pantalla35(nav)
     }
 }
 

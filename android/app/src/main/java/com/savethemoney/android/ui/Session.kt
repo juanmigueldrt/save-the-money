@@ -9,6 +9,8 @@ import com.savethemoney.android.data.Backend
 import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.InviteCode
+import com.savethemoney.android.data.NoNotifier
+import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.data.Profile
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
@@ -22,6 +24,7 @@ class Session(
     /** Modo captura: datos de muestra y fecha fija para comparar con el diseño. */
     val capture: Boolean = false,
     private val today: () -> LocalDate = LocalDate::now,
+    private val notifier: Notifier = NoNotifier,
 ) {
     sealed interface State {
         data object Loading : State
@@ -67,7 +70,7 @@ class Session(
         if (next is State.Ready) {
             // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros.
             if (finance?.household?.id != next.household.id) {
-                finance = FinanceModel(next.household, financeService, today).also { it.load() }
+                finance = FinanceModel(next.household, financeService, today, notifier).also { it.load() }
             }
         } else if (next !is State.Loading) {
             finance = null

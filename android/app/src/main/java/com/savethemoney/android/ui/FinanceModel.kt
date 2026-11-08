@@ -15,6 +15,8 @@ import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.ImportResult
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDraft
+import com.savethemoney.android.data.NoNotifier
+import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.ui.icons.StmIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
@@ -27,8 +29,14 @@ import java.util.Locale
 data class MovementForm(val movement: Movement? = null, val accountId: String? = null, val transfer: Boolean = false)
 
 /** Cuentas, saldos, categorías y movimientos del hogar abierto (FinanceModel de iOS). */
-class FinanceModel(val household: Household, private val service: FinanceService, val today: () -> LocalDate = LocalDate::now) {
-    val budgets = BudgetModel(household, service, today)
+class FinanceModel(
+    val household: Household,
+    private val service: FinanceService,
+    val today: () -> LocalDate = LocalDate::now,
+    notifier: Notifier = NoNotifier,
+) {
+    val budgets = BudgetModel(household, service, notifier, today)
+    val planning = PlanningModel(household, service, notifier, today)
 
     var accounts by mutableStateOf(emptyList<Account>())
         private set
@@ -94,6 +102,9 @@ class FinanceModel(val household: Household, private val service: FinanceService
                 recent = r.await()
             }
             error = null
+            planning.load()
+            budgets.load()
+            budgets.checkAlerts(categories)
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {

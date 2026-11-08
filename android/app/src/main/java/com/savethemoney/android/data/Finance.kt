@@ -204,6 +204,18 @@ interface FinanceService {
     suspend fun latestBudget(householdId: String, month: YearMonth): Budget?
     suspend fun saveBudget(budget: Budget): Budget
     suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement>
+
+    suspend fun recurringSeries(householdId: String): List<RecurringSeries>
+    suspend fun createRecurring(series: RecurringSeries): RecurringSeries
+    suspend fun updateRecurring(series: RecurringSeries): RecurringSeries
+    suspend fun deleteRecurring(seriesId: String)
+    suspend fun goals(householdId: String): List<Goal>
+    suspend fun createGoal(goal: Goal): Goal
+    suspend fun updateGoal(goal: Goal): Goal
+    suspend fun deleteGoal(goalId: String)
+    suspend fun contributions(householdId: String): List<GoalContribution>
+    suspend fun addContribution(contribution: GoalContribution): GoalContribution
+    suspend fun deleteContribution(contributionId: String)
 }
 
 /**
@@ -327,4 +339,55 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate) =
         movements.filter { it.householdId == householdId && it.day in from..through }
+
+    private val series = mutableListOf<RecurringSeries>()
+    private val goals = mutableListOf<Goal>()
+    private val contributions = mutableListOf<GoalContribution>()
+
+    override suspend fun recurringSeries(householdId: String) = series.filter { it.householdId == householdId }.sortedBy { it.name }
+
+    override suspend fun createRecurring(series: RecurringSeries): RecurringSeries {
+        series.issue?.let(::fail)
+        return series.copy(id = id(), name = series.trimmedName).also { this.series += it }
+    }
+
+    override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries {
+        series.issue?.let(::fail)
+        this.series.replaceAll { if (it.id == series.id) series else it }
+        return series
+    }
+
+    override suspend fun deleteRecurring(seriesId: String) {
+        series.removeAll { it.id == seriesId }
+    }
+
+    override suspend fun goals(householdId: String) = goals.filter { it.householdId == householdId }
+
+    override suspend fun createGoal(goal: Goal): Goal {
+        goal.issue?.let(::fail)
+        return goal.copy(id = id(), name = goal.trimmedName).also { goals += it }
+    }
+
+    override suspend fun updateGoal(goal: Goal): Goal {
+        goal.issue?.let(::fail)
+        goals.replaceAll { if (it.id == goal.id) goal else it }
+        return goal
+    }
+
+    override suspend fun deleteGoal(goalId: String) {
+        goals.removeAll { it.id == goalId }
+        contributions.removeAll { it.goalId == goalId }
+    }
+
+    override suspend fun contributions(householdId: String) =
+        contributions.filter { it.householdId == householdId }.sortedByDescending { it.madeOn }
+
+    override suspend fun addContribution(contribution: GoalContribution): GoalContribution {
+        contribution.issue?.let(::fail)
+        return contribution.copy(id = id()).also { contributions += it }
+    }
+
+    override suspend fun deleteContribution(contributionId: String) {
+        contributions.removeAll { it.id == contributionId }
+    }
 }

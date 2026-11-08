@@ -278,16 +278,17 @@ fun Pantalla27(nav: Nav) {
 /** 30 Más opciones: menú de secciones, datos y preferencias. */
 @Composable
 fun Pantalla30(nav: Nav) {
-    val categorias = LocalSession.current.finance?.categories?.size ?: 0
+    val finance = LocalSession.current.finance
+    val categorias = finance?.categories?.size ?: 0
     var dark by remember { mutableStateOf(false) }
-    var alerts by remember { mutableStateOf(true) }
+    var alerts by remember(finance) { mutableStateOf(finance?.planning?.alertsEnabled ?: true) }
     StmScreen(
         topBar = { MasHeader() },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
     ) {
         ListCard {
             MenuRow(StmIcons.creditCard, "Tarjetas") { nav.go(10) }
-            MenuRow(StmIcons.eventRepeat, "Pagos fijos", count = "9") { nav.go(20) }
+            MenuRow(StmIcons.eventRepeat, "Pagos fijos", count = LocalSession.current.finance?.planning?.activeSeries?.size?.toString()) { nav.go(20) }
             MenuRow(StmIcons.monitoring, "Patrimonio, informes y score") { nav.go(17) }
             MenuRow(StmIcons.candlestickChart, "Inversiones") { nav.go(25) }
             MenuRow(StmIcons.group, "Hogar") { nav.go(28) }
@@ -311,7 +312,12 @@ fun Pantalla30(nav: Nav) {
             ListItem(
                 "Avisos de cobros y límites",
                 leading = { StmIcon(StmIcons.notifications, Stm.colors.onSurfaceVariant) },
-                trailing = { StmSwitch(alerts) { alerts = it } },
+                trailing = {
+                    StmSwitch(alerts) {
+                        alerts = it
+                        finance?.planning?.alertsEnabled = it
+                    }
+                },
             )
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
         }
