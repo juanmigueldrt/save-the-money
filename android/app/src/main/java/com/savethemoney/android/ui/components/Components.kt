@@ -683,6 +683,21 @@ fun BoxScope.BottomSheet(title: String?, subtitle: String? = null, onDismiss: ()
     }
 }
 
+/** Hoja para elegir una opción; la lista se desplaza si no cabe. */
+@Composable
+fun BoxScope.SelectorSheet(title: String, options: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
+    BottomSheet(title, onDismiss = onDismiss) {
+        Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState())) {
+            options.forEach { (label, pick) ->
+                ListItem(label, onClick = {
+                    pick()
+                    onDismiss()
+                })
+            }
+        }
+    }
+}
+
 /** Elemento de una hoja o menú: icono de 24 y texto (56 dp). */
 @Composable
 fun SheetItem(icon: ImageVector, label: String, color: Color = Stm.colors.onSurface, iconTint: Color = Stm.colors.onSurfaceVariant, onClick: (() -> Unit)?) {

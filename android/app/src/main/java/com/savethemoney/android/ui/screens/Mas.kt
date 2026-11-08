@@ -1,9 +1,16 @@
 package com.savethemoney.android.ui.screens
 
+import android.content.Context
+import android.net.Uri
+import android.provider.OpenableColumns
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -24,6 +31,8 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -42,7 +51,23 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.data.AmountColumns
+import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.BudgetCategory
+import com.savethemoney.android.data.BudgetGroup
+import com.savethemoney.android.data.CategoryKind
+import com.savethemoney.android.data.CsvImporter
+import com.savethemoney.android.data.CsvMapping
+import com.savethemoney.android.data.CsvTable
+import com.savethemoney.android.data.DateOrder
+import com.savethemoney.android.data.ImportResult
+import com.savethemoney.android.data.Money
+import com.savethemoney.android.ui.Fechas
+import com.savethemoney.android.ui.FinanceModel
+import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.iconoCategoria
+import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Chip
@@ -61,6 +86,8 @@ import com.savethemoney.android.ui.components.OutlinedField
 import com.savethemoney.android.ui.components.Pill
 import com.savethemoney.android.ui.components.Segmented
 import com.savethemoney.android.ui.components.Slice
+import com.savethemoney.android.ui.components.Snackbar
+import com.savethemoney.android.ui.components.SelectorSheet
 import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmDialog
 import com.savethemoney.android.ui.components.StmIcon
@@ -72,6 +99,11 @@ import com.savethemoney.android.ui.components.tap
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.util.UUID
 
 /** 25 Inversiones: cartera con evolución, reparto y posiciones. */
 @Composable
@@ -246,6 +278,7 @@ fun Pantalla27(nav: Nav) {
 /** 30 Más opciones: menú de secciones, datos y preferencias. */
 @Composable
 fun Pantalla30(nav: Nav) {
+    val categorias = LocalSession.current.finance?.categories?.size ?: 0
     var dark by remember { mutableStateOf(false) }
     var alerts by remember { mutableStateOf(true) }
     StmScreen(
@@ -265,7 +298,7 @@ fun Pantalla30(nav: Nav) {
             MenuRow(StmIcons.uploadFile, "Importar CSV") { nav.go(32) }
             MenuRow(StmIcons.pictureAsPdf, "PDF de pagos del mes", onClick = null)
             MenuRow(StmIcons.tableView, "CSV para Excel", onClick = null)
-            MenuRow(StmIcons.category, "Categorías", count = "20") { nav.go(31) }
+            MenuRow(StmIcons.category, "Categorías", count = categorias.toString()) { nav.go(31) }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
@@ -285,17 +318,27 @@ fun Pantalla30(nav: Nav) {
     }
 }
 
-/** 31 Categorías: gastos o ingresos agrupados, con asa para reordenar. */
+/** 31 Categorías: gastos o ingresos agrupados; tocar una para editarla. */
 @Composable
 fun Pantalla31(nav: Nav) {
+    val finance = LocalSession.current.finance ?: return
     val c = Stm.colors
     var income by remember { mutableStateOf(false) }
+    var editando by remember { mutableStateOf<BudgetCategory?>(null) }
+    val kind = if (income) CategoryKind.Income else CategoryKind.Expense
+    val lista = finance.categories(kind)
     StmScreen(
         topBar = {
             TopBar("Categorías", onNav = nav::back) {
-                IconBtn(StmIcons.add, null, contentDescription = "Añadir categoría")
+                IconBtn(StmIcons.add, {
+                    editando = BudgetCategory(
+                        UUID.randomUUID().toString(), finance.household.id, "", kind,
+                        if (income) null else BudgetGroup.Needs,
+                    )
+                }, contentDescription = "Añadir categoría")
             }
         },
+        overlay = editando?.let { cat -> { DialogoCategoria(cat, finance) { editando = null } } },
     ) {
         ChipRow {
             Chip("Gastos", selected = !income, onClick = { income = false })
@@ -303,65 +346,298 @@ fun Pantalla31(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Necesidades")
-            CategoryRow(StmIcons.home, "Vivienda")
-            CategoryRow(StmIcons.shoppingCart, "Comida")
-            CategoryRow(StmIcons.accountBalance, "Impuestos")
-            CategoryRow(StmIcons.gavel, "Multas y sanciones")
-            ListHeader("Deseos")
-            CategoryRow(StmIcons.theaterComedy, "Ocio", c.tertiaryContainer, c.onTertiaryContainer)
-            CategoryRow(StmIcons.subscriptions, "Suscripciones", c.tertiaryContainer, c.onTertiaryContainer)
+            val grupos = lista.groupBy { it.budgetGroup }
+            (BudgetGroup.entries + listOf(null)).forEach { grupo ->
+                val filas = grupos[grupo] ?: return@forEach
+                when {
+                    grupo != null -> ListHeader(grupo.title)
+                    !income -> ListHeader("Sin grupo")
+                }
+                filas.forEach { cat ->
+                    val deseo = grupo == BudgetGroup.Wants
+                    CategoryRow(
+                        iconoCategoria(cat), cat.name,
+                        if (deseo) c.tertiaryContainer else c.secondaryContainer,
+                        if (deseo) c.onTertiaryContainer else c.onSecondaryContainer,
+                    ) { editando = cat }
+                }
+            }
         }
     }
 }
 
-/** 32 Importar CSV: archivo elegido, columnas, vista previa e importación. */
+/** Crear, renombrar, cambiar de grupo o borrar una categoría. */
+@Composable
+private fun BoxScope.DialogoCategoria(inicial: BudgetCategory, finance: FinanceModel, onDismiss: () -> Unit) {
+    val c = Stm.colors
+    val existe = finance.categories.any { it.id == inicial.id }
+    var nombre by remember { mutableStateOf(inicial.name) }
+    var grupo by remember { mutableStateOf(inicial.budgetGroup) }
+    var borrando by remember { mutableStateOf(false) }
+    val action = rememberAction()
+    if (borrando) {
+        val usos = finance.recent.count { it.categoryId == inicial.id }
+        StmDialog(
+            "¿Borrar «${inicial.name}»?",
+            if (usos > 0) "$usos movimientos recientes se quedarán sin categoría." else "No hay movimientos recientes con esta categoría.",
+            icon = StmIcons.deleteForever,
+            onDismiss = { borrando = false },
+            actions = {
+                Btn("Cancelar", { borrando = false }, kind = BtnKind.Text)
+                Btn("Borrar", {
+                    action.run {
+                        finance.delete(inicial)
+                        onDismiss()
+                    }
+                }, kind = BtnKind.Error)
+            },
+        ) { action.error?.let { Text(it, style = StmType.bodySmall, color = c.error) } }
+        return
+    }
+    StmDialog(
+        if (existe) "Editar categoría" else "Nueva categoría",
+        onDismiss = onDismiss,
+        actions = {
+            if (existe) Btn("Borrar", { borrando = true }, kind = BtnKind.Error)
+            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
+            Btn("Guardar", {
+                action.run {
+                    finance.save(inicial.copy(name = nombre, budgetGroup = grupo))
+                    onDismiss()
+                }
+            }, kind = BtnKind.Text)
+        },
+    ) {
+        Spacer(Modifier.height(16.dp))
+        OutlinedField(
+            "Nombre", nombre, { nombre = it }, labelBackground = c.surfaceContainerHigh, autoFocus = !existe,
+            error = action.error != null, supporting = action.error,
+        )
+        if (inicial.kind == CategoryKind.Expense) {
+            Spacer(Modifier.height(12.dp))
+            ChipRow {
+                BudgetGroup.entries.forEach { g -> Chip(g.title, selected = g == grupo, onClick = { grupo = g }) }
+            }
+        }
+    }
+}
+
+/** 32 Importar CSV: archivo elegido, columnas, vista previa e importación. El archivo no sale del móvil. */
 @Composable
 fun Pantalla32(nav: Nav) {
+    val session = LocalSession.current
+    val finance = session.finance ?: return
     val c = Stm.colors
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val cardShape = RoundedCornerShape(12.dp)
+    var nombre by remember { mutableStateOf<String?>(null) }
+    var tabla by remember { mutableStateOf<CsvTable?>(null) }
+    var mapeo by remember { mutableStateOf<CsvMapping?>(null) }
+    var cuenta by remember { mutableStateOf(finance.takeCsvAccount() ?: finance.activeAccounts.firstOrNull()?.id) }
+    var aviso by remember { mutableStateOf<String?>(null) }
+    var resultado by remember { mutableStateOf<ImportResult?>(null) }
+    var selector by remember { mutableStateOf<String?>(null) }
+    val action = rememberAction()
+
+    fun cargar(texto: String, archivo: String) {
+        val t = CsvTable.parse(texto)
+        nombre = archivo
+        tabla = t
+        mapeo = CsvMapping.detect(t)
+        resultado = null
+        aviso = null
+    }
+    LaunchedEffect(Unit) { if (session.capture) cargar(CSV_MUESTRA, "movimientos-octubre.csv") }
+    val elegir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            val leido = withContext(Dispatchers.IO) { leerCsv(context, uri) }
+            leido.onSuccess { (texto, archivo) -> cargar(texto, archivo) }.onFailure { aviso = it.message }
+        }
+    }
+    val abrir = { elegir.launch(arrayOf("text/*", "application/csv", "application/vnd.ms-excel", "application/octet-stream")) }
+
+    val t = tabla
+    val m = mapeo
+    val filas = remember(t, m, cuenta) {
+        val id = cuenta
+        if (t != null && m != null && id != null) CsvImporter.rows(t, m, id) else emptyList()
+    }
+    val validas = filas.mapNotNull { it.draft }
+    val problemas = filas.filter { it.issue != null }
+    val anchura = t?.rows?.maxOfOrNull { it.size } ?: 0
+    val cabeceras = m?.headerRow?.let { t?.rows?.get(it) } ?: emptyList()
+    fun letra(i: Int) = "Columna " + if (i < 26) ('A' + i).toString() else (i + 1).toString()
+    fun columna(i: Int) = letra(i) + (cabeceras.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
+
     StmScreen(
         topBar = { TopBar("Importar CSV", navIcon = StmIcons.close, onNav = nav::back) },
+        // En una snackbar: la vista previa puede ocupar más que la pantalla.
+        snackbar = (action.error ?: resultado?.let { r ->
+            "${r.inserted} movimientos importados." + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
+        })?.let { texto -> { Snackbar(texto) } },
         bottomBar = {
             Box(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
-                Btn("Importar 148 movimientos", { nav.go(5) }, Modifier.fillMaxWidth(), large = true)
+                Btn(
+                    when {
+                        action.busy -> "Importando…"
+                        validas.isEmpty() -> "Importar"
+                        else -> "Importar ${validas.size} movimientos"
+                    },
+                    {
+                        action.run {
+                            aviso = null
+                            resultado = finance.importMovements(validas)
+                        }
+                    },
+                    Modifier.fillMaxWidth(), large = true, enabled = validas.isNotEmpty() && !action.busy,
+                )
+            }
+        },
+        overlay = selector?.let { campo ->
+            {
+                val cerrar = { selector = null }
+                val columnas = { fijar: (Int) -> Unit -> (0 until anchura).map { i -> columna(i) to { fijar(i) } } }
+                when (campo) {
+                    "fecha" -> SelectorSheet("Fecha", columnas { i -> mapeo = mapeo?.copy(date = i) }, cerrar)
+                    "concepto" -> SelectorSheet("Concepto", columnas { i -> mapeo = mapeo?.copy(description = i) }, cerrar)
+                    "importe" -> SelectorSheet("Importe", columnas { i -> mapeo = mapeo?.copy(amount = AmountColumns.Signed(i)) }, cerrar)
+                    "cargos" -> SelectorSheet("Cargos (gastos)", columnas { i ->
+                        mapeo = mapeo?.let { it.copy(amount = AmountColumns.Split(i, (it.amount as? AmountColumns.Split)?.credit ?: i)) }
+                    }, cerrar)
+                    "abonos" -> SelectorSheet("Abonos (ingresos)", columnas { i ->
+                        mapeo = mapeo?.let { it.copy(amount = AmountColumns.Split((it.amount as? AmountColumns.Split)?.debit ?: i, i)) }
+                    }, cerrar)
+                    "formato" -> SelectorSheet("Formato de fecha", DateOrder.entries.map { o -> o.title to { mapeo = mapeo?.copy(dateOrder = o) } }, cerrar)
+                    else -> SelectorSheet("Cuenta de destino", finance.activeAccounts.map { a -> a.name to { cuenta = a.id; resultado = null } }, cerrar)
+                }
             }
         },
     ) {
         Spacer(Modifier.height(8.dp))
         Row(
             Modifier.fillMaxWidth().height(72.dp).clip(cardShape).background(c.surface)
-                .border(1.dp, c.outlineVariant, cardShape).padding(horizontal = 16.dp),
+                .border(1.dp, c.outlineVariant, cardShape).tap(onClick = abrir).padding(horizontal = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             LeadIcon(StmIcons.description, c.tertiaryContainer, c.onTertiaryContainer)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("movimientos-octubre.csv", style = StmType.titleMedium, color = c.onSurface, maxLines = 1)
-                Text("148 filas · separador ;", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(nombre ?: "Elegir archivo CSV", style = StmType.titleMedium, color = c.onSurface, maxLines = 1)
+                Text(
+                    t?.let { "${it.rows.size - (m?.firstDataRow ?: 0)} filas · separador ${if (it.delimiter == '\t') "tabulador" else it.delimiter}" }
+                        ?: "El archivo no se sube: solo se guardan los movimientos",
+                    style = StmType.bodySmall, color = c.onSurfaceVariant, maxLines = 1,
+                )
             }
-            IconBtn(StmIcons.close, null, contentDescription = "Quitar archivo")
+            if (nombre != null) IconBtn(StmIcons.close, {
+                nombre = null
+                tabla = null
+                mapeo = null
+                resultado = null
+            }, contentDescription = "Quitar archivo")
         }
-        Spacer(Modifier.height(16.dp))
-        Text("Qué columna es cada dato", style = StmType.titleSmall, color = c.onSurfaceVariant)
-        listOf(
-            "Fecha" to "Columna A · dd/mm/aaaa",
-            "Concepto" to "Columna B",
-            "Importe" to "Columna D · coma decimal",
-            "Cuenta de destino" to "Cuenta principal",
-        ).forEach { (label, value) ->
+        aviso?.let {
+            Spacer(Modifier.height(12.dp))
+            Text(it, style = StmType.bodySmall, color = c.error)
+        }
+        if (t != null && m == null) {
+            Spacer(Modifier.height(12.dp))
+            Text("No he reconocido las columnas de fecha, concepto e importe de este archivo.", style = StmType.bodySmall, color = c.error)
+        }
+        if (finance.activeAccounts.isEmpty()) {
+            Spacer(Modifier.height(12.dp))
+            Btn("Crear una cuenta", { nav.go(9) }, kind = BtnKind.Tonal, icon = StmIcons.add)
+        }
+        if (m != null) {
             Spacer(Modifier.height(16.dp))
-            FilledField(label, value, trailing = StmIcons.arrowDropDown)
+            Text("Qué columna es cada dato", style = StmType.titleSmall, color = c.onSurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            FilledField("Fecha", "${letra(m.date)} · ${m.dateOrder.title.lowercase()}", trailing = StmIcons.arrowDropDown, onClick = { selector = "fecha" })
+            Spacer(Modifier.height(16.dp))
+            FilledField("Concepto", columna(m.description), trailing = StmIcons.arrowDropDown, onClick = { selector = "concepto" })
+            when (val a = m.amount) {
+                is AmountColumns.Signed -> {
+                    Spacer(Modifier.height(16.dp))
+                    val coma = t.orEmptyRows().drop(m.firstDataRow).take(20).any { ',' in it.getOrElse(a.column) { "" } }
+                    FilledField("Importe", letra(a.column) + if (coma) " · coma decimal" else "", trailing = StmIcons.arrowDropDown, onClick = { selector = "importe" })
+                }
+                is AmountColumns.Split -> {
+                    Spacer(Modifier.height(16.dp))
+                    FilledField("Cargos (gastos)", columna(a.debit), trailing = StmIcons.arrowDropDown, onClick = { selector = "cargos" })
+                    Spacer(Modifier.height(16.dp))
+                    FilledField("Abonos (ingresos)", columna(a.credit), trailing = StmIcons.arrowDropDown, onClick = { selector = "abonos" })
+                }
+            }
         }
         Spacer(Modifier.height(16.dp))
-        ListCard {
-            ListHeader("Vista previa")
-            ListItem("Supermercado Día", "03/10/2026", trailingText = "−64,20 €")
-            Divider(inset = 16.dp)
-            ListItem("Nómina", "01/10/2026", trailingText = "+2.150,00 €")
+        FilledField("Cuenta de destino", finance.account(cuenta)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+        if (validas.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListHeader("Vista previa")
+                validas.take(10).forEachIndexed { i, d ->
+                    if (i > 0) Divider(inset = 16.dp)
+                    ListItem(d.description, Fechas.numerica(d.bookedOn), trailingText = Money.format(d.amountMinor, signed = true))
+                }
+                if (validas.size > 10) ListItem("… y ${validas.size - 10} más")
+            }
+        }
+        if (problemas.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListHeader("Filas que no se importarán (${problemas.size})")
+                problemas.take(10).forEach { ListItem("Fila ${it.line}: ${it.issue}", supportingColor = c.error) }
+            }
+        }
+        if (m != null) {
+            Spacer(Modifier.height(16.dp))
+            FilledField("Formato de fecha", m.dateOrder.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "formato" })
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListItem(
+                    "Cargos y abonos en columnas separadas",
+                    trailing = {
+                        StmSwitch(m.amount is AmountColumns.Split) { separadas ->
+                            mapeo = when (val a = m.amount) {
+                                is AmountColumns.Signed -> if (separadas) m.copy(amount = AmountColumns.Split(a.column, a.column)) else m
+                                is AmountColumns.Split -> if (!separadas) m.copy(amount = AmountColumns.Signed(a.debit)) else m
+                            }
+                        }
+                    },
+                )
+            }
         }
     }
 }
+
+/** Lee el archivo en el dispositivo. Devuelve el texto y el nombre, o el motivo en español. */
+private fun leerCsv(context: Context, uri: Uri): Result<Pair<String, String>> = try {
+    var archivo = "archivo.csv"
+    var bytes = -1L
+    context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+        if (cursor.moveToFirst()) {
+            val n = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            val s = cursor.getColumnIndex(OpenableColumns.SIZE)
+            if (n >= 0 && !cursor.isNull(n)) archivo = cursor.getString(n)
+            if (s >= 0 && !cursor.isNull(s)) bytes = cursor.getLong(s)
+        }
+    }
+    if (bytes > MAX_CSV_BYTES) {
+        Result.failure(AppError.InvalidInput("El archivo es demasiado grande (máximo 10 MB)."))
+    } else {
+        val data = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+        if (data == null) Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+        else Result.success(CsvTable.decode(data) to archivo)
+    }
+} catch (_: IOException) {
+    Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+} catch (_: SecurityException) {
+    Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+}
+
+private const val MAX_CSV_BYTES = 10L * 1024 * 1024
+private const val CSV_MUESTRA = "Fecha;Concepto;Cuenta;Importe\n03/10/2026;Supermercado Día;;-64,20\n01/10/2026;Nómina;;2150,00\n"
 
 /** 33 Borrar datos: diálogo de confirmación sobre Más opciones. */
 @Composable
@@ -520,10 +796,14 @@ private fun CategoryRow(
     label: String,
     container: Color = Stm.colors.secondaryContainer,
     tint: Color = Stm.colors.onSecondaryContainer,
+    onClick: () -> Unit,
 ) {
     ListItem(
         label,
+        onClick = onClick,
         leading = { LeadIcon(icon, container, tint) },
         trailing = { StmIcon(StmIcons.dragIndicator, Stm.colors.onSurfaceVariant, contentDescription = "Reordenar") },
     )
 }
+
+private fun CsvTable?.orEmptyRows(): List<List<String>> = this?.rows ?: emptyList()

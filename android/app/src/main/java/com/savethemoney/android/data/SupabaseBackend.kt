@@ -128,7 +128,7 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
     }
 
     /** Convierte cualquier error en un AppError con mensaje en español. Nunca registra datos del usuario. */
-    private suspend fun <T> mapped(block: suspend () -> T): T = try {
+    internal suspend fun <T> mapped(block: suspend () -> T): T = try {
         block()
     } catch (e: AppError) {
         throw e

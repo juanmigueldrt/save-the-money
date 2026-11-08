@@ -6,14 +6,23 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Backend
+import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.InviteCode
 import com.savethemoney.android.data.Profile
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
+import java.time.LocalDate
 
 /** Estado de la sesión: quién ha entrado y en qué hogar está (SessionModel de iOS). */
-class Session(val backend: Backend, val isDemo: Boolean) {
+class Session(
+    val backend: Backend,
+    val financeService: FinanceService,
+    val isDemo: Boolean,
+    /** Modo captura: datos de muestra y fecha fija para comparar con el diseño. */
+    val capture: Boolean = false,
+    private val today: () -> LocalDate = LocalDate::now,
+) {
     sealed interface State {
         data object Loading : State
         data object SignedOut : State
@@ -22,6 +31,10 @@ class Session(val backend: Backend, val isDemo: Boolean) {
     }
 
     var state by mutableStateOf<State>(State.Loading)
+        private set
+
+    /** Finanzas del hogar abierto; nulo si no hay ninguno. */
+    var finance by mutableStateOf<FinanceModel?>(null)
         private set
 
     /** Código recibido por enlace o QR, pendiente de usar. */
@@ -36,10 +49,11 @@ class Session(val backend: Backend, val isDemo: Boolean) {
 
     suspend fun refresh() {
         if (backend.currentUserId() == null) {
+            finance = null
             state = State.SignedOut
             return
         }
-        state = try {
+        val next = try {
             val profile = backend.myProfile()
             val homes = backend.households()
             val home = homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
@@ -50,6 +64,15 @@ class Session(val backend: Backend, val isDemo: Boolean) {
             // Sin conexión con sesión abierta: se queda donde estaba si ya había cargado.
             if (state == State.Loading) State.SignedOut else state
         }
+        if (next is State.Ready) {
+            // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros.
+            if (finance?.household?.id != next.household.id) {
+                finance = FinanceModel(next.household, financeService, today).also { it.load() }
+            }
+        } else if (next !is State.Loading) {
+            finance = null
+        }
+        state = next
     }
 
     suspend fun signIn(username: String, password: String) {
@@ -65,6 +88,7 @@ class Session(val backend: Backend, val isDemo: Boolean) {
 
     suspend fun signOut() {
         runCatching { backend.signOut() }
+        finance = null
         state = State.SignedOut
     }
 
