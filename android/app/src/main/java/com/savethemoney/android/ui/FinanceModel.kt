@@ -27,7 +27,14 @@ import java.time.LocalDate
 import java.util.Locale
 
 /** Qué abre la pantalla 07: un movimiento a editar, una cuenta preelegida o una transferencia. */
-data class MovementForm(val movement: Movement? = null, val accountId: String? = null, val transfer: Boolean = false)
+data class MovementForm(
+    val movement: Movement? = null,
+    val accountId: String? = null,
+    val transfer: Boolean = false,
+    val toAccountId: String? = null,
+    val amountMinor: Long? = null,
+    val description: String = "",
+)
 
 /** Cuentas, saldos, categorías y movimientos del hogar abierto (FinanceModel de iOS). */
 class FinanceModel(
@@ -38,6 +45,7 @@ class FinanceModel(
 ) {
     val budgets = BudgetModel(household, service, notifier, today)
     val planning = PlanningModel(household, service, notifier, today)
+    val cards = CreditCardModel(household, service, notifier, today)
 
     var accounts by mutableStateOf(emptyList<Account>())
         private set
@@ -58,6 +66,7 @@ class FinanceModel(
     var selectedAccountId by mutableStateOf<String?>(null)
     var movementForm: MovementForm? = null
     var accountToEdit: Account? = null
+    var newAccountKind: AccountKind? = null
     var csvAccountId: String? = null
 
     val activeAccounts: List<Account> get() = accounts.filter { !it.isArchived }
@@ -106,6 +115,7 @@ class FinanceModel(
             planning.load()
             budgets.load()
             budgets.checkAlerts(categories)
+            cards.load(accounts, balances, categories)
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
@@ -165,6 +175,7 @@ class FinanceModel(
     private suspend fun reloadAccounts() {
         accounts = service.accounts(household.id)
         balances = service.balances(household.id)
+        cards.load(accounts, balances, categories)
     }
 
     private suspend fun reloadAll() {

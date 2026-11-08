@@ -16,7 +16,9 @@ enum class AccountKind(val title: String) {
     @SerialName("cash") Cash("Efectivo"),
     @SerialName("investment") Investment("Inversión"),
     @SerialName("loan") Loan("Préstamo"),
-    @SerialName("other") Other("Otra"),
+    @SerialName("other") Other("Otra");
+
+    val isLiability: Boolean get() = this == CreditCard || this == Loan
 }
 
 /** Cuenta de un hogar. `ownerId` nulo significa compartida. */
@@ -219,6 +221,16 @@ interface FinanceService {
     suspend fun contributions(householdId: String): List<GoalContribution>
     suspend fun addContribution(contribution: GoalContribution): GoalContribution
     suspend fun deleteContribution(contributionId: String)
+
+    suspend fun creditCards(householdId: String): List<CreditCardTerms>
+
+    /** Crea o cambia las condiciones de una tarjeta (una por cuenta). */
+    suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms
+    suspend fun cardInstallments(householdId: String): List<CardInstallment>
+
+    /** Crea o cambia el aplazado de un movimiento (uno por movimiento). */
+    suspend fun saveInstallment(installment: CardInstallment): CardInstallment
+    suspend fun deleteInstallment(installmentId: String)
 }
 
 /**
@@ -251,6 +263,8 @@ class InMemoryFinance : FinanceService {
         series.removeAll { it.householdId == householdId }
         goals.removeAll { it.householdId == householdId }
         contributions.removeAll { it.householdId == householdId }
+        cards.removeAll { it.householdId == householdId }
+        installments.removeAll { it.householdId == householdId }
     }
 
     override suspend fun accounts(householdId: String) = accounts.filter { it.householdId == householdId }
@@ -275,6 +289,9 @@ class InMemoryFinance : FinanceService {
     override suspend fun deleteAccount(accountId: String) {
         accounts.removeAll { it.id == accountId }
         movements.removeAll { it.accountId == accountId }
+        cards.removeAll { it.accountId == accountId }
+        installments.removeAll { it.accountId == accountId }
+        cards.replaceAll { if (it.payFromAccountId == accountId) it.copy(payFromAccountId = null) else it }
     }
 
     override suspend fun categories(householdId: String): List<BudgetCategory> {
@@ -319,6 +336,7 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun deleteMovement(movementId: String) {
         movements.removeAll { it.id == movementId }
+        installments.removeAll { it.movementId == movementId }
     }
 
     override suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult {
@@ -403,5 +421,33 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun deleteContribution(contributionId: String) {
         contributions.removeAll { it.id == contributionId }
+    }
+
+    private val cards = mutableListOf<CreditCardTerms>()
+    private val installments = mutableListOf<CardInstallment>()
+
+    override suspend fun creditCards(householdId: String) = cards.filter { it.householdId == householdId }
+
+    override suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms {
+        terms.issue?.let(::fail)
+        if (accounts.none { it.id == terms.accountId && it.kind == AccountKind.CreditCard }) fail("Esa cuenta no es una tarjeta de crédito.")
+        cards.removeAll { it.accountId == terms.accountId }
+        cards += terms
+        return terms
+    }
+
+    override suspend fun cardInstallments(householdId: String) = installments.filter { it.householdId == householdId }
+
+    override suspend fun saveInstallment(installment: CardInstallment): CardInstallment {
+        installment.issue?.let(::fail)
+        if (movements.none { it.id == installment.movementId && it.accountId == installment.accountId }) fail("Solo se aplazan compras de la tarjeta.")
+        val saved = installment.copy(id = installments.firstOrNull { it.movementId == installment.movementId }?.id ?: id())
+        installments.removeAll { it.id == saved.id }
+        installments += saved
+        return saved
+    }
+
+    override suspend fun deleteInstallment(installmentId: String) {
+        installments.removeAll { it.id == installmentId }
     }
 }

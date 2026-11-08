@@ -31,9 +31,10 @@ class LocalNotifier(private val context: Context) : Notifier {
         get() = prefs.getBoolean(KEY_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
-    override fun replaceReminders(reminders: List<PlannedReminder>) {
-        pending().forEach { alarms.cancel(alarm(it)) }
-        prefs.edit().putString(KEY_PENDING, Json.encodeToString(if (enabled) reminders else emptyList())).apply()
+    override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) {
+        val (old, others) = pending().partition { !enabled || it.id.startsWith(prefix) }
+        old.forEach { alarms.cancel(alarm(it)) }
+        prefs.edit().putString(KEY_PENDING, Json.encodeToString(if (enabled) others + reminders else emptyList())).apply()
         arm()
     }
 

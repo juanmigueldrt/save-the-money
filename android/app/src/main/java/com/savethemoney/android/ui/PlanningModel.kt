@@ -81,7 +81,7 @@ class PlanningModel(
         reschedule()
     }
 
-    private fun reschedule() = notifier.replaceReminders(ReminderPlanner.plan(series, today()))
+    private fun reschedule() = notifier.replaceReminders(ReminderPlanner.plan(series, today()), ReminderPlanner.PREFIX)
 
     var alertsEnabled: Boolean
         get() = notifier.enabled

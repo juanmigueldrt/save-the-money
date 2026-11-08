@@ -271,11 +271,11 @@ fun Pantalla07(nav: Nav) {
     val form = remember { finance.takeMovementForm() }
     val base = remember { form.movement ?: if (session.capture) finance.recent.firstOrNull() else null }
     var tipo by remember { mutableIntStateOf(if (form.transfer) 2 else if (base?.isExpense == false) 1 else 0) }
-    var importe by remember { mutableStateOf(base?.let { Money.format(abs(it.amountMinor)) } ?: "") }
-    var concepto by remember { mutableStateOf(base?.description ?: "") }
+    var importe by remember { mutableStateOf(base?.let { Money.format(abs(it.amountMinor)) } ?: form.amountMinor?.let(Money::input) ?: "") }
+    var concepto by remember { mutableStateOf(base?.description ?: form.description) }
     var categoria by remember { mutableStateOf(base?.categoryId) }
     var cuenta by remember { mutableStateOf(form.accountId ?: base?.accountId ?: finance.activeAccounts.firstOrNull()?.id) }
-    var destino by remember { mutableStateOf<String?>(null) }
+    var destino by remember { mutableStateOf(form.toAccountId) }
     var fecha by remember { mutableStateOf(base?.day ?: finance.today()) }
     var notas by remember { mutableStateOf(base?.notes ?: "") }
     var conNotas by remember { mutableStateOf(notas.isNotEmpty()) }
@@ -410,7 +410,11 @@ fun Pantalla08(nav: Nav) {
             BottomSheet(m.description, "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
                 SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
                 SheetItem(StmIcons.callSplit, "Dividir gasto", onClick = null)
-                SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") { nav.go(13) }
+                SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
+                    finance.cards.selectedId = m.accountId
+                    finance.cards.purchaseId = m.id
+                    nav.go(13)
+                }
                 SheetItem(StmIcons.visibilityOff, "Ocultar de informes", onClick = null)
                 SheetItem(StmIcons.delete, "Eliminar") {
                     action.run {
@@ -433,7 +437,7 @@ fun Pantalla09(nav: Nav) {
     val c = Stm.colors
     val editando = remember { finance.takeAccountToEdit() }
     var nombre by remember { mutableStateOf(editando?.name ?: if (session.capture) "Cuenta ahorro" else "") }
-    var tipo by remember { mutableStateOf(editando?.kind ?: if (session.capture) AccountKind.Savings else AccountKind.Checking) }
+    var tipo by remember { mutableStateOf(editando?.kind ?: finance.newAccountKind.also { finance.newAccountKind = null } ?: if (session.capture) AccountKind.Savings else AccountKind.Checking) }
     var saldo by remember {
         mutableStateOf(editando?.openingMinor?.takeIf { it != 0L }?.let(Money::input) ?: if (session.capture) "1.500,00" else "")
     }
@@ -525,7 +529,11 @@ fun Pantalla34(nav: Nav) {
                             nav.back()
                         }
                     }
-                    ElementoMenu(StmIcons.eventRepeat, "Aplazar") { nav.go(13) }
+                    ElementoMenu(StmIcons.eventRepeat, "Aplazar") {
+                        finance.cards.selectedId = m.accountId
+                        finance.cards.purchaseId = m.id
+                        nav.go(13)
+                    }
                     Spacer(Modifier.height(8.dp))
                     Divider(inset = 0.dp, endInset = 0.dp)
                     Spacer(Modifier.height(8.dp))

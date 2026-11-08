@@ -351,6 +351,7 @@ fun Pantalla30(nav: Nav) {
                     StmSwitch(alerts) {
                         alerts = it
                         finance?.planning?.alertsEnabled = it
+                        finance?.cards?.reschedule()
                     }
                 },
             )

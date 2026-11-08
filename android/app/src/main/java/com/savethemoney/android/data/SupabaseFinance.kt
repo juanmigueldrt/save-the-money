@@ -270,6 +270,52 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         client.from("goal_contributions").insert(row) { select(Columns.raw(CONTRIBUTION)) }.decodeSingle()
     }
 
+    override suspend fun creditCards(householdId: String): List<CreditCardTerms> = backend.mapped {
+        client.from("credit_cards").select(Columns.raw(CARD)) { filter { eq("household_id", householdId) } }.decodeList()
+    }
+
+    // No se usa upsert: haría UPDATE de la cuenta y el hogar, que no se pueden cambiar.
+    override suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms = backend.mapped {
+        terms.issue?.let(::fail)
+        client.from("credit_cards").update(terms.columns()) {
+            select(Columns.raw(CARD))
+            filter { eq("account_id", terms.accountId) }
+        }.decodeList<CreditCardTerms>().firstOrNull()
+            ?: client.from("credit_cards").insert(
+                JsonObject(terms.columns() + mapOf("account_id" to JsonPrimitive(terms.accountId), "household_id" to JsonPrimitive(terms.householdId))),
+            ) { select(Columns.raw(CARD)) }.decodeSingle()
+    }
+
+    override suspend fun cardInstallments(householdId: String): List<CardInstallment> = backend.mapped {
+        client.from("card_installments").select(Columns.raw(INSTALLMENT)) { filter { eq("household_id", householdId) } }.decodeList()
+    }
+
+    override suspend fun saveInstallment(installment: CardInstallment): CardInstallment = backend.mapped {
+        installment.issue?.let(::fail)
+        val changes = buildJsonObject {
+            put("months", installment.months)
+            put("rate", installment.rate)
+        }
+        client.from("card_installments").update(changes) {
+            select(Columns.raw(INSTALLMENT))
+            filter { eq("transaction_id", installment.movementId) }
+        }.decodeList<CardInstallment>().firstOrNull()
+            ?: client.from("card_installments").insert(
+                JsonObject(
+                    changes + mapOf(
+                        "household_id" to JsonPrimitive(installment.householdId),
+                        "account_id" to JsonPrimitive(installment.accountId),
+                        "transaction_id" to JsonPrimitive(installment.movementId),
+                    ),
+                ),
+            ) { select(Columns.raw(INSTALLMENT)) }.decodeSingle()
+    }
+
+    override suspend fun deleteInstallment(installmentId: String) = backend.mapped {
+        client.from("card_installments").delete { filter { eq("id", installmentId) } }
+        Unit
+    }
+
     override suspend fun deleteContribution(contributionId: String) = backend.mapped {
         client.from("goal_contributions").delete { filter { eq("id", contributionId) } }
         Unit
@@ -288,6 +334,26 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500
     }
+}
+
+private const val CARD = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode," +
+    "fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent"
+private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate"
+
+private fun CreditCardTerms.columns() = buildJsonObject {
+    put("credit_limit_minor", creditLimit)
+    put("statement_day", statementDay)
+    put("payment_day", paymentDay)
+    put("payment_delay_months", paymentDelayMonths)
+    put("payment_mode", paymentMode.name.lowercase())
+    put("fixed_payment_minor", fixedPayment)
+    put("min_payment_percent", minPaymentPercent)
+    put("min_payment_minor", minPayment)
+    put("revolving_rate", revolvingRate)
+    put("installment_rate", installmentRate)
+    put("pay_from_account_id", payFromAccountId)
+    put("remind_days_before", remindDaysBefore)
+    put("alert_percent", alertPercent)
 }
 
 /** Columnas editables, con los nulos explícitos para poder borrar un valor. */

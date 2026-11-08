@@ -155,7 +155,10 @@ fun App(capture: Int? = null) {
     }
     // Se pide el permiso cuando hay algo de lo que avisar, no al abrir la app.
     val activity = LocalContext.current as ComponentActivity
-    val hayAvisos = capture == null && session.finance?.planning?.activeSeries.orEmpty().any { it.remindDaysBefore != null }
+    val hayAvisos = capture == null && (
+        session.finance?.planning?.activeSeries.orEmpty().any { it.remindDaysBefore != null } ||
+            session.finance?.cards?.terms.orEmpty().values.any { it.remindDaysBefore != null || it.alertPercent != null }
+        )
     LaunchedEffect(hayAvisos) {
         val permiso = Manifest.permission.POST_NOTIFICATIONS
         if (hayAvisos && Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(permiso) != PackageManager.PERMISSION_GRANTED) {

@@ -666,7 +666,7 @@ private fun periodo(r: Recurrence): String = when (r.unit) {
     RecurrenceUnit.Year -> if (r.every == 1) "1 año" else "${r.every} años"
 }
 
-private fun textoAviso(dias: Int) = when (dias) {
+internal fun textoAviso(dias: Int) = when (dias) {
     0 -> "el mismo día"
     1 -> "1 día antes"
     else -> "$dias días antes"
@@ -794,7 +794,7 @@ private fun Tag(text: String) {
 
 /** «Contador» con borde: texto y botones − / + (56 dp). */
 @Composable
-private fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit) {
+internal fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit) {
     val c = Stm.colors
     Row(
         Modifier.width(194.dp).height(56.dp).border(1.dp, c.outline, RoundedCornerShape(4.dp)).padding(start = 16.dp, end = 4.dp),

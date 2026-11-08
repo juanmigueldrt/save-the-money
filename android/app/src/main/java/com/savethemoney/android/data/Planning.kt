@@ -394,13 +394,13 @@ interface Notifier {
     /** Interruptor general de Más opciones. */
     var enabled: Boolean
 
-    /** Sustituye los avisos de pagos pendientes. */
-    fun replaceReminders(reminders: List<PlannedReminder>)
+    /** Sustituye los avisos pendientes cuyo id empieza por [prefix]; sin prefijo, todos. */
+    fun replaceReminders(reminders: List<PlannedReminder>, prefix: String = "")
     fun budgetAlerts(alerts: List<BudgetAlert>)
 }
 
 object NoNotifier : Notifier {
     override var enabled = true
-    override fun replaceReminders(reminders: List<PlannedReminder>) = Unit
+    override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) = Unit
     override fun budgetAlerts(alerts: List<BudgetAlert>) = Unit
 }
