@@ -9,6 +9,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.runtime.SideEffect
+import androidx.core.view.WindowCompat
+import com.savethemoney.android.data.AppTheme
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -68,7 +72,22 @@ class MainActivity : ComponentActivity() {
         session = (application as StmApp).session(capture != null)
         handleLink(intent)
         setContent {
-            StmTheme {
+            val prefs = remember { getSharedPreferences("ajustes", MODE_PRIVATE) }
+            // Hasta que carga el perfil se usa el último tema, para que no parpadee al abrir.
+            val theme = session.profile?.theme ?: AppTheme.entries.firstOrNull { it.name == prefs.getString("tema", null) } ?: AppTheme.System
+            val dark = when (theme) {
+                AppTheme.Light -> false
+                AppTheme.Dark -> true
+                AppTheme.System -> isSystemInDarkTheme()
+            }
+            SideEffect {
+                prefs.edit().putString("tema", theme.name).apply()
+                WindowCompat.getInsetsController(window, window.decorView).run {
+                    isAppearanceLightStatusBars = !dark
+                    isAppearanceLightNavigationBars = !dark
+                }
+            }
+            StmTheme(dark) {
                 CompositionLocalProvider(LocalSession provides session) { App(capture) }
             }
         }

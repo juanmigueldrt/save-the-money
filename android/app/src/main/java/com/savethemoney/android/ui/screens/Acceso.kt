@@ -189,7 +189,7 @@ fun Pantalla03(nav: Nav) {
                 )
             },
         ) {
-            Btn("Escanear QR", null, kind = BtnKind.Outlined, icon = StmIcons.qrCodeScanner)
+            Btn("Escanear QR", { nav.go(37) }, kind = BtnKind.Outlined, icon = StmIcons.qrCodeScanner)
             Btn("Unirme", { parsed?.let { join.run { session.join(it) } } }, kind = BtnKind.Tonal, enabled = parsed != null && !join.busy)
         }
     }

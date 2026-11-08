@@ -57,7 +57,12 @@ import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.CsvImporter
+import androidx.compose.foundation.isSystemInDarkTheme
+import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.CsvMapping
+import com.savethemoney.android.data.MovementsCsv
+import com.savethemoney.android.ui.compartir
+import com.savethemoney.android.ui.ficheroExportar
 import com.savethemoney.android.data.CsvTable
 import com.savethemoney.android.data.DateOrder
 import com.savethemoney.android.data.ImportResult
@@ -280,11 +285,30 @@ fun Pantalla27(nav: Nav) {
 fun Pantalla30(nav: Nav) {
     val finance = LocalSession.current.finance
     val categorias = finance?.categories?.size ?: 0
-    var dark by remember { mutableStateOf(false) }
+    val session = LocalSession.current
+    val context = LocalContext.current
+    val tema = session.profile?.theme ?: AppTheme.System
+    val oscuro = when (tema) {
+        AppTheme.Light -> false
+        AppTheme.Dark -> true
+        AppTheme.System -> isSystemInDarkTheme()
+    }
+    var eligeTema by remember { mutableStateOf(false) }
+    val action = rememberAction()
     var alerts by remember(finance) { mutableStateOf(finance?.planning?.alertsEnabled ?: true) }
     StmScreen(
         topBar = { MasHeader() },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
+        snackbar = action.error?.let { e -> { Snackbar(e) } },
+        overlay = if (eligeTema) {
+            {
+                SelectorSheet(
+                    "Tema", AppTheme.entries.map { t -> t.title to { action.run { session.setTheme(t) } } }, { eligeTema = false },
+                )
+            }
+        } else {
+            null
+        },
     ) {
         ListCard {
             MenuRow(StmIcons.creditCard, "Tarjetas") { nav.go(10) }
@@ -297,17 +321,28 @@ fun Pantalla30(nav: Nav) {
         ListCard {
             ListHeader("Datos")
             MenuRow(StmIcons.uploadFile, "Importar CSV") { nav.go(32) }
-            MenuRow(StmIcons.pictureAsPdf, "PDF de pagos del mes", onClick = null)
-            MenuRow(StmIcons.tableView, "CSV para Excel", onClick = null)
+            MenuRow(StmIcons.pictureAsPdf, "PDF de pagos del mes") { nav.go(36) }
+            MenuRow(StmIcons.tableView, "CSV para Excel") {
+                action.run {
+                    val modelo = finance ?: return@run
+                    val datos = modelo.exportCsv()
+                    val fichero = ficheroExportar(context, MovementsCsv.fileName(modelo.today()))
+                    withContext(Dispatchers.IO) { fichero.writeBytes(datos) }
+                    compartir(context, fichero, "text/csv")
+                }
+            }
             MenuRow(StmIcons.category, "Categorías", count = categorias.toString()) { nav.go(31) }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListHeader("Preferencias")
             ListItem(
-                "Tema oscuro", "Igual que el sistema",
+                "Tema oscuro", if (tema == AppTheme.System) "Igual que el sistema" else tema.title,
                 leading = { StmIcon(StmIcons.darkMode, Stm.colors.onSurfaceVariant) },
-                trailing = { StmSwitch(dark) { dark = it } },
+                trailing = {
+                    StmSwitch(oscuro) { activo -> action.run { session.setTheme(if (activo) AppTheme.Dark else AppTheme.Light) } }
+                },
+                onClick = { eligeTema = true },
             )
             ListItem(
                 "Avisos de cobros y límites",
@@ -321,6 +356,12 @@ fun Pantalla30(nav: Nav) {
             )
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
         }
+        // No está en el diseño; va la última para no mover lo anterior.
+        Spacer(Modifier.height(16.dp))
+        ListCard {
+            MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
+        }
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -649,10 +690,15 @@ private const val CSV_MUESTRA = "Fecha;Concepto;Cuenta;Importe\n03/10/2026;Super
 @Composable
 fun Pantalla33(nav: Nav) {
     val c = Stm.colors
-    var confirm by remember { mutableStateOf("borrar") }
+    val session = LocalSession.current
+    val finance = session.finance
+    // Vacío de verdad: solo la captura del diseño lo trae escrito.
+    var confirm by remember { mutableStateOf(if (session.capture) "borrar" else "") }
+    val action = rememberAction()
     StmScreen(
         topBar = { MasHeader() },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
+        snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = {
             StmDialog(
                 "¿Borrar todos los datos?",
@@ -661,7 +707,16 @@ fun Pantalla33(nav: Nav) {
                 onDismiss = nav::back,
                 actions = {
                     Btn("Cancelar", nav::back, kind = BtnKind.Text)
-                    Btn("Borrar", { nav.reset(1) }, kind = BtnKind.Error, enabled = confirm.trim() == "borrar")
+                    Btn(
+                        "Borrar",
+                        {
+                            action.run {
+                                finance?.resetHousehold()
+                                nav.reset(4)
+                            }
+                        },
+                        kind = BtnKind.Error, enabled = confirm.trim().lowercase() == "borrar" && !action.busy,
+                    )
                 },
             ) {
                 Spacer(Modifier.height(16.dp))

@@ -173,6 +173,10 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     /** El servidor devuelve como mucho 1000 filas por petición (max_rows): se pide por páginas. */
+    override suspend fun resetHousehold(householdId: String) = backend.mapped<Unit> {
+        client.postgrest.rpc("reset_household", buildJsonObject { put("target_household", householdId) })
+    }
+
     override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement> = backend.mapped {
         val all = mutableListOf<Movement>()
         while (true) {

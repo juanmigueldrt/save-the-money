@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Backend
 import com.savethemoney.android.data.FinanceService
@@ -89,8 +90,20 @@ class Session(
         refresh()
     }
 
+    /** Se guarda en el perfil, así sigue a la persona en sus otros dispositivos. */
+    suspend fun setTheme(theme: AppTheme) {
+        val actual = profile ?: return
+        val nuevo = backend.updateProfile(actual.displayName, theme)
+        state = when (val s = state) {
+            is State.Ready -> s.copy(profile = nuevo)
+            is State.NeedsHousehold -> s.copy(profile = nuevo)
+            else -> s
+        }
+    }
+
     suspend fun signOut() {
         runCatching { backend.signOut() }
+        notifier.replaceReminders(emptyList())
         finance = null
         state = State.SignedOut
     }

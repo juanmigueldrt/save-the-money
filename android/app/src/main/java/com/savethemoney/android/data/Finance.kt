@@ -179,6 +179,9 @@ fun monthEndBalances(current: Long, movements: List<Movement>, today: LocalDate,
 
 /** Cuentas, saldos, categorías y movimientos de un hogar (FinanceService de iOS). */
 interface FinanceService {
+    /** Borra todo lo apuntado en el hogar (RPC `reset_household`). */
+    suspend fun resetHousehold(householdId: String)
+
     suspend fun accounts(householdId: String): List<Account>
     suspend fun balances(householdId: String): Map<String, Long>
     suspend fun createAccount(draft: AccountDraft, householdId: String): Account
@@ -237,6 +240,17 @@ class InMemoryFinance : FinanceService {
             id(), householdId, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor,
             draft.description.trim(), draft.notes, draft.importHash,
         )
+    }
+
+    override suspend fun resetHousehold(householdId: String) {
+        accounts.removeAll { it.householdId == householdId }
+        categories.removeAll { it.householdId == householdId }
+        seeded -= householdId
+        movements.removeAll { it.householdId == householdId }
+        budgets.removeAll { it.householdId == householdId }
+        series.removeAll { it.householdId == householdId }
+        goals.removeAll { it.householdId == householdId }
+        contributions.removeAll { it.householdId == householdId }
     }
 
     override suspend fun accounts(householdId: String) = accounts.filter { it.householdId == householdId }

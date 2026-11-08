@@ -22,6 +22,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import java.text.Collator
+import com.savethemoney.android.data.MovementsCsv
 import java.time.LocalDate
 import java.util.Locale
 
@@ -149,6 +150,16 @@ class FinanceModel(
         service.deleteCategory(category.id)
         categories = service.categories(household.id)
         reloadAll()
+    }
+
+    /** El CSV con todos los movimientos del hogar, listo para Excel. */
+    suspend fun exportCsv(): ByteArray =
+        MovementsCsv.bytes(service.movements(household.id, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31)), accounts, categories)
+
+    /** Borra todo lo apuntado en el hogar y vuelve a cargar. */
+    suspend fun resetHousehold() {
+        service.resetHousehold(household.id)
+        load()
     }
 
     private suspend fun reloadAccounts() {

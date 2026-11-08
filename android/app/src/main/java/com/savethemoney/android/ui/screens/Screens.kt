@@ -20,6 +20,8 @@ fun ScreenFor(number: Int, nav: Nav) {
         33 -> Pantalla33(nav); 34 -> Pantalla34(nav)
         // Fuera del diseño: el formulario de aportar a una meta.
         35 -> Pantalla35(nav)
+        // Fuera del diseño: pagos del mes y lector de QR, como en iOS.
+        36 -> Pantalla36(nav); 37 -> Pantalla37(nav)
     }
 }
 
