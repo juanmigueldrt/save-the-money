@@ -1,8 +1,19 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
+
+// Supabase: URL y clave anon en local.properties (git lo ignora). Sin clave, la app arranca en modo demo.
+// La clave service_role NUNCA va aquí.
+val localProps = Properties().apply {
+    rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
+}
+// -Psupabase.url=… tiene prioridad: sirve para probar contra el Supabase local sin tocar el archivo.
+fun local(key: String) = (findProperty(key) as String? ?: localProps.getProperty(key) ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
 
 android {
     namespace = "com.savethemoney.android"
@@ -14,6 +25,8 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "0.8.0"
+        buildConfigField("String", "SUPABASE_URL", "\"${local("supabase.url")}\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"${local("supabase.anonKey")}\"")
     }
 
     buildTypes {
@@ -30,7 +43,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures { compose = true; buildConfig = true }
 }
 
 dependencies {
@@ -41,5 +54,11 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
+    // supabase-kt 3.2.x es la última compilada con Kotlin 2.2 (la 3.3+ pide Kotlin 2.3).
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.2.6"))
+    implementation("io.github.jan-tennert.supabase:auth-kt")
+    implementation("io.github.jan-tennert.supabase:postgrest-kt")
+    implementation("io.ktor:ktor-client-okhttp:3.3.1")
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
 }

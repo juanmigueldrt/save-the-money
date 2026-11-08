@@ -187,7 +187,9 @@ fun Btn(
         BtnKind.Text -> Color.Transparent to c.primary
         BtnKind.Error -> Color.Transparent to c.error
     }
-    val content = color ?: fg
+    // Desactivado según M3: fondo on-surface al 12 % y contenido al 38 %.
+    val content = if (!enabled) c.onSurface.copy(alpha = 0.38f) else color ?: fg
+    val bgColor = if (!enabled && bg != Color.Transparent) c.onSurface.copy(alpha = 0.12f) else bg
     val h = if (large) 56.dp else 40.dp
     val shape = RoundedCornerShape(h / 2)
     val pad = when {
@@ -197,8 +199,8 @@ fun Btn(
         else -> 24.dp
     }
     Row(
-        modifier.height(h).clip(shape).background(bg)
-            .let { if (kind == BtnKind.Outlined) it.border(1.dp, c.outline, shape) else it }
+        modifier.height(h).clip(shape).background(bgColor)
+            .let { if (kind == BtnKind.Outlined) it.border(1.dp, if (enabled) c.outline else c.onSurface.copy(alpha = 0.12f), shape) else it }
             .tap(enabled = enabled, onClick = onClick)
             .padding(start = pad, end = if (icon != null && kind != BtnKind.Text && kind != BtnKind.Error) 24.dp else pad),
         horizontalArrangement = Arrangement.Center,

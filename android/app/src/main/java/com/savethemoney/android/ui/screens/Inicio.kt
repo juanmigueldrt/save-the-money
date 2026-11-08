@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.components.Avatar
 import com.savethemoney.android.ui.components.Divider
@@ -40,15 +41,16 @@ import com.savethemoney.android.ui.theme.StmType
 @Composable
 fun Pantalla04(nav: Nav) {
     val c = Stm.colors
+    val name = LocalSession.current.profile?.name ?: ""
     StmScreen(
         topBar = {
             TopBar(null, navIcon = StmIcons.menu, onNav = { nav.tab(Tab.Mas) }) {
                 IconBtn(StmIcons.search, { nav.go(5) }, contentDescription = "Buscar")
                 Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(28) }, contentAlignment = Alignment.Center) {
-                    Avatar("A", c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
+                    Avatar(name.take(1).uppercase(), c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
                 }
             }
-            LargeTitle("Hola, Ana", "Noviembre · 4 cuentas")
+            LargeTitle("Hola, $name", "Noviembre · 4 cuentas")
         },
         bottomBar = { NavBar(Tab.Inicio, nav::tab, badgeOnMore = true) },
         fab = { Fab("Añadir movimiento") { nav.go(7) } },

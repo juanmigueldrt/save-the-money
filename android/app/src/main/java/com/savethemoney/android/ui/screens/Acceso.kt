@@ -53,15 +53,36 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Brand
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
-import kotlin.random.Random
+import android.content.Intent
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
+import com.savethemoney.android.data.HouseholdInvite
+import com.savethemoney.android.data.HouseholdMember
+import com.savethemoney.android.data.InviteCode
+import com.savethemoney.android.data.MemberRole
+import com.savethemoney.android.data.SignUpForm
+import com.savethemoney.android.data.Username
+import com.savethemoney.android.ui.LocalSession
+import com.savethemoney.android.ui.rememberAction
+import java.time.Duration
+import java.time.Instant
 
 /** 01 Iniciar sesión: marca, usuario y contraseña, entrar o crear cuenta. */
 @Composable
 fun Pantalla01(nav: Nav) {
     val c = Stm.colors
-    var user by remember { mutableStateOf("ana") }
-    var password by remember { mutableStateOf("contraseña") }
+    val session = LocalSession.current
+    val action = rememberAction()
+    var user by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var hidden by remember { mutableStateOf(true) }
+    val canSubmit = user.isNotBlank() && password.isNotEmpty() && !action.busy
     StmScreen {
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 48.dp)) {
             Text("Save the Money", style = StmType.labelLarge, color = c.primary)
@@ -75,10 +96,11 @@ fun Pantalla01(nav: Nav) {
             OutlinedField(
                 "Contraseña", password, { password = it }, leading = StmIcons.lock,
                 trailing = if (hidden) StmIcons.visibility else StmIcons.visibilityOff, onTrailing = { hidden = !hidden },
-                password = hidden, autoFocus = true,
+                password = hidden,
+                error = action.error != null, supporting = action.error,
             )
             Spacer(Modifier.height(24.dp))
-            Btn("Entrar", { nav.reset(4) }, Modifier.fillMaxWidth(), large = true)
+            Btn("Entrar", { action.run { session.signIn(user, password) } }, Modifier.fillMaxWidth(), large = true, enabled = canSubmit)
             Spacer(Modifier.height(24.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Btn("Crear cuenta", { nav.go(2) }, kind = BtnKind.Text)
@@ -91,16 +113,25 @@ fun Pantalla01(nav: Nav) {
 @Composable
 fun Pantalla02(nav: Nav) {
     val c = Stm.colors
-    var name by remember { mutableStateOf("Ana") }
-    var user by remember { mutableStateOf("ana") }
-    var password by remember { mutableStateOf("abcde") }
+    val session = LocalSession.current
+    val action = rememberAction()
+    var name by remember { mutableStateOf("") }
+    var user by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var repeat by remember { mutableStateOf("") }
-    val tooShort = password.length < 10
+    val form = SignUpForm(user, name, password, repeat)
+    // Los avisos salen en cuanto se escribe en el campo, como en el diseño.
+    val userIssue = if (user.isEmpty()) null else Username.parse(user).exceptionOrNull()?.message
+    val tooShort = password.isNotEmpty() && password.length < SignUpForm.MIN_PASSWORD
+    val mismatch = repeat.isNotEmpty() && repeat != password
     StmScreen(
         topBar = { TopBar("Crear cuenta", onNav = nav::back) },
         bottomBar = {
             Box(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
-                Btn("Crear cuenta", { nav.go(3) }, Modifier.fillMaxWidth(), large = true)
+                Btn(
+                    "Crear cuenta", { action.run { session.signUp(form) } }, Modifier.fillMaxWidth(), large = true,
+                    enabled = form.firstIssue == null && !action.busy,
+                )
             }
         },
     ) {
@@ -109,15 +140,22 @@ fun Pantalla02(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         OutlinedField("Nombre", name, { name = it }, supporting = "Así te verá tu pareja en el hogar")
         Spacer(Modifier.height(16.dp))
-        OutlinedField("Usuario", user, { user = it }, supporting = "Letras y números, sin espacios")
+        OutlinedField(
+            "Usuario", user, { user = it }, error = userIssue != null,
+            supporting = userIssue ?: "Letras y números, sin espacios",
+        )
         Spacer(Modifier.height(16.dp))
         OutlinedField(
             "Contraseña", password, { password = it }, password = true, error = tooShort,
             trailing = if (tooShort) StmIcons.error else null,
-            supporting = if (tooShort) "Usa al menos 10 caracteres" else null,
+            supporting = if (tooShort) "Usa al menos ${SignUpForm.MIN_PASSWORD} caracteres" else null,
         )
         Spacer(Modifier.height(16.dp))
-        OutlinedField("Repite la contraseña", repeat, { repeat = it }, password = true, placeholder = "Contraseña")
+        OutlinedField(
+            "Repite la contraseña", repeat, { repeat = it }, password = true, placeholder = "Contraseña",
+            error = mismatch || action.error != null,
+            supporting = action.error ?: if (mismatch) "Las contraseñas no coinciden." else null,
+        )
     }
 }
 
@@ -125,7 +163,11 @@ fun Pantalla02(nav: Nav) {
 @Composable
 fun Pantalla03(nav: Nav) {
     val c = Stm.colors
-    var code by remember { mutableStateOf("4K9Q2X") }
+    val session = LocalSession.current
+    val create = rememberAction()
+    val join = rememberAction()
+    var code by remember { mutableStateOf(session.pendingInvite?.value ?: "") }
+    val parsed = InviteCode.parse(code)
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null)
@@ -134,15 +176,21 @@ fun Pantalla03(nav: Nav) {
     ) {
         OptionCard(StmIcons.homeWork, c.secondaryContainer, c.onSecondaryContainer, "Crear un hogar nuevo",
             "Empieza de cero y después invita a tu pareja con un código o un QR.") {
-            Btn("Crear hogar", { nav.reset(4) })
+            create.error?.let { Text(it, Modifier.weight(1f), style = StmType.bodySmall, color = c.error) }
+            Btn("Crear hogar", { create.run { session.createHousehold("Casa de ${session.profile?.name ?: "todos"}") } }, enabled = !create.busy)
         }
         Spacer(Modifier.height(16.dp))
         OptionCard(StmIcons.qrCodeScanner, c.tertiaryContainer, c.onTertiaryContainer, "Unirme a un hogar",
             "Escanea el QR de tu pareja o escribe su código de 6 letras.",
-            field = { OutlinedField("Código", code, { code = it }, labelBackground = c.surfaceContainerLowest) },
+            field = {
+                OutlinedField(
+                    "Código", code, { code = it }, labelBackground = c.surfaceContainerLowest,
+                    error = join.error != null, supporting = join.error,
+                )
+            },
         ) {
             Btn("Escanear QR", null, kind = BtnKind.Outlined, icon = StmIcons.qrCodeScanner)
-            Btn("Unirme", { nav.reset(4) }, kind = BtnKind.Tonal)
+            Btn("Unirme", { parsed?.let { join.run { session.join(it) } } }, kind = BtnKind.Tonal, enabled = parsed != null && !join.busy)
         }
     }
 }
@@ -156,7 +204,7 @@ private fun OptionCard(
     title: String,
     text: String,
     field: (@Composable () -> Unit)? = null,
-    actions: @Composable () -> Unit,
+    actions: @Composable RowScope.() -> Unit,
 ) {
     val c = Stm.colors
     StmCard {
@@ -170,7 +218,7 @@ private fun OptionCard(
             field()
         }
         Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) { actions() }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) { actions() }
     }
 }
 
@@ -190,15 +238,24 @@ fun Pantalla28(nav: Nav) {
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
     ) {
+        val session = LocalSession.current
+        val me = session.profile?.id
+        val members by produceState(emptyList<HouseholdMember>(), session.household) {
+            value = session.household?.let { h -> runCatching { session.backend.members(h.id) }.getOrDefault(emptyList()) }.orEmpty()
+                .sortedBy { it.profile.id != me }
+        }
         ListCard {
             ListHeader("Miembros")
-            ListItem("Ana", "Tú · creó el hogar", leading = { Avatar("A") })
-            Divider()
-            ListItem(
-                "Leo", "Se unió el 2 nov", leading = { Avatar("L") },
-                // El diseño deja 24 dp a la derecha del icono final.
-                trailing = { StmIcon(StmIcons.moreVert, c.onSurfaceVariant, Modifier.padding(end = 8.dp)) },
-            )
+            members.forEachIndexed { i, m ->
+                if (i > 0) Divider()
+                val role = if (m.role == MemberRole.Owner) "creó el hogar" else "miembro"
+                ListItem(
+                    m.profile.name, if (m.profile.id == me) "Tú · $role" else role.replaceFirstChar { it.uppercase() },
+                    leading = { Avatar(m.profile.name.take(1).uppercase()) },
+                    // El diseño deja 24 dp a la derecha del icono final.
+                    trailing = if (m.profile.id == me) null else ({ StmIcon(StmIcons.moreVert, c.onSurfaceVariant, Modifier.padding(end = 8.dp)) }),
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
         val shape = RoundedCornerShape(12.dp)
@@ -215,12 +272,20 @@ fun Pantalla28(nav: Nav) {
     }
 }
 
-private const val INVITE_CODE = "4K9Q2X"
-
 /** 29 Invitar a tu pareja: QR, código de 6 caracteres y botones para copiar o compartir. */
 @Composable
 fun Pantalla29(nav: Nav) {
     val c = Stm.colors
+    val session = LocalSession.current
+    val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    // Reutiliza la invitación pendiente si la hay; si no, pide una nueva al servidor.
+    val invite by produceState<HouseholdInvite?>(null, session.household) {
+        value = session.household?.let { h ->
+            runCatching { session.backend.pendingInvites(h.id).firstOrNull() ?: session.backend.createInvite(h.id) }.getOrNull()
+        }
+    }
+    val code = invite?.code?.let(InviteCode::parse)
     StmScreen(topBar = { TopBar("Invitar", navIcon = StmIcons.close, onNav = nav::back) }) {
         Spacer(Modifier.height(12.dp))
         Text(
@@ -233,13 +298,13 @@ fun Pantalla29(nav: Nav) {
             Modifier.align(Alignment.CenterHorizontally).size(216.dp).clip(RoundedCornerShape(16.dp))
                 .background(Brand.paper).padding(16.dp),
         ) {
-            QrPlaceholder(INVITE_CODE)
+            if (code != null) QrCode(code.link)
         }
         Spacer(Modifier.height(24.dp))
         Text("O escribe el código", Modifier.fillMaxWidth(), style = StmType.labelMedium, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.align(Alignment.CenterHorizontally), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            INVITE_CODE.forEach { ch ->
+            (code?.value ?: "······").forEach { ch ->
                 Box(
                     Modifier.size(44.dp, 56.dp).clip(RoundedCornerShape(8.dp)).background(c.surfaceContainerHighest),
                     contentAlignment = Alignment.Center,
@@ -249,34 +314,39 @@ fun Pantalla29(nav: Nav) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text("Caduca en 24 horas", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
+        val hours = invite?.let { Duration.between(Instant.now(), Instant.parse(it.expiresAt)).toHours().coerceAtLeast(1) }
+        Text(if (hours == null) "" else "Caduca en $hours ${if (hours == 1L) "hora" else "horas"}", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.align(Alignment.CenterHorizontally), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn("Copiar código", null, kind = BtnKind.Tonal, icon = StmIcons.contentCopy)
-            Btn("Compartir enlace", null, kind = BtnKind.Outlined, icon = StmIcons.share)
+            Btn("Copiar código", code?.let { { clipboard.setText(AnnotatedString(it.value)) } }, kind = BtnKind.Tonal, icon = StmIcons.contentCopy)
+            Btn("Compartir enlace", code?.let {
+                {
+                    val send = Intent(Intent.ACTION_SEND).setType("text/plain")
+                        .putExtra(Intent.EXTRA_TEXT, "Únete a nuestro hogar en Save the Money: ${it.link} (código ${it.value})")
+                    context.startActivity(Intent.createChooser(send, "Compartir enlace"))
+                }
+            }, kind = BtnKind.Outlined, icon = StmIcons.share)
         }
     }
 }
 
-private const val QR_MODULES = 25
-
 /**
- * QR de muestra (25 × 25 módulos de 7,36 dp): los tres buscadores redondeados y un patrón fijo
- * derivado de [code]. shortcut: no es un QR legible; se cambia por uno real al conectar las invitaciones.
+ * QR real del enlace de invitación (zxing), en tinta sobre papel. Los tres buscadores se pintan
+ * redondeados como en el diseño; su geometría no cambia, así que se sigue leyendo.
  */
 @Composable
-private fun QrPlaceholder(code: String) {
-    val cells = remember(code) {
-        val rnd = Random(code.hashCode())
-        List(QR_MODULES * QR_MODULES) { rnd.nextBoolean() }
+private fun QrCode(text: String) {
+    val matrix = remember(text) {
+        QRCodeWriter().encode(text, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 0))
     }
     Canvas(Modifier.size(184.dp)) {
-        val m = size.width / QR_MODULES
-        for (y in 0 until QR_MODULES) for (x in 0 until QR_MODULES) {
-            if (inFinder(x, y) || !cells[y * QR_MODULES + x]) continue
+        val n = matrix.width
+        val m = size.width / n
+        for (y in 0 until n) for (x in 0 until n) {
+            if (inFinder(x, y, n) || !matrix[x, y]) continue
             drawRect(Brand.ink, Offset(x * m, y * m), Size(m, m))
         }
-        val far = (QR_MODULES - 7) * m
+        val far = (n - 7) * m
         listOf(Offset(0f, 0f), Offset(far, 0f), Offset(0f, far)).forEach { finder(it, m) }
     }
 }
@@ -289,7 +359,7 @@ private fun DrawScope.finder(at: Offset, m: Float) {
 }
 
 /** Zona de un buscador más su separador de un módulo. */
-private fun inFinder(x: Int, y: Int): Boolean {
-    val far = QR_MODULES - 8
+private fun inFinder(x: Int, y: Int, n: Int): Boolean {
+    val far = n - 8
     return (x < 8 && y < 8) || (x >= far && y < 8) || (x < 8 && y >= far)
 }
