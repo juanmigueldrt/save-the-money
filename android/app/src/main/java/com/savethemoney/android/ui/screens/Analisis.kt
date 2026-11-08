@@ -52,6 +52,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.AccountKind
+import com.savethemoney.android.data.CreditScore
+import com.savethemoney.android.data.Movement
+import com.savethemoney.android.data.NetWorth
+import com.savethemoney.android.data.NetWorthPoint
+import com.savethemoney.android.data.ReportKind
+import com.savethemoney.android.data.ReportPeriod
+import com.savethemoney.android.data.SpendingReport
+import com.savethemoney.android.data.biggestRise
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BudgetTemplate
 import com.savethemoney.android.data.CashFlow
@@ -64,6 +73,7 @@ import com.savethemoney.android.ui.BudgetModel
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.components.BottomSheet
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Chip
@@ -331,42 +341,92 @@ fun Pantalla16(nav: Nav) {
     }
 }
 
+/** Puntos de 0 a 1 para el gráfico: de la cifra más baja a la más alta del periodo. */
+private fun normalizar(valores: List<Long>): List<Float> {
+    val min = valores.minOrNull() ?: return emptyList()
+    val max = valores.max()
+    return valores.map { if (max == min) 0.5f else (it - min).toFloat() / (max - min) }
+}
+
+private fun euros(minor: Long, signed: Boolean = false) = Money.format(minor, decimals = minor % 100 != 0L, signed = signed)
+
 /** 17 Patrimonio neto: cifra, variación, evolución por periodo y lista de activos y deudas. */
 @Composable
 fun Pantalla17(nav: Nav) {
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val tracking = finance.tracking
     val c = Stm.colors
     var range by remember { mutableIntStateOf(1) }
+    LaunchedEffect(finance.recent) { if (!session.capture) tracking.loadMovements() }
+    val saldos = finance.activeAccounts.map { it to finance.balance(it) }
+    val hoy = NetWorth.current(finance.accounts, finance.balances, finance.today())
+    val meses = listOf(2, 7, 13, tracking.monthsWithData)[range]
+    val historia = tracking.history(finance.accounts, meses)
+    val cambio = (historia.lastOrNull()?.net ?: 0) - (historia.firstOrNull()?.net ?: 0)
+    val tramo = listOf("en 1 mes", "en 6 meses", "en 1 año", "desde el principio")[range]
+    val inversiones = saldos.filter { (a, b) -> a.kind == AccountKind.Investment && b > 0 }.sumOf { it.second }
+    val tarjetas = saldos.filter { (a, b) -> a.kind == AccountKind.CreditCard && b < 0 }.sumOf { it.second }
+    val otrasDeudas = saldos.filter { (a, b) -> a.kind != AccountKind.CreditCard && b < 0 }.sumOf { it.second }
     StmScreen(
         topBar = {
             TopBar("Patrimonio neto", onNav = nav::back) {
-                IconBtn(StmIcons.add, { nav.go(18) }, contentDescription = "Añadir")
+                IconBtn(StmIcons.add, {
+                    finance.accountToEdit = null
+                    nav.go(9)
+                }, contentDescription = "Añadir cuenta")
             }
         },
+        snackbar = tracking.error?.let { e -> { Snackbar(e) } },
     ) {
         Spacer(Modifier.height(8.dp))
-        Text("48.230 €", style = StmType.displayMedium, color = c.onSurface)
+        Text(if (session.capture) "48.230 €" else euros(hoy.net), style = StmType.displayMedium, color = if (hoy.net < 0) c.error else c.onSurface)
         Spacer(Modifier.height(4.dp))
-        Pill("+1.130 € en 6 meses")
+        if (session.capture) Pill("+1.130 € en 6 meses") else Pill("${euros(cambio, signed = true)} $tramo", positive = cambio >= 0, icon = if (cambio >= 0) StmIcons.arrowUpward else null)
         Spacer(Modifier.height(20.dp))
         SegmentedWrap(listOf("1M", "6M", "1A", "Todo"), range) { range = it }
         Spacer(Modifier.height(16.dp))
         StmCard {
             // Alturas del diseño en una caja de 160: 156, 114,5, 129,6, 72,9, 42,7 y 0.
-            LineChart(listOf(156f, 114.5f, 129.6f, 72.9f, 42.7f, 0f).map { 1f - it / 160f }, plotHeight = 160.dp)
+            LineChart(
+                if (session.capture) listOf(156f, 114.5f, 129.6f, 72.9f, 42.7f, 0f).map { 1f - it / 160f } else normalizar(historia.map { it.net }),
+                plotHeight = 160.dp,
+            )
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListHeader("Activos")
-            ListItem("Cuentas", leading = { LeadIcon(StmIcons.accountBalance) }, trailingText = "18.420 €", onClick = { nav.go(6) })
+            ListItem(
+                "Cuentas", leading = { LeadIcon(StmIcons.accountBalance) },
+                trailingText = if (session.capture) "18.420 €" else euros(hoy.assets - inversiones), onClick = { nav.go(6) },
+            )
             Divider()
             ListItem(
                 "Inversiones", leading = { LeadIcon(StmIcons.candlestickChart, c.tertiaryContainer, c.onTertiaryContainer) },
-                trailingText = "31.950 €", onClick = { nav.go(25) },
+                trailingText = if (session.capture) "31.950 €" else euros(inversiones), onClick = { nav.go(25) },
             )
             ListHeader("Deudas")
             ListItem(
                 "Tarjetas", leading = { LeadIcon(StmIcons.creditCard, c.errorContainer, c.onErrorContainer) },
-                trailingText = "−2.140 €", onClick = { nav.go(10) },
+                trailingText = if (session.capture) "−2.140 €" else euros(tarjetas), onClick = { nav.go(10) },
+            )
+            if (otrasDeudas != 0L) {
+                Divider()
+                ListItem("Otras deudas", leading = { LeadIcon(StmIcons.description, c.errorContainer, c.onErrorContainer) }, trailingText = euros(otrasDeudas))
+            }
+        }
+        // El diseño no dibuja cómo se llega a estas dos; en iOS están en el mismo apartado.
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListItem("Informes", leading = { LeadIcon(StmIcons.monitoring) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(18) })
+                Divider()
+                ListItem("Score crediticio", leading = { LeadIcon(StmIcons.creditScore) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(19) })
+            }
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan.",
+                style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
         }
     }
@@ -375,34 +435,115 @@ fun Pantalla17(nav: Nav) {
 /** 18 Informes: filtros, barras de ingresos y gastos de los últimos 6 meses y resumen. */
 @Composable
 fun Pantalla18(nav: Nav) {
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val tracking = finance.tracking
     val c = Stm.colors
     var filter by remember { mutableIntStateOf(0) }
+    var kind by remember { mutableStateOf(ReportKind.Expense) }
+    var period by remember { mutableStateOf(ReportPeriod.Last6Months) }
+    var categoria by remember { mutableStateOf<String?>(null) }
+    var selector by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(finance.recent) { if (!session.capture) tracking.loadMovements() }
+    val hoy = finance.today()
+    val seis = ReportPeriod.Last6Months.range(hoy)
+    val movimientos = tracking.allMovements
+    val ingresos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Income)
+    val gastos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Expense)
+    val tope = (ingresos.byMonth.map { it.amount } + gastos.byMonth.map { it.amount }).max().coerceAtLeast(1)
+    val informe = SpendingReport(movimientos, finance.categories, period.range(hoy), kind, setOfNotNull(categoria))
+    val sube = biggestRise(movimientos, finance.categories, YearMonth.from(hoy))
     StmScreen(
         topBar = {
             TopBar("Informes", onNav = nav::back) {
-                IconBtn(StmIcons.iosShare, { nav.go(19) }, contentDescription = "Compartir")
+                if (session.capture) IconBtn(StmIcons.iosShare, { nav.go(19) }, contentDescription = "Compartir")
+            }
+        },
+        snackbar = tracking.error?.let { e -> { Snackbar(e) } },
+        overlay = selector?.let { campo ->
+            {
+                val cerrar = { selector = null }
+                if (campo == "periodo") {
+                    SelectorSheet("Periodo", ReportPeriod.entries.map { p -> p.title to { period = p } }, cerrar)
+                } else {
+                    val lista = finance.categories(if (kind == ReportKind.Expense) CategoryKind.Expense else CategoryKind.Income)
+                    SelectorSheet("Categoría", listOf<Pair<String, () -> Unit>>("Todas" to { categoria = null }) + lista.map { x -> x.name to { categoria = x.id } }, cerrar)
+                }
             }
         },
     ) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf("Ingresos y gastos", "Por categoría", "Por persona", "2026").forEachIndexed { i, label ->
-                Chip(label, selected = i == filter, onClick = { filter = i })
+            if (session.capture) {
+                listOf("Ingresos y gastos", "Por categoría", "Por persona", "2026").forEachIndexed { i, label ->
+                    Chip(label, selected = i == filter, onClick = { filter = i })
+                }
+            } else {
+                Chip("Ingresos y gastos", selected = filter == 0, onClick = { filter = 0 })
+                Chip("Por categoría", selected = filter == 1, onClick = { filter = 1 })
+                if (filter == 1) {
+                    Chip(period.title, onClick = { selector = "periodo" })
+                    Chip(finance.category(categoria)?.name ?: "Todas", onClick = { selector = "categoria" })
+                }
             }
         }
         Spacer(Modifier.height(16.dp))
+        if (filter == 1 && !session.capture) {
+            Segmented(ReportKind.entries.map { it.title }, kind.ordinal, {
+                kind = ReportKind.entries[it]
+                categoria = null
+            })
+            Spacer(Modifier.height(16.dp))
+            StmCard {
+                Text("${kind.title} · ${period.title.lowercase()}", style = StmType.labelMedium, color = c.onSurfaceVariant)
+                Spacer(Modifier.height(4.dp))
+                Text(Money.format(informe.total), style = StmType.displaySmall, color = c.onSurface)
+                if (informe.byMonth.size > 1) {
+                    Spacer(Modifier.height(4.dp))
+                    Text("Media de ${Money.format(informe.averagePerMonth)} al mes", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            if (informe.byCategory.isEmpty()) {
+                Text("No hay movimientos en este periodo.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            } else {
+                ListCard {
+                    informe.byCategory.forEachIndexed { i, fila ->
+                        if (i > 0) Divider()
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LeadIcon(iconoCategoria(fila.category))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(fila.title, style = StmType.bodyLarge, color = c.onSurface)
+                                    Text("${Math.round(fila.share * 100)} % · ${fila.count} movimientos", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                                }
+                                Text(Money.format(fila.amount), style = StmType.labelLarge, color = c.onSurface)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Progress(fila.share.toFloat())
+                        }
+                    }
+                }
+            }
+            return@StmScreen
+        }
         StmCard {
             Row(Modifier.fillMaxWidth()) {
                 Text("Ingresos y gastos", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
                 Text("últimos 6 meses", Modifier.padding(top = 5.dp), style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
             Spacer(Modifier.height(12.dp))
-            GroupedBars(
-                income = listOf(131.76f, 131.76f, 135.88f, 131.76f, 133.82f, 131.76f),
-                spending = listOf(111.18f, 125.59f, 140f, 107.06f, 115.29f, 52.71f),
-            )
+            if (session.capture) {
+                GroupedBars(
+                    income = listOf(131.76f, 131.76f, 135.88f, 131.76f, 133.82f, 131.76f),
+                    spending = listOf(111.18f, 125.59f, 140f, 107.06f, 115.29f, 52.71f),
+                )
+            } else {
+                GroupedBars(ingresos.byMonth.map { maxOf(it.amount, 0L) * 140f / tope }, gastos.byMonth.map { maxOf(it.amount, 0L) * 140f / tope })
+            }
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.5.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("jun", "jul", "ago", "sep", "oct", "nov").forEach {
+                (if (session.capture) listOf("jun", "jul", "ago", "sep", "oct", "nov") else gastos.byMonth.map { Fechas.mes(it.month.atDay(1)).take(3) }).forEach {
                     Text(it, style = StmType.labelSmall, color = c.onSurfaceVariant)
                 }
             }
@@ -417,36 +558,81 @@ fun Pantalla18(nav: Nav) {
             ListItem(
                 "Ahorro medio", "Lo que te queda cada mes",
                 leading = { LeadIcon(StmIcons.savings, c.successContainer, c.onSuccessContainer) },
-                trailingText = "+452 €", onClick = { nav.go(19) },
+                trailingText = if (session.capture) "+452 €" else euros(ingresos.averagePerMonth - gastos.averagePerMonth, signed = true),
             )
-            Divider()
-            ListItem(
-                "Categoría que más sube", "Ocio, +18 % vs. octubre",
-                leading = { LeadIcon(StmIcons.trendingUp, c.errorContainer, c.onErrorContainer) },
-                trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(14) },
-            )
+            val texto = when {
+                session.capture -> "Ocio, +18 % vs. octubre"
+                sube == null -> null
+                else -> sube.title + (sube.percent?.let { ", +$it %" } ?: "") + " vs. ${Fechas.mes(sube.previous.atDay(1))}"
+            }
+            if (texto != null) {
+                Divider()
+                ListItem(
+                    "Categoría que más sube", texto,
+                    leading = { LeadIcon(StmIcons.trendingUp, c.errorContainer, c.onErrorContainer) },
+                    trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(14) },
+                )
+            }
         }
     }
 }
 
-/** 19 Score crediticio: indicador de 742 «Bueno» e historial de puntuaciones apuntadas a mano. */
+/** 19 Score crediticio: indicador con la última puntuación e historial de las apuntadas a mano. */
 @Composable
 fun Pantalla19(nav: Nav) {
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    val tracking = finance.tracking
     val c = Stm.colors
+    var borrando by remember { mutableStateOf<CreditScore?>(null) }
+    val action = rememberAction()
+    LaunchedEffect(Unit) { if (!session.capture) tracking.loadScores() }
+    val ultimo = tracking.latestScore
     StmScreen(
         topBar = {
             TopBar("Score crediticio", onNav = nav::back) {
-                IconBtn(StmIcons.add, null, contentDescription = "Añadir puntuación")
+                IconBtn(StmIcons.add, { nav.go(38) }, contentDescription = "Añadir puntuación")
+            }
+        },
+        snackbar = (action.error ?: tracking.error)?.let { e -> { Snackbar(e) } },
+        overlay = borrando?.let { item ->
+            {
+                BottomSheet("¿Borrar este score?", "${item.score} de ${item.maxScore}", onDismiss = { borrando = null }) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                        Btn("Cancelar", { borrando = null }, kind = BtnKind.Text)
+                        Btn("Borrar", {
+                            action.run {
+                                tracking.delete(item)
+                                borrando = null
+                            }
+                        }, kind = BtnKind.Error)
+                    }
+                }
             }
         },
     ) {
+        if (!session.capture && ultimo == null) {
+            StmCard {
+                Text("Apunta el score que te da tu banco o tu proveedor para ver cómo evoluciona.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Spacer(Modifier.height(16.dp))
+                Btn("Apuntar mi score", { nav.go(38) })
+            }
+            return@StmScreen
+        }
         StmCard {
+            val valor = if (session.capture) "742" else "${ultimo!!.score}"
+            val titulo = if (session.capture) "Bueno" else ultimo!!.rating.title
+            val tono = if (session.capture) c.success else when (ultimo!!.rating) {
+                CreditScore.Rating.Excellent, CreditScore.Rating.Good -> c.success
+                CreditScore.Rating.Fair -> c.onSurfaceVariant
+                CreditScore.Rating.Poor -> c.error
+            }
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
                 // El tramo del diseño barre 129,6° de 180°.
-                SemicircleGauge(listOf(Slice(0.72f, c.success)), width = 280.dp, thickness = 20.dp, gapDegrees = 0f)
+                SemicircleGauge(listOf(Slice(if (session.capture) 0.72f else ultimo!!.fraction.toFloat(), tono)), width = 280.dp, thickness = 20.dp, gapDegrees = 0f)
                 Column(Modifier.padding(top = 92.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("742", style = StmType.displaySmall, color = c.onSurface)
-                    Text("Bueno", style = StmType.labelMedium, color = c.success)
+                    Text(valor, style = StmType.displaySmall, color = c.onSurface)
+                    Text(titulo, style = StmType.labelMedium, color = tono)
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -458,21 +644,88 @@ fun Pantalla19(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListHeader("Historial")
-            ListItem(
-                "742", "Octubre 2026 · informe del banco",
-                leading = { LeadIcon(StmIcons.creditScore, c.successContainer, c.onSuccessContainer) },
-                trailing = { Pill("+12", icon = null) },
-            )
-            Divider()
-            ListItem(
-                "730", "Julio 2026",
-                leading = { LeadIcon(StmIcons.creditScore, c.surfaceContainerHighest, c.onSurfaceVariant) },
-                trailing = { Pill("−5", positive = false, icon = null) },
-            )
-            Divider()
-            ListItem("735", "Abril 2026", leading = { LeadIcon(StmIcons.creditScore, c.surfaceContainerHighest, c.onSurfaceVariant) })
+            if (session.capture) {
+                ListItem(
+                    "742", "Octubre 2026 · informe del banco",
+                    leading = { LeadIcon(StmIcons.creditScore, c.successContainer, c.onSuccessContainer) },
+                    trailing = { Pill("+12", icon = null) },
+                )
+                Divider()
+                ListItem(
+                    "730", "Julio 2026",
+                    leading = { LeadIcon(StmIcons.creditScore, c.surfaceContainerHighest, c.onSurfaceVariant) },
+                    trailing = { Pill("−5", positive = false, icon = null) },
+                )
+                Divider()
+                ListItem("735", "Abril 2026", leading = { LeadIcon(StmIcons.creditScore, c.surfaceContainerHighest, c.onSurfaceVariant) })
+            } else {
+                tracking.scores.forEachIndexed { i, item ->
+                    if (i > 0) Divider()
+                    val delta = tracking.scores.getOrNull(i + 1)?.takeIf { it.maxScore == item.maxScore }?.let { item.score - it.score }
+                    ListItem(
+                        "${item.score} de ${item.maxScore} · ${item.rating.title}",
+                        listOfNotNull("${Fechas.mesTitulo(item.day)} ${item.day.year}", item.trimmedProvider, item.note).joinToString(" · "),
+                        leading = {
+                            if (i == 0) LeadIcon(StmIcons.creditScore, c.successContainer, c.onSuccessContainer)
+                            else LeadIcon(StmIcons.creditScore, c.surfaceContainerHighest, c.onSurfaceVariant)
+                        },
+                        trailing = { if (delta != null && delta != 0) Pill(if (delta > 0) "+$delta" else "${Money.MINUS}${-delta}", positive = delta > 0, icon = null) },
+                        onClick = { borrando = item },
+                    )
+                }
+            }
+        }
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            Text("Sólo lo ves tú: no se comparte con el resto del hogar. Los tramos son orientativos. Toca uno para borrarlo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
     }
+}
+
+/** Apuntar un score. No está en el diseño: sigue el molde de los otros formularios y el de iOS. */
+@Composable
+fun Pantalla38(nav: Nav) {
+    val finance = LocalSession.current.finance ?: return
+    val tracking = finance.tracking
+    val ultimo = remember { tracking.latestScore }
+    var score by remember { mutableStateOf("") }
+    var escala by remember { mutableIntStateOf(ultimo?.maxScore ?: 850) }
+    var proveedor by remember { mutableStateOf(ultimo?.trimmedProvider.orEmpty()) }
+    var fecha by remember { mutableStateOf(finance.today()) }
+    var nota by remember { mutableStateOf("") }
+    var eligeFecha by remember { mutableStateOf(false) }
+    var eligeEscala by remember { mutableStateOf(false) }
+    val action = rememberAction()
+
+    fun guardar() = action.run {
+        val valor = score.trim().toIntOrNull() ?: throw AppError.InvalidInput("Escribe el score con números.")
+        tracking.add(CreditScore("", valor, escala, proveedor, fecha.toString(), nota))
+        nav.back()
+    }
+
+    StmScreen(
+        topBar = {
+            TopBar("Apuntar score", navIcon = StmIcons.close, onNav = nav::back) {
+                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            }
+        },
+        snackbar = action.error?.let { e -> { Snackbar(e) } },
+        overlay = if (eligeEscala) {
+            { SelectorSheet("Escala", listOf(850, 900, 999, 1000, 100).map { e -> "Sobre $e" to { escala = e } }) { eligeEscala = false } }
+        } else {
+            null
+        },
+    ) {
+        Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            FilledField("Score", score, { score = it }, keyboard = KeyboardType.Number, autoFocus = true)
+            FilledField("Escala", "Sobre $escala", trailing = StmIcons.arrowDropDown, onClick = { eligeEscala = true })
+            FilledField("Proveedor (opcional)", proveedor, { proveedor = it })
+            FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+            FilledField("Nota (opcional)", nota, { nota = it })
+            Text("Sólo lo ves tú. No se comparte con el hogar.", style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant)
+        }
+    }
+    if (eligeFecha) SelectorFecha(fecha, { if (!it.isAfter(finance.today())) fecha = it }) { eligeFecha = false }
 }
 
 // ───────────────────────── Piezas privadas ─────────────────────────

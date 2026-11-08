@@ -311,6 +311,30 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
             ) { select(Columns.raw(INSTALLMENT)) }.decodeSingle()
     }
 
+    override suspend fun creditScores(): List<CreditScore> = backend.mapped {
+        client.from("credit_scores").select(Columns.raw(SCORE)) {
+            order("recorded_on", Order.DESCENDING)
+            order("created_at", Order.DESCENDING)
+        }.decodeList()
+    }
+
+    override suspend fun addCreditScore(score: CreditScore): CreditScore = backend.mapped {
+        score.issue?.let(::fail)
+        val row = buildJsonObject {
+            put("score", score.score)
+            put("max_score", score.maxScore)
+            put("provider", score.trimmedProvider)
+            put("recorded_on", score.recordedOn)
+            put("note", score.note?.trim()?.ifEmpty { null })
+        }
+        client.from("credit_scores").insert(row) { select(Columns.raw(SCORE)) }.decodeSingle()
+    }
+
+    override suspend fun deleteCreditScore(scoreId: String) = backend.mapped {
+        client.from("credit_scores").delete { filter { eq("id", scoreId) } }
+        Unit
+    }
+
     override suspend fun deleteInstallment(installmentId: String) = backend.mapped {
         client.from("card_installments").delete { filter { eq("id", installmentId) } }
         Unit
@@ -338,6 +362,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
 private const val CARD = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode," +
     "fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent"
+private const val SCORE = "id,score,max_score,provider,recorded_on,note"
 private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate"
 
 private fun CreditCardTerms.columns() = buildJsonObject {

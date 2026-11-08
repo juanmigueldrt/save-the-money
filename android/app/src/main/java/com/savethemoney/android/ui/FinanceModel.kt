@@ -46,6 +46,7 @@ class FinanceModel(
     val budgets = BudgetModel(household, service, notifier, today)
     val planning = PlanningModel(household, service, notifier, today)
     val cards = CreditCardModel(household, service, notifier, today)
+    val tracking = TrackingModel(household, service, today)
 
     var accounts by mutableStateOf(emptyList<Account>())
         private set

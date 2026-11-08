@@ -231,6 +231,11 @@ interface FinanceService {
     /** Crea o cambia el aplazado de un movimiento (uno por movimiento). */
     suspend fun saveInstallment(installment: CardInstallment): CardInstallment
     suspend fun deleteInstallment(installmentId: String)
+
+    /** Los del usuario con sesión, del más reciente al más antiguo. */
+    suspend fun creditScores(): List<CreditScore>
+    suspend fun addCreditScore(score: CreditScore): CreditScore
+    suspend fun deleteCreditScore(scoreId: String)
 }
 
 /**
@@ -449,5 +454,18 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun deleteInstallment(installmentId: String) {
         installments.removeAll { it.id == installmentId }
+    }
+
+    private val scores = mutableListOf<CreditScore>()
+
+    override suspend fun creditScores() = scores.sortedByDescending { it.recordedOn }
+
+    override suspend fun addCreditScore(score: CreditScore): CreditScore {
+        score.issue?.let(::fail)
+        return score.copy(id = id()).also { scores += it }
+    }
+
+    override suspend fun deleteCreditScore(scoreId: String) {
+        scores.removeAll { it.id == scoreId }
     }
 }
