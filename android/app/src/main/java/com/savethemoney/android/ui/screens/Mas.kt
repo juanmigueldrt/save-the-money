@@ -96,6 +96,8 @@ import com.savethemoney.android.ui.components.Segmented
 import com.savethemoney.android.ui.components.Slice
 import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.SelectorSheet
+import com.savethemoney.android.ui.components.SheetItem
+import com.savethemoney.android.ui.components.BottomSheet
 import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmDialog
 import com.savethemoney.android.ui.components.StmIcon
@@ -536,7 +538,7 @@ fun Pantalla32(nav: Nav) {
         topBar = { TopBar("Importar CSV", navIcon = StmIcons.close, onNav = nav::back) },
         // En una snackbar: la vista previa puede ocupar más que la pantalla.
         snackbar = (action.error ?: resultado?.let { r ->
-            "${r.inserted} movimientos importados" + (creados?.let { if (it == 1) ", 1 pago fijo creado" else ", $it pagos fijos creados" } ?: "") + "." + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
+            "${r.inserted} movimientos importados." + (creados?.let { if (it == 1) " 1 pago recurrente creado." else " $it pagos recurrentes creados." } ?: "") + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
         })?.let { texto -> { Snackbar(texto) } },
         bottomBar = {
             Box(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
@@ -551,7 +553,7 @@ fun Pantalla32(nav: Nav) {
                             aviso = null
                             creados = null
                             resultado = finance.importMovements(ImportMarks.drafts(filas, marcas, tarjeta))
-                            val fijos = marcas.values.any { it == ImportMark.Fixed || it == ImportMark.Subscription }
+                            val fijos = ImportMark.Recurring in marcas.values
                             if (fijos) {
                                 val nuevos = ImportMarks.series(filas, marcas, finance.planning.series, finance.planning.household.id)
                                 nuevos.forEach { finance.planning.save(it) }
@@ -565,8 +567,16 @@ fun Pantalla32(nav: Nav) {
         },
         overlay = marcando?.let { fila ->
             {
-                val opciones = ImportMark.entries.filter { it != ImportMark.Card || tarjetas.isNotEmpty() }
-                SelectorSheet("Marcar como", opciones.map { o -> o.title to { marcas = marcas + (fila.line to o) } }) { marcando = null }
+                val cerrar = { marcando = null }
+                fun marcar(o: ImportMark) {
+                    marcas = marcas + (fila.line to o)
+                    cerrar()
+                }
+                BottomSheet("Marcar como", onDismiss = cerrar) {
+                    SheetItem(StmIcons.close, ImportMark.None.title) { marcar(ImportMark.None) }
+                    SheetItem(StmIcons.eventRepeat, ImportMark.Recurring.title) { marcar(ImportMark.Recurring) }
+                    if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, ImportMark.Card.title) { marcar(ImportMark.Card) }
+                }
             }
         } ?: selector?.let { campo ->
             {
@@ -656,7 +666,11 @@ fun Pantalla32(nav: Nav) {
                     if (i > 0) Divider(inset = 16.dp)
                     val marca = marcas[fila.line]?.takeIf { it != ImportMark.None }
                     ListItem(
-                        d.description, Fechas.numerica(d.bookedOn) + (marca?.let { " · ${it.title}" } ?: ""),
+                        d.description, Fechas.numerica(d.bookedOn) + when (marca) {
+                            ImportMark.Recurring -> " · Recurrente, cada mes"
+                            ImportMark.Card -> " · Compra con tarjeta"
+                            else -> ""
+                        },
                         trailingText = Money.format(d.amountMinor, signed = true),
                         // Solo los gastos se marcan como pago fijo, suscripción o compra con tarjeta.
                         onClick = if (d.amountMinor < 0) ({ marcando = fila }) else null,
@@ -670,7 +684,7 @@ fun Pantalla32(nav: Nav) {
             }
             if (!session.capture) {
                 Spacer(Modifier.height(8.dp))
-                Text("Toca un gasto para marcarlo como pago fijo, suscripción o compra con tarjeta.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text("Toca un gasto para marcarlo como recurrente (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         if (problemas.isNotEmpty()) {
