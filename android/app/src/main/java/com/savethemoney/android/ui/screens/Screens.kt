@@ -26,6 +26,8 @@ fun ScreenFor(number: Int, nav: Nav) {
         38 -> Pantalla38(nav)
         // Fuera del diseño: formularios de inversiones, como en iOS.
         39 -> Pantalla39(nav); 40 -> Pantalla40(nav); 41 -> Pantalla41(nav); 42 -> Pantalla42(nav)
+        // Fuera del diseño: calendario de pagos.
+        43 -> Pantalla43(nav)
     }
 }
 

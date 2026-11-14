@@ -56,7 +56,10 @@ import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.CategoryKind
+import com.savethemoney.android.data.CsvImportRow
 import com.savethemoney.android.data.CsvImporter
+import com.savethemoney.android.data.ImportMark
+import com.savethemoney.android.data.ImportMarks
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.CsvMapping
@@ -486,6 +489,13 @@ fun Pantalla32(nav: Nav) {
     var aviso by remember { mutableStateOf<String?>(null) }
     var resultado by remember { mutableStateOf<ImportResult?>(null) }
     var selector by remember { mutableStateOf<String?>(null) }
+    // Marcas por número de línea del CSV: siguen valiendo si cambia la cuenta de destino.
+    var marcas by remember { mutableStateOf(emptyMap<Int, ImportMark>()) }
+    var marcando by remember { mutableStateOf<CsvImportRow?>(null) }
+    var verTodas by remember { mutableStateOf(false) }
+    var creados by remember { mutableStateOf<Int?>(null) }
+    val tarjetas = finance.cards.cardAccounts
+    var tarjeta by remember { mutableStateOf(tarjetas.firstOrNull()?.id) }
     val action = rememberAction()
 
     fun cargar(texto: String, archivo: String) {
@@ -495,6 +505,9 @@ fun Pantalla32(nav: Nav) {
         mapeo = CsvMapping.detect(t)
         resultado = null
         aviso = null
+        marcas = emptyMap()
+        verTodas = false
+        creados = null
     }
     LaunchedEffect(Unit) { if (session.capture) cargar(CSV_MUESTRA, "movimientos-octubre.csv") }
     val elegir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -512,6 +525,7 @@ fun Pantalla32(nav: Nav) {
         if (t != null && m != null && id != null) CsvImporter.rows(t, m, id) else emptyList()
     }
     val validas = filas.mapNotNull { it.draft }
+    val previas = filas.filter { it.draft != null }
     val problemas = filas.filter { it.issue != null }
     val anchura = t?.rows?.maxOfOrNull { it.size } ?: 0
     val cabeceras = m?.headerRow?.let { t?.rows?.get(it) } ?: emptyList()
@@ -522,7 +536,7 @@ fun Pantalla32(nav: Nav) {
         topBar = { TopBar("Importar CSV", navIcon = StmIcons.close, onNav = nav::back) },
         // En una snackbar: la vista previa puede ocupar más que la pantalla.
         snackbar = (action.error ?: resultado?.let { r ->
-            "${r.inserted} movimientos importados." + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
+            "${r.inserted} movimientos importados" + (creados?.let { if (it == 1) ", 1 pago fijo creado" else ", $it pagos fijos creados" } ?: "") + "." + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
         })?.let { texto -> { Snackbar(texto) } },
         bottomBar = {
             Box(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
@@ -535,14 +549,26 @@ fun Pantalla32(nav: Nav) {
                     {
                         action.run {
                             aviso = null
-                            resultado = finance.importMovements(validas)
+                            creados = null
+                            resultado = finance.importMovements(ImportMarks.drafts(filas, marcas, tarjeta))
+                            val fijos = marcas.values.any { it == ImportMark.Fixed || it == ImportMark.Subscription }
+                            if (fijos) {
+                                val nuevos = ImportMarks.series(filas, marcas, finance.planning.series, finance.planning.household.id)
+                                nuevos.forEach { finance.planning.save(it) }
+                                creados = nuevos.size
+                            }
                         }
                     },
                     Modifier.fillMaxWidth(), large = true, enabled = validas.isNotEmpty() && !action.busy,
                 )
             }
         },
-        overlay = selector?.let { campo ->
+        overlay = marcando?.let { fila ->
+            {
+                val opciones = ImportMark.entries.filter { it != ImportMark.Card || tarjetas.isNotEmpty() }
+                SelectorSheet("Marcar como", opciones.map { o -> o.title to { marcas = marcas + (fila.line to o) } }) { marcando = null }
+            }
+        } ?: selector?.let { campo ->
             {
                 val cerrar = { selector = null }
                 val columnas = { fijar: (Int) -> Unit -> (0 until anchura).map { i -> columna(i) to { fijar(i) } } }
@@ -556,6 +582,7 @@ fun Pantalla32(nav: Nav) {
                     "abonos" -> SelectorSheet("Abonos (ingresos)", columnas { i ->
                         mapeo = mapeo?.let { it.copy(amount = AmountColumns.Split((it.amount as? AmountColumns.Split)?.debit ?: i, i)) }
                     }, cerrar)
+                    "tarjeta" -> SelectorSheet("Tarjeta de las compras", tarjetas.map { a -> a.name to { tarjeta = a.id } }, cerrar)
                     "formato" -> SelectorSheet("Formato de fecha", DateOrder.entries.map { o -> o.title to { mapeo = mapeo?.copy(dateOrder = o) } }, cerrar)
                     else -> SelectorSheet("Cuenta de destino", finance.activeAccounts.map { a -> a.name to { cuenta = a.id; resultado = null } }, cerrar)
                 }
@@ -624,11 +651,26 @@ fun Pantalla32(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListHeader("Vista previa")
-                validas.take(10).forEachIndexed { i, d ->
+                (if (verTodas) previas else previas.take(10)).forEachIndexed { i, fila ->
+                    val d = fila.draft!!
                     if (i > 0) Divider(inset = 16.dp)
-                    ListItem(d.description, Fechas.numerica(d.bookedOn), trailingText = Money.format(d.amountMinor, signed = true))
+                    val marca = marcas[fila.line]?.takeIf { it != ImportMark.None }
+                    ListItem(
+                        d.description, Fechas.numerica(d.bookedOn) + (marca?.let { " · ${it.title}" } ?: ""),
+                        trailingText = Money.format(d.amountMinor, signed = true),
+                        // Solo los gastos se marcan como pago fijo, suscripción o compra con tarjeta.
+                        onClick = if (d.amountMinor < 0) ({ marcando = fila }) else null,
+                    )
                 }
-                if (validas.size > 10) ListItem("… y ${validas.size - 10} más")
+                if (!verTodas && previas.size > 10) ListItem("… y ${previas.size - 10} más", onClick = { verTodas = true })
+            }
+            if (marcas.values.any { it == ImportMark.Card } && tarjetas.size > 1) {
+                Spacer(Modifier.height(16.dp))
+                FilledField("Tarjeta de las compras", finance.account(tarjeta)?.name ?: "Elige una tarjeta", trailing = StmIcons.arrowDropDown, onClick = { selector = "tarjeta" })
+            }
+            if (!session.capture) {
+                Spacer(Modifier.height(8.dp))
+                Text("Toca un gasto para marcarlo como pago fijo, suscripción o compra con tarjeta.", style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         if (problemas.isNotEmpty()) {

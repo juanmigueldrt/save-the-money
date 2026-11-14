@@ -28,6 +28,7 @@ import com.savethemoney.android.ui.components.LeadIcon
 import com.savethemoney.android.ui.components.ListCard
 import com.savethemoney.android.ui.components.ListHeader
 import com.savethemoney.android.ui.components.ListItem
+import com.savethemoney.android.ui.components.StmIcon
 import com.savethemoney.android.ui.components.NavBar
 import com.savethemoney.android.ui.components.Pill
 import com.savethemoney.android.ui.components.SectionHeader
@@ -101,6 +102,18 @@ fun Pantalla04(nav: Nav) {
                 },
                 Modifier.weight(1f),
             ) { nav.go(if (session.capture) 11 else 20) }
+        }
+        // El calendario no está en el diseño: en las capturas se queda fuera.
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListItem(
+                    "Calendario de pagos", "Lo que se cobra cada día",
+                    leading = { LeadIcon(StmIcons.calendarMonth, c.secondaryContainer, c.onSecondaryContainer) },
+                    trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) },
+                    onClick = { nav.go(43) },
+                )
+            }
         }
         Spacer(Modifier.height(16.dp))
         SectionHeader("Últimos movimientos", "Ver todo") { nav.go(5) }

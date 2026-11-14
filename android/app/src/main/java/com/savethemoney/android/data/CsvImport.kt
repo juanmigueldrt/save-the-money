@@ -255,3 +255,40 @@ object CsvImporter {
     fun sha256Hex(text: String): String =
         MessageDigest.getInstance("SHA-256").digest(text.toByteArray()).joinToString("") { "%02x".format(it) }
 }
+
+/** Lo que se puede marcar en una fila de la vista previa. Solo los gastos se marcan. */
+enum class ImportMark(val title: String) { None("Nada"), Fixed("Pago fijo"), Subscription("Suscripción"), Card("Compra con tarjeta") }
+
+object ImportMarks {
+    /** Los movimientos a guardar: las compras con tarjeta van a la cuenta de la tarjeta en vez de a la del CSV. */
+    fun drafts(rows: List<CsvImportRow>, marks: Map<Int, ImportMark>, cardAccountId: String?): List<MovementDraft> =
+        rows.mapNotNull { row ->
+            row.draft?.let { d ->
+                if (cardAccountId != null && d.amountMinor < 0 && marks[row.line] == ImportMark.Card) d.copy(accountId = cardAccountId) else d
+            }
+        }
+
+    /**
+     * Pagos fijos nuevos para las filas marcadas: cada mes desde la fecha del movimiento, con su cuenta, categoría
+     * y aviso un día antes. No repite uno que ya esté activo con el mismo nombre (sin mayúsculas ni espacios).
+     */
+    fun series(rows: List<CsvImportRow>, marks: Map<Int, ImportMark>, existing: List<RecurringSeries>, householdId: String): List<RecurringSeries> {
+        val taken = existing.filter { !it.isArchived }.map { key(it.name) }.toMutableSet()
+        return rows.mapNotNull { row ->
+            val d = row.draft ?: return@mapNotNull null
+            val kind = when (marks[row.line]) {
+                ImportMark.Fixed -> RecurringKind.Essential
+                ImportMark.Subscription -> RecurringKind.Subscription
+                else -> return@mapNotNull null
+            }
+            val name = d.description.trim().take(60).trim()
+            if (d.amountMinor >= 0 || !taken.add(key(name))) return@mapNotNull null
+            RecurringSeries(
+                "", householdId, name, kind, -d.amountMinor, d.accountId, d.categoryId,
+                startsOn = d.bookedOn.toString(), remindDaysBefore = 1,
+            )
+        }
+    }
+
+    fun key(name: String): String = CsvMapping.normalize(name).filterNot { it.isWhitespace() }
+}

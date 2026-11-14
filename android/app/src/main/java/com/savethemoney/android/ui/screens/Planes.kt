@@ -86,7 +86,8 @@ import kotlin.math.roundToInt
 /** 20 Pagos fijos: total del mes y cargos recurrentes agrupados en próximos e ingresos. */
 @Composable
 fun Pantalla20(nav: Nav) {
-    val finance = LocalSession.current.finance ?: return
+    val session = LocalSession.current
+    val finance = session.finance ?: return
     val planning = finance.planning
     val c = Stm.colors
     val hoy = planning.today()
@@ -103,7 +104,11 @@ fun Pantalla20(nav: Nav) {
         topBar = {
             // En el diseño la fila mide 60 (no 64) y el título va justo debajo, sin subtítulo.
             Box(Modifier.fillMaxWidth().height(60.dp)) {
-                TopBar(null, onNav = nav::back) { IconBtn(StmIcons.search, null, contentDescription = "Buscar") }
+                TopBar(null, onNav = nav::back) {
+                    // El calendario no está en el diseño: en las capturas se queda fuera.
+                    if (!session.capture) IconBtn(StmIcons.calendarMonth, { nav.go(43) }, contentDescription = "Calendario de pagos")
+                    IconBtn(StmIcons.search, null, contentDescription = "Buscar")
+                }
             }
             Text("Pagos fijos", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
         },
