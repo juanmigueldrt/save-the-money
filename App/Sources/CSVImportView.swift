@@ -7,6 +7,7 @@ import STMUI
 /// El archivo se lee en el dispositivo; al servidor sólo van los movimientos.
 struct CSVImportView: View {
     @Environment(FinanceModel.self) private var finance
+    @Environment(PlanningModel.self) private var planning
     @State private var choosingFile = false
     @State private var fileName: String?
     @State private var table: CSVTable?
@@ -14,6 +15,9 @@ struct CSVImportView: View {
     @State private var accountId: UUID?
     @State private var error: String?
     @State private var result: ImportResult?
+    @State private var createdSeries = 0
+    /// Marcas de cada fila (por número de línea): pago fijo, suscripción o compra con tarjeta.
+    @State private var marks: [Int: CSVRowMark] = [:]
     @State private var isImporting = false
     @State private var addingAccount = false
 
@@ -26,6 +30,12 @@ struct CSVImportView: View {
     private func recompute() {
         guard let table, let mapping, let accountId else { rows = []; return }
         rows = CSVImporter.rows(in: table, mapping: mapping, accountId: accountId)
+        let lines = Set(rows.map(\.line))
+        marks = marks.filter { lines.contains($0.key) }
+    }
+
+    private var cardAccounts: [Account] {
+        finance.activeAccounts.filter { $0.kind == .creditCard && $0.id != accountId }
     }
 
     var body: some View {
@@ -57,7 +67,7 @@ struct CSVImportView: View {
             }
 
             if !rows.isEmpty {
-                PreviewSection(rows: rows)
+                PreviewSection(rows: rows, marks: $marks, cards: cardAccounts)
             }
 
             if let result {
@@ -97,6 +107,10 @@ struct CSVImportView: View {
 
     private var validDrafts: [MovementDraft] { rows.compactMap(\.draft) }
 
+    private var importPlan: CSVImportPlan {
+        CSVImportPlan.make(rows: rows, marks: marks, householdId: finance.household.id, existing: planning.series)
+    }
+
     private var importTitle: String {
         if isImporting { return "Importando…" }
         return validDrafts.isEmpty ? "Importar" : "Importar \(validDrafts.count) movimientos"
@@ -105,12 +119,14 @@ struct CSVImportView: View {
     private func resultText(_ result: ImportResult) -> String {
         var text = "\(result.inserted) movimientos importados."
         if result.duplicates > 0 { text += " \(result.duplicates) ya estaban y no se han repetido." }
+        if createdSeries > 0 { text += createdSeries == 1 ? " 1 pago fijo creado." : " \(createdSeries) pagos fijos creados." }
         return text
     }
 
     private func load(_ picked: Result<URL, Error>) {
         error = nil
         result = nil
+        createdSeries = 0
         guard case .success(let url) = picked else { return }
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
@@ -127,6 +143,7 @@ struct CSVImportView: View {
             }
             let parsed = CSVTable.parse(text)
             fileName = url.lastPathComponent
+            marks = [:]
             table = parsed
             mapping = CSVMapping.detect(in: parsed)
             recompute()
@@ -136,15 +153,21 @@ struct CSVImportView: View {
     }
 
     private func runImport() async {
-        let drafts = validDrafts
-        guard !drafts.isEmpty else { return }
+        let plan = importPlan
+        guard !plan.drafts.isEmpty else { return }
         isImporting = true
         defer { isImporting = false }
-        if let imported = await finance.importMovements(drafts) {
-            result = imported
-        } else {
+        error = nil
+        createdSeries = 0
+        guard let imported = await finance.importMovements(plan.drafts) else {
             error = finance.error
+            return
         }
+        // Los pagos fijos se crean después, para no dejarlos a medias si falla la importación.
+        for series in plan.newSeries {
+            if await planning.save(series) { createdSeries += 1 } else { error = planning.error }
+        }
+        result = imported
     }
 }
 
@@ -203,35 +226,30 @@ private struct MappingSection: View {
 /// Primeras filas tal como se van a guardar, y las que tienen problemas.
 private struct PreviewSection: View {
     let rows: [CSVImportRow]
+    @Binding var marks: [Int: CSVRowMark]
+    let cards: [Account]
+
+    /// Al principio se ven 10; el resto, al pedirlo, para poder marcarlas todas.
+    @State private var showsAll = false
 
     private var problems: [CSVImportRow] { rows.filter { $0.issue != nil } }
 
     var body: some View {
-        Section("Vista previa") {
-            ForEach(rows.filter { $0.draft != nil }.prefix(10)) { row in
+        let valid = rows.filter { $0.draft != nil }
+        Section {
+            ForEach(showsAll ? valid : Array(valid.prefix(10))) { row in
                 if let draft = row.draft {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(draft.description)
-                                .font(Typography.subheadline)
-                                .lineLimit(1)
-                            Text(draft.bookedOn.shortText)
-                                .font(Typography.footnote)
-                                .foregroundStyle(Palette.labelSecondary)
-                        }
-                        Spacer()
-                        Text(draft.amount.formatted())
-                            .font(Typography.subheadlineEmphasis)
-                            .foregroundStyle(draft.amount.isNegative ? Palette.label : Palette.positiveText)
-                    }
+                    PreviewRow(draft: draft, mark: binding(for: row.line), cards: cards)
                 }
             }
-            let valid = rows.count - problems.count
-            if valid > 10 {
-                Text("… y \(valid - 10) más")
-                    .font(Typography.footnote)
-                    .foregroundStyle(Palette.labelSecondary)
+            if valid.count > 10 && !showsAll {
+                Button("Ver las \(valid.count) filas") { showsAll = true }
+                    .font(Typography.subheadlineEmphasis)
             }
+        } header: {
+            Text("Vista previa")
+        } footer: {
+            Text("Toca un gasto para marcarlo como pago fijo o suscripción (se crea un pago mensual desde esa fecha) o como compra con tarjeta de crédito (se apunta en la tarjeta).")
         }
         if !problems.isEmpty {
             Section("Filas que no se importarán (\(problems.count))") {
@@ -241,6 +259,71 @@ private struct PreviewSection: View {
                         .foregroundStyle(Palette.negativeText)
                 }
             }
+        }
+    }
+
+    private func binding(for line: Int) -> Binding<CSVRowMark> {
+        Binding { marks[line] ?? .none } set: { marks[line] = $0 == .none ? nil : $0 }
+    }
+}
+
+/// Una fila de la vista previa, con su marca si es un gasto.
+private struct PreviewRow: View {
+    let draft: MovementDraft
+    @Binding var mark: CSVRowMark
+    let cards: [Account]
+
+    var body: some View {
+        if draft.amount.isNegative {
+            Menu {
+                Picker("Marcar como", selection: $mark) {
+                    Label("Sin marcar", systemImage: "circle").tag(CSVRowMark.none)
+                    Label("Pago fijo", systemImage: RecurringKind.essential.systemImage).tag(CSVRowMark.essential)
+                    Label("Suscripción", systemImage: RecurringKind.subscription.systemImage).tag(CSVRowMark.subscription)
+                    ForEach(cards) { card in
+                        Label(cards.count == 1 ? "Compra con tarjeta" : "Compra con \(card.name)", systemImage: "creditcard")
+                            .tag(CSVRowMark.creditCard(accountId: card.id))
+                    }
+                }
+                .pickerStyle(.inline)
+                if cards.isEmpty {
+                    Text("Añade una tarjeta de crédito en Cuentas para marcar compras con tarjeta.")
+                }
+            } label: {
+                content
+            }
+            .buttonStyle(.plain)
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(draft.description)
+                    .font(Typography.subheadline)
+                    .foregroundStyle(Palette.label)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(Typography.footnote)
+                    .foregroundStyle(mark == .none ? Palette.labelSecondary : Palette.accentText)
+            }
+            Spacer()
+            Text(draft.amount.formatted())
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(draft.amount.isNegative ? Palette.label : Palette.positiveText)
+        }
+        .contentShape(Rectangle())
+    }
+
+    private var detail: String {
+        switch mark {
+        case .none: return draft.bookedOn.shortText
+        case .creditCard(let id):
+            let name = cards.first { $0.id == id }?.name ?? "tarjeta"
+            return "\(draft.bookedOn.shortText) · Compra con \(name)"
+        default: return "\(draft.bookedOn.shortText) · \(mark.title) cada mes"
         }
     }
 }

@@ -33,6 +33,9 @@ final class PlanningModel {
 
     func series(of kind: RecurringKind) -> [RecurringSeries] { activeSeries.filter { $0.kind == kind } }
 
+    /// Hoy (fijo en el modo de capturas).
+    var day: CalendarDay { today() }
+
     var upcoming: [UpcomingCharge] { series.upcoming(from: today(), days: 30) }
 
     func monthlyTotal(of kind: RecurringKind) -> Money { series.monthlyTotal(of: kind, on: today()) }

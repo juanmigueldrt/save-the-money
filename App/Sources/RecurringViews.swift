@@ -38,6 +38,13 @@ struct RecurringView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Nuevo pago fijo", systemImage: "plus") { adding = true }
             }
+            ToolbarItem(placement: .primaryAction) {
+                NavigationLink {
+                    PaymentCalendarView()
+                } label: {
+                    Label("Calendario de pagos", systemImage: "calendar")
+                }
+            }
         }
         .refreshable { await planning.load() }
         .sheet(isPresented: $adding) { RecurringFormView(series: nil) }

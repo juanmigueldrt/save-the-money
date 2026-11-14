@@ -36,6 +36,8 @@ struct SummaryView: View {
                 }
                 .buttonStyle(.plain)
 
+                NextPaymentsCard()
+
                 AdaptiveColumns {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         HStack {
