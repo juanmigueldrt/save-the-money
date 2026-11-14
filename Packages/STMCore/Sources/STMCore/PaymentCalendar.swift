@@ -177,6 +177,8 @@ public enum CSVRowMark: Hashable, Sendable {
     case none
     /// Crea un pago recurrente mensual desde ese día (suscripción, recibo, cuota...).
     case recurring
+    /// Crea una suscripción mensual desde ese día.
+    case subscription
     /// Guarda el movimiento en esa tarjeta de crédito en vez de en la cuenta del CSV.
     case creditCard(accountId: UUID)
 
@@ -184,6 +186,7 @@ public enum CSVRowMark: Hashable, Sendable {
         switch self {
         case .none: "Sin marcar"
         case .recurring: "Recurrente"
+        case .subscription: "Suscripción"
         case .creditCard: "Compra con tarjeta"
         }
     }
@@ -192,6 +195,7 @@ public enum CSVRowMark: Hashable, Sendable {
     public var recurringKind: RecurringKind? {
         switch self {
         case .recurring: .essential
+        case .subscription: .subscription
         case .none, .creditCard: nil
         }
     }
@@ -203,7 +207,7 @@ public struct CSVImportPlan: Hashable, Sendable {
     public var newSeries: [RecurringSeries]
 
     /// Aplica las marcas a las filas válidas: cambia la cuenta de las compras con tarjeta
-    /// y prepara un pago mensual por cada fila marcada como recurrente.
+    /// y prepara un pago mensual por cada fila marcada como recurrente o suscripción.
     /// Sólo se marcan gastos; no se repite una serie activa con el mismo nombre
     /// (ni dos filas marcadas con el mismo concepto: se queda la primera).
     public static func make(rows: [CSVImportRow], marks: [Int: CSVRowMark], householdId: UUID,
