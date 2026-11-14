@@ -257,7 +257,7 @@ object CsvImporter {
 }
 
 /** Lo que se puede marcar en una fila de la vista previa. Solo los gastos se marcan. */
-enum class ImportMark(val title: String) { None("Sin marcar"), Recurring("Recurrente"), Card("Compra con tarjeta") }
+enum class ImportMark(val title: String) { None("Sin marcar"), Recurring("Recurrente"), Subscription("Suscripción"), Card("Compra con tarjeta") }
 
 object ImportMarks {
     /** Los movimientos a guardar: las compras con tarjeta van a la cuenta de la tarjeta en vez de a la del CSV. */
@@ -276,11 +276,15 @@ object ImportMarks {
         val taken = existing.filter { !it.isArchived }.map { key(it.name) }.toMutableSet()
         return rows.mapNotNull { row ->
             val d = row.draft ?: return@mapNotNull null
-            if (marks[row.line] != ImportMark.Recurring) return@mapNotNull null
+            val kind = when (marks[row.line]) {
+                ImportMark.Recurring -> RecurringKind.Essential
+                ImportMark.Subscription -> RecurringKind.Subscription
+                else -> return@mapNotNull null
+            }
             val name = d.description.trim().take(60).trim()
             if (d.amountMinor >= 0 || !taken.add(key(name))) return@mapNotNull null
             RecurringSeries(
-                "", householdId, name, RecurringKind.Essential, -d.amountMinor, d.accountId, d.categoryId,
+                "", householdId, name, kind, -d.amountMinor, d.accountId, d.categoryId,
                 startsOn = d.bookedOn.toString(), remindDaysBefore = 1,
             )
         }

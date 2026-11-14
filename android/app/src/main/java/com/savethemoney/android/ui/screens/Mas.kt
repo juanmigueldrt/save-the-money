@@ -553,7 +553,7 @@ fun Pantalla32(nav: Nav) {
                             aviso = null
                             creados = null
                             resultado = finance.importMovements(ImportMarks.drafts(filas, marcas, tarjeta))
-                            val fijos = ImportMark.Recurring in marcas.values
+                            val fijos = ImportMark.Recurring in marcas.values || ImportMark.Subscription in marcas.values
                             if (fijos) {
                                 val nuevos = ImportMarks.series(filas, marcas, finance.planning.series, finance.planning.household.id)
                                 nuevos.forEach { finance.planning.save(it) }
@@ -575,6 +575,7 @@ fun Pantalla32(nav: Nav) {
                 BottomSheet("Marcar como", onDismiss = cerrar) {
                     SheetItem(StmIcons.close, ImportMark.None.title) { marcar(ImportMark.None) }
                     SheetItem(StmIcons.eventRepeat, ImportMark.Recurring.title) { marcar(ImportMark.Recurring) }
+                    SheetItem(StmIcons.subscriptions, ImportMark.Subscription.title) { marcar(ImportMark.Subscription) }
                     if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, ImportMark.Card.title) { marcar(ImportMark.Card) }
                 }
             }
@@ -668,6 +669,7 @@ fun Pantalla32(nav: Nav) {
                     ListItem(
                         d.description, Fechas.numerica(d.bookedOn) + when (marca) {
                             ImportMark.Recurring -> " · Recurrente, cada mes"
+                            ImportMark.Subscription -> " · Suscripción, cada mes"
                             ImportMark.Card -> " · Compra con tarjeta"
                             else -> ""
                         },
@@ -684,7 +686,7 @@ fun Pantalla32(nav: Nav) {
             }
             if (!session.capture) {
                 Spacer(Modifier.height(8.dp))
-                Text("Toca un gasto para marcarlo como recurrente (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text("Toca un gasto para marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         if (problemas.isNotEmpty()) {
