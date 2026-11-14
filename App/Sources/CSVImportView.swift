@@ -119,7 +119,7 @@ struct CSVImportView: View {
     private func resultText(_ result: ImportResult) -> String {
         var text = "\(result.inserted) movimientos importados."
         if result.duplicates > 0 { text += " \(result.duplicates) ya estaban y no se han repetido." }
-        if createdSeries > 0 { text += createdSeries == 1 ? " 1 pago fijo creado." : " \(createdSeries) pagos fijos creados." }
+        if createdSeries > 0 { text += createdSeries == 1 ? " 1 pago recurrente creado." : " \(createdSeries) pagos recurrentes creados." }
         return text
     }
 
@@ -249,7 +249,7 @@ private struct PreviewSection: View {
         } header: {
             Text("Vista previa")
         } footer: {
-            Text("Toca un gasto para marcarlo como pago fijo o suscripción (se crea un pago mensual desde esa fecha) o como compra con tarjeta de crédito (se apunta en la tarjeta).")
+            Text("Toca un gasto para marcarlo como recurrente (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).")
         }
         if !problems.isEmpty {
             Section("Filas que no se importarán (\(problems.count))") {
@@ -278,8 +278,7 @@ private struct PreviewRow: View {
             Menu {
                 Picker("Marcar como", selection: $mark) {
                     Label("Sin marcar", systemImage: "circle").tag(CSVRowMark.none)
-                    Label("Pago fijo", systemImage: RecurringKind.essential.systemImage).tag(CSVRowMark.essential)
-                    Label("Suscripción", systemImage: RecurringKind.subscription.systemImage).tag(CSVRowMark.subscription)
+                    Label("Recurrente", systemImage: "repeat").tag(CSVRowMark.recurring)
                     ForEach(cards) { card in
                         Label(cards.count == 1 ? "Compra con tarjeta" : "Compra con \(card.name)", systemImage: "creditcard")
                             .tag(CSVRowMark.creditCard(accountId: card.id))
@@ -323,7 +322,7 @@ private struct PreviewRow: View {
         case .creditCard(let id):
             let name = cards.first { $0.id == id }?.name ?? "tarjeta"
             return "\(draft.bookedOn.shortText) · Compra con \(name)"
-        default: return "\(draft.bookedOn.shortText) · \(mark.title) cada mes"
+        default: return "\(draft.bookedOn.shortText) · Recurrente, cada mes"
         }
     }
 }

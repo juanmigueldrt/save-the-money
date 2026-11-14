@@ -175,26 +175,23 @@ extension CalendarDay {
 /// Cómo se marca una fila del CSV antes de importarla.
 public enum CSVRowMark: Hashable, Sendable {
     case none
-    /// Crea un pago fijo (gasto esencial) mensual desde ese día.
-    case essential
-    /// Crea una suscripción mensual desde ese día.
-    case subscription
+    /// Crea un pago recurrente mensual desde ese día (suscripción, recibo, cuota...).
+    case recurring
     /// Guarda el movimiento en esa tarjeta de crédito en vez de en la cuenta del CSV.
     case creditCard(accountId: UUID)
 
     public var title: String {
         switch self {
         case .none: "Sin marcar"
-        case .essential: "Pago fijo"
-        case .subscription: "Suscripción"
+        case .recurring: "Recurrente"
         case .creditCard: "Compra con tarjeta"
         }
     }
 
+    /// Tipo del pago que se crea; se puede cambiar después en Pagos fijos.
     public var recurringKind: RecurringKind? {
         switch self {
-        case .essential: .essential
-        case .subscription: .subscription
+        case .recurring: .essential
         case .none, .creditCard: nil
         }
     }
@@ -206,7 +203,7 @@ public struct CSVImportPlan: Hashable, Sendable {
     public var newSeries: [RecurringSeries]
 
     /// Aplica las marcas a las filas válidas: cambia la cuenta de las compras con tarjeta
-    /// y prepara un pago fijo por cada fila marcada como recurrente o suscripción.
+    /// y prepara un pago mensual por cada fila marcada como recurrente.
     /// Sólo se marcan gastos; no se repite una serie activa con el mismo nombre
     /// (ni dos filas marcadas con el mismo concepto: se queda la primera).
     public static func make(rows: [CSVImportRow], marks: [Int: CSVRowMark], householdId: UUID,

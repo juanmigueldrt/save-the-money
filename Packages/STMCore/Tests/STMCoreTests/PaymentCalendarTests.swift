@@ -86,10 +86,10 @@ final class PaymentCalendarTests: XCTestCase {
         let existing = [RecurringSeries(householdId: household, name: "Cafetería", amount: Money(minor: 900),
                                         startsOn: day(2026, 1, 1))]
         let marks: [Int: CSVRowMark] = [
-            2: .subscription, 3: .essential, 4: .creditCard(accountId: card),
-            5: .essential, // un ingreso no se marca
-            6: .subscription, // mismo concepto que la fila 2: no se repite
-            7: .essential,   // ya hay una serie con ese nombre
+            2: .recurring, 3: .recurring, 4: .creditCard(accountId: card),
+            5: .recurring, // un ingreso no se marca
+            6: .recurring, // mismo concepto que la fila 2: no se repite
+            7: .recurring,   // ya hay una serie con ese nombre
         ]
         let plan = CSVImportPlan.make(rows: rows, marks: marks, householdId: household, existing: existing)
 
@@ -98,7 +98,7 @@ final class PaymentCalendarTests: XCTestCase {
         XCTAssertEqual(plan.drafts.filter { $0.accountId == bank }.count, 5)
         XCTAssertEqual(plan.newSeries.map(\.name), ["STREAMING EJEMPLO", "Luz Eléctrica Ficticia"])
         let streaming = plan.newSeries[0]
-        XCTAssertEqual(streaming.kind, .subscription)
+        XCTAssertEqual(streaming.kind, .essential)
         XCTAssertEqual(streaming.amount, Money(minor: 1_299))
         XCTAssertEqual(streaming.startsOn, day(2026, 10, 3))
         XCTAssertEqual(streaming.recurrence, .monthly)
