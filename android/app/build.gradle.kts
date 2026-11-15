@@ -15,6 +15,14 @@ val localProps = Properties().apply {
 // -Psupabase.url=… tiene prioridad: sirve para probar contra el Supabase local sin tocar el archivo.
 fun local(key: String) = (findProperty(key) as String? ?: localProps.getProperty(key) ?: "").replace("\\", "\\\\").replace("\"", "\\\"")
 
+// Firma de la versión release: almacén y contraseñas en local.properties (nunca en git):
+//   release.storeFile=/ruta/al/almacen.jks   release.storePassword=…
+//   release.keyAlias=…                       release.keyPassword=…
+// Sin ellas, la release se firma con la clave de depuración y no se instala encima de la buena.
+val releaseStore = (findProperty("release.storeFile") as String? ?: localProps.getProperty("release.storeFile"))
+    ?.let { file(it) }?.takeIf { it.exists() }
+fun rawLocal(key: String) = findProperty(key) as String? ?: localProps.getProperty(key)
+
 android {
     namespace = "com.savethemoney.android"
     compileSdk = 36
@@ -31,6 +39,17 @@ android {
         buildConfigField("String", "LOGO_DEV_TOKEN", "\"${local("logodev.token")}\"")
     }
 
+    signingConfigs {
+        if (releaseStore != null) {
+            create("release") {
+                storeFile = releaseStore
+                storePassword = rawLocal("release.storePassword")
+                keyAlias = rawLocal("release.keyAlias")
+                keyPassword = rawLocal("release.keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             // -Pentrega: APK reducido con R8 (el de 37 MB no se puede enviar al móvil).
@@ -41,8 +60,7 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
-            // shortcut: firma con la clave de depuración para poder instalar el APK hoy; usar una clave propia antes de publicar.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -51,6 +69,17 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+}
+
+// Una release nunca debe apuntar al Supabase local ni salir con la clave de depuración:
+// con la clave local la app recibe "Invalid API key" y cierra la sesión.
+gradle.taskGraph.whenReady {
+    if (allTasks.any { it.name.startsWith("assembleRelease") || it.name.startsWith("bundleRelease") }) {
+        val url = rawLocal("supabase.url") ?: ""
+        val local = listOf("127.0.0.1", "localhost", "10.0.2.2").any { url.contains(it) }
+        check(!local) { "La release apunta al Supabase local ($url). Pon la URL y la clave anon de la nube en local.properties." }
+        check(releaseStore != null) { "Falta la firma de release (release.storeFile y compañía en local.properties)." }
+    }
 }
 
 dependencies {
