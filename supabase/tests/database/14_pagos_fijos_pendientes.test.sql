@@ -28,7 +28,7 @@ with s as (insert into public.recurring_series (household_id, name, kind, amount
 insert into ids select 'serie', id from s;
 
 select is((select format('%s %s', creates_pending, pending_from = current_date) from public.recurring_series),
-  'true true', 'una serie nueva crea pendientes desde hoy');
+  't t', 'una serie nueva crea pendientes desde hoy');
 
 -- Cargo pendiente -----------------------------------------------------------------------
 with c as (insert into public.recurring_charges (household_id, series_id, due_on, amount_minor)
