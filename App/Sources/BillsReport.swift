@@ -175,6 +175,10 @@ enum BillsPDF {
         let url = folder.appendingPathComponent(bills.fileName)
         try? FileManager.default.removeItem(at: url)
 
+        // El PDF lleva siempre los importes reales, aunque la app esté en modo incógnito o sin céntimos.
+        let shown = Money.display
+        Money.display = .standard
+        defer { Money.display = shown }
         let renderer = ImageRenderer(content: BillsPDFPage(bills: bills, householdName: householdName, today: today))
         renderer.proposedSize = ProposedViewSize(width: BillsPDFPage.width, height: nil)
         var written = false

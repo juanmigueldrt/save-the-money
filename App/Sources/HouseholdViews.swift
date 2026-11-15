@@ -124,6 +124,8 @@ struct HouseholdView: View {
     @State private var error: String?
     @State private var confirmingLeave = false
     @State private var removing: HouseholdMember?
+    @State private var renaming = false
+    @State private var newName = ""
 
     private var myRole: MemberRole? {
         members.first { $0.profile.id == profile.id }?.role
@@ -132,9 +134,21 @@ struct HouseholdView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                Text(household.name)
-                    .titleFont(.title1)
-                    .foregroundStyle(Palette.label)
+                HStack(alignment: .firstTextBaseline) {
+                    Text(household.name)
+                        .titleFont(.title1)
+                        .foregroundStyle(Palette.label)
+                    Spacer()
+                    if myRole == .owner {
+                        Button("Cambiar nombre", systemImage: "pencil") {
+                            newName = household.name
+                            renaming = true
+                        }
+                        .labelStyle(.iconOnly)
+                        .font(Typography.headline)
+                        .help("Cambiar el nombre del hogar")
+                    }
+                }
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Miembros")
@@ -211,6 +225,18 @@ struct HouseholdView: View {
         .task(id: household.id) { await load() }
         .sheet(item: $shownInvite, onDismiss: { Task { await load() } }) { invite in
             InviteSheet(invite: invite, householdName: household.name)
+        }
+        .alert("Nombre del hogar", isPresented: $renaming) {
+            TextField("Nombre del hogar", text: $newName)
+            Button("Cancelar", role: .cancel) {}
+            Button("Guardar") {
+                Task {
+                    do { try await session.renameHousehold(household, to: newName) }
+                    catch { self.error = (error as? AppError)?.errorDescription ?? "No se ha podido cambiar el nombre." }
+                }
+            }
+        } message: {
+            Text("Lo verán todos los miembros.")
         }
         .confirmationDialog("¿Salir de \(household.name)?", isPresented: $confirmingLeave, titleVisibility: .visible) {
             Button("Salir del hogar", role: .destructive) {

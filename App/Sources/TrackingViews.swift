@@ -15,6 +15,7 @@ struct NetWorthView: View {
         let now = NetWorth.current(accounts: finance.accounts, balances: finance.balances)
         let history = tracking.history(accounts: finance.accounts, range: range)
         let rangeChange = NetWorthRange.change(history)
+        let projection = NetWorthProjection(history: tracking.history(accounts: finance.accounts, months: 7))
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
@@ -63,6 +64,10 @@ struct NetWorthView: View {
                 }
                 .card()
 
+                if let projection, !finance.accounts.isEmpty {
+                    projectionCard(projection)
+                }
+
                 accountsCard(title: "Lo que tienes", accounts: finance.activeAccounts.filter { !finance.balance(of: $0).isNegative })
                 accountsCard(title: "Lo que debes", accounts: finance.activeAccounts.filter { finance.balance(of: $0).isNegative })
 
@@ -80,6 +85,42 @@ struct NetWorthView: View {
             await finance.load()
             await tracking.loadHistory()
         }
+    }
+
+    /// "A final de año: 12.400 €", con la línea discontinua de la predicción.
+    private func projectionCard(_ projection: NetWorthProjection) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("A final de año")
+                    .titleFont(.title2)
+                    .foregroundStyle(Palette.label)
+                Spacer()
+                Text(projection.endOfYear.formatted())
+                    .font(Typography.headline)
+                    .foregroundStyle(projection.endOfYear.isNegative ? Palette.negativeText : Palette.label)
+            }
+            Chart(projection.points) { point in
+                LineMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
+                         y: .value("Patrimonio", point.net.decimal))
+                    .foregroundStyle(Palette.accent)
+                    .lineStyle(StrokeStyle(lineWidth: 2, dash: [5, 4]))
+                PointMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
+                          y: .value("Patrimonio", point.net.decimal))
+                    .foregroundStyle(Palette.accent)
+                    .symbolSize(20)
+            }
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
+                }
+            }
+            .frame(height: 120)
+            .accessibilityLabel("Predicción del patrimonio hasta diciembre")
+            Text("Si sigue como los últimos meses (\(projection.monthlyChange.signedText()) al mes de media). Es una estimación, no una promesa.")
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
+        }
+        .card()
     }
 
     private func figure(_ title: String, _ amount: Money) -> some View {
@@ -420,6 +461,7 @@ struct ReportsView: View {
     private var byCategory: some View {
         @Bindable var tracking = tracking
         let report = tracking.report(categories: finance.categories)
+        let previous = tracking.previousReport(categories: finance.categories)
         VStack(alignment: .leading, spacing: Spacing.s16) {
             CapsuleSegmented("Qué", selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
             HStack {
@@ -438,6 +480,10 @@ struct ReportsView: View {
                 .titleFont(.largeTitle)
                 .foregroundStyle(Palette.label)
                 .contentTransition(.numericText())
+            comparison(report, previous)
+            Text("\(report.averagePerDay.formatted()) al día de media · \(report.byCategory.reduce(0) { $0 + $1.count }) movimientos")
+                .font(Typography.subheadline)
+                .foregroundStyle(Palette.labelSecondary)
             if report.byMonth.count > 1 {
                 Text("Media de \(report.averagePerMonth.formatted()) al mes")
                     .font(Typography.subheadline)
@@ -486,6 +532,22 @@ struct ReportsView: View {
             }
         }
         .card()
+    }
+
+    /// "+12 % (+40,00 €) que el mes pasado a estas alturas". En gastos, subir es malo (rojo); en ingresos, bueno.
+    @ViewBuilder
+    private func comparison(_ report: SpendingReport, _ previous: SpendingReport) -> some View {
+        let change = report.change(from: previous)
+        if previous.total.minor > 0 || report.total.minor > 0 {
+            let up = change.difference.minor > 0
+            let good = tracking.kind == .expense ? !up : up
+            let percent = change.percent.map { ($0 > 0 ? "+" : "") + "\($0) % · " } ?? ""
+            Text(change.difference.minor == 0
+                 ? "Igual que \(tracking.period.previousTitle)"
+                 : percent + change.difference.signedText() + " frente a " + tracking.period.previousTitle)
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(change.difference.minor == 0 ? Palette.labelSecondary : (good ? Palette.positiveText : Palette.negativeText))
+        }
     }
 
     private var categoryMenu: some View {

@@ -40,6 +40,9 @@ final class PlanningModel {
 
     func monthlyTotal(of kind: RecurringKind) -> Money { series.monthlyTotal(of: kind, on: today()) }
 
+    /// Pagos fijos y suscripciones de los próximos 12 meses.
+    var yearlyFixedTotal: Money { series.yearlyTotal(of: [.subscription, .essential], from: today()) }
+
     var progress: [GoalProgress] {
         let day = today()
         return goals.filter { !$0.isArchived }.map { GoalProgress(goal: $0, contributions: contributions, today: day) }

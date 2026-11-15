@@ -92,7 +92,8 @@ struct RootView: View {
     var body: some View {
         VStack(spacing: 0) {
             if session.isDemo { DemoBanner() }
-            content
+            // Modo incógnito y sin céntimos: al cambiar se vuelve a pintar el contenido (los modelos se conservan).
+            content.modifier(MoneyDisplayModifier())
         }
         #if os(macOS)
         .frame(minWidth: 900, minHeight: 600)

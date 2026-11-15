@@ -269,7 +269,7 @@ struct BudgetFormView: View {
 
     private func save() async {
         let trimmed = income.trimmingCharacters(in: .whitespaces)
-        guard let expected = trimmed.isEmpty ? .zero : Money(parsing: trimmed), !expected.isNegative else {
+        guard let expected = trimmed.isEmpty ? .zero : Money(entered: trimmed), !expected.isNegative else {
             error = "Los ingresos previstos no son un importe válido."
             return
         }
@@ -277,7 +277,7 @@ struct BudgetFormView: View {
         for (id, text) in limits {
             let value = text.trimmingCharacters(in: .whitespaces)
             guard !value.isEmpty else { continue }
-            guard let money = Money(parsing: value), !money.isNegative else {
+            guard let money = Money(entered: value), !money.isNegative else {
                 let name = finance.category(id)?.name ?? "una categoría"
                 error = "El límite de \(name) no es un importe válido."
                 return

@@ -558,7 +558,7 @@ struct BuyCard: View {
     private var quote: BuyQuote? {
         switch mode {
         case .amount:
-            Money(parsing: text).flatMap { BuyQuote.byAmount($0, price: holding.price, feeRate: holding.feeRate) }
+            Money(entered: text).flatMap { BuyQuote.byAmount($0, price: holding.price, feeRate: holding.feeRate) }
         case .quantity:
             Decimal(parsing: text).flatMap { BuyQuote.byQuantity($0, price: holding.price, feeRate: holding.feeRate) }
         }
@@ -932,7 +932,7 @@ struct SellView: View {
             return
         }
         let trimmedFee = fee.trimmingCharacters(in: .whitespaces)
-        guard let feeValue = trimmedFee.isEmpty ? Money.zero : Money(parsing: trimmedFee) else {
+        guard let feeValue = trimmedFee.isEmpty ? Money.zero : Money(entered: trimmedFee) else {
             error = "Escribe la comisión con números."
             return
         }
@@ -1150,7 +1150,7 @@ struct PlanFormView: View {
     @State private var confirmingDelete = false
 
     private var draft: InvestmentPlan? {
-        guard let holdingId, let money = Money(parsing: amount), let rate = Decimal(parsing: expectedReturn) else { return nil }
+        guard let holdingId, let money = Money(entered: amount), let rate = Decimal(parsing: expectedReturn) else { return nil }
         var item = plan ?? InvestmentPlan(householdId: investments.household.id, holdingId: holdingId, amount: money,
                                           startsOn: CalendarDay(startsOn))
         item.amount = money

@@ -493,13 +493,13 @@ struct CardTermsFormView: View {
     }
 
     private func save() async {
-        guard let limitMoney = Money(parsing: limit), limitMoney.minor > 0 else { error = "El límite no es un importe válido."; return }
+        guard let limitMoney = Money(entered: limit), limitMoney.minor > 0 else { error = "El límite no es un importe válido."; return }
         guard let revolving = Decimal(parsing: revolvingRate), let installment = Decimal(parsing: installmentRate),
               let percent = Decimal(parsing: minPercent) else { error = "Revisa los intereses y el pago mínimo."; return }
-        guard let minimum = Money(parsing: minAmount.isEmpty ? "0" : minAmount) else { error = "El pago mínimo no es un importe válido."; return }
+        guard let minimum = Money(entered: minAmount.isEmpty ? "0" : minAmount) else { error = "El pago mínimo no es un importe válido."; return }
         var fixedMoney: Money?
         if mode == .fixed {
-            guard let value = Money(parsing: fixed), value.minor > 0 else { error = "La cuota no es un importe válido."; return }
+            guard let value = Money(entered: fixed), value.minor > 0 else { error = "La cuota no es un importe válido."; return }
             fixedMoney = value
         }
         let terms = CreditCardTerms(
@@ -638,7 +638,7 @@ struct CardPaymentFormView: View {
     }
 
     private func save() async {
-        guard let money = Money(parsing: amount), money.minor > 0 else { error = "El importe no es válido."; return }
+        guard let money = Money(entered: amount), money.minor > 0 else { error = "El importe no es válido."; return }
         guard let from else { error = "Elige la cuenta desde la que pagas."; return }
         let transfer = finance.categories(for: .transfer).first?.id
         let date = CalendarDay(day)
