@@ -133,6 +133,14 @@ struct MoreView: View {
             } footer: {
                 Text("Borra las cuentas, movimientos, presupuestos, pagos fijos y metas de todo el hogar.")
             }
+
+            Section {
+                Button { Task { await session.signOut() } } label: {
+                    Label("Cerrar sesión", systemImage: "rectangle.portrait.and.arrow.right")
+                }
+            } footer: {
+                Text("Sesión iniciada como \(profile.name).")
+            }
         }
         .brandBackground()
         .navigationTitle("Más opciones")

@@ -363,3 +363,101 @@ public enum BudgetAlertPlanner {
                            body: "Has gastado \(spent.formatted()) de \(limit.formatted()). Quedan \((limit - spent).formatted()).")
     }
 }
+
+// MARK: - Tramos del patrimonio (igual que en Android)
+
+/// Tramo del gráfico de patrimonio: 1M, 6M, 1A o Todo.
+public enum NetWorthRange: String, CaseIterable, Sendable, Identifiable {
+    case oneMonth, sixMonths, oneYear, all
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .oneMonth: "1M"
+        case .sixMonths: "6M"
+        case .oneYear: "1A"
+        case .all: "Todo"
+        }
+    }
+
+    /// Para la frase del cambio: "+120 € en 6 meses".
+    public var caption: String {
+        switch self {
+        case .oneMonth: "en 1 mes"
+        case .sixMonths: "en 6 meses"
+        case .oneYear: "en 1 año"
+        case .all: "desde el principio"
+        }
+    }
+
+    /// Puntos del gráfico (final de cada mes); el primero es el punto de partida.
+    /// "Todo" va desde el mes del primer movimiento, y siempre hay al menos 2.
+    public func months(firstMovement: CalendarDay?, through: MonthKey) -> Int {
+        switch self {
+        case .oneMonth: return 2
+        case .sixMonths: return 7
+        case .oneYear: return 13
+        case .all:
+            guard let first = firstMovement.map(MonthKey.init) else { return 2 }
+            let span = (through.year - first.year) * 12 + (through.month - first.month) + 1
+            return max(2, span)
+        }
+    }
+
+    /// Cuánto ha cambiado el patrimonio entre el primer y el último punto.
+    public static func change(_ history: [NetWorthPoint]) -> Money {
+        guard let first = history.first, let last = history.last else { return .zero }
+        return last.net - first.net
+    }
+}
+
+// MARK: - Resumen del mes (igual que en Android)
+
+public enum MonthSummary {
+    /// Lo gastado en el mes de `today` hasta hoy. Los traspasos no cuentan; una devolución resta.
+    public static func spent(movements: [Movement], categories: [BudgetCategory],
+                             today: CalendarDay = CalendarDay()) -> Money {
+        SpendingReport(movements: movements, categories: categories, range: MonthKey(today).firstDay...today,
+                       kind: .expense).total
+    }
+
+    /// Cuánto ha cambiado el patrimonio este mes: la suma de los movimientos del mes en cuentas no archivadas.
+    /// Los traspasos entre cuentas propias se anulan solos.
+    public static func netWorthChange(accounts: [Account], movements: [Movement],
+                                      today: CalendarDay = CalendarDay()) -> Money {
+        let ids = Set(accounts.filter { !$0.isArchived }.map(\.id))
+        let start = MonthKey(today).firstDay
+        return Money(minor: movements
+            .filter { ids.contains($0.accountId) && $0.bookedOn >= start && $0.bookedOn <= today }
+            .reduce(0) { $0 + $1.amount.minor })
+    }
+}
+
+// MARK: - Categoría que más sube (igual que en Android)
+
+/// La categoría de gasto que más sube de un mes al anterior.
+public struct BiggestRise: Hashable, Sendable {
+    public var title: String
+    public var icon: String?
+    /// Subida en %, o nil si el mes anterior no se gastó nada en ella.
+    public var percent: Int?
+    public var previous: MonthKey
+
+    public static func find(movements: [Movement], categories: [BudgetCategory], month: MonthKey) -> BiggestRise? {
+        func rows(_ m: MonthKey) -> [String: SpendingReport.Row] {
+            let range = m.firstDay...m.adding(months: 1).firstDay.adding(days: -1)
+            let report = SpendingReport(movements: movements, categories: categories, range: range, kind: .expense)
+            return Dictionary(report.byCategory.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        }
+        let previous = month.adding(months: -1)
+        let before = rows(previous)
+        let rises = rows(month).values
+            .map { ($0, $0.amount.minor - (before[$0.id]?.amount.minor ?? 0)) }
+            .filter { $0.1 > 0 }
+        guard let best = rises.max(by: { $0.1 != $1.1 ? $0.1 < $1.1 : $0.0.title > $1.0.title }) else { return nil }
+        let old = before[best.0.id]?.amount.minor ?? 0
+        return BiggestRise(title: best.0.title, icon: best.0.icon,
+                           percent: old > 0 ? best.1 * 100 / old : nil, previous: previous)
+    }
+}

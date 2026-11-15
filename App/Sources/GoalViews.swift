@@ -6,6 +6,28 @@ import STMUI
 struct GoalsView: View {
     @Environment(PlanningModel.self) private var planning
     @State private var adding = false
+    @State private var filter: GoalFilter = .savings
+
+    /// Ahorro, Deudas o Completadas, como en Android.
+    enum GoalFilter: String, CaseIterable, Hashable {
+        case savings, debt, completed
+
+        var title: String {
+            switch self {
+            case .savings: "Ahorro"
+            case .debt: "Deudas"
+            case .completed: "Completadas"
+            }
+        }
+
+        func includes(_ progress: GoalProgress) -> Bool {
+            switch self {
+            case .savings: progress.goal.kind == .savings && !progress.isReached
+            case .debt: progress.goal.kind == .debt && !progress.isReached
+            case .completed: progress.isReached
+            }
+        }
+    }
 
     var body: some View {
         ScrollView {
@@ -21,20 +43,17 @@ struct GoalsView: View {
                     }
                     .card()
                 }
-                ForEach(GoalKind.allCases, id: \.self) { kind in
-                    let items = planning.progress.filter { $0.goal.kind == kind }
-                    if !items.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.s16) {
-                            Text(kind == .savings ? "Ahorro" : "Deudas")
-                                .titleFont(.title2)
-                                .foregroundStyle(Palette.label)
-                            ForEach(items) { progress in
-                                NavigationLink(value: progress.goal) {
-                                    GoalCard(progress: progress)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                if !planning.progress.isEmpty {
+                    CapsuleSegmented("Mostrar", selection: $filter, options: GoalFilter.allCases) { $0.title }
+                    let items = planning.progress.filter(filter.includes)
+                    if items.isEmpty {
+                        EmptyHint(text: "No hay metas en esta sección.")
+                    }
+                    ForEach(items) { progress in
+                        NavigationLink(value: progress.goal) {
+                            GoalCard(progress: progress)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
                 ErrorText(message: planning.error)

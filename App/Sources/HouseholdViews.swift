@@ -52,6 +52,11 @@ struct HouseholdOnboardingView: View {
                         Button("Unirme", action: join)
                             .buttonStyle(SecondaryButtonStyle())
                             .disabled(isWorking || code.isEmpty)
+                        ScanInviteButton { invite in
+                            code = invite.display
+                            join()
+                        }
+                        .disabled(isWorking)
                     }
                     .card()
 
@@ -267,13 +272,14 @@ struct InviteSheet: View {
     let householdName: String
 
     @Environment(\.dismiss) private var dismiss
+    @State private var copied = false
 
     var body: some View {
         VStack(spacing: Spacing.s24) {
             Text("Invita a tu pareja")
                 .titleFont(.title1)
                 .foregroundStyle(Palette.label)
-            Text("Que escanee el QR con la cámara del iPhone o escriba el código al unirse.")
+            Text("Que escanee el QR con su móvil o escriba el código al unirse.")
                 .font(Typography.body)
                 .foregroundStyle(Palette.labelSecondary)
                 .multilineTextAlignment(.center)
@@ -293,6 +299,13 @@ struct InviteSheet: View {
                     .font(Typography.footnote)
                     .foregroundStyle(Palette.labelSecondary)
 
+                Button(copied ? "Código copiado" : "Copiar código",
+                       systemImage: copied ? "checkmark" : "doc.on.doc") {
+                    copyToClipboard(code.value)
+                    copied = true
+                }
+                .buttonStyle(SecondaryButtonStyle())
+
                 ShareLink(item: code.link,
                           message: Text("Únete a \(householdName) en Save the Money con el código \(code.display)")) {
                     Label("Compartir enlace", systemImage: "square.and.arrow.up")
@@ -307,6 +320,16 @@ struct InviteSheet: View {
         .formWidth()
         .background(Palette.bgGrouped)
     }
+}
+
+/// Copiar al portapapeles en iPhone y en Mac.
+func copyToClipboard(_ text: String) {
+    #if os(iOS)
+    UIPasteboard.general.string = text
+    #else
+    NSPasteboard.general.clearContents()
+    NSPasteboard.general.setString(text, forType: .string)
+    #endif
 }
 
 #Preview("Bienvenida") {

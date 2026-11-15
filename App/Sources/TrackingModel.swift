@@ -38,6 +38,13 @@ final class TrackingModel {
         NetWorth.history(accounts: accounts, movements: allMovements, months: months, through: MonthKey(today()))
     }
 
+    /// Patrimonio del tramo elegido (1M, 6M, 1A o Todo), como en Android.
+    func history(accounts: [Account], range: NetWorthRange) -> [NetWorthPoint] {
+        let through = MonthKey(today())
+        let first = allMovements.map(\.bookedOn).min()
+        return history(accounts: accounts, months: range.months(firstMovement: first, through: through))
+    }
+
     func loadHistory() async {
         let finance = finance, id = household.id
         await perform { self.allMovements = try await finance.allMovements(in: id) }
