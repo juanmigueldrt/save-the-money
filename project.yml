@@ -37,6 +37,7 @@ targets:
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        LogoDevToken: $(LOGO_DEV_TOKEN)
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false

@@ -26,8 +26,15 @@ public struct Merchant: Hashable, Sendable {
     }
 
     /// URL del logo. Sólo viaja el dominio.
-    public var logoURL: URL? {
+    public var logoURL: URL? { logoURL(logoDevToken: nil) }
+
+    /// Con la clave publicable de logo.dev (`pk_…`) el logo sale de img.logo.dev;
+    /// sin ella (o si no es publicable), del favicon de Google.
+    public func logoURL(logoDevToken token: String?) -> URL? {
         guard let domain else { return nil }
+        if let token = MerchantDirectory.publishableToken(token) {
+            return URL(string: "https://img.logo.dev/\(domain)?token=\(token)&size=128&format=png&retina=true")
+        }
         return URL(string: "https://www.google.com/s2/favicons?domain=\(domain)&sz=128")
     }
 }
@@ -116,6 +123,13 @@ public enum MerchantDirectory {
         let words = normalize(description).split(separator: " ")
             .filter { word in !word.contains(where: \.isNumber) }
         return words.prefix(4).joined(separator: " ")
+    }
+
+    /// Sólo se acepta la clave publicable de logo.dev; una secreta (`sk_…`) nunca se usa en la app.
+    public static func publishableToken(_ token: String?) -> String? {
+        guard let token = token?.trimmingCharacters(in: .whitespacesAndNewlines), token.hasPrefix("pk_"),
+              token.count > 3, token.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" }) else { return nil }
+        return token
     }
 
     /// Mayúsculas, sin tildes y con cualquier signo convertido en espacio:

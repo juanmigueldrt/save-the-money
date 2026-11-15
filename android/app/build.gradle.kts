@@ -27,6 +27,8 @@ android {
         versionName = "0.8.0"
         buildConfigField("String", "SUPABASE_URL", "\"${local("supabase.url")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${local("supabase.anonKey")}\"")
+        // Logos de comercios: clave PUBLICABLE de logo.dev (pk_…) en local.properties como logodev.token. Opcional.
+        buildConfigField("String", "LOGO_DEV_TOKEN", "\"${local("logodev.token")}\"")
     }
 
     buildTypes {
