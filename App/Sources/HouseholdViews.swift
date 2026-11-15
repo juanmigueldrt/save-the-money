@@ -118,6 +118,7 @@ struct HouseholdView: View {
     @State private var shownInvite: HouseholdInvite?
     @State private var error: String?
     @State private var confirmingLeave = false
+    @State private var removing: HouseholdMember?
 
     private var myRole: MemberRole? {
         members.first { $0.profile.id == profile.id }?.role
@@ -148,6 +149,13 @@ struct HouseholdView: View {
                             Text(member.role.title)
                                 .font(Typography.footnote)
                                 .foregroundStyle(Palette.labelSecondary)
+                            if myRole == .owner && member.profile.id != profile.id {
+                                Button("Quitar") { removing = member }
+                                    .font(Typography.subheadlineEmphasis)
+                                    .foregroundStyle(Palette.negativeText)
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Quitar a \(member.profile.name) del hogar")
+                            }
                         }
                     }
                     Button("Invitar a tu pareja", action: invite)
@@ -207,7 +215,21 @@ struct HouseholdView: View {
                 }
             }
         } message: {
-            Text("Dejarás de ver las metas y gastos compartidos de este hogar.")
+            Text("Dejarás de ver lo que te hayan compartido en este hogar.")
+        }
+        .confirmationDialog("¿Quitar a \(removing?.profile.name ?? "") del hogar?",
+                            isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
+                            titleVisibility: .visible, presenting: removing) { member in
+            Button("Quitar del hogar", role: .destructive) {
+                Task {
+                    do {
+                        try await session.services.households.removeMember(member.profile.id, from: household.id)
+                        await load()
+                    } catch { self.error = (error as? AppError)?.errorDescription }
+                }
+            }
+        } message: { _ in
+            Text("Dejará de tener acceso a este hogar. Puedes volver a invitarle cuando quieras.")
         }
     }
 
