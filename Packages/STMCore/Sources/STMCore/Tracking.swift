@@ -30,7 +30,7 @@ public struct NetWorthPoint: Hashable, Sendable, Identifiable {
 public enum NetWorth {
     /// Patrimonio de hoy con los saldos actuales.
     public static func current(accounts: [Account], balances: [UUID: Money], today: CalendarDay = CalendarDay()) -> NetWorthPoint {
-        let active = accounts.filter { !$0.isArchived }
+        let active = accounts.filter { !$0.isArchived && $0.includeInNetWorth }
         return NetWorthPoint(month: MonthKey(today), balances: active.map { balances[$0.id] ?? $0.openingBalance })
     }
 
@@ -38,7 +38,7 @@ public enum NetWorth {
     /// rehecho a partir del saldo inicial de cada cuenta y sus movimientos.
     public static func history(accounts: [Account], movements: [Movement], months: Int = 12,
                                through: MonthKey) -> [NetWorthPoint] {
-        let active = accounts.filter { !$0.isArchived }
+        let active = accounts.filter { !$0.isArchived && $0.includeInNetWorth }
         let ids = Set(active.map(\.id))
         let byAccount = Dictionary(grouping: movements.filter { ids.contains($0.accountId) }, by: \.accountId)
             .mapValues { $0.sorted { $0.bookedOn < $1.bookedOn } }
@@ -249,7 +249,7 @@ public struct SpendingReport: Hashable, Sendable {
         var totals: [String: (title: String, icon: String?, minor: Int, count: Int)] = [:]
         var months: [MonthKey: Int] = [:]
         var total = 0
-        for movement in movements where range.contains(movement.bookedOn) {
+        for movement in movements where !movement.excluded && range.contains(movement.bookedOn) {
             if !accountIds.isEmpty && !accountIds.contains(movement.accountId) { continue }
             let category = movement.categoryId.flatMap { byId[$0] }
             if category?.kind == .transfer { continue }
@@ -512,7 +512,7 @@ public enum MonthSummary {
     /// Los traspasos entre cuentas propias se anulan solos.
     public static func netWorthChange(accounts: [Account], movements: [Movement],
                                       today: CalendarDay = CalendarDay()) -> Money {
-        let ids = Set(accounts.filter { !$0.isArchived }.map(\.id))
+        let ids = Set(accounts.filter { !$0.isArchived && $0.includeInNetWorth }.map(\.id))
         let start = MonthKey(today).firstDay
         return Money(minor: movements
             .filter { ids.contains($0.accountId) && $0.bookedOn >= start && $0.bookedOn <= today }

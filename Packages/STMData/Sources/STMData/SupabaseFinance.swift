@@ -5,9 +5,9 @@ import Supabase
 /// Cuentas, categorías y movimientos sobre Supabase. El RLS del servidor decide
 /// qué se ve; aquí no se filtra por seguridad, sólo por lo que pide la pantalla.
 extension SupabaseBackend: FinanceService {
-    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at"
+    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
     private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
-    private static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash"
+    private static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
     private static let importBatchSize = 500
 
@@ -173,7 +173,8 @@ extension SupabaseBackend: FinanceService {
 
     public func updateMovement(_ movement: Movement) async throws -> Movement {
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
-                                  amount: movement.amount, description: movement.description, notes: movement.notes)
+                                  amount: movement.amount, description: movement.description, notes: movement.notes,
+                                  excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
         return try await mapped {
             try await client.from("transactions")
@@ -253,8 +254,12 @@ private struct AccountChanges: Encodable, Sendable {
     var openingBalanceMinor: Int
     var ownerId: UUID?
     var archivedAt: String?
+    var isDefault: Bool
+    var includeInNetWorth: Bool
 
     init(_ account: Account) {
+        isDefault = account.isDefault && !account.isArchived
+        includeInNetWorth = account.includeInNetWorth
         name = account.name.trimmingCharacters(in: .whitespacesAndNewlines)
         kind = account.kind
         openingBalanceMinor = account.openingBalance.minor
@@ -267,6 +272,8 @@ private struct AccountChanges: Encodable, Sendable {
         case openingBalanceMinor = "opening_balance_minor"
         case ownerId = "owner_id"
         case archivedAt = "archived_at"
+        case isDefault = "is_default"
+        case includeInNetWorth = "include_in_net_worth"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -277,6 +284,8 @@ private struct AccountChanges: Encodable, Sendable {
         // null explícito para poder volver a compartida o desarchivar.
         try c.encode(ownerId, forKey: .ownerId)
         try c.encode(archivedAt, forKey: .archivedAt)
+        try c.encode(isDefault, forKey: .isDefault)
+        try c.encode(includeInNetWorth, forKey: .includeInNetWorth)
     }
 }
 
@@ -318,8 +327,14 @@ private struct NewMovementRow: Encodable, Sendable {
     var description: String
     var notes: String?
     var importHash: String?
+    var excluded: Bool
+    var payee: String?
+    var tags: [String]
 
     init(_ draft: MovementDraft, householdId: UUID) {
+        excluded = draft.excluded
+        payee = Payee.clean(draft.payee)
+        tags = draft.tags
         self.householdId = householdId
         accountId = draft.accountId
         categoryId = draft.categoryId
@@ -338,6 +353,7 @@ private struct NewMovementRow: Encodable, Sendable {
         case bookedOn = "booked_on"
         case amountMinor = "amount_minor"
         case importHash = "import_hash"
+        case excluded, payee, tags
     }
 
     // Todas las filas de un lote deben llevar las mismas claves para PostgREST,
@@ -352,6 +368,9 @@ private struct NewMovementRow: Encodable, Sendable {
         try c.encode(description, forKey: .description)
         try c.encode(notes, forKey: .notes)
         try c.encode(importHash, forKey: .importHash)
+        try c.encode(excluded, forKey: .excluded)
+        try c.encode(payee, forKey: .payee)
+        try c.encode(tags, forKey: .tags)
     }
 }
 
@@ -361,11 +380,12 @@ private struct MovementChanges: Encodable, Sendable {
     init(_ movement: Movement) { self.movement = movement }
 
     enum CodingKeys: String, CodingKey {
-        case description, notes
+        case description, notes, excluded, payee, tags
         case accountId = "account_id"
         case categoryId = "category_id"
         case bookedOn = "booked_on"
         case amountMinor = "amount_minor"
+        case reviewedAt = "reviewed_at"
     }
 
     func encode(to encoder: Encoder) throws {
@@ -376,5 +396,9 @@ private struct MovementChanges: Encodable, Sendable {
         try c.encode(movement.amount.minor, forKey: .amountMinor)
         try c.encode(movement.description.trimmingCharacters(in: .whitespacesAndNewlines), forKey: .description)
         try c.encode(movement.notes, forKey: .notes)
+        try c.encode(movement.excluded, forKey: .excluded)
+        try c.encode(movement.reviewedAt.map { ISO8601DateFormatter().string(from: $0) }, forKey: .reviewedAt)
+        try c.encode(Payee.clean(movement.payee), forKey: .payee)
+        try c.encode(movement.tags, forKey: .tags)
     }
 }

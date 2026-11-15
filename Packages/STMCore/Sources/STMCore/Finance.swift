@@ -41,10 +41,14 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
     public var openingBalance: Money
     public var ownerId: UUID?
     public var archivedAt: Date?
+    /// La que sale elegida al apuntar un movimiento.
+    public var isDefault: Bool
+    /// Si suma en el patrimonio neto.
+    public var includeInNetWorth: Bool
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: AccountKind = .checking,
                 currency: String = "EUR", openingBalance: Money = .zero, ownerId: UUID? = nil,
-                archivedAt: Date? = nil) {
+                archivedAt: Date? = nil, isDefault: Bool = false, includeInNetWorth: Bool = true) {
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -53,6 +57,8 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         self.openingBalance = openingBalance
         self.ownerId = ownerId
         self.archivedAt = archivedAt
+        self.isDefault = isDefault
+        self.includeInNetWorth = includeInNetWorth
     }
 
     public var isArchived: Bool { archivedAt != nil }
@@ -64,6 +70,8 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         case openingBalanceMinor = "opening_balance_minor"
         case ownerId = "owner_id"
         case archivedAt = "archived_at"
+        case isDefault = "is_default"
+        case includeInNetWorth = "include_in_net_worth"
     }
 
     public init(from decoder: Decoder) throws {
@@ -76,6 +84,8 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         openingBalance = Money(minor: try c.decode(Int.self, forKey: .openingBalanceMinor), currency: currency)
         ownerId = try c.decodeIfPresent(UUID.self, forKey: .ownerId)
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
+        includeInNetWorth = try c.decodeIfPresent(Bool.self, forKey: .includeInNetWorth) ?? true
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -88,6 +98,8 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         try c.encode(openingBalance.minor, forKey: .openingBalanceMinor)
         try c.encode(ownerId, forKey: .ownerId)
         try c.encodeIfPresent(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encode(isDefault, forKey: .isDefault)
+        try c.encode(includeInNetWorth, forKey: .includeInNetWorth)
     }
 }
 
@@ -183,10 +195,19 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
     public var description: String
     public var notes: String?
     public var importHash: String?
+    /// No cuenta en presupuesto, informes ni flujo (sí en el saldo).
+    public var excluded: Bool
+    /// Cuándo se marcó como revisado; nil = sin revisar.
+    public var reviewedAt: Date?
+    /// A quién se paga o quién paga.
+    public var payee: String?
+    /// Etiquetas en minúsculas, sin «#».
+    public var tags: [String]
 
     public init(id: UUID = UUID(), householdId: UUID, accountId: UUID, categoryId: UUID? = nil,
                 bookedOn: CalendarDay, amount: Money, description: String, notes: String? = nil,
-                importHash: String? = nil) {
+                importHash: String? = nil, excluded: Bool = false, reviewedAt: Date? = nil,
+                payee: String? = nil, tags: [String] = []) {
         self.id = id
         self.householdId = householdId
         self.accountId = accountId
@@ -196,9 +217,14 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         self.description = description
         self.notes = notes
         self.importHash = importHash
+        self.excluded = excluded
+        self.reviewedAt = reviewedAt
+        self.payee = payee
+        self.tags = tags
     }
 
     public var isExpense: Bool { amount.isNegative }
+    public var isReviewed: Bool { reviewedAt != nil }
 
     enum CodingKeys: String, CodingKey {
         case id, description, notes
@@ -208,6 +234,8 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         case bookedOn = "booked_on"
         case amountMinor = "amount_minor"
         case importHash = "import_hash"
+        case excluded, payee, tags
+        case reviewedAt = "reviewed_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -215,6 +243,10 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         id = try c.decode(UUID.self, forKey: .id)
         householdId = try c.decode(UUID.self, forKey: .householdId)
         accountId = try c.decode(UUID.self, forKey: .accountId)
+        excluded = try c.decodeIfPresent(Bool.self, forKey: .excluded) ?? false
+        reviewedAt = try c.decodeIfPresent(ServerDate.self, forKey: .reviewedAt)?.date
+        payee = try c.decodeIfPresent(String.self, forKey: .payee)
+        tags = try c.decodeIfPresent([String].self, forKey: .tags) ?? []
         categoryId = try c.decodeIfPresent(UUID.self, forKey: .categoryId)
         bookedOn = try c.decode(CalendarDay.self, forKey: .bookedOn)
         amount = Money(minor: try c.decode(Int.self, forKey: .amountMinor))
@@ -234,6 +266,10 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         try c.encode(description, forKey: .description)
         try c.encode(notes, forKey: .notes)
         try c.encodeIfPresent(importHash, forKey: .importHash)
+        try c.encode(excluded, forKey: .excluded)
+        try c.encodeIfPresent(reviewedAt.map(ServerDate.init), forKey: .reviewedAt)
+        try c.encode(payee, forKey: .payee)
+        try c.encode(tags, forKey: .tags)
     }
 }
 
@@ -246,9 +282,13 @@ public struct MovementDraft: Hashable, Sendable {
     public var description: String
     public var notes: String?
     public var importHash: String?
+    public var excluded: Bool
+    public var payee: String?
+    public var tags: [String]
 
     public init(accountId: UUID, categoryId: UUID? = nil, bookedOn: CalendarDay, amount: Money,
-                description: String, notes: String? = nil, importHash: String? = nil) {
+                description: String, notes: String? = nil, importHash: String? = nil,
+                excluded: Bool = false, payee: String? = nil, tags: [String] = []) {
         self.accountId = accountId
         self.categoryId = categoryId
         self.bookedOn = bookedOn
@@ -256,6 +296,9 @@ public struct MovementDraft: Hashable, Sendable {
         self.description = description
         self.notes = notes
         self.importHash = importHash
+        self.excluded = excluded
+        self.payee = payee
+        self.tags = tags
     }
 
     /// Problema que impide guardarlo, en español, o nil si es válido.
@@ -265,6 +308,10 @@ public struct MovementDraft: Hashable, Sendable {
         if text.count > 200 { return "El concepto es demasiado largo (máximo 200 caracteres)." }
         if amount.minor == 0 { return "El importe no puede ser cero." }
         if let notes, notes.count > 500 { return "Las notas son demasiado largas (máximo 500 caracteres)." }
+        if let payee, payee.trimmingCharacters(in: .whitespacesAndNewlines).count > 80 {
+            return "El beneficiario es demasiado largo (máximo 80 caracteres)."
+        }
+        if let issue = MovementTags.issue(tags) { return issue }
         return nil
     }
 }

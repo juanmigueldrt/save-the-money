@@ -16,6 +16,22 @@ public enum MovementKindFilter: String, CaseIterable, Sendable, Identifiable {
     }
 }
 
+/// Revisados, sin revisar o excluidos del presupuesto.
+public enum MovementStatusFilter: String, CaseIterable, Sendable, Identifiable {
+    case all, unreviewed, reviewed, excluded
+
+    public var id: String { rawValue }
+
+    public var title: String {
+        switch self {
+        case .all: "Todos"
+        case .unreviewed: "Sin revisar"
+        case .reviewed: "Revisados"
+        case .excluded: "Excluidos"
+        }
+    }
+}
+
 /// Fechas rápidas del filtro de movimientos.
 public enum MovementDateFilter: String, CaseIterable, Sendable, Identifiable {
     case all, thisMonth, lastMonth, last30Days, last90Days, thisYear, custom
@@ -59,12 +75,17 @@ public struct MovementFilter: Hashable, Sendable {
     public var dates: MovementDateFilter = .all
     public var customFrom: CalendarDay?
     public var customThrough: CalendarDay?
-    /// Busca en el concepto, las notas, el nombre de la categoría o el importe ("12,50", "12.5", "-12,50").
+    public var status: MovementStatusFilter = .all
+    /// Sólo los que llevan esta etiqueta.
+    public var tag: String?
+    /// Busca en el concepto, las notas, el beneficiario, las etiquetas, el nombre de la categoría o el importe ("12,50", "12.5", "-12,50").
     public var search: String = ""
 
     public init(accountId: UUID? = nil, kind: MovementKindFilter = .all, categoryId: UUID? = nil,
                 dates: MovementDateFilter = .all, customFrom: CalendarDay? = nil, customThrough: CalendarDay? = nil,
-                search: String = "") {
+                search: String = "", status: MovementStatusFilter = .all, tag: String? = nil) {
+        self.status = status
+        self.tag = tag
         self.accountId = accountId
         self.kind = kind
         self.categoryId = categoryId
@@ -76,7 +97,7 @@ public struct MovementFilter: Hashable, Sendable {
 
     /// Cuántos filtros (sin contar la búsqueda) hay puestos, para el icono del menú.
     public var activeCount: Int {
-        [accountId != nil, kind != .all, categoryId != nil, dates != .all].filter { $0 }.count
+        [accountId != nil, kind != .all, categoryId != nil, dates != .all, status != .all, tag != nil].filter { $0 }.count
     }
 
     public func dateRange(today: CalendarDay) -> ClosedRange<CalendarDay>? {
@@ -97,6 +118,13 @@ public struct MovementFilter: Hashable, Sendable {
             if let accountId, movement.accountId != accountId { return false }
             if let categoryId, movement.categoryId != categoryId { return false }
             if let range, !range.contains(movement.bookedOn) { return false }
+            if let tag, !movement.tags.contains(tag) { return false }
+            switch status {
+            case .all: break
+            case .unreviewed: if movement.isReviewed { return false }
+            case .reviewed: if !movement.isReviewed { return false }
+            case .excluded: if !movement.excluded { return false }
+            }
             let category = movement.categoryId.flatMap { byId[$0] }
             let isTransfer = category?.kind == .transfer
             switch kind {
@@ -108,6 +136,9 @@ public struct MovementFilter: Hashable, Sendable {
             guard !query.isEmpty else { return true }
             if movement.description.localizedCaseInsensitiveContains(query) { return true }
             if movement.notes?.localizedCaseInsensitiveContains(query) ?? false { return true }
+            if movement.payee?.localizedCaseInsensitiveContains(query) ?? false { return true }
+            let bareQuery = query.hasPrefix("#") ? String(query.dropFirst()) : query
+            if movement.tags.contains(where: { $0.localizedCaseInsensitiveContains(bareQuery) }) { return true }
             if category?.name.localizedCaseInsensitiveContains(query) ?? false { return true }
             if let amountQuery {
                 // Sin signo busca el importe en los dos sentidos; con "-" sólo gastos.
@@ -139,7 +170,7 @@ public struct MovementDay: Hashable, Sendable, Identifiable {
         }
         return order.sorted(by: >).map { day in
             let items = byDay[day] ?? []
-            let total = items.filter { !($0.categoryId.map(transfers.contains) ?? false) }
+            let total = items.filter { !$0.excluded && !($0.categoryId.map(transfers.contains) ?? false) }
                 .reduce(0) { $0 + $1.amount.minor }
             return MovementDay(day: day, movements: items, total: Money(minor: total))
         }

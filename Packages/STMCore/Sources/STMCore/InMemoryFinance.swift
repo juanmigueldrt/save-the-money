@@ -40,6 +40,12 @@ extension InMemoryBackend: FinanceService {
         _ = try requireMember(of: householdId)
         var updated = account
         updated.householdId = householdId
+        if updated.isDefault && !updated.isArchived {
+            // Como en la base de datos: sólo una predeterminada por persona.
+            for other in financeAccounts.indices where financeAccounts[other].id != account.id {
+                financeAccounts[other].isDefault = false
+            }
+        }
         financeAccounts[index] = updated
         return updated
     }
@@ -146,7 +152,8 @@ extension InMemoryBackend: FinanceService {
         return Movement(householdId: householdId, accountId: draft.accountId, categoryId: draft.categoryId,
                         bookedOn: draft.bookedOn, amount: draft.amount,
                         description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
-                        notes: draft.notes, importHash: draft.importHash)
+                        notes: draft.notes, importHash: draft.importHash, excluded: draft.excluded,
+                        payee: Payee.clean(draft.payee), tags: draft.tags)
     }
 
     public func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement {
@@ -161,12 +168,14 @@ extension InMemoryBackend: FinanceService {
         let householdId = financeMovements[index].householdId
         _ = try requireMember(of: householdId)
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
-                                  amount: movement.amount, description: movement.description, notes: movement.notes)
+                                  amount: movement.amount, description: movement.description, notes: movement.notes,
+                                  excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
         var updated = try validated(draft, in: householdId)
         updated = Movement(id: movement.id, householdId: householdId, accountId: updated.accountId,
                            categoryId: updated.categoryId, bookedOn: updated.bookedOn, amount: updated.amount,
                            description: updated.description, notes: updated.notes,
-                           importHash: financeMovements[index].importHash)
+                           importHash: financeMovements[index].importHash, excluded: updated.excluded,
+                           reviewedAt: movement.reviewedAt, payee: updated.payee, tags: updated.tags)
         financeMovements[index] = updated
         return updated
     }
