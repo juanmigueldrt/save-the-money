@@ -171,8 +171,9 @@ struct MovementRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s16) {
+            MerchantBadge(description: movement.description, categoryIcon: finance.category(movement.categoryId)?.icon)
             VStack(alignment: .leading, spacing: 2) {
-                Text(movement.description)
+                Text(MovementText.display(movement.description))
                     .font(Typography.body)
                     .foregroundStyle(Palette.label)
                     .lineLimit(1)
@@ -537,6 +538,8 @@ struct MovementFormView: View {
     @State private var date = Date()
     @State private var selectedAccount: UUID?
     @State private var selectedCategory: UUID?
+    /// Categoría puesta sola por el comercio reconocido (se cambia si el concepto cambia).
+    @State private var autoCategory: UUID?
     @State private var notes = ""
     @State private var error: String?
     @State private var isWorking = false
@@ -555,6 +558,7 @@ struct MovementFormView: View {
                     TextField("Importe, p. ej. 12,50", text: $amount)
                         .decimalInput()
                     TextField("Concepto", text: $concept)
+                        .conceptInput()
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "es_ES"))
                 }
@@ -588,6 +592,7 @@ struct MovementFormView: View {
                     Button("Guardar") { Task { await save() } }.disabled(isWorking)
                 }
             }
+            .onChange(of: concept) { _, newValue in suggestCategory(for: newValue) }
             .onChange(of: isExpense) { _, _ in
                 if let current = finance.category(selectedCategory), current.kind != .transfer, current.kind != kind {
                     selectedCategory = nil
@@ -608,6 +613,15 @@ struct MovementFormView: View {
         selectedAccount = movement.accountId
         selectedCategory = movement.categoryId
         notes = movement.notes ?? ""
+    }
+
+    /// Si el concepto es de un comercio conocido y no hay categoría elegida a mano, la pone sola.
+    private func suggestCategory(for text: String) {
+        if selectedCategory != nil, selectedCategory != autoCategory { return }
+        let suggested = MerchantDirectory.suggestedCategory(for: text, isExpense: isExpense, in: finance.categories,
+                                                            learned: CategoryLearner(movements: finance.recent))
+        selectedCategory = suggested?.id ?? (selectedCategory == autoCategory ? nil : selectedCategory)
+        autoCategory = suggested?.id
     }
 
     private func save() async {
@@ -657,6 +671,15 @@ extension Money {
 }
 
 extension View {
+    /// Concepto de un movimiento: se escribe en mayúsculas, como se enseña.
+    func conceptInput() -> some View {
+        #if os(iOS)
+        self.textInputAutocapitalization(.characters)
+        #else
+        self
+        #endif
+    }
+
     /// Teclado numérico con coma en iPhone.
     func decimalInput() -> some View {
         #if os(iOS)

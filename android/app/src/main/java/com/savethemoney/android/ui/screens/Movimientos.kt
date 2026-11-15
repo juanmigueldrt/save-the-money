@@ -48,7 +48,11 @@ import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.Money
+import com.savethemoney.android.data.CategoryLearner
+import com.savethemoney.android.data.MerchantDirectory
 import com.savethemoney.android.data.Movement
+import com.savethemoney.android.ui.components.MerchantLogo
+import com.savethemoney.android.data.MovementText
 import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.monthEndBalances
 import com.savethemoney.android.ui.Fechas
@@ -274,6 +278,7 @@ fun Pantalla07(nav: Nav) {
     var importe by remember { mutableStateOf(base?.let { Money.format(abs(it.amountMinor)) } ?: form.amountMinor?.let(Money::input) ?: "") }
     var concepto by remember { mutableStateOf(base?.description ?: form.description) }
     var categoria by remember { mutableStateOf(base?.categoryId) }
+    var autoCategoria by remember { mutableStateOf<String?>(null) }
     var cuenta by remember { mutableStateOf(form.accountId ?: base?.accountId ?: finance.activeAccounts.firstOrNull()?.id) }
     var destino by remember { mutableStateOf(form.toAccountId) }
     var fecha by remember { mutableStateOf(base?.day ?: finance.today()) }
@@ -372,7 +377,15 @@ fun Pantalla07(nav: Nav) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Concepto", concepto, { concepto = it })
+        FilledField("Concepto", concepto, { texto ->
+            concepto = MovementText.display(texto)
+            // Comercio conocido o concepto ya usado: pone la categoría sola si no la elegiste a mano.
+            if (tipo == 0 && (categoria == null || categoria == autoCategoria)) {
+                val sugerida = MerchantDirectory.suggestedCategory(concepto, true, finance.categories, CategoryLearner(finance.recent))?.id
+                categoria = sugerida ?: if (categoria == autoCategoria) null else categoria
+                autoCategoria = sugerida
+            }
+        })
         Spacer(Modifier.height(16.dp))
         if (tipo == 2) {
             FilledField("Cuenta de destino", finance.account(destino)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "destino" })
@@ -407,7 +420,7 @@ fun Pantalla08(nav: Nav) {
         topBar = { MovimientosTopBar(nav) },
         bottomBar = { NavBar(Tab.Inicio, nav::tab) },
         overlay = {
-            BottomSheet(m.description, "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
+            BottomSheet(MovementText.display(m.description), "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
                 SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
                 SheetItem(StmIcons.callSplit, "Dividir gasto", onClick = null)
                 SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
@@ -508,7 +521,7 @@ fun Pantalla34(nav: Nav) {
     }
     StmScreen(
         topBar = {
-            TopBar(m.description, onNav = nav::back) {
+            TopBar(MovementText.display(m.description), onNav = nav::back) {
                 IconBtn(StmIcons.edit, editar, contentDescription = "Editar")
                 IconBtn(StmIcons.moreVert, { menu = !menu }, contentDescription = "Más opciones")
             }
@@ -596,10 +609,13 @@ private fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String? 
     val cat = finance.category(m.categoryId)
     val icono = iconoCategoria(cat)
     ListItem(
-        m.description,
+        MovementText.display(m.description),
         detalle ?: listOfNotNull(cat?.name ?: "Sin categoría", finance.account(m.accountId)?.name).joinToString(" · "),
         trailingText = Money.format(m.amountMinor, signed = true),
-        leading = { if (m.isExpense) LeadIcon(icono) else LeadIcon(icono, c.successContainer, c.onSuccessContainer) },
+        leading = {
+            if (m.isExpense) MerchantLogo(m.description, icono)
+            else MerchantLogo(m.description, icono, c.successContainer, c.onSuccessContainer)
+        },
         onClick = onClick,
     )
 }

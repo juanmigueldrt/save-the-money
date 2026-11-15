@@ -29,7 +29,9 @@ struct CSVImportView: View {
 
     private func recompute() {
         guard let table, let mapping, let accountId else { rows = []; return }
-        rows = CSVImporter.rows(in: table, mapping: mapping, accountId: accountId)
+        rows = MerchantDirectory.categorize(CSVImporter.rows(in: table, mapping: mapping, accountId: accountId),
+                                            with: finance.categories,
+                                            learned: CategoryLearner(movements: finance.recent))
         let lines = Set(rows.map(\.line))
         marks = marks.filter { lines.contains($0.key) }
     }
@@ -300,8 +302,9 @@ private struct PreviewRow: View {
 
     private var content: some View {
         HStack {
+            MerchantBadge(description: draft.description, size: 28)
             VStack(alignment: .leading, spacing: 2) {
-                Text(draft.description)
+                Text(MovementText.display(draft.description))
                     .font(Typography.subheadline)
                     .foregroundStyle(Palette.label)
                     .lineLimit(1)

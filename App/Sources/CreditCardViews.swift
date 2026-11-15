@@ -314,7 +314,7 @@ struct CreditCardDetailView: View {
                 if let movement = cards.movements(of: account).first(where: { $0.id == plan.movementId }) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(movement.description)
+                            Text(MovementText.display(movement.description))
                                 .font(Typography.subheadlineEmphasis)
                                 .foregroundStyle(Palette.label)
                             Text("\((-movement.amount).formatted()) en \(plan.months) meses · \(movement.bookedOn.shortText)")
@@ -541,7 +541,7 @@ struct DeferPurchaseView: View {
                     Picker("Compra", selection: $movementId) {
                         Text("Elige una compra").tag(UUID?.none)
                         ForEach(candidates) { movement in
-                            Text("\(movement.description) · \((-movement.amount).formatted())").tag(Optional(movement.id))
+                            Text("\(MovementText.display(movement.description)) · \((-movement.amount).formatted())").tag(Optional(movement.id))
                         }
                     }
                     Picker("Plazo", selection: $months) {

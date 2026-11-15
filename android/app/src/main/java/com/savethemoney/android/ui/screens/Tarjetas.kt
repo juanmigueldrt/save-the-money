@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.data.MovementText
 import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
@@ -359,7 +360,7 @@ fun Pantalla11(nav: Nav) {
         val m = compras.firstOrNull { it.id == plan.movementId } ?: return@mapNotNull null
         val quedan = CreditCardCalculator.remainingInstallments(plan, m, s)
         Plazo11(
-            iconoCategoria(finance.category(m.categoryId)), m.description, "${plan.months} meses · TIN ${tasa(plan.rate)} %",
+            iconoCategoria(finance.category(m.categoryId)), MovementText.display(m.description), "${plan.months} meses · TIN ${tasa(plan.rate)} %",
             when (quedan) { 0 -> "Pagada"; 1 -> "Queda 1 cuota"; else -> "Quedan $quedan cuotas" },
             Money.format(-m.amountMinor), "${Money.format(CardInstallment.payment(-m.amountMinor, plan.months, plan.rate))}/mes",
         ) {
@@ -624,7 +625,7 @@ fun Pantalla13(nav: Nav) {
                     val rate = leerTasa(tin)
                     val cuota = rate?.let { CardInstallment.payment(total, meses[plazo], it) }
                     HojaAplazar(
-                        "Aplazar ${compra.description}", "${Money.format(total)} · ${Fechas.corto(compra.day)}", plazo, { plazo = it }, tin, { tin = it },
+                        "Aplazar ${MovementText.display(compra.description)}", "${Money.format(total)} · ${Fechas.corto(compra.day)}", plazo, { plazo = it }, tin, { tin = it },
                         cuota?.let { "${Money.format(it)}/mes" } ?: "—", cuota?.let { Money.format(it * meses[plazo] - total) } ?: "—", nav::back,
                         {
                             action.run {
@@ -636,7 +637,7 @@ fun Pantalla13(nav: Nav) {
                     )
                 }
                 compraId == null && candidatas.isNotEmpty() -> SelectorSheet(
-                    "Elige una compra", candidatas.map { m -> "${m.description} · ${Money.format(-m.amountMinor)}" to { compraId = m.id } },
+                    "Elige una compra", candidatas.map { m -> "${MovementText.display(m.description)} · ${Money.format(-m.amountMinor)}" to { compraId = m.id } },
                 ) { if (compraId == null) nav.back() }
                 else -> BottomSheet("No se puede aplazar", null, onDismiss = nav::back) {
                     Column(Modifier.padding(horizontal = 16.dp)) {

@@ -57,7 +57,10 @@ import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.CsvImportRow
+import com.savethemoney.android.data.CategoryLearner
 import com.savethemoney.android.data.CsvImporter
+import com.savethemoney.android.data.MerchantDirectory
+import com.savethemoney.android.data.MovementText
 import com.savethemoney.android.data.ImportMark
 import com.savethemoney.android.data.ImportMarks
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -536,7 +539,9 @@ fun Pantalla32(nav: Nav) {
     val m = mapeo
     val filas = remember(t, m, cuenta) {
         val id = cuenta
-        if (t != null && m != null && id != null) CsvImporter.rows(t, m, id) else emptyList()
+        if (t != null && m != null && id != null) {
+            MerchantDirectory.categorize(CsvImporter.rows(t, m, id), finance.categories, CategoryLearner(finance.recent))
+        } else emptyList()
     }
     val validas = filas.mapNotNull { it.draft }
     val previas = filas.filter { it.draft != null }
@@ -679,7 +684,7 @@ fun Pantalla32(nav: Nav) {
                     if (i > 0) Divider(inset = 16.dp)
                     val marca = marcas[fila.line]?.takeIf { it != ImportMark.None }
                     ListItem(
-                        d.description, Fechas.numerica(d.bookedOn) + when (marca) {
+                        MovementText.display(d.description), Fechas.numerica(d.bookedOn) + when (marca) {
                             ImportMark.Recurring -> " · Recurrente, cada mes"
                             ImportMark.Subscription -> " · Suscripción, cada mes"
                             ImportMark.Card -> " · Compra con tarjeta"
