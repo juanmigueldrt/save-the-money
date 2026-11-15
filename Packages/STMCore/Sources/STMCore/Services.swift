@@ -48,6 +48,8 @@ public protocol HouseholdService: Sendable {
     func revokeInvite(_ inviteId: UUID) async throws
     func acceptInvite(_ code: InviteCode) async throws -> Household
     func leave(householdId: UUID) async throws
+    /// Solo el dueño del hogar: saca a otro miembro.
+    func removeMember(_ userId: UUID, from householdId: UUID) async throws
 }
 
 /// Cuentas, categorías y movimientos de un hogar.

@@ -163,6 +163,16 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
+        try await mapped {
+            try await client.from("household_members")
+                .delete()
+                .eq("household_id", value: householdId.uuidString)
+                .eq("user_id", value: userId.uuidString)
+                .execute()
+        }
+    }
+
     // MARK: Errores
 
     /// Ejecuta la llamada y convierte cualquier error en un AppError con mensaje en español.

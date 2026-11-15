@@ -100,10 +100,11 @@ select throws_ok(
   '23505', null, 'una compra sólo se aplaza una vez'
 );
 
--- Bruno, del mismo hogar, lo ve y lo puede cambiar ----------------------------------------
+-- Bruno, del mismo hogar, no ve ni toca la tarjeta de Ana ----------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000b');
-select is((select count(*)::int from public.credit_cards), 1, 'Bruno ve la tarjeta del hogar');
-select lives_ok($$ update public.credit_cards set credit_limit_minor = 250000 $$, 'y puede cambiar el límite');
+select is((select count(*)::int from public.credit_cards), 0, 'Bruno no ve la tarjeta de Ana');
+with cambiados as (update public.credit_cards set credit_limit_minor = 250000 returning 1)
+select is((select count(*)::int from cambiados), 0, 'ni puede cambiar su límite');
 
 -- Carla, de otro hogar, ni lo ve ni lo toca -------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');

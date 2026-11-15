@@ -46,7 +46,7 @@ select is(
 );
 select is(
   (select count(*)::int from public.categories where household_id = (select id from hogar_ana)),
-  20, 'cada hogar nuevo recibe sus categorías'
+  40, 'cada miembro del hogar recibe sus 20 categorías'
 );
 
 -- Ana crea una cuenta y un movimiento ------------------------------------------------
@@ -96,15 +96,14 @@ select throws_ok(
   '23514', null, 'un importe de cero no vale'
 );
 
--- Bruno, del mismo hogar, lo ve todo y puede editar --------------------------------
+-- Bruno, del mismo hogar, no ve ni toca lo de Ana -----------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000b');
-select is((select count(*)::int from public.accounts), 1, 'Bruno ve la cuenta del hogar');
-select is((select count(*)::int from public.transactions), 2, 'Bruno ve los movimientos del hogar');
-update public.transactions set notes = 'Revisado' where description = 'Compra semanal';
-select is(
-  (select notes from public.transactions where description = 'Compra semanal'),
-  'Revisado', 'Bruno puede anotar un movimiento del hogar'
-);
+select is((select count(*)::int from public.accounts), 0, 'Bruno no ve la cuenta de Ana');
+select is((select count(*)::int from public.transactions), 0, 'ni sus movimientos');
+with cambiados as (
+  update public.transactions set notes = 'Revisado' where description = 'Compra semanal' returning 1
+)
+select is((select count(*)::int from cambiados), 0, 'Bruno no puede anotar un movimiento de Ana');
 select throws_ok(
   $$ update public.transactions set household_id = (select id from hogar_carla) $$,
   '42501', null, 'nadie puede mover un movimiento a otro hogar'
@@ -126,7 +125,7 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.transactions (household_id, account_id, booked_on, amount_minor, description)
      select id, (select id from ids where name = 'cuenta'), '2026-10-05', -100, 'Truco' from hogar_carla $$,
-  '23503', null, 'Carla no apunta en una cuenta ajena aunque ponga su hogar'
+  '42501', null, 'Carla no apunta en una cuenta ajena aunque ponga su hogar'
 );
 delete from public.transactions;
 update public.accounts set name = 'Hackeada';
