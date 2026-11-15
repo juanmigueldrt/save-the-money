@@ -71,6 +71,9 @@ import com.savethemoney.android.data.MovementsCsv
 import com.savethemoney.android.ui.compartir
 import com.savethemoney.android.ui.ficheroExportar
 import com.savethemoney.android.data.CsvTable
+import com.savethemoney.android.data.CsvRowReview
+import com.savethemoney.android.data.CsvSavedFormat
+import kotlinx.serialization.json.Json
 import com.savethemoney.android.data.DateOrder
 import com.savethemoney.android.data.ImportResult
 import com.savethemoney.android.data.Money
@@ -527,7 +530,12 @@ fun Pantalla32(nav: Nav) {
     var nombre by remember { mutableStateOf<String?>(null) }
     var tabla by remember { mutableStateOf<CsvTable?>(null) }
     var mapeo by remember { mutableStateOf<CsvMapping?>(null) }
-    var cuenta by remember { mutableStateOf(finance.takeCsvAccount() ?: finance.activeAccounts.firstOrNull()?.id) }
+    var cuenta by remember { mutableStateOf(finance.takeCsvAccount() ?: finance.defaultAccount?.id) }
+    // Revisión fila a fila (por número de línea): no importar, categoría elegida a mano, excluir.
+    var revision by remember { mutableStateOf(CsvRowReview()) }
+    var filaCategoria by remember { mutableStateOf<CsvImportRow?>(null) }
+    // Las columnas salen de un formato de banco ya usado.
+    var formatoGuardado by remember { mutableStateOf(false) }
     var aviso by remember { mutableStateOf<String?>(null) }
     var resultado by remember { mutableStateOf<ImportResult?>(null) }
     var selector by remember { mutableStateOf<String?>(null) }
@@ -544,7 +552,12 @@ fun Pantalla32(nav: Nav) {
         val t = CsvTable.parse(texto)
         nombre = archivo
         tabla = t
-        mapeo = CsvMapping.detect(t)
+        val guardado = if (session.capture) null else CsvSavedFormat.match(t, FormatosCsv.load(context))
+        val conocido = guardado?.mapping
+        mapeo = conocido ?: CsvMapping.detect(t)
+        formatoGuardado = conocido != null
+        guardado?.accountId?.takeIf { id -> finance.activeAccounts.any { it.id == id } }?.let { cuenta = it }
+        revision = CsvRowReview()
         resultado = null
         aviso = null
         marcas = emptyMap()
@@ -568,7 +581,10 @@ fun Pantalla32(nav: Nav) {
             MerchantDirectory.categorize(CsvImporter.rows(t, m, id), finance.categories, CategoryLearner(finance.recent))
         } else emptyList()
     }
-    val validas = filas.mapNotNull { it.draft }
+    LaunchedEffect(filas) { revision = revision.keep(filas.map { it.line }.toSet()) }
+    // Las filas con lo decidido al revisarlas: sin las descartadas y con su categoría o «excluido».
+    val revisadas = revision.apply(filas)
+    val validas = revisadas.mapNotNull { it.draft }
     val previas = filas.filter { it.draft != null }
     val problemas = filas.filter { it.issue != null }
     val anchura = t?.rows?.maxOfOrNull { it.size } ?: 0
@@ -594,10 +610,11 @@ fun Pantalla32(nav: Nav) {
                         action.run {
                             aviso = null
                             creados = null
-                            resultado = finance.importMovements(ImportMarks.drafts(filas, marcas, tarjeta))
+                            resultado = finance.importMovements(ImportMarks.drafts(revisadas, marcas, tarjeta))
+                            if (t != null && m != null && !session.capture) FormatosCsv.remember(context, CsvSavedFormat.of(t, m, cuenta))
                             val fijos = ImportMark.Recurring in marcas.values || ImportMark.Subscription in marcas.values
                             if (fijos) {
-                                val nuevos = ImportMarks.series(filas, marcas, finance.planning.series, finance.planning.household.id)
+                                val nuevos = ImportMarks.series(revisadas, marcas, finance.planning.series, finance.planning.household.id)
                                 nuevos.forEach { finance.planning.save(it) }
                                 creados = nuevos.size
                             }
@@ -614,12 +631,36 @@ fun Pantalla32(nav: Nav) {
                     marcas = marcas + (fila.line to o)
                     cerrar()
                 }
-                BottomSheet("Marcar como", onDismiss = cerrar) {
-                    SheetItem(StmIcons.close, ImportMark.None.title) { marcar(ImportMark.None) }
-                    SheetItem(StmIcons.eventRepeat, ImportMark.Recurring.title) { marcar(ImportMark.Recurring) }
-                    SheetItem(StmIcons.subscriptions, ImportMark.Subscription.title) { marcar(ImportMark.Subscription) }
-                    if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, ImportMark.Card.title) { marcar(ImportMark.Card) }
+                val d = revision.apply(fila.draft!!, fila.line)
+                BottomSheet(MovementText.display(d.description), "${Fechas.numerica(d.bookedOn)} · ${Money.format(d.amountMinor, signed = true)}", onDismiss = cerrar) {
+                    FilaInterruptor("Importar esta fila", null, fila.line !in revision.skipped) { si ->
+                        revision = revision.copy(skipped = if (si) revision.skipped - fila.line else revision.skipped + fila.line)
+                    }
+                    FilaInterruptor("Excluir del presupuesto", null, fila.line in revision.excluded) { si ->
+                        revision = revision.copy(excluded = if (si) revision.excluded + fila.line else revision.excluded - fila.line)
+                    }
+                    SheetItem(StmIcons.category, "Categoría: " + (finance.category(d.categoryId)?.name ?: "Sin categoría")) {
+                        filaCategoria = fila
+                        cerrar()
+                    }
+                    if (d.amountMinor < 0) {
+                        Divider(inset = 16.dp)
+                        SheetItem(StmIcons.close, ImportMark.None.title) { marcar(ImportMark.None) }
+                        SheetItem(StmIcons.eventRepeat, ImportMark.Recurring.title) { marcar(ImportMark.Recurring) }
+                        SheetItem(StmIcons.subscriptions, ImportMark.Subscription.title) { marcar(ImportMark.Subscription) }
+                        if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, ImportMark.Card.title) { marcar(ImportMark.Card) }
+                    }
                 }
+            }
+        } ?: filaCategoria?.let { fila ->
+            {
+                val tipo = if (fila.draft!!.amountMinor < 0) CategoryKind.Expense else CategoryKind.Income
+                fun pon(id: String?) { revision = revision.copy(categories = revision.categories + (fila.line to id)) }
+                SelectorSheet(
+                    "Categoría",
+                    listOf<Pair<String, () -> Unit>>("Sin categoría" to { pon(null) }) +
+                        (finance.categories(tipo) + finance.categories(CategoryKind.Transfer)).map { cat -> cat.name to { pon(cat.id) } },
+                ) { filaCategoria = null }
             }
         } ?: selector?.let { campo ->
             {
@@ -678,6 +719,10 @@ fun Pantalla32(nav: Nav) {
             Btn("Crear una cuenta", { nav.go(9) }, kind = BtnKind.Tonal, icon = StmIcons.add)
         }
         if (m != null) {
+            if (formatoGuardado) {
+                Spacer(Modifier.height(12.dp))
+                Text("Columnas como la última vez con este banco.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            }
             Spacer(Modifier.height(16.dp))
             Text("Qué columna es cada dato", style = StmType.titleSmall, color = c.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
@@ -703,21 +748,33 @@ fun Pantalla32(nav: Nav) {
         if (validas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             ListCard {
-                ListHeader("Vista previa")
+                Row(Modifier.fillMaxWidth().padding(end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.weight(1f)) { ListHeader("Revisa fila a fila") }
+                    if (revision.skipped.isNotEmpty()) {
+                        Text("${revision.skipped.size} sin importar", Modifier.padding(top = 8.dp), style = StmType.labelMedium, color = c.onSurfaceVariant)
+                    }
+                }
                 (if (verTodas) previas else previas.take(10)).forEachIndexed { i, fila ->
-                    val d = fila.draft!!
+                    val d = revision.apply(fila.draft!!, fila.line)
                     if (i > 0) Divider(inset = 16.dp)
                     val marca = marcas[fila.line]?.takeIf { it != ImportMark.None }
-                    ListItem(
-                        MovementText.display(d.description), Fechas.numerica(d.bookedOn) + when (marca) {
-                            ImportMark.Recurring -> " · Recurrente, cada mes"
-                            ImportMark.Subscription -> " · Suscripción, cada mes"
-                            ImportMark.Card -> " · Compra con tarjeta"
-                            else -> ""
+                    val fuera = fila.line in revision.skipped
+                    val detalle = if (fuera) "${Fechas.numerica(d.bookedOn)} · No se importará" else listOfNotNull(
+                        Fechas.numerica(d.bookedOn),
+                        finance.category(d.categoryId)?.name,
+                        if (d.excluded) "Excluido" else null,
+                        when (marca) {
+                            ImportMark.Recurring -> "Recurrente, cada mes"
+                            ImportMark.Subscription -> "Suscripción, cada mes"
+                            ImportMark.Card -> "Compra con tarjeta"
+                            else -> null
                         },
+                    ).joinToString(" · ")
+                    ListItem(
+                        MovementText.display(d.description), detalle,
                         trailingText = Money.format(d.amountMinor, signed = true),
-                        // Solo los gastos se marcan como pago fijo, suscripción o compra con tarjeta.
-                        onClick = if (d.amountMinor < 0) ({ marcando = fila }) else null,
+                        trailingColor = if (fuera) c.onSurfaceVariant else c.onSurface,
+                        onClick = { marcando = fila },
                     )
                 }
                 if (!verTodas && previas.size > 10) ListItem("… y ${previas.size - 10} más", onClick = { verTodas = true })
@@ -728,7 +785,7 @@ fun Pantalla32(nav: Nav) {
             }
             if (!session.capture) {
                 Spacer(Modifier.height(8.dp))
-                Text("Toca un gasto para marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text("Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         if (problemas.isNotEmpty()) {
@@ -756,6 +813,22 @@ fun Pantalla32(nav: Nav) {
                 )
             }
         }
+    }
+}
+
+/** Formatos de banco recordados en este móvil (sólo columnas y cuenta, nunca datos del archivo). */
+private object FormatosCsv {
+    private const val KEY = "formatos"
+    private fun prefs(context: Context) = context.getSharedPreferences("csv", Context.MODE_PRIVATE)
+
+    fun load(context: Context): List<CsvSavedFormat> = try {
+        prefs(context).getString(KEY, null)?.let { Json.decodeFromString<List<CsvSavedFormat>>(it) }.orEmpty()
+    } catch (_: Exception) {
+        emptyList()
+    }
+
+    fun remember(context: Context, format: CsvSavedFormat) {
+        prefs(context).edit().putString(KEY, Json.encodeToString(CsvSavedFormat.remember(format, load(context)))).apply()
     }
 }
 

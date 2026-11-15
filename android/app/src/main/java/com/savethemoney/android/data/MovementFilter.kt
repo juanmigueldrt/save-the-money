@@ -11,6 +11,11 @@ enum class MovementKindFilter(val title: String) {
     All("Todos"), Expense("Gastos"), Income("Ingresos"), Transfer("Transferencias"),
 }
 
+/** Revisados, sin revisar o excluidos del presupuesto. */
+enum class MovementStatusFilter(val title: String) {
+    All("Todos"), Unreviewed("Sin revisar"), Reviewed("Revisados"), Excluded("Excluidos"),
+}
+
 /** Fechas rápidas del filtro de movimientos. */
 enum class MovementDateFilter(val title: String) {
     All("Cualquier fecha"), ThisMonth("Este mes"), LastMonth("El mes pasado"), Last30Days("Últimos 30 días"),
@@ -39,12 +44,17 @@ data class MovementFilter(
     val dates: MovementDateFilter = MovementDateFilter.All,
     val customFrom: LocalDate? = null,
     val customThrough: LocalDate? = null,
-    /** Busca en el concepto, las notas, el nombre de la categoría o el importe ("12,50", "12.5", "-12,50"). */
+    /** Busca en el concepto, las notas, el beneficiario, las etiquetas, el nombre de la categoría o el importe ("12,50", "12.5", "-12,50"). */
     val search: String = "",
+    val status: MovementStatusFilter = MovementStatusFilter.All,
+    /** Sólo los que llevan esta etiqueta. */
+    val tag: String? = null,
 ) {
     /** Cuántos filtros (sin contar la búsqueda) hay puestos, para el icono del menú. */
     val activeCount: Int
-        get() = listOf(accountId != null, kind != MovementKindFilter.All, categoryId != null, dates != MovementDateFilter.All).count { it }
+        get() = listOf(accountId != null, kind != MovementKindFilter.All, categoryId != null, dates != MovementDateFilter.All,
+            status != MovementStatusFilter.All, tag != null,
+        ).count { it }
 
     fun dateRange(today: LocalDate): ClosedRange<LocalDate>? {
         val from = customFrom
@@ -63,6 +73,14 @@ data class MovementFilter(
             if (accountId != null && m.accountId != accountId) return@filter false
             if (categoryId != null && m.categoryId != categoryId) return@filter false
             if (range != null && m.day !in range) return@filter false
+            if (tag != null && tag !in m.tags) return@filter false
+            val statusOk = when (status) {
+                MovementStatusFilter.All -> true
+                MovementStatusFilter.Unreviewed -> !m.isReviewed
+                MovementStatusFilter.Reviewed -> m.isReviewed
+                MovementStatusFilter.Excluded -> m.excluded
+            }
+            if (!statusOk) return@filter false
             val category = byId[m.categoryId]
             val isTransfer = category?.kind == CategoryKind.Transfer
             val kindOk = when (kind) {
@@ -75,6 +93,9 @@ data class MovementFilter(
             if (query.isEmpty()) return@filter true
             if (m.description.contains(query, ignoreCase = true)) return@filter true
             if (m.notes?.contains(query, ignoreCase = true) == true) return@filter true
+            if (m.payee?.contains(query, ignoreCase = true) == true) return@filter true
+            val bareQuery = query.removePrefix("#")
+            if (m.tags.any { it.contains(bareQuery, ignoreCase = true) }) return@filter true
             if (category?.name?.contains(query, ignoreCase = true) == true) return@filter true
             // Sin signo busca el importe en los dos sentidos; con "-" sólo gastos.
             amountQuery != null && if (signed) m.amountMinor == amountQuery else abs(m.amountMinor) == abs(amountQuery)
@@ -89,7 +110,7 @@ data class MovementDay(val day: LocalDate, val movements: List<Movement>, val to
         fun group(movements: List<Movement>, categories: List<BudgetCategory>): List<MovementDay> {
             val transfers = categories.filter { it.kind == CategoryKind.Transfer }.map { it.id }.toSet()
             return movements.groupBy { it.day }.entries.sortedByDescending { it.key }.map { (day, items) ->
-                MovementDay(day, items, items.filter { it.categoryId !in transfers }.sumOf { it.amountMinor })
+                MovementDay(day, items, items.filter { !it.excluded && it.categoryId !in transfers }.sumOf { it.amountMinor })
             }
         }
     }

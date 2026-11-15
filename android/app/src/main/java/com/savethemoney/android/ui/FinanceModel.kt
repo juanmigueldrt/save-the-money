@@ -17,6 +17,9 @@ import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.ImportResult
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDraft
+import com.savethemoney.android.data.MovementTags
+import com.savethemoney.android.data.Payee
+import com.savethemoney.android.data.defaultAccount
 import com.savethemoney.android.data.NoNotifier
 import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.ui.icons.StmIcons
@@ -81,7 +84,8 @@ class FinanceModel(
 
     /** Filtros de la lista de Movimientos; se mantienen al ir y volver de un movimiento. */
     var movementFilter by mutableStateOf(MovementFilter())
-    val totalBalance: Long get() = activeAccounts.sumOf(::balance)
+    /** Patrimonio: saldo de las cuentas activas que cuentan en el patrimonio. */
+    val totalBalance: Long get() = activeAccounts.filter { it.includeInNetWorth }.sumOf(::balance)
     val selectedMovement: Movement? get() = recent.firstOrNull { it.id == selectedMovementId } ?: recent.firstOrNull()
     val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId } ?: activeAccounts.firstOrNull()
 
@@ -96,12 +100,15 @@ class FinanceModel(
 
     private fun thisMonth(m: Movement): Boolean = m.day.withDayOfMonth(1) == today().withDayOfMonth(1)
 
-    /** Lo que ha entrado menos lo que ha salido este mes; las transferencias se compensan. */
-    val netThisMonth: Long get() = recent.filter(::thisMonth).sumOf { it.amountMinor }
+    /** Cambio del patrimonio este mes: lo que ha entrado menos lo que ha salido en las cuentas que cuentan; las transferencias se compensan. */
+    val netThisMonth: Long get() {
+        val ids = activeAccounts.filter { it.includeInNetWorth }.map { it.id }.toSet()
+        return recent.filter { thisMonth(it) && it.accountId in ids }.sumOf { it.amountMinor }
+    }
 
     /** Gasto del mes sin contar transferencias entre cuentas. */
     val spentThisMonth: Long get() = -recent
-        .filter { thisMonth(it) && it.isExpense && category(it.categoryId)?.kind != CategoryKind.Transfer }
+        .filter { thisMonth(it) && it.isExpense && !it.excluded && category(it.categoryId)?.kind != CategoryKind.Transfer }
         .sumOf { it.amountMinor }
 
     fun takeMovementForm(): MovementForm = (movementForm ?: MovementForm()).also { movementForm = null }
@@ -139,7 +146,7 @@ class FinanceModel(
 
     suspend fun movements(account: Account): List<Movement> = service.movements(household.id, account.id, RECENT_LIMIT)
 
-    suspend fun createAccount(draft: AccountDraft) { service.createAccount(draft, household.id); reloadAccounts() }
+    suspend fun createAccount(draft: AccountDraft): Account = service.createAccount(draft, household.id).also { reloadAccounts() }
     suspend fun updateAccount(account: Account) { service.updateAccount(account); reloadAccounts() }
     suspend fun deleteAccount(account: Account) { service.deleteAccount(account.id); reloadAll() }
 
@@ -150,6 +157,26 @@ class FinanceModel(
 
     suspend fun add(draft: MovementDraft) { service.addMovement(draft, household.id); reloadAll() }
     suspend fun update(movement: Movement) { service.updateMovement(movement); reloadAll() }
+
+    /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
+    suspend fun update(movements: List<Movement>) {
+        if (movements.isEmpty()) return
+        movements.forEach { service.updateMovement(it) }
+        reloadAll()
+    }
+
+    /** Borra varios a la vez (sin «Deshacer»: la pantalla pide confirmación antes). */
+    suspend fun delete(movements: List<Movement>) {
+        movements.forEach { service.deleteMovement(it.id) }
+        reloadAll()
+    }
+
+    /** La cuenta que sale elegida al apuntar: la predeterminada o la primera activa. */
+    val defaultAccount: Account? get() = accounts.defaultAccount()
+
+    /** Etiquetas y beneficiarios usados, para sugerir al escribir. */
+    val knownTags: List<String> get() = MovementTags.all(recent)
+    val knownPayees: List<String> get() = Payee.all(recent)
 
     suspend fun delete(movement: Movement) {
         service.deleteMovement(movement.id)

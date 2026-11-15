@@ -45,7 +45,10 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun updateAccount(account: Account): Account = backend.mapped {
-        client.from("accounts").update(AccountChanges(account.name.trim(), account.kind, account.openingMinor, account.ownerId, account.archivedAt)) {
+        client.from("accounts").update(AccountChanges(
+            account.name.trim(), account.kind, account.openingMinor, account.ownerId, account.archivedAt,
+            account.isDefault && !account.isArchived, account.includeInNetWorth,
+        )) {
             select(Columns.raw(ACCOUNT))
             filter { eq("id", account.id) }
         }.decodeSingle()
@@ -106,6 +109,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         movement.toDraft().issue?.let(::fail)
         val changes = MovementChanges(
             movement.accountId, movement.categoryId, movement.bookedOn, movement.amountMinor, movement.description.trim(), movement.notes,
+            movement.excluded, movement.reviewedAt, Payee.clean(movement.payee), movement.tags,
         )
         client.from("transactions").update(changes) {
             select(Columns.raw(MOVEMENT))
@@ -507,9 +511,9 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
         const val BUDGET = "household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
         const val PAGE = 1000
-        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at"
+        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
-        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash"
+        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
 
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500
@@ -616,6 +620,8 @@ private data class AccountChanges(
     @SerialName("opening_balance_minor") val openingMinor: Long,
     @SerialName("owner_id") val ownerId: String?,
     @SerialName("archived_at") val archivedAt: String?,
+    @SerialName("is_default") val isDefault: Boolean,
+    @SerialName("include_in_net_worth") val includeInNetWorth: Boolean,
 )
 
 @Serializable
@@ -644,10 +650,14 @@ private data class NewMovementRow(
     val description: String,
     val notes: String?,
     @SerialName("import_hash") val importHash: String?,
+    val excluded: Boolean,
+    val payee: String?,
+    val tags: List<String>,
 ) {
     companion object {
         fun of(d: MovementDraft, householdId: String) = NewMovementRow(
             householdId, d.accountId, d.categoryId, d.bookedOn.toString(), d.amountMinor, d.description.trim(), d.notes, d.importHash,
+            d.excluded, Payee.clean(d.payee), d.tags,
         )
     }
 }
@@ -660,4 +670,8 @@ private data class MovementChanges(
     @SerialName("amount_minor") val amountMinor: Long,
     val description: String,
     val notes: String?,
+    val excluded: Boolean,
+    @SerialName("reviewed_at") val reviewedAt: String?,
+    val payee: String?,
+    val tags: List<String>,
 )

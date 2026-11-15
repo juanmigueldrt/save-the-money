@@ -32,6 +32,10 @@ data class Account(
     @SerialName("opening_balance_minor") val openingMinor: Long = 0,
     @SerialName("owner_id") val ownerId: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
+    /** La que sale elegida al apuntar un movimiento. */
+    @SerialName("is_default") val isDefault: Boolean = false,
+    /** Si suma en el patrimonio neto. */
+    @SerialName("include_in_net_worth") val includeInNetWorth: Boolean = true,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val isShared: Boolean get() = ownerId == null
@@ -122,11 +126,20 @@ data class Movement(
     val description: String,
     val notes: String? = null,
     @SerialName("import_hash") val importHash: String? = null,
+    /** No cuenta en presupuesto, informes ni flujo (sí en el saldo). */
+    val excluded: Boolean = false,
+    /** Cuándo se marcó como revisado (ISO 8601); nulo = sin revisar. */
+    @SerialName("reviewed_at") val reviewedAt: String? = null,
+    /** A quién se paga o quién paga. */
+    val payee: String? = null,
+    /** Etiquetas en minúsculas, sin «#». */
+    val tags: List<String> = emptyList(),
 ) {
     val day: LocalDate get() = LocalDate.parse(bookedOn.take(10))
     val isExpense: Boolean get() = amountMinor < 0
+    val isReviewed: Boolean get() = reviewedAt != null
 
-    fun toDraft() = MovementDraft(accountId, categoryId, day, amountMinor, description, notes, importHash)
+    fun toDraft() = MovementDraft(accountId, categoryId, day, amountMinor, description, notes, importHash, excluded, payee, tags)
 }
 
 /** Lo que se apunta o se importa, antes de tener id en el servidor. */
@@ -138,6 +151,9 @@ data class MovementDraft(
     val description: String,
     val notes: String? = null,
     val importHash: String? = null,
+    val excluded: Boolean = false,
+    val payee: String? = null,
+    val tags: List<String> = emptyList(),
 ) {
     /** Problema que impide guardarlo, en español, o nulo si es válido. */
     val issue: String? get() {
@@ -147,7 +163,8 @@ data class MovementDraft(
             text.length > 200 -> "El concepto es demasiado largo (máximo 200 caracteres)."
             amountMinor == 0L -> "El importe no puede ser cero."
             notes != null && notes.length > 500 -> "Las notas son demasiado largas (máximo 500 caracteres)."
-            else -> null
+            payee != null && payee.trim().length > 80 -> "El beneficiario es demasiado largo (máximo 80 caracteres)."
+            else -> MovementTags.issue(tags)
         }
     }
 }
@@ -288,7 +305,7 @@ class InMemoryFinance : FinanceService {
         draft.issue?.let(::fail)
         return Movement(
             id(), householdId, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor,
-            draft.description.trim(), draft.notes, draft.importHash,
+            draft.description.trim(), draft.notes, draft.importHash, draft.excluded, null, Payee.clean(draft.payee), draft.tags,
         )
     }
 
@@ -324,6 +341,10 @@ class InMemoryFinance : FinanceService {
     override suspend fun updateAccount(account: Account): Account {
         val i = accounts.indexOfFirst { it.id == account.id }
         if (i < 0) throw AppError.Unknown("cuenta")
+        if (account.isDefault && !account.isArchived) {
+            // Como en la base de datos: sólo una predeterminada.
+            accounts.replaceAll { if (it.id != account.id) it.copy(isDefault = false) else it }
+        }
         accounts[i] = account.copy(name = account.name.trim())
         return accounts[i]
     }
@@ -372,7 +393,7 @@ class InMemoryFinance : FinanceService {
         movement.toDraft().issue?.let(::fail)
         val i = movements.indexOfFirst { it.id == movement.id }
         if (i < 0) throw AppError.Unknown("movimiento")
-        movements[i] = movement.copy(description = movement.description.trim())
+        movements[i] = movement.copy(description = movement.description.trim(), payee = Payee.clean(movement.payee))
         return movements[i]
     }
 
