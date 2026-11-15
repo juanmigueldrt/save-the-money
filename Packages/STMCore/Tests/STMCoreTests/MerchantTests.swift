@@ -35,6 +35,13 @@ final class MerchantTests: XCTestCase {
         let apple = MerchantDirectory.match("APPLE.COM/BILL")
         XCTAssertEqual(apple?.logoURL?.absoluteString, "https://www.google.com/s2/favicons?domain=apple.com&sz=128")
         XCTAssertNil(MerchantDirectory.match("FARMACIA CENTRAL")?.logoURL)
+        let fake = "pk_" + "ejemplo"  // inventada; partida para que gitleaks no la tome por real
+        XCTAssertEqual(apple?.logoURL(logoDevToken: " \(fake) ")?.absoluteString,
+                       "https://img.logo.dev/apple.com?token=\(fake)&size=128&format=png&retina=true")
+        // Una clave secreta o vacía no se usa: se queda el favicon de Google.
+        XCTAssertEqual(apple?.logoURL(logoDevToken: "sk_secreta"), apple?.logoURL)
+        XCTAssertEqual(apple?.logoURL(logoDevToken: ""), apple?.logoURL)
+        XCTAssertEqual(apple?.logoURL(logoDevToken: "pega-aqui"), apple?.logoURL)
     }
 
     func testEveryMerchantPointsToADefaultCategory() {

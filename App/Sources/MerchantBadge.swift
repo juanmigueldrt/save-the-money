@@ -45,13 +45,16 @@ struct MerchantBadge: View {
 actor LogoCache {
     static let shared = LogoCache()
 
+    private let token = AppConfig.fromBundle().logoDevToken
     private var memory: [String: Data] = [:]
     private var failed: Set<String> = []
     private let folder: URL? = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first?
-        .appendingPathComponent("logos", isDirectory: true)
+        .appendingPathComponent(
+        MerchantDirectory.publishableToken(AppConfig.fromBundle().logoDevToken) == nil ? "logos" : "logos-logodev",
+        isDirectory: true)
 
     func data(for merchant: Merchant?) async -> Data? {
-        guard let merchant, let domain = merchant.domain, let url = merchant.logoURL else { return nil }
+        guard let merchant, let domain = merchant.domain, let url = merchant.logoURL(logoDevToken: token) else { return nil }
         return await data(domain: domain, url: url)
     }
 

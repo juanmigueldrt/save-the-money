@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.BuildConfig
 import com.savethemoney.android.data.MerchantDirectory
 import com.savethemoney.android.ui.theme.Stm
 import kotlinx.coroutines.Dispatchers
@@ -65,7 +66,7 @@ object LogoCache {
     suspend fun get(context: Context, domain: String): Bitmap? = lock.withLock {
         memory[domain]?.let { return it }
         if (domain in failed) return null
-        val bitmap = withContext(Dispatchers.IO) { load(File(context.cacheDir, "logos"), domain) }
+        val bitmap = withContext(Dispatchers.IO) { load(File(context.cacheDir, if (MerchantDirectory.publishableToken(BuildConfig.LOGO_DEV_TOKEN) == null) "logos" else "logos-logodev"), domain) }
         if (bitmap == null) failed += domain else memory[domain] = bitmap
         bitmap
     }
@@ -73,7 +74,7 @@ object LogoCache {
     private fun load(folder: File, domain: String): Bitmap? {
         val file = File(folder, "$domain.png")
         if (file.exists()) BitmapFactory.decodeFile(file.path)?.let { return it }
-        val url = MerchantDirectory.all.firstOrNull { it.domain == domain }?.logoUrl ?: return null
+        val url = MerchantDirectory.all.firstOrNull { it.domain == domain }?.logoUrl(BuildConfig.LOGO_DEV_TOKEN) ?: return null
         return runCatching {
             val conn = URL(url).openConnection() as HttpURLConnection
             conn.connectTimeout = 5000

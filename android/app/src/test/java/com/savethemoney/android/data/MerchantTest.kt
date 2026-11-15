@@ -39,6 +39,11 @@ class MerchantTest {
     fun logoOnlyCarriesTheDomain() {
         assertEquals("https://www.google.com/s2/favicons?domain=apple.com&sz=128", MerchantDirectory.match("APPLE.COM/BILL")?.logoUrl)
         assertNull(MerchantDirectory.match("FARMACIA CENTRAL")?.logoUrl)
+        val apple = MerchantDirectory.match("APPLE.COM/BILL")!!
+        val fake = "pk_" + "ejemplo" // inventada; partida para que gitleaks no la tome por real
+        assertEquals("https://img.logo.dev/apple.com?token=$fake&size=128&format=png&retina=true", apple.logoUrl(" $fake "))
+        assertEquals(apple.logoUrl, apple.logoUrl("sk_secreta"))
+        assertEquals(apple.logoUrl, apple.logoUrl(""))
         val defaults = setOf("Vivienda", "Supermercado", "Suministros", "Transporte", "Salud", "Seguros", "Restaurantes", "Ocio", "Compras", "Viajes", "Suscripciones")
         MerchantDirectory.all.forEach { assertTrue(it.name, it.category in defaults); assertFalse(it.name, it.keywords.isEmpty()) }
     }

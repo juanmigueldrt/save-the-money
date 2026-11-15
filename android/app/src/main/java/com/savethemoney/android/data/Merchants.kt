@@ -15,7 +15,15 @@ class Merchant(val name: String, val domain: String?, val category: String, keyw
     val keywords: List<String> = keywords.map(MerchantDirectory::normalize)
 
     /** URL del logo. Sólo viaja el dominio. */
-    val logoUrl: String? get() = domain?.let { "https://www.google.com/s2/favicons?domain=$it&sz=128" }
+    val logoUrl: String? get() = logoUrl(null)
+
+    /** Con la clave publicable de logo.dev (`pk_…`) sale de img.logo.dev; si no, del favicon de Google. */
+    fun logoUrl(logoDevToken: String?): String? {
+        val d = domain ?: return null
+        val token = MerchantDirectory.publishableToken(logoDevToken)
+        return if (token != null) "https://img.logo.dev/$d?token=$token&size=128&format=png&retina=true"
+        else "https://www.google.com/s2/favicons?domain=$d&sz=128"
+    }
 }
 
 /** Texto de los movimientos tal como se enseña: siempre en mayúsculas. Lo guardado no cambia. */
@@ -94,6 +102,12 @@ object MerchantDirectory {
         match(description)?.let { return "@" + it.name }
         return normalize(description).split(" ").filter { w -> w.isNotEmpty() && w.none(Char::isDigit) }
             .take(4).joinToString(" ")
+    }
+
+    /** Sólo se acepta la clave publicable de logo.dev; una secreta (`sk_…`) nunca se usa en la app. */
+    fun publishableToken(token: String?): String? {
+        val t = token?.trim() ?: return null
+        return t.takeIf { it.startsWith("pk_") && it.length > 3 && it.all { c -> c.isLetterOrDigit() || c == '_' || c == '-' } }
     }
 
     /** Mayúsculas, sin tildes y cualquier signo como espacio: "Apple.com/bill" -> "APPLE COM BILL". */
