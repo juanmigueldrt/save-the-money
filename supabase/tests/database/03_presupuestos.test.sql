@@ -66,7 +66,7 @@ select throws_ok(
   format($$ select public.save_budget(%L, '2026-11-01', 1, 50::smallint, 30::smallint, 20::smallint,
             jsonb_build_array(jsonb_build_object('category_id', %L, 'limit_minor', 1))) $$,
          (select id from hogar_carla), (select id from super)),
-  '23503', null, 'ni usar una categoría de otro hogar en el suyo'
+  '42501', null, 'ni usar una categoría de otro hogar en el suyo'
 );
 
 select pg_temp.logout();

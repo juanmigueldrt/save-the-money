@@ -156,4 +156,16 @@ public actor InMemoryBackend: AuthService, HouseholdService {
             users[user]?.profile.defaultHouseholdId = nil
         }
     }
+
+    public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
+        let user = try requireUser()
+        guard memberships.contains(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
+            throw AppError.invalidInput("Solo quien creó el hogar puede quitar a un miembro.")
+        }
+        guard userId != user else { throw AppError.invalidInput("No puedes quitarte a ti mismo.") }
+        memberships.removeAll { $0.userId == userId && $0.householdId == householdId }
+        if users[userId]?.profile.defaultHouseholdId == householdId {
+            users[userId]?.profile.defaultHouseholdId = nil
+        }
+    }
 }

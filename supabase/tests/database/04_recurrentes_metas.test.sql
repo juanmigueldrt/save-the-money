@@ -80,14 +80,12 @@ select throws_ok(
   '42501', null, 'el hogar de una meta no se puede cambiar'
 );
 
--- Bruno, del mismo hogar, lo ve y lo puede tocar ------------------------------------------
+-- Bruno, del mismo hogar, no ve ni toca lo de Ana -----------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000b');
-select is((select count(*)::int from public.recurring_series), 1, 'Bruno ve la suscripción del hogar');
-select is((select count(*)::int from public.goal_contributions), 1, 'y las aportaciones a la meta');
-select lives_ok(
-  $$ update public.recurring_series set amount_minor = 1499 $$,
-  'Bruno cambia el precio de la suscripción'
-);
+select is((select count(*)::int from public.recurring_series), 0, 'Bruno no ve la suscripción de Ana');
+select is((select count(*)::int from public.goal_contributions), 0, 'ni las aportaciones a su meta');
+with cambiados as (update public.recurring_series set amount_minor = 1499 returning 1)
+select is((select count(*)::int from cambiados), 0, 'Bruno no cambia el precio de la suscripción de Ana');
 
 -- Carla, de otro hogar ----------------------------------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');
@@ -102,7 +100,7 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.goal_contributions (household_id, goal_id, amount_minor, made_on)
      select (select id from hogar_carla), (select id from ids where name = 'meta'), 100, '2026-11-01' $$,
-  '23503', null, 'ni aportar a una meta ajena desde su hogar'
+  '42501', null, 'ni aportar a una meta ajena desde su hogar'
 );
 update public.goals set name = 'Cambiada';
 select pg_temp.login('00000000-0000-0000-0000-00000000000a');
