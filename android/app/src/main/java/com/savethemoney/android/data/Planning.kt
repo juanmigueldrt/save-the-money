@@ -391,8 +391,11 @@ object BudgetAlertPlanner {
 
 /** Avisos del dispositivo. No pasan por ningún servidor. */
 interface Notifier {
-    /** Interruptor general de Más opciones. */
+    /** «Avisos de pagos fijos» de Más opciones: los recordatorios antes de cada cargo. */
     var enabled: Boolean
+
+    /** «Avisos de límites del presupuesto» de Más opciones, como en iOS: al 80 % y al pasarse. */
+    var budgetAlertsEnabled: Boolean
 
     /** Sustituye los avisos pendientes cuyo id empieza por [prefix]; sin prefijo, todos. */
     fun replaceReminders(reminders: List<PlannedReminder>, prefix: String = "")
@@ -401,6 +404,7 @@ interface Notifier {
 
 object NoNotifier : Notifier {
     override var enabled = true
+    override var budgetAlertsEnabled = true
     override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) = Unit
     override fun budgetAlerts(alerts: List<BudgetAlert>) = Unit
 }

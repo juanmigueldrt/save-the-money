@@ -90,6 +90,10 @@ class PlanningModel(
             reschedule()
         }
 
+    var budgetAlertsEnabled: Boolean
+        get() = notifier.budgetAlertsEnabled
+        set(value) { notifier.budgetAlertsEnabled = value }
+
     suspend fun save(item: RecurringSeries) {
         item.issue?.let { throw AppError.InvalidInput(it) }
         val saved = if (series.none { it.id == item.id }) service.createRecurring(item) else service.updateRecurring(item)

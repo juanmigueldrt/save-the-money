@@ -31,6 +31,11 @@ class LocalNotifier(private val context: Context) : Notifier {
         get() = prefs.getBoolean(KEY_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_ENABLED, value).apply()
 
+    // Antes había un solo interruptor: si estaba apagado, los límites también empiezan apagados.
+    override var budgetAlertsEnabled: Boolean
+        get() = prefs.getBoolean(KEY_BUDGET, prefs.getBoolean(KEY_ENABLED, true))
+        set(value) = prefs.edit().putBoolean(KEY_BUDGET, value).apply()
+
     override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) {
         val (old, others) = pending().partition { !enabled || it.id.startsWith(prefix) }
         old.forEach { alarms.cancel(alarm(it)) }
@@ -49,7 +54,7 @@ class LocalNotifier(private val context: Context) : Notifier {
     }
 
     override fun budgetAlerts(alerts: List<BudgetAlert>) {
-        if (!enabled) return
+        if (!budgetAlertsEnabled) return
         val sent = prefs.getStringSet(KEY_SENT, emptySet()).orEmpty().toMutableSet()
         val fresh = alerts.filter { it.id !in sent }
         if (fresh.isEmpty()) return
@@ -86,6 +91,7 @@ class LocalNotifier(private val context: Context) : Notifier {
     companion object {
         private const val CHANNEL = "avisos"
         private const val KEY_ENABLED = "activos"
+        private const val KEY_BUDGET = "limites"
         private const val KEY_PENDING = "pendientes"
         private const val KEY_SENT = "enviados"
         const val EXTRA_TITLE = "titulo"
