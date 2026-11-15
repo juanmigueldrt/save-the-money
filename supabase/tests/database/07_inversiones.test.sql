@@ -80,14 +80,16 @@ select throws_ok(
   '42501', null, 'el dueño de un activo tiene que ser del hogar'
 );
 
--- Bruno, del mismo hogar, lo ve y puede actualizar el precio --------------------------
+-- Bruno, del mismo hogar, no ve ni toca lo de Ana --------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000b');
-select is((select count(*)::int from public.holdings), 1, 'Bruno ve el activo del hogar');
-select is((select count(*)::int from public.investment_trades), 1, 'Bruno ve la compra');
-select is((select count(*)::int from public.investment_plans), 1, 'Bruno ve el plan');
-update public.holdings set price = 13.1, price_on = '2026-11-03' where id = (select id from ids where name = 'fondo');
-select is((select price from public.holdings where id = (select id from ids where name = 'fondo')), 13.1::numeric,
-  'Bruno apunta el precio nuevo a mano');
+select is((select count(*)::int from public.holdings), 0, 'Bruno no ve el activo de Ana');
+select is((select count(*)::int from public.investment_trades), 0, 'ni la compra');
+select is((select count(*)::int from public.investment_plans), 0, 'ni el plan');
+with cambiados as (
+  update public.holdings set price = 13.1, price_on = '2026-11-03'
+  where id = (select id from ids where name = 'fondo') returning 1
+)
+select is((select count(*)::int from cambiados), 0, 'Bruno no cambia el precio del activo de Ana');
 select throws_ok(
   $$ update public.holdings set household_id = (select id from hogar_carla) $$,
   '42501', null, 'el hogar de un activo no se puede cambiar'
@@ -106,11 +108,11 @@ select throws_ok(
 select throws_ok(
   $$ insert into public.investment_trades (household_id, holding_id, traded_on, quantity, price)
      select (select id from hogar_carla), (select id from ids where name = 'fondo'), '2026-10-01', 1, 1 $$,
-  '23503', null, 'una operación no puede apuntar a un activo de otro hogar'
+  '42501', null, 'una operación no puede apuntar a un activo de otro hogar'
 );
 update public.holdings set price = 0 where id = (select id from ids where name = 'fondo');
 select pg_temp.login('00000000-0000-0000-0000-00000000000a');
-select is((select price from public.holdings where id = (select id from ids where name = 'fondo')), 13.1::numeric,
+select is((select price from public.holdings where id = (select id from ids where name = 'fondo')), 12.345678::numeric,
   'Carla no puede cambiar el precio de un activo ajeno');
 
 -- Empezar de cero también borra las inversiones -------------------------------------------
