@@ -167,6 +167,23 @@ data class AccountDraft(
     }
 }
 
+/** «Actualizar saldo»: escribes lo que hay de verdad en la cuenta y se apunta un ajuste por la diferencia. */
+object BalanceAdjustment {
+    const val DESCRIPTION = "AJUSTE DE SALDO"
+
+    /**
+     * El movimiento de ajuste, o nulo si el saldo ya coincide.
+     * Va con la categoría de transferencia (si la hay) para que no cuente como gasto ni ingreso.
+     */
+    fun draft(account: Account, current: Long, actual: Long, day: LocalDate, categories: List<BudgetCategory>): MovementDraft? {
+        val difference = actual - current
+        if (difference == 0L) return null
+        val transfer = categories.firstOrNull { it.kind == CategoryKind.Transfer && it.householdId == account.householdId }
+            ?: categories.firstOrNull { it.kind == CategoryKind.Transfer }
+        return MovementDraft(account.id, transfer?.id, day, difference, DESCRIPTION)
+    }
+}
+
 data class ImportResult(val inserted: Int, val duplicates: Int)
 
 /**

@@ -8,6 +8,8 @@ import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.BalanceAdjustment
+import com.savethemoney.android.data.MovementFilter
 import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.FinanceService
@@ -38,11 +40,14 @@ data class MovementForm(
 
 /** Cuentas, saldos, categorías y movimientos del hogar abierto (FinanceModel de iOS). */
 class FinanceModel(
-    val household: Household,
+    household: Household,
     private val service: FinanceService,
     val today: () -> LocalDate = LocalDate::now,
     notifier: Notifier = NoNotifier,
 ) {
+    /** Cambia si el dueño le pone otro nombre; el id es siempre el mismo. */
+    var household by mutableStateOf(household)
+
     val budgets = BudgetModel(household, service, notifier, today)
     val planning = PlanningModel(household, service, notifier, today)
     val cards = CreditCardModel(household, service, notifier, today)
@@ -72,6 +77,10 @@ class FinanceModel(
     var csvAccountId: String? = null
 
     val activeAccounts: List<Account> get() = accounts.filter { !it.isArchived }
+    val archivedAccounts: List<Account> get() = accounts.filter { it.isArchived }
+
+    /** Filtros de la lista de Movimientos; se mantienen al ir y volver de un movimiento. */
+    var movementFilter by mutableStateOf(MovementFilter())
     val totalBalance: Long get() = activeAccounts.sumOf(::balance)
     val selectedMovement: Movement? get() = recent.firstOrNull { it.id == selectedMovementId } ?: recent.firstOrNull()
     val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId } ?: activeAccounts.firstOrNull()
@@ -133,6 +142,11 @@ class FinanceModel(
     suspend fun createAccount(draft: AccountDraft) { service.createAccount(draft, household.id); reloadAccounts() }
     suspend fun updateAccount(account: Account) { service.updateAccount(account); reloadAccounts() }
     suspend fun deleteAccount(account: Account) { service.deleteAccount(account.id); reloadAll() }
+
+    /** «Actualizar saldo»: apunta hoy un ajuste para que el saldo de la cuenta sea [actual]. */
+    suspend fun adjustBalance(account: Account, actual: Long) {
+        BalanceAdjustment.draft(account, balance(account), actual, today(), categories)?.let { add(it) }
+    }
 
     suspend fun add(draft: MovementDraft) { service.addMovement(draft, household.id); reloadAll() }
     suspend fun update(movement: Movement) { service.updateMovement(movement); reloadAll() }

@@ -10,6 +10,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -29,6 +30,8 @@ fun LineChart(
     plotHeight: Dp = 120.dp,
     color: Color = Stm.colors.primary,
     guide: Color = Stm.colors.outlineVariant,
+    /** Línea discontinua y sin área, para una predicción. */
+    dashed: Boolean = false,
 ) {
     Canvas(modifier.height(plotHeight + 20.dp)) {
         val top = 4.dp.toPx()
@@ -43,8 +46,9 @@ fun LineChart(
         val pts = values.mapIndexed { i, v -> Offset(inset + w * i / (values.size - 1), top + h * (1f - v.coerceIn(0f, 1f))) }
         val line = Path().apply { moveTo(pts[0].x, pts[0].y); pts.drop(1).forEach { lineTo(it.x, it.y) } }
         val area = Path().apply { addPath(line); lineTo(pts.last().x, top + h); lineTo(pts[0].x, top + h); close() }
-        drawPath(area, color.copy(alpha = 0.12f))
-        drawPath(line, color, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
+        if (!dashed) drawPath(area, color.copy(alpha = 0.12f))
+        val dash = if (dashed) PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx())) else null
+        drawPath(line, color, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round, pathEffect = dash))
         drawCircle(color, 5.dp.toPx(), pts.last())
     }
 }

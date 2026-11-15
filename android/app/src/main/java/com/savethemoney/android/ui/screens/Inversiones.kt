@@ -719,7 +719,7 @@ fun Pantalla42(nav: Nav) {
 
     val borrador = run {
         val id = activo
-        val money = Money.parse(importe)
+        val money = Money.entered(importe)
         val rate = parseDecimal(rentabilidad)
         if (id == null || money == null || rate == null) null
         else (editando ?: InvestmentPlan("", inv.householdId, id, amountMinor = money, startsOn = inicio.toString())).copy(
@@ -790,7 +790,7 @@ fun Pantalla42(nav: Nav) {
             } else {
                 FilledField("Activo", inv.holding(activo)?.trimmedName ?: "Elige uno", trailing = StmIcons.arrowDropDown, onClick = { selector = "activo" })
             }
-            FilledField("Importe", importe, { importe = it }, keyboard = KeyboardType.Decimal, suffix = "€", autoFocus = editando == null)
+            FilledField("Importe", importe, { importe = it }, keyboard = KeyboardType.Decimal, suffix = "€", autoFocus = editando == null, calculator = true)
             FilledField("Cada", recurrencia.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
             FilledField("Sale de", finance.account(cuenta)?.name ?: "Ninguna cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
             FilledField("Primera aportación", Fechas.largo(inicio, hoy), trailing = StmIcons.arrowDropDown, onClick = { eligeFecha = true })

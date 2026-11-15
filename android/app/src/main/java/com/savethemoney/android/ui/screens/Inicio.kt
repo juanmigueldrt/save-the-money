@@ -18,6 +18,11 @@ import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.Vista
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import com.savethemoney.android.ui.iconoCuenta
 import com.savethemoney.android.ui.components.Avatar
 import com.savethemoney.android.ui.components.Divider
@@ -59,6 +64,12 @@ fun Pantalla04(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = StmIcons.menu, onNav = { nav.tab(Tab.Mas) }) {
+                if (!session.capture) {
+                    IconBtn(
+                        if (Vista.incognito) StmIcons.visibilityOff else StmIcons.visibility, { Vista.setIncognito(!Vista.incognito) },
+                        contentDescription = if (Vista.incognito) "Mostrar importes" else "Ocultar importes",
+                    )
+                }
                 IconBtn(StmIcons.search, { nav.go(5) }, contentDescription = "Buscar")
                 Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(28) }, contentAlignment = Alignment.Center) {
                     Avatar(name.take(1).uppercase(), c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
@@ -143,6 +154,33 @@ fun Pantalla04(nav: Nav) {
                             nav.go(6)
                         },
                     )
+                }
+            }
+        }
+        val archivadas = finance.archivedAccounts
+        if (archivadas.isNotEmpty() && !session.capture) {
+            var abiertas by remember { mutableStateOf(false) }
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListItem(
+                    "Archivadas (${archivadas.size})", if (abiertas) null else "Ábrelas para verlas o desarchivarlas",
+                    trailing = { StmIcon(if (abiertas) StmIcons.arrowDropDown else StmIcons.chevronRight, c.onSurfaceVariant) },
+                    onClick = { abiertas = !abiertas },
+                )
+                if (abiertas) {
+                    archivadas.forEach { cuenta ->
+                        Divider()
+                        ListItem(
+                            cuenta.name, "${cuenta.kind.title} · archivada",
+                            trailingText = Money.format(finance.balance(cuenta)),
+                            trailingColor = c.onSurfaceVariant,
+                            leading = { LeadIcon(iconoCuenta(cuenta.kind)) },
+                            onClick = {
+                                finance.selectedAccountId = cuenta.id
+                                nav.go(6)
+                            },
+                        )
+                    }
                 }
             }
         }

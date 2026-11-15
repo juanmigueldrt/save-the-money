@@ -1,5 +1,8 @@
 package com.savethemoney.android.data
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import kotlin.math.abs
 
 /**
@@ -47,23 +50,51 @@ object Money {
     }
 
     /**
-     * "1.234,56 €". [decimals] false quita los céntimos ("48.230 €"); [signed] pone "+" a los positivos.
+     * Cómo se enseñan los importes en la app (Más opciones > Vista). Es estado de Compose:
+     * al cambiarlo se vuelve a pintar todo lo que muestra importes.
      */
-    fun format(minor: Long, decimals: Boolean = true, signed: Boolean = false, symbol: Boolean = true): String {
+    data class Display(
+        /** Modo incógnito: todos los importes salen como "•••• €". */
+        val hidesAmounts: Boolean = false,
+        /** Sin céntimos: "1.235 €" en vez de "1.234,56 €". */
+        val roundsToUnits: Boolean = false,
+        /** «+» delante de los ingresos donde la app enseña el signo. */
+        val plusSign: Boolean = true,
+    ) {
+        companion object {
+            /** Sin ocultar ni redondear, para PDF, CSV y pruebas. */
+            val Standard = Display()
+        }
+    }
+
+    var display by mutableStateOf(Display.Standard)
+
+    const val HIDDEN = "••••"
+
+    /**
+     * "1.234,56 €". [decimals] false quita los céntimos ("48.230 €"); [signed] pone "+" a los positivos
+     * (si la vista lo permite). Respeta [display] salvo que se pasen otras [options] (p. ej. [Display.Standard] en un PDF).
+     */
+    fun format(minor: Long, decimals: Boolean = true, signed: Boolean = false, symbol: Boolean = true, options: Display = display): String {
+        if (options.hidesAmounts) return HIDDEN + if (symbol) " €" else ""
+        if (options.roundsToUnits && decimals) return format((abs(minor) + 50) / 100 * 100 * (if (minor < 0) -1 else 1), false, signed, symbol, options.copy(roundsToUnits = false))
         val units = abs(minor) / 100
         val cents = abs(minor) % 100
         val grouped = units.toString().reversed().chunked(3).joinToString(".").reversed()
         val number = if (decimals) "$grouped,${cents.toString().padStart(2, '0')}" else grouped
         val sign = when {
             minor < 0 -> MINUS.toString()
-            signed && minor > 0 -> "+"
+            signed && minor > 0 && options.plusSign -> "+"
             else -> ""
         }
         return sign + number + if (symbol) " €" else ""
     }
 
+    /** Lo que se escribe en un campo de importe: un número o una cuenta ("12,50+3×2"). */
+    fun entered(text: String): Long? = parse(text) ?: AmountExpression.evaluate(text)
+
     /** Para un campo de texto: "1500,00" (sin miles ni símbolo, coma decimal). */
-    fun input(minor: Long): String = format(minor, symbol = false).replace(".", "").replace(MINUS, '-')
+    fun input(minor: Long): String = format(minor, symbol = false, options = Display.Standard).replace(".", "").replace(MINUS, '-')
 
     /**
      * Reparte [minor] según porcentajes que suman 100 sin perder céntimos:

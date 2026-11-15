@@ -71,6 +71,8 @@ class MainActivity : ComponentActivity() {
         val capture = intent.getIntExtra("pantalla", 0).takeIf { it in 1..SCREEN_COUNT }
         session = (application as StmApp).session(capture != null)
         handleLink(intent)
+        // Las capturas comparan con el diseño: siempre con la vista normal.
+        if (capture == null) com.savethemoney.android.ui.Vista.load(getSharedPreferences("ajustes", MODE_PRIVATE))
         setContent {
             val prefs = remember { getSharedPreferences("ajustes", MODE_PRIVATE) }
             // Hasta que carga el perfil se usa el último tema, para que no parpadee al abrir.

@@ -35,6 +35,32 @@ object NetWorth {
     }
 }
 
+/** Predicción del patrimonio hasta final de año: sigue el cambio medio mensual de los últimos meses. */
+class NetWorthProjection private constructor(
+    /** Cambio medio al mes que se ha usado. */
+    val monthlyChange: Long,
+    /** Un punto por mes, desde el último real (incluido) hasta diciembre. */
+    val points: List<Pair<YearMonth, Long>>,
+) {
+    val endOfYear: Long get() = points.lastOrNull()?.second ?: 0
+
+    companion object {
+        /**
+         * [history]: patrimonio a final de cada mes, del más antiguo al actual (el último es el mes en curso).
+         * Se usan como mucho los últimos [maxChanges] cambios. Hacen falta al menos 2 puntos, y no se predice en diciembre.
+         */
+        fun of(history: List<NetWorthPoint>, maxChanges: Int = 6): NetWorthProjection? {
+            val last = history.lastOrNull() ?: return null
+            if (history.size < 2 || last.month.monthValue == 12) return null
+            val recent = history.takeLast(maxChanges + 1)
+            val average = Math.round((recent.last().net - recent.first().net).toDouble() / (recent.size - 1))
+            val points = generateSequence(last.month) { it.plusMonths(1) }.takeWhile { it.year == last.month.year }
+                .mapIndexed { i, month -> month to last.net + average * i }.toList()
+            return NetWorthProjection(average, points)
+        }
+    }
+}
+
 /** Score apuntado a mano. Es personal: sólo lo ve quien lo apunta. */
 @Serializable
 data class CreditScore(
@@ -74,6 +100,34 @@ enum class ReportKind(val title: String) { Expense("Gastos"), Income("Ingresos")
 enum class ReportPeriod(val title: String) {
     ThisMonth("Este mes"), LastMonth("El mes pasado"), Last3Months("Últimos 3 meses"), Last6Months("Últimos 6 meses"), ThisYear("Este año"), Last12Months("Últimos 12 meses");
 
+    /**
+     * El mismo tramo justo antes, para comparar: este mes hasta hoy frente al mes pasado hasta el mismo día,
+     * los últimos 3 meses frente a los 3 anteriores, este año hasta hoy frente al año pasado hasta el mismo día.
+     */
+    fun previousRange(today: LocalDate): ClosedRange<LocalDate> {
+        val current = range(today)
+        val shift = when (this) {
+            ThisMonth, LastMonth -> 1L
+            Last3Months -> 3L
+            Last6Months -> 6L
+            ThisYear, Last12Months -> 12L
+        }
+        val start = current.start.minusMonths(shift)
+        // Un mes completo se compara con el mes anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
+        val end = if (this == LastMonth) YearMonth.from(start).atEndOfMonth() else current.endInclusive.minusMonths(shift)
+        return start..maxOf(start, end)
+    }
+
+    /** "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación. */
+    val previousTitle: String get() = when (this) {
+        ThisMonth -> "el mes pasado a estas alturas"
+        LastMonth -> "el mes anterior"
+        Last3Months -> "los 3 meses anteriores"
+        Last6Months -> "los 6 meses anteriores"
+        ThisYear -> "el año pasado a estas alturas"
+        Last12Months -> "los 12 meses anteriores"
+    }
+
     fun range(today: LocalDate): ClosedRange<LocalDate> {
         val month = YearMonth.from(today)
         return when (this) {
@@ -98,6 +152,21 @@ class SpendingReport(
     val total: Long
     val byCategory: List<Row>
     val byMonth: List<MonthTotal>
+
+    val range: ClosedRange<LocalDate> = range
+
+    /** Días que abarca el informe (los dos extremos incluidos). */
+    val dayCount: Int get() = (java.time.temporal.ChronoUnit.DAYS.between(range.start, range.endInclusive) + 1).toInt()
+
+    /** Media por día del periodo, redondeada al céntimo. */
+    val averagePerDay: Long get() = Math.round(total.toDouble() / maxOf(1, dayCount))
+
+    /** Diferencia frente a otro informe (normalmente el del periodo anterior) y porcentaje; nulo si antes no había nada. */
+    fun change(previous: SpendingReport): Pair<Long, Long?> {
+        val difference = total - previous.total
+        if (previous.total <= 0) return difference to null
+        return difference to Math.round(difference.toDouble() / previous.total * 100)
+    }
 
     val averagePerMonth: Long get() = if (byMonth.isEmpty()) 0 else (total + byMonth.size / 2) / byMonth.size
 

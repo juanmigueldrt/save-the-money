@@ -52,6 +52,9 @@ import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.components.Avatar
 import com.savethemoney.android.ui.components.Btn
+import com.savethemoney.android.ui.components.BottomSheet
+import com.savethemoney.android.ui.components.SheetItem
+import com.savethemoney.android.data.yearlyTotal
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Chip
 import com.savethemoney.android.ui.components.ChipRow
@@ -91,11 +94,16 @@ fun Pantalla20(nav: Nav) {
     val planning = finance.planning
     val c = Stm.colors
     val hoy = planning.today()
-    val porFecha = planning.activeSeries.sortedBy { it.nextDue(hoy) ?: LocalDate.MAX }
+    var buscando by remember { mutableStateOf(false) }
+    var busqueda by remember { mutableStateOf("") }
+    val texto = busqueda.trim()
+    val coincide = { s: RecurringSeries -> texto.isEmpty() || s.trimmedName.contains(texto, ignoreCase = true) }
+    val porFecha = planning.activeSeries.filter(coincide).sortedBy { it.nextDue(hoy) ?: LocalDate.MAX }
     val gastos = porFecha.filter { it.kind != RecurringKind.Income }
     val ingresos = porFecha.filter { it.kind == RecurringKind.Income }
-    val archivados = planning.series.filter { it.isArchived }
+    val archivados = planning.series.filter { it.isArchived && coincide(it) }
     val total = planning.series.monthlyTotal(RecurringKind.Subscription, hoy) + planning.series.monthlyTotal(RecurringKind.Essential, hoy)
+    val anual = planning.series.yearlyTotal(setOf(RecurringKind.Subscription, RecurringKind.Essential), hoy)
     fun editar(s: RecurringSeries?) {
         planning.seriesToEdit = s
         nav.go(21)
@@ -107,10 +115,17 @@ fun Pantalla20(nav: Nav) {
                 TopBar(null, onNav = nav::back) {
                     // El calendario no está en el diseño: en las capturas se queda fuera.
                     if (!session.capture) IconBtn(StmIcons.calendarMonth, { nav.go(43) }, contentDescription = "Calendario de pagos")
-                    IconBtn(StmIcons.search, null, contentDescription = "Buscar")
+                    IconBtn(if (buscando) StmIcons.close else StmIcons.search, {
+                        buscando = !buscando
+                        busqueda = ""
+                    }, contentDescription = if (buscando) "Cerrar búsqueda" else "Buscar")
                 }
             }
             Text("Pagos fijos", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
+            if (buscando) {
+                CampoBusqueda(busqueda, { busqueda = it }, "Nombre del pago", autoFocus = true)
+                Spacer(Modifier.height(16.dp))
+            }
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
         fab = { Fab("Nuevo pago") { editar(null) } },
@@ -122,12 +137,17 @@ fun Pantalla20(nav: Nav) {
                     Text("Este mes", style = StmType.labelMedium, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text(Money.format(total), style = StmType.titleLarge, color = c.onSurface)
+                    if (!session.capture && anual > 0) {
+                        Text("${Money.format(anual)} en los próximos 12 meses", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                    }
                 }
                 Tag(if (gastos.size == 1) "1 pago" else "${gastos.size} pagos")
             }
         }
         Spacer(Modifier.height(16.dp))
-        if (porFecha.isEmpty() && archivados.isEmpty()) {
+        if (texto.isNotEmpty() && porFecha.isEmpty() && archivados.isEmpty()) {
+            Vacio("Ningún pago fijo se llama así.")
+        } else if (porFecha.isEmpty() && archivados.isEmpty()) {
             StmCard {
                 Text(
                     "Apunta suscripciones, alquiler, luz o tu nómina para ver cuánto suman y recibir un aviso antes de cada cobro.",
@@ -195,9 +215,9 @@ fun Pantalla21(nav: Nav) {
 
     fun guardar() = action.run {
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val dinero = Money.parse(amount)?.takeIf { it > 0 } ?: falla("El importe no es válido.")
+        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: falla("El importe no es válido.")
         val conOferta = offer && !esIngreso
-        val oferta = if (conOferta) Money.parse(offerPrice)?.takeIf { it > 0 } ?: falla("El precio de oferta no es válido.") else null
+        val oferta = if (conOferta) Money.entered(offerPrice)?.takeIf { it > 0 } ?: falla("El precio de oferta no es válido.") else null
         val item = (editando ?: RecurringSeries("", planning.household.id, name, amountMinor = dinero, startsOn = fecha.toString())).copy(
             name = name, kind = tipos[kind], amountMinor = dinero, accountId = cuenta, categoryId = categoria,
             every = cada.every, unit = cada.unit, startsOn = fecha.toString(), endsOn = if (conFin) fin.toString() else null,
@@ -271,7 +291,7 @@ fun Pantalla21(nav: Nav) {
             )
             FilledField("Nombre", name, { name = it })
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledField("Importe", amount, { amount = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal)
+                FilledField("Importe", amount, { amount = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
                 FilledField("Cada", periodo(cada), modifier = Modifier.weight(1f), trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
             }
             FilledField(
@@ -289,7 +309,7 @@ fun Pantalla21(nav: Nav) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FilledField(
                             "Precio de oferta", offerPrice, { offerPrice = it }, Modifier.weight(1f),
-                            suffix = "€", keyboard = KeyboardType.Decimal, autoFocus = session.capture,
+                            suffix = "€", keyboard = KeyboardType.Decimal, autoFocus = session.capture, calculator = true,
                         )
                         Stepper(if (charges == 1) "1 cargo" else "$charges cargos", { charges = (charges - 1).coerceAtLeast(1) }, { charges = (charges + 1).coerceAtMost(36) })
                     }
@@ -343,7 +363,8 @@ fun Pantalla22(nav: Nav) {
     val planning = finance.planning
     val c = Stm.colors
     var filter by remember { mutableIntStateOf(0) }
-    val visibles = planning.progress.filter { p ->
+    val archivadas = planning.goals.filter { it.isArchived }.map(planning::progress)
+    val visibles = if (filter == 3) archivadas else planning.progress.filter { p ->
         when (filter) {
             0 -> p.goal.kind == GoalKind.Savings && !p.isReached
             1 -> p.goal.kind == GoalKind.Debt && !p.isReached
@@ -356,7 +377,8 @@ fun Pantalla22(nav: Nav) {
     }
     StmScreen(
         topBar = {
-            TopBar(null, navIcon = null) { IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones") }
+            // En el diseño hay un «más» sin menú; fuera de las capturas no se enseña.
+            TopBar(null, navIcon = null) { if (LocalSession.current.capture) IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones") }
             LargeTitle("Metas", "Fija metas (y cúmplelas)")
         },
         bottomBar = { NavBar(Tab.Metas, nav::tab) },
@@ -367,10 +389,11 @@ fun Pantalla22(nav: Nav) {
             listOf("Ahorro", "Deudas", "Completadas").forEachIndexed { i, label ->
                 Chip(label, selected = i == filter, onClick = { filter = i })
             }
+            if (archivadas.isNotEmpty() || filter == 3) Chip("Archivadas (${archivadas.size})", selected = filter == 3, onClick = { filter = 3 })
         }
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (planning.progress.isEmpty()) {
+            if (planning.progress.isEmpty() && filter != 3) {
                 StmCard {
                     Text("Sin metas todavía", style = StmType.titleMedium, color = c.onSurface)
                     Spacer(Modifier.height(8.dp))
@@ -413,7 +436,13 @@ fun Pantalla23(nav: Nav) {
         value = runCatching { session.backend.members(planning.household.id) }.getOrDefault(emptyList())
     }
     var borrando by remember { mutableStateOf<GoalContribution?>(null) }
+    var opciones by remember { mutableStateOf(false) }
+    var borrarMeta by remember { mutableStateOf(false) }
     val action = rememberAction()
+    val editarMeta = {
+        planning.goalToEdit = goal
+        nav.go(24)
+    }
     StmScreen(
         topBar = {
             TopBar(goal.trimmedName, onNav = nav::back) {
@@ -421,7 +450,7 @@ fun Pantalla23(nav: Nav) {
                     planning.goalToEdit = goal
                     nav.go(24)
                 }, contentDescription = "Editar")
-                IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones")
+                IconBtn(StmIcons.moreVert, { opciones = true }, contentDescription = "Más opciones")
             }
         },
         fab = {
@@ -439,7 +468,44 @@ fun Pantalla23(nav: Nav) {
                     { borrando = null },
                 )
             }
-        },
+        } ?: if (borrarMeta) {
+            {
+                StmDialog(
+                    "¿Borrar esta meta?", "Se borran también sus aportaciones, para todo el hogar. No se puede deshacer.",
+                    icon = StmIcons.deleteForever, onDismiss = { borrarMeta = false },
+                    actions = {
+                        Btn("Cancelar", { borrarMeta = false }, kind = BtnKind.Text)
+                        Btn("Borrar", {
+                            action.run {
+                                planning.delete(goal)
+                                planning.selectedGoalId = null
+                                nav.back()
+                            }
+                        }, kind = BtnKind.Error, enabled = !action.busy)
+                    },
+                )
+            }
+        } else if (opciones) {
+            {
+                BottomSheet(goal.trimmedName, onDismiss = { opciones = false }) {
+                    SheetItem(StmIcons.edit, "Editar") {
+                        opciones = false
+                        editarMeta()
+                    }
+                    SheetItem(StmIcons.visibilityOff, if (goal.isArchived) "Desarchivar" else "Archivar") {
+                        opciones = false
+                        action.run {
+                            planning.setArchived(goal, !goal.isArchived)
+                            if (!goal.isArchived) nav.back()
+                        }
+                    }
+                    SheetItem(StmIcons.delete, "Borrar meta y aportaciones", Stm.colors.error, Stm.colors.error) {
+                        opciones = false
+                        borrarMeta = true
+                    }
+                }
+            }
+        } else null,
     ) {
         Spacer(Modifier.height(8.dp))
         Text(if (goal.kind == GoalKind.Savings) "Ahorrado" else "Pagado", style = StmType.labelMedium, color = c.onSurfaceVariant)
@@ -502,12 +568,12 @@ fun Pantalla24(nav: Nav) {
     var confirmar by remember { mutableStateOf(false) }
     val action = rememberAction()
     val deuda = kind == 1
-    val invalid = target.isNotEmpty() && (Money.parse(target) ?: 0) <= 0
-    val objetivo = Money.parse(target)?.takeIf { it > 0 } ?: base?.targetMinor
+    val invalid = target.isNotEmpty() && (Money.entered(target) ?: 0) <= 0
+    val objetivo = Money.entered(target)?.takeIf { it > 0 } ?: base?.targetMinor
     val limite = fecha
     val necesario = if (limite != null && objetivo != null) {
         GoalProgress(
-            Goal(editando?.id ?: "", "", name, targetMinor = objetivo, startingMinor = Money.parse(starting) ?: 0, targetOn = limite.toString()),
+            Goal(editando?.id ?: "", "", name, targetMinor = objetivo, startingMinor = Money.entered(starting) ?: 0, targetOn = limite.toString()),
             planning.contributions, hoy,
         ).neededMonthly
     } else {
@@ -516,10 +582,10 @@ fun Pantalla24(nav: Nav) {
 
     fun guardar() = action.run {
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val meta = Money.parse(target)?.takeIf { it > 0 } ?: falla(if (deuda) "Indica cuánto se debía." else "Indica cuánto quieres juntar.")
+        val meta = Money.entered(target)?.takeIf { it > 0 } ?: falla(if (deuda) "Indica cuánto se debía." else "Indica cuánto quieres juntar.")
         // Un campo vacío es cero o nada; lo que no se entiende, se avisa.
-        val inicio = if (starting.isBlank()) 0 else Money.parse(starting) ?: falla("Algún importe no es válido.")
-        val previsto = if (plan.isBlank()) null else Money.parse(plan) ?: falla("Algún importe no es válido.")
+        val inicio = if (starting.isBlank()) 0 else Money.entered(starting) ?: falla("Algún importe no es válido.")
+        val previsto = if (plan.isBlank()) null else Money.entered(plan) ?: falla("Algún importe no es válido.")
         val item = (editando ?: Goal("", planning.household.id, name, targetMinor = meta)).copy(
             name = name, kind = if (deuda) GoalKind.Debt else GoalKind.Savings, targetMinor = meta, startingMinor = inicio,
             monthlyPlanMinor = previsto, targetOn = fecha?.toString(), accountId = cuenta,
@@ -573,7 +639,7 @@ fun Pantalla24(nav: Nav) {
             Segmented(listOf("Ahorro", "Pagar deuda"), kind, { kind = it })
             FilledField("Nombre de la meta", name, { name = it }, supporting = "Lo verás en tu lista de metas")
             FilledField(
-                if (deuda) "Cuánto se debía al empezar" else "Importe objetivo", target, { target = it }, keyboard = KeyboardType.Decimal,
+                if (deuda) "Cuánto se debía al empezar" else "Importe objetivo", target, { target = it }, keyboard = KeyboardType.Decimal, calculator = true,
                 trailing = if (invalid) StmIcons.error else null,
                 supporting = if (invalid) "Escribe un importe, por ejemplo 150" else null,
                 error = invalid,
@@ -597,8 +663,8 @@ fun Pantalla24(nav: Nav) {
             }
             // Lo que el diseño no dibuja y iOS sí permite va debajo, para no mover lo anterior.
             if (limite != null) Btn("Quitar la fecha", { fecha = null }, kind = BtnKind.Text)
-            FilledField(if (deuda) "Lo que ya has pagado (opcional)" else "Lo que ya tienes (opcional)", starting, { starting = it }, keyboard = KeyboardType.Decimal)
-            FilledField("Aportación mensual prevista (opcional)", plan, { plan = it }, keyboard = KeyboardType.Decimal)
+            FilledField(if (deuda) "Lo que ya has pagado (opcional)" else "Lo que ya tienes (opcional)", starting, { starting = it }, keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField("Aportación mensual prevista (opcional)", plan, { plan = it }, keyboard = KeyboardType.Decimal, calculator = true)
             FilledField("Cuenta asociada", finance.account(cuenta)?.name ?: "Ninguna", trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
             if (editando != null) {
                 Btn(
@@ -634,7 +700,7 @@ fun Pantalla35(nav: Nav) {
     val ahorro = goal.kind == GoalKind.Savings
 
     fun guardar() = action.run {
-        val dinero = Money.parse(amount)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("El importe no es válido.")
+        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("El importe no es válido.")
         planning.contribute(if (sacar) -dinero else dinero, goal, fecha, nota)
         nav.back()
     }
@@ -648,7 +714,7 @@ fun Pantalla35(nav: Nav) {
         snackbar = action.error?.let { e -> { Snackbar(e) } },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Importe", amount, { amount = it }, suffix = "€", keyboard = KeyboardType.Decimal)
+            FilledField("Importe", amount, { amount = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
             if (ahorro) {
                 ListCard {
                     ListItem("Sacar dinero de la meta", trailing = { StmSwitch(sacar) { sacar = it } })

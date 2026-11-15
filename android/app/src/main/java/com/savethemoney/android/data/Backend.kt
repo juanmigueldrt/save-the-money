@@ -21,9 +21,13 @@ interface Backend {
     suspend fun revokeInvite(inviteId: String)
     suspend fun acceptInvite(code: InviteCode): Household
     suspend fun leave(householdId: String)
+    /** Cambia el nombre del hogar. Sólo puede quien lo creó. */
+    suspend fun renameHousehold(householdId: String, name: String): Household
     /** Solo el dueño del hogar puede quitar a otro miembro. */
     suspend fun removeMember(householdId: String, userId: String)
 }
+
+const val HOUSEHOLD_NAME_ISSUE = "El nombre del hogar tiene que tener entre 1 y 80 letras."
 
 fun HouseholdInvite.isUsable(now: Instant = Instant.now()): Boolean =
     status == InviteStatus.Pending && Instant.parse(expiresAt).isAfter(now)
@@ -86,6 +90,17 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         householdsById[household.id] = household
         memberships += Membership(id(), household.id, user, MemberRole.Owner)
         setDefaultIfMissing(user, household.id)
+        return household
+    }
+
+    override suspend fun renameHousehold(householdId: String, name: String): Household {
+        val user = requireUser()
+        if (memberships.none { it.userId == user && it.householdId == householdId && it.role == MemberRole.Owner }) {
+            throw AppError.InvalidInput("Solo quien creó el hogar puede cambiarle el nombre.")
+        }
+        val valid = validHouseholdName(name) ?: throw AppError.InvalidInput(HOUSEHOLD_NAME_ISSUE)
+        val household = householdsById[householdId]?.copy(name = valid) ?: throw AppError.Unknown("hogar")
+        householdsById[householdId] = household
         return household
     }
 

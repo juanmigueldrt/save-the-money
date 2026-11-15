@@ -29,6 +29,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsBottomHeight
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,6 +64,11 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.foundation.horizontalScroll
+import com.savethemoney.android.data.AmountExpression
+import com.savethemoney.android.data.Money
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -339,6 +347,8 @@ fun FilledField(
     keyboard: KeyboardType = KeyboardType.Text,
     onClick: (() -> Unit)? = null,
     autoFocus: Boolean = false,
+    /** Campo de importe que también hace cuentas ("12,50+3×2"). */
+    calculator: Boolean = false,
 ) {
     val c = Stm.colors
     var focused by remember { mutableStateOf(false) }
@@ -372,6 +382,7 @@ fun FilledField(
             }
         }
         if (supporting != null) Supporting(supporting, error)
+        if (calculator && onValueChange != null) Calculadora(value, onValueChange, focused)
     }
 }
 
@@ -449,6 +460,37 @@ private fun FieldText(value: String, onValueChange: ((String) -> Unit)?, keyboar
             keyboardOptions = KeyboardOptions(keyboardType = if (password) KeyboardType.Password else keyboard),
             visualTransformation = if (password) PasswordVisualTransformation('•') else VisualTransformation.None,
         )
+    }
+}
+
+/**
+ * Debajo de un campo de importe: el resultado de la cuenta ("= 18,50 €") y, con [teclas],
+ * las operaciones que el teclado numérico no trae (+ − × ÷ y paréntesis).
+ */
+@Composable
+fun Calculadora(value: String, onValueChange: (String) -> Unit, teclas: Boolean) {
+    val conCuenta = AmountExpression.hasOperation(value)
+    val resultado = if (conCuenta) AmountExpression.evaluate(value) else null
+    if (conCuenta) {
+        Supporting(resultado?.let { "= " + Money.format(it, options = Money.Display.Standard) } ?: "La cuenta no está completa", resultado == null)
+    }
+    if (!teclas) return
+    Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("+" to "Más", "−" to "Menos", "×" to "Por", "÷" to "Entre", "(" to "Abrir paréntesis", ")" to "Cerrar paréntesis")
+            .forEach { (simbolo, nombre) -> TeclaCalculadora(simbolo, nombre) { onValueChange(value + simbolo) } }
+        if (resultado != null) TeclaCalculadora("=", "Calcular") { onValueChange(Money.input(resultado)) }
+    }
+}
+
+@Composable
+private fun TeclaCalculadora(simbolo: String, nombre: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Box(
+        Modifier.size(48.dp, 40.dp).clip(shape).background(Stm.colors.secondaryContainer)
+            .tap(shape, onClick = onClick).semantics { contentDescription = nombre },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(simbolo, style = StmType.titleMedium, color = Stm.colors.onSecondaryContainer)
     }
 }
 
@@ -531,6 +573,7 @@ fun ListItem(
     leading: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
     trailingText: String? = null,
+    trailingColor: Color = Stm.colors.onSurface,
     supportingColor: Color = Stm.colors.onSurfaceVariant,
     supportingLines: Int = 1,
     onClick: (() -> Unit)? = null,
@@ -552,7 +595,7 @@ fun ListItem(
         }
         if (trailingText != null) {
             Spacer(Modifier.width(16.dp))
-            Text(trailingText, style = StmType.labelLarge, color = Stm.colors.onSurface, textAlign = TextAlign.End)
+            Text(trailingText, style = StmType.labelLarge, color = trailingColor, textAlign = TextAlign.End)
         }
         if (trailing != null) {
             Spacer(Modifier.width(16.dp))
@@ -669,7 +712,8 @@ fun BoxScope.BottomSheet(title: String?, subtitle: String? = null, onDismiss: ()
         Modifier.align(Alignment.BottomCenter).zIndex(2f).fillMaxWidth().shadow(8.dp, shape).clip(shape)
             .background(Stm.colors.surfaceContainerLow)
             .clickable(remember { MutableInteractionSource() }, indication = null) {}
-            .navigationBarsPadding().padding(bottom = 24.dp),
+            // Con un campo dentro, la hoja sube por encima del teclado.
+            .windowInsetsPadding(WindowInsets.ime.union(WindowInsets.navigationBars)).padding(bottom = 24.dp),
     ) {
         Box(Modifier.fillMaxWidth().height(36.dp), contentAlignment = Alignment.Center) {
             Box(Modifier.size(32.dp, 4.dp).clip(CircleShape).background(Stm.colors.onSurfaceVariant))

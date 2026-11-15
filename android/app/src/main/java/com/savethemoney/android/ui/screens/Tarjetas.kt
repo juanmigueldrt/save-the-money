@@ -1,5 +1,8 @@
 package com.savethemoney.android.ui.screens
 
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -486,12 +489,12 @@ fun Pantalla12(nav: Nav) {
             return@run
         }
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val limiteMinor = Money.parse(limite)?.takeIf { it > 0 } ?: falla("El límite no es un importe válido.")
+        val limiteMinor = Money.entered(limite)?.takeIf { it > 0 } ?: falla("El límite no es un importe válido.")
         val revolving = leerTasa(tinAplazado) ?: falla("Revisa los intereses y el pago mínimo.")
         val plazos = leerTasa(tinPlazos) ?: falla("Revisa los intereses y el pago mínimo.")
         val pct = leerTasa(minimoPct) ?: falla("Revisa los intereses y el pago mínimo.")
-        val suelo = Money.parse(minimo.ifBlank { "0" }) ?: falla("El pago mínimo no es un importe válido.")
-        val fija = if (modo == CardPaymentMode.Fixed) Money.parse(cuota)?.takeIf { it > 0 } ?: falla("La cuota no es un importe válido.") else null
+        val suelo = Money.entered(minimo.ifBlank { "0" }) ?: falla("El pago mínimo no es un importe válido.")
+        val fija = if (modo == CardPaymentMode.Fixed) Money.entered(cuota)?.takeIf { it > 0 } ?: falla("La cuota no es un importe válido.") else null
         cards.save(
             CreditCardTerms(
                 cuenta.id, cuenta.householdId, limiteMinor, diaExtracto.toIntOrNull() ?: 0, diaCargo.toIntOrNull() ?: 0, retraso, modo, fija,
@@ -521,7 +524,7 @@ fun Pantalla12(nav: Nav) {
         },
     ) {
         Spacer(Modifier.height(8.dp))
-        FilledField("Límite de crédito", limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal)
+        FilledField("Límite de crédito", limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             FilledField("Día del extracto", diaExtracto, { diaExtracto = it }, Modifier.weight(1f), keyboard = KeyboardType.Number)
@@ -534,7 +537,7 @@ fun Pantalla12(nav: Nav) {
         // Solo aparecen al cambiar la forma de pago, así que el diseño no se mueve.
         if (modo == CardPaymentMode.Fixed) {
             Spacer(Modifier.height(16.dp))
-            FilledField("Cuota al mes", cuota, { cuota = it }, suffix = "€", keyboard = KeyboardType.Decimal)
+            FilledField("Cuota al mes", cuota, { cuota = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         }
         if (modo.isRevolving) {
             Spacer(Modifier.height(16.dp))
@@ -697,12 +700,58 @@ private fun BoxScope.HojaAplazar(
     }
 }
 
-/** Barra con el nombre de la tarjeta que comparten el detalle (11) y el aplazamiento (13). */
+/** Barra con el nombre de la tarjeta que comparten el detalle (11) y el aplazamiento (13); el «más» abre Editar, Archivar y Borrar. */
 @Composable
 private fun DetalleBar(nav: Nav, nombre: String) {
+    val session = LocalSession.current
+    val finance = session.finance
+    val cuenta = finance?.cards?.selected
+    var menu by remember { mutableStateOf(false) }
+    var borrar by remember { mutableStateOf(false) }
+    val action = rememberAction()
+    val c = Stm.colors
     TopBar(nombre, onNav = nav::back) {
         IconBtn(StmIcons.edit, { nav.go(12) }, contentDescription = "Editar condiciones")
-        IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones")
+        Box {
+            IconBtn(StmIcons.moreVert, if (session.capture || cuenta == null) null else ({ menu = true }), contentDescription = "Más opciones")
+            DropdownMenu(menu, { menu = false }, containerColor = c.surfaceContainer) {
+                DropdownMenuItem({ Text("Editar condiciones", color = c.onSurface) }, {
+                    menu = false
+                    nav.go(12)
+                }, leadingIcon = { StmIcon(StmIcons.edit, c.onSurfaceVariant) })
+                DropdownMenuItem({ Text("Archivar tarjeta", color = c.onSurface) }, {
+                    menu = false
+                    val a = cuenta ?: return@DropdownMenuItem
+                    action.run {
+                        finance.updateAccount(a.copy(archivedAt = java.time.Instant.now().toString()))
+                        nav.back()
+                    }
+                }, leadingIcon = { StmIcon(StmIcons.visibilityOff, c.onSurfaceVariant) })
+                DropdownMenuItem({ Text("Borrar tarjeta y movimientos", color = c.error) }, {
+                    menu = false
+                    borrar = true
+                }, leadingIcon = { StmIcon(StmIcons.delete, c.error) })
+            }
+        }
+    }
+    if (borrar && cuenta != null) {
+        AlertDialog(
+            onDismissRequest = { borrar = false },
+            icon = { StmIcon(StmIcons.deleteForever, c.error) },
+            title = { Text("¿Borrar esta tarjeta?", style = StmType.headlineSmall, color = c.onSurface) },
+            text = { Text("Se borran también todos sus movimientos, para todo el hogar. No se puede deshacer.", style = StmType.bodyMedium, color = c.onSurfaceVariant) },
+            containerColor = c.surfaceContainerHigh,
+            dismissButton = { Btn("Cancelar", { borrar = false }, kind = BtnKind.Text) },
+            confirmButton = {
+                Btn("Borrar", {
+                    action.run {
+                        finance.deleteAccount(cuenta)
+                        borrar = false
+                        nav.back()
+                    }
+                }, kind = BtnKind.Error, enabled = !action.busy)
+            },
+        )
     }
 }
 
