@@ -300,6 +300,19 @@ extension Array where Element == RecurringSeries {
         }
     }
 
+    /// Lo que se pagará (o cobrará) en los próximos 12 meses con las series activas de esos tipos:
+    /// cuenta cada cargo con su precio real (oferta incluida) y respeta la fecha de fin.
+    public func yearlyTotal(of kinds: Set<RecurringKind>, from today: CalendarDay) -> Money {
+        let end = today.adding(months: 12).adding(days: -1)
+        var total = 0
+        for series in self where !series.isArchived && kinds.contains(series.kind) {
+            for due in series.occurrences(from: today, through: end) {
+                total += series.amount(on: due).minor
+            }
+        }
+        return Money(minor: total)
+    }
+
     /// Lo que suman al mes las series activas de ese tipo.
     public func monthlyTotal(of kind: RecurringKind, on day: CalendarDay) -> Money {
         filter { !$0.isArchived && $0.kind == kind && ($0.endsOn.map { $0 >= day } ?? true) }

@@ -68,12 +68,24 @@ public struct Money: Hashable, Codable, Sendable {
         self.init(minor: negative ? -total : total, currency: currency)
     }
 
-    /// Texto en formato español: "1.234,56 €".
+    /// Texto en formato español: "1.234,56 €". Respeta `Money.display` (modo incógnito y redondeo).
     public func formatted(locale: Locale = Locale(identifier: "es_ES")) -> String {
+        formatted(locale: locale, options: Money.display)
+    }
+
+    /// Igual, con unas opciones concretas (p. ej. `.standard` para un PDF o un archivo).
+    public func formatted(locale: Locale = Locale(identifier: "es_ES"), options: MoneyDisplayOptions) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = locale
         formatter.currencyCode = currency
+        if options.hidesAmounts {
+            return "•••• " + (formatter.currencySymbol ?? currency)
+        }
+        if options.roundsToUnits {
+            formatter.maximumFractionDigits = 0
+            formatter.minimumFractionDigits = 0
+        }
         let text = formatter.string(from: decimal as NSDecimalNumber) ?? "\(decimal) \(currency)"
         // Signo menos tipográfico (U+2212), como pide el manual, en vez del guion.
         return text.replacingOccurrences(of: "-", with: "\u{2212}")
@@ -126,4 +138,38 @@ extension Money {
 
 private extension Character {
     var isASCIIDigit: Bool { ("0"..."9").contains(self) }
+}
+
+/// Cómo se enseñan los importes en la app (Más opciones > Vista).
+public struct MoneyDisplayOptions: Hashable, Sendable {
+    /// Modo incógnito: todos los importes salen como "•••• €".
+    public var hidesAmounts: Bool
+    /// Sin céntimos: "1.235 €" en vez de "1.234,56 €".
+    public var roundsToUnits: Bool
+
+    public init(hidesAmounts: Bool = false, roundsToUnits: Bool = false) {
+        self.hidesAmounts = hidesAmounts
+        self.roundsToUnits = roundsToUnits
+    }
+
+    /// Sin ocultar ni redondear, para PDF, CSV y pruebas.
+    public static let standard = MoneyDisplayOptions()
+}
+
+extension Money {
+    private static let displayLock = NSLock()
+    nonisolated(unsafe) private static var storedDisplay = MoneyDisplayOptions.standard
+
+    /// Opciones de vista activas. La app las cambia desde Más opciones; por defecto, `.standard`.
+    public static var display: MoneyDisplayOptions {
+        get { displayLock.lock(); defer { displayLock.unlock() }; return storedDisplay }
+        set { displayLock.lock(); storedDisplay = newValue; displayLock.unlock() }
+    }
+
+    /// "+12,50 €" / "−12,50 €": con signo también en positivo (opción «Mostrar +»).
+    public func signedText(options: MoneyDisplayOptions = Money.display) -> String {
+        let magnitude = Money(minor: abs(minor), currency: currency).formatted(options: options)
+        if options.hidesAmounts || minor == 0 { return magnitude }
+        return (minor < 0 ? "\u{2212}" : "+") + magnitude
+    }
 }

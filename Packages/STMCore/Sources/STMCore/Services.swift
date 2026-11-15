@@ -50,6 +50,8 @@ public protocol HouseholdService: Sendable {
     func leave(householdId: UUID) async throws
     /// Solo el dueño del hogar: saca a otro miembro.
     func removeMember(_ userId: UUID, from householdId: UUID) async throws
+    /// Cambia el nombre del hogar. Sólo puede quien lo creó.
+    func renameHousehold(_ householdId: UUID, to name: String) async throws -> Household
 }
 
 /// Cuentas, categorías y movimientos de un hogar.

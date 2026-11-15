@@ -80,17 +80,27 @@ final class TrackingModel {
 
     var reportRange: ClosedRange<CalendarDay> { period.range(today: today()) }
 
+    var previousRange: ClosedRange<CalendarDay> { period.previousRange(today: today()) }
+
     func report(categories: [BudgetCategory]) -> SpendingReport {
         SpendingReport(movements: reportMovements, categories: categories, range: reportRange, kind: kind,
                        categoryIds: categoryFilter)
     }
 
+    /// El mismo informe del periodo anterior, para comparar.
+    func previousReport(categories: [BudgetCategory]) -> SpendingReport {
+        SpendingReport(movements: reportMovements, categories: categories, range: previousRange, kind: kind,
+                       categoryIds: categoryFilter)
+    }
+
     func loadReport() async {
         let budgets = budgets, id = household.id, range = reportRange
+        // Se carga desde el principio del periodo anterior para poder comparar.
+        let from = min(previousRange.lowerBound, range.lowerBound)
         isLoading = true
         defer { isLoading = false }
         await perform {
-            let list = try await budgets.movements(in: id, from: range.lowerBound, through: range.upperBound)
+            let list = try await budgets.movements(in: id, from: from, through: range.upperBound)
             // Si se cambió de periodo mientras cargaba, no se pisa.
             if range == self.reportRange { self.reportMovements = list }
         }

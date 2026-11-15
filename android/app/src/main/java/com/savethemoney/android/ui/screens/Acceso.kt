@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.components.Avatar
 import com.savethemoney.android.ui.components.Btn
+import com.savethemoney.android.ui.components.FilledField
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Divider
 import com.savethemoney.android.ui.components.IconBtn
@@ -238,6 +239,7 @@ fun Pantalla28(nav: Nav) {
     val soyDueno = members.any { it.profile.id == me && it.role == MemberRole.Owner }
     var quitando by remember { mutableStateOf<HouseholdMember?>(null) }
     var saliendo by remember { mutableStateOf(false) }
+    var nombre by remember { mutableStateOf<String?>(null) }
     val action = rememberAction()
     StmScreen(
         topBar = {
@@ -245,9 +247,15 @@ fun Pantalla28(nav: Nav) {
             Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconBtn(StmIcons.arrowBack, nav::back, contentDescription = "Atrás")
                 Spacer(Modifier.weight(1f))
-                IconBtn(StmIcons.edit, null, contentDescription = "Editar")
+                // Sólo el dueño puede cambiar el nombre (RLS de households).
+                if (soyDueno || session.capture) {
+                    IconBtn(StmIcons.edit, { nombre = session.household?.name.orEmpty() }, contentDescription = "Cambiar el nombre del hogar")
+                }
             }
-            Text("Hogar", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
+            Text("Hogar", Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (session.capture) 16.dp else 4.dp), style = StmType.headlineMedium, color = c.onSurface)
+            if (!session.capture) {
+                Text(session.household?.name.orEmpty(), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.bodyLarge, color = c.onSurfaceVariant)
+            }
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
         overlay = quitando?.let { m ->
@@ -269,6 +277,27 @@ fun Pantalla28(nav: Nav) {
                         }, kind = BtnKind.Error, enabled = !action.busy)
                     },
                 ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
+            }
+        } ?: nombre?.let { texto ->
+            {
+                StmDialog(
+                    "Nombre del hogar", "Lo verán todos los miembros.",
+                    onDismiss = { nombre = null },
+                    actions = {
+                        Btn("Cancelar", { nombre = null }, kind = BtnKind.Text)
+                        Btn("Guardar", {
+                            val h = session.household ?: return@Btn
+                            action.run {
+                                session.renameHousehold(h, texto)
+                                nombre = null
+                            }
+                        }, kind = BtnKind.Text, enabled = !action.busy)
+                    },
+                ) {
+                    Spacer(Modifier.height(16.dp))
+                    FilledField("Nombre", texto, { nombre = it }, autoFocus = true)
+                    action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) }
+                }
             }
         } ?: if (saliendo) {
             {

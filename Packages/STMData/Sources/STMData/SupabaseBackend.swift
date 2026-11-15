@@ -163,6 +163,22 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    public func renameHousehold(_ householdId: UUID, to name: String) async throws -> Household {
+        guard let valid = HouseholdName.validated(name) else {
+            throw AppError.invalidInput("El nombre del hogar tiene que tener entre 1 y 80 letras.")
+        }
+        // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila y falla.
+        return try await mapped {
+            try await client.from("households")
+                .update(["name": valid])
+                .eq("id", value: householdId.uuidString)
+                .select(Self.householdColumns)
+                .single()
+                .execute()
+                .value
+        }
+    }
+
     public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
         try await mapped {
             try await client.from("household_members")

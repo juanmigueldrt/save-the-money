@@ -88,6 +88,8 @@ struct MoreView: View {
                 Text("Se guarda en tu perfil. «Automático» sigue el modo claro u oscuro del dispositivo.")
             }
 
+            DisplayOptionsSection()
+
             Section {
                 Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
                     .onChange(of: remindersEnabled) { _, _ in Task { await planning.reschedule() } }

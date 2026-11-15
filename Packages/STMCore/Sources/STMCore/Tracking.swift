@@ -56,6 +56,42 @@ public enum NetWorth {
     }
 }
 
+/// Predicción del patrimonio hasta final de año: sigue el cambio medio mensual de los últimos meses.
+public struct NetWorthProjection: Hashable, Sendable {
+    public struct Point: Hashable, Sendable, Identifiable {
+        public var month: MonthKey
+        public var net: Money
+        public var id: MonthKey { month }
+    }
+
+    /// Cambio medio al mes que se ha usado.
+    public var monthlyChange: Money
+    /// Un punto por mes, desde el último real (incluido) hasta diciembre.
+    public var points: [Point]
+
+    public var endOfYear: Money { points.last?.net ?? .zero }
+
+    /// - Parameter history: patrimonio a final de cada mes, del más antiguo al actual (el último es el mes en curso).
+    ///   Se usan como mucho los últimos 6 cambios. Hacen falta al menos 2 puntos, y no se predice en diciembre.
+    public init?(history: [NetWorthPoint], maxChanges: Int = 6) {
+        guard history.count >= 2, let last = history.last, last.month.month < 12 else { return nil }
+        let recent = Array(history.suffix(maxChanges + 1))
+        let changes = recent.count - 1
+        let total = recent.last!.net.minor - recent.first!.net.minor
+        let average = Int((Double(total) / Double(changes)).rounded())
+        monthlyChange = Money(minor: average)
+        var points = [Point(month: last.month, net: last.net)]
+        var month = last.month
+        var net = last.net.minor
+        while month.month < 12 {
+            month = month.adding(months: 1)
+            net += average
+            points.append(Point(month: month, net: Money(minor: net)))
+        }
+        self.points = points
+    }
+}
+
 // MARK: - Score crediticio
 
 /// Score crediticio apuntado a mano. Es personal: sólo lo ve quien lo apunta.
@@ -180,6 +216,24 @@ public struct SpendingReport: Hashable, Sendable {
     public var byCategory: [Row]
     public var byMonth: [MonthTotal]
 
+    /// Días que abarca el informe (los dos extremos incluidos).
+    public var dayCount: Int { range.lowerBound.days(until: range.upperBound) + 1 }
+
+    /// Media por día del periodo, redondeada al céntimo.
+    public var averagePerDay: Money {
+        let days = max(1, dayCount)
+        return Money(minor: Int((Double(total.minor) / Double(days)).rounded()))
+    }
+
+    /// Cambio frente a otro informe (normalmente el del periodo anterior): diferencia y porcentaje.
+    /// El porcentaje es nil si antes no había nada con qué comparar.
+    public func change(from previous: SpendingReport) -> (difference: Money, percent: Int?) {
+        let difference = total - previous.total
+        guard previous.total.minor > 0 else { return (difference, nil) }
+        let percent = (Double(difference.minor) / Double(previous.total.minor) * 100).rounded()
+        return (difference, Int(percent))
+    }
+
     public var averagePerMonth: Money {
         byMonth.isEmpty ? .zero : Money(minor: (total.minor + byMonth.count / 2) / byMonth.count)
     }
@@ -248,6 +302,38 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
         case .last6Months: "Últimos 6 meses"
         case .thisYear: "Este año"
         case .last12Months: "Últimos 12 meses"
+        }
+    }
+
+    /// El mismo tramo justo antes, para comparar: este mes hasta hoy frente al mes pasado hasta el mismo día,
+    /// los últimos 3 meses frente a los 3 anteriores, este año hasta hoy frente al año pasado hasta el mismo día.
+    public func previousRange(today: CalendarDay = CalendarDay()) -> ClosedRange<CalendarDay> {
+        let current = range(today: today)
+        let shift: Int
+        switch self {
+        case .thisMonth, .lastMonth: shift = 1
+        case .last3Months: shift = 3
+        case .last6Months: shift = 6
+        case .thisYear, .last12Months: shift = 12
+        }
+        let start = current.lowerBound.adding(months: -shift)
+        var end = current.upperBound.adding(months: -shift)
+        // Un mes completo se compara con el mes anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
+        if self == .lastMonth {
+            end = MonthKey(start).adding(months: 1).firstDay.adding(days: -1)
+        }
+        return start...max(start, end)
+    }
+
+    /// "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación.
+    public var previousTitle: String {
+        switch self {
+        case .thisMonth: "el mes pasado a estas alturas"
+        case .lastMonth: "el mes anterior"
+        case .last3Months: "los 3 meses anteriores"
+        case .last6Months: "los 6 meses anteriores"
+        case .thisYear: "el año pasado a estas alturas"
+        case .last12Months: "los 12 meses anteriores"
         }
     }
 

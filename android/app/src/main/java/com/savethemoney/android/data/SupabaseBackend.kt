@@ -127,6 +127,18 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         Unit
     }
 
+    override suspend fun renameHousehold(householdId: String, name: String): Household {
+        val valid = validHouseholdName(name) ?: throw AppError.InvalidInput(HOUSEHOLD_NAME_ISSUE)
+        // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila.
+        val rows = mapped {
+            client.from("households").update(buildJsonObject { put("name", valid) }) {
+                select(Columns.raw(HOUSEHOLD))
+                filter { eq("id", householdId) }
+            }.decodeList<Household>()
+        }
+        return rows.firstOrNull() ?: throw AppError.InvalidInput("Solo quien creó el hogar puede cambiarle el nombre.")
+    }
+
     override suspend fun removeMember(householdId: String, userId: String) = mapped {
         // Sin permiso, RLS no borra nada y no da error: se pide la fila borrada para saberlo.
         val removed = client.from("household_members").delete {

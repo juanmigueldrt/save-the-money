@@ -57,6 +57,9 @@ import com.savethemoney.android.data.CreditScore
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.NetWorth
 import com.savethemoney.android.data.NetWorthPoint
+import com.savethemoney.android.data.NetWorthProjection
+import androidx.compose.ui.platform.LocalContext
+import android.content.Intent
 import com.savethemoney.android.data.ReportKind
 import com.savethemoney.android.data.ReportPeriod
 import com.savethemoney.android.data.SpendingReport
@@ -208,15 +211,15 @@ fun Pantalla15(nav: Nav) {
     var income by remember(inicial) { mutableStateOf(if (inicial.expectedIncome == 0L) "" else Money.input(inicial.expectedIncome)) }
     var template by remember(inicial) { mutableStateOf(inicial.template) }
     val limites = remember(inicial) { mutableStateMapOf<String, String>().apply { inicial.limits.forEach { (k, v) -> put(k, Money.input(v)) } } }
-    val base = Money.parse(income)?.coerceAtLeast(0) ?: 0
+    val base = Money.entered(income)?.coerceAtLeast(0) ?: 0
     val reparto = template.allocate(base)
     val gastos = finance.categories(CategoryKind.Expense)
     val guardar = {
         action.run {
-            val expected = if (income.isBlank()) 0L else Money.parse(income)?.takeIf { it >= 0 }
+            val expected = if (income.isBlank()) 0L else Money.entered(income)?.takeIf { it >= 0 }
                 ?: throw AppError.InvalidInput("Los ingresos previstos no son un importe válido.")
             val parsed = limites.filterValues { it.isNotBlank() }.mapValues { (id, text) ->
-                Money.parse(text)?.takeIf { it >= 0 }
+                Money.entered(text)?.takeIf { it >= 0 }
                     ?: throw AppError.InvalidInput("El límite de ${finance.category(id)?.name ?: "una categoría"} no es un importe válido.")
             }.filterValues { it > 0 }
             budgets.save(inicial.copy(expectedIncome = expected, template = template, limits = parsed))
@@ -235,7 +238,7 @@ fun Pantalla15(nav: Nav) {
         Spacer(Modifier.height(8.dp))
         Segmented(listOf("Por categorías", "Flexible"), mode, { mode = it })
         Spacer(Modifier.height(16.dp))
-        FilledField("Ingresos previstos", income, { income = it }, suffix = "€", keyboard = KeyboardType.Decimal)
+        FilledField("Ingresos previstos", income, { income = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         Spacer(Modifier.height(16.dp))
         StmCard(color = c.surfaceContainerHighest) {
             Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -393,6 +396,26 @@ fun Pantalla17(nav: Nav) {
                 plotHeight = 160.dp,
             )
         }
+        val prevision = if (session.capture || finance.accounts.isEmpty()) null else NetWorthProjection.of(tracking.history(finance.accounts, 7))
+        if (prevision != null) {
+            Spacer(Modifier.height(16.dp))
+            StmCard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("A final de año", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                    Text(euros(prevision.endOfYear), style = StmType.labelLarge, color = if (prevision.endOfYear < 0) c.error else c.onSurface)
+                }
+                Spacer(Modifier.height(8.dp))
+                LineChart(normalizar(prevision.points.map { it.second }), plotHeight = 80.dp, dashed = true)
+                Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                    prevision.points.forEach { (mes, _) -> Text(Fechas.mes(mes.atDay(1)).take(3), style = StmType.labelSmall, color = c.onSurfaceVariant) }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Si sigue como los últimos meses (${euros(prevision.monthlyChange, signed = true)} al mes de media). Es una estimación, no una promesa.",
+                    style = StmType.bodySmall, color = c.onSurfaceVariant,
+                )
+            }
+        }
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListHeader("Activos")
@@ -452,11 +475,22 @@ fun Pantalla18(nav: Nav) {
     val gastos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Expense)
     val tope = (ingresos.byMonth.map { it.amount } + gastos.byMonth.map { it.amount }).max().coerceAtLeast(1)
     val informe = SpendingReport(movimientos, finance.categories, period.range(hoy), kind, setOfNotNull(categoria))
+    val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy), kind, setOfNotNull(categoria))
     val sube = biggestRise(movimientos, finance.categories, YearMonth.from(hoy))
+    val context = LocalContext.current
+    val compartirInforme = {
+        val texto = if (filter == 1) {
+            textoInforme(informe, anterior, period, finance.category(categoria)?.name)
+        } else {
+            textoIngresosGastos(ingresos, gastos)
+        }
+        val envio = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "Informe de Save the Money").putExtra(Intent.EXTRA_TEXT, texto)
+        context.startActivity(Intent.createChooser(envio, "Compartir informe"))
+    }
     StmScreen(
         topBar = {
             TopBar("Informes", onNav = nav::back) {
-                if (session.capture) IconBtn(StmIcons.iosShare, { nav.go(19) }, contentDescription = "Compartir")
+                IconBtn(StmIcons.iosShare, if (session.capture) null else compartirInforme, contentDescription = "Compartir")
             }
         },
         snackbar = tracking.error?.let { e -> { Snackbar(e) } },
@@ -497,10 +531,15 @@ fun Pantalla18(nav: Nav) {
                 Text("${kind.title} · ${period.title.lowercase()}", style = StmType.labelMedium, color = c.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text(Money.format(informe.total), style = StmType.displaySmall, color = c.onSurface)
-                if (informe.byMonth.size > 1) {
+                comparacion(informe, anterior, period)?.let { (texto, bueno) ->
                     Spacer(Modifier.height(4.dp))
-                    Text("Media de ${Money.format(informe.averagePerMonth)} al mes", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                    Text(texto, style = StmType.labelLarge, color = when (bueno) { null -> c.onSurfaceVariant; true -> c.success; false -> c.error })
                 }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    (if (informe.byMonth.size > 1) "Media de ${Money.format(informe.averagePerMonth)} al mes · " else "") + "${Money.format(informe.averagePerDay)} al día",
+                    style = StmType.bodyMedium, color = c.onSurfaceVariant,
+                )
             }
             Spacer(Modifier.height(16.dp))
             if (informe.byCategory.isEmpty()) {
@@ -575,6 +614,47 @@ fun Pantalla18(nav: Nav) {
             }
         }
     }
+}
+
+/**
+ * "+12 % · +40,00 € frente al mes pasado a estas alturas". En gastos, subir es malo; en ingresos, bueno.
+ * Devuelve el texto y si es buena noticia (nulo si no cambia), o nulo si no hay nada que comparar.
+ */
+private fun comparacion(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod): Pair<String, Boolean?>? {
+    if (informe.total <= 0 && anterior.total <= 0) return null
+    val (diferencia, porcentaje) = informe.change(anterior)
+    if (diferencia == 0L) return "Igual que ${period.previousTitle}" to null
+    val sube = diferencia > 0
+    val pct = porcentaje?.let { (if (it > 0) "+" else "") + "$it % · " } ?: ""
+    return "$pct${Money.format(diferencia, signed = true, options = Money.display.copy(plusSign = true))} frente a ${period.previousTitle}" to
+        (if (informe.kind == ReportKind.Expense) !sube else sube)
+}
+
+/** El informe por categorías en texto, siempre con importes completos (no respeta el modo incógnito). */
+private fun textoInforme(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod, categoria: String?): String {
+    val e = { minor: Long -> Money.format(minor, options = Money.Display.Standard) }
+    val (diferencia, porcentaje) = informe.change(anterior)
+    return buildString {
+        appendLine("${informe.kind.title} · ${period.title}" + (categoria?.let { " · $it" } ?: ""))
+        appendLine("Del ${Fechas.numerica(informe.range.start)} al ${Fechas.numerica(informe.range.endInclusive)}")
+        appendLine("Total: ${e(informe.total)}")
+        appendLine("Media por día: ${e(informe.averagePerDay)}")
+        appendLine("Frente a ${period.previousTitle}: ${Money.format(diferencia, signed = true, options = Money.Display.Standard)}" + (porcentaje?.let { " ($it %)" } ?: ""))
+        if (informe.byCategory.isNotEmpty()) appendLine()
+        informe.byCategory.forEach { appendLine("${it.title}: ${e(it.amount)} (${Math.round(it.share * 100)} %, ${it.count} movimientos)") }
+    }.trimEnd()
+}
+
+/** Ingresos y gastos de los últimos 6 meses en texto, con importes completos. */
+private fun textoIngresosGastos(ingresos: SpendingReport, gastos: SpendingReport): String {
+    val e = { minor: Long -> Money.format(minor, options = Money.Display.Standard) }
+    return buildString {
+        appendLine("Ingresos y gastos · últimos 6 meses")
+        ingresos.byMonth.zip(gastos.byMonth).forEach { (i, g) ->
+            appendLine("${Fechas.mesTitulo(i.month.atDay(1))} ${i.month.year}: ingresos ${e(i.amount)}, gastos ${e(g.amount)}")
+        }
+        appendLine("Ahorro medio al mes: ${Money.format(ingresos.averagePerMonth - gastos.averagePerMonth, signed = true, options = Money.Display.Standard)}")
+    }.trimEnd()
 }
 
 /** 19 Score crediticio: indicador con la última puntuación e historial de las apuntadas a mano. */

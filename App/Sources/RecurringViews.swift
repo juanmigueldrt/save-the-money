@@ -59,6 +59,9 @@ struct RecurringView: View {
                 .titleFont(.largeTitle)
                 .foregroundStyle(Palette.label)
                 .contentTransition(.numericText())
+            Text("\(planning.yearlyFixedTotal.formatted()) en los próximos 12 meses")
+                .font(Typography.subheadline)
+                .foregroundStyle(Palette.labelSecondary)
             HStack(spacing: Spacing.s16) {
                 ForEach(RecurringKind.allCases, id: \.self) { kind in
                     VStack(alignment: .leading, spacing: Spacing.s8) {
@@ -329,7 +332,7 @@ struct RecurringFormView: View {
     }
 
     private func build() -> RecurringSeries? {
-        guard let money = Money(parsing: amount), money.minor > 0 else {
+        guard let money = Money(entered: amount), money.minor > 0 else {
             error = "El importe no es válido."
             return nil
         }
@@ -345,7 +348,7 @@ struct RecurringFormView: View {
         item.categoryId = categoryId
         item.remindDaysBefore = reminds ? remindDays : nil
         if hasIntro && kind != .income {
-            guard let intro = Money(parsing: introAmount), intro.minor > 0 else {
+            guard let intro = Money(entered: introAmount), intro.minor > 0 else {
                 error = "El precio de oferta no es válido."
                 return nil
             }

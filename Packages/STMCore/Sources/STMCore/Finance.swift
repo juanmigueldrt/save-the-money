@@ -387,3 +387,21 @@ struct ServerDate: Codable {
         try c.encode(ISO8601DateFormatter().string(from: date))
     }
 }
+
+/// «Actualizar saldo»: escribes lo que hay de verdad en la cuenta y se apunta un ajuste por la diferencia.
+public enum BalanceAdjustment {
+    public static let description = "AJUSTE DE SALDO"
+
+    /// El movimiento de ajuste, o nil si el saldo ya coincide.
+    /// Va con la categoría de transferencia (si la hay) para que no cuente como gasto ni ingreso.
+    public static func draft(account: Account, current: Money, actual: Money, on day: CalendarDay,
+                             categories: [BudgetCategory]) -> MovementDraft? {
+        let difference = actual.minor - current.minor
+        guard difference != 0 else { return nil }
+        let transfer = categories.first { $0.kind == .transfer && $0.householdId == account.householdId }
+            ?? categories.first { $0.kind == .transfer }
+        return MovementDraft(accountId: account.id, categoryId: transfer?.id, bookedOn: day,
+                             amount: Money(minor: difference, currency: account.currency),
+                             description: description)
+    }
+}

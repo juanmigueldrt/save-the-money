@@ -96,6 +96,13 @@ final class SessionModel {
         await refresh()
     }
 
+    func renameHousehold(_ household: Household, to name: String) async throws {
+        let renamed = try await services.households.renameHousehold(household.id, to: name)
+        if case .ready(let profile, let current) = state, current.id == renamed.id {
+            state = .ready(profile, renamed)
+        }
+    }
+
     func leaveHousehold(_ household: Household) async throws {
         try await services.households.leave(householdId: household.id)
         await refresh()

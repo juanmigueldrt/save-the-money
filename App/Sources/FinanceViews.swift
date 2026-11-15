@@ -76,6 +76,19 @@ struct SummaryView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        if !finance.archivedAccounts.isEmpty {
+                            DisclosureGroup("Archivadas (\(finance.archivedAccounts.count))") {
+                                ForEach(finance.archivedAccounts) { account in
+                                    NavigationLink(value: account) {
+                                        AccountRow(account: account, balance: finance.balance(of: account))
+                                    }
+                                    .buttonStyle(.plain)
+                                    .padding(.top, Spacing.s8)
+                                }
+                            }
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.labelSecondary)
+                        }
                     }
                     .card()
                 } trailing: {
@@ -110,6 +123,7 @@ struct SummaryView: View {
                 Button("Nuevo movimiento", systemImage: "plus") { addingMovement = true }
                     .disabled(finance.activeAccounts.isEmpty)
             }
+            ToolbarItem(placement: .secondaryAction) { IncognitoButton() }
         }
         .refreshable { await finance.load() }
         .sheet(isPresented: $addingAccount) { AccountFormView(account: nil) }
@@ -159,14 +173,25 @@ struct AccountRow: View {
 struct MovementRow: View {
     let movement: Movement
     var showsAccount = false
+    /// En la lista agrupada por día la fecha ya está en la cabecera.
+    var showsDate = true
 
     @Environment(FinanceModel.self) private var finance
 
     private var subtitle: String {
-        var parts = [movement.bookedOn.shortText]
+        var parts = showsDate ? [movement.bookedOn.shortText] : []
         if let category = finance.category(movement.categoryId) { parts.append(category.name) }
         if showsAccount, let account = finance.account(movement.accountId) { parts.append(account.name) }
         return parts.joined(separator: " · ")
+    }
+
+    @AppStorage(DisplayPreferences.plusSignKey) private var showsPlusSign = false
+    @AppStorage(DisplayPreferences.colorAmountsKey) private var colorsAmounts = true
+
+    /// Ingresos en verde y gastos en tinta; con «Colorear importes» apagado, todo en tinta.
+    private var amountColor: Color {
+        guard colorsAmounts else { return Palette.label }
+        return movement.isExpense ? Palette.label : Palette.positiveText
     }
 
     var body: some View {
@@ -183,9 +208,9 @@ struct MovementRow: View {
                     .lineLimit(1)
             }
             Spacer()
-            Text(movement.amount.formatted())
+            Text(showsPlusSign ? movement.amount.signedText() : movement.amount.formatted())
                 .font(Typography.headline)
-                .foregroundStyle(movement.isExpense ? Palette.label : Palette.positiveText)
+                .foregroundStyle(amountColor)
         }
         .accessibilityElement(children: .combine)
     }
@@ -202,50 +227,62 @@ struct EmptyHint: View {
     }
 }
 
-/// Lista de movimientos agrupada por mes, con búsqueda. Sin cuenta: todos los del hogar.
+/// Lista de movimientos agrupada por día (con lo que suma cada día), búsqueda por concepto o importe
+/// y filtros de cuenta, tipo, categoría y fechas. Sin cuenta: todos los del hogar.
 struct MovementsView: View {
     var account: Account?
 
     @Environment(FinanceModel.self) private var finance
     @State private var accountMovements: [Movement] = []
-    @State private var search = ""
+    @State private var filter = MovementFilter()
+    @State private var customFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var customThrough = Date()
     @State private var editing: Movement?
     @State private var adding = false
     @State private var transferring = false
-    /// Filtro por categoría, como en Android.
-    @State private var categoryFilter: UUID?
 
-    private var source: [Movement] {
-        let all = account == nil ? finance.recent : accountMovements
-        guard let categoryFilter else { return all }
-        return all.filter { $0.categoryId == categoryFilter }
+    private var source: [Movement] { account == nil ? finance.recent : accountMovements }
+
+    private var effectiveFilter: MovementFilter {
+        var current = filter
+        if let account { current.accountId = account.id }
+        if current.dates == .custom {
+            current.customFrom = CalendarDay(customFrom)
+            current.customThrough = CalendarDay(customThrough)
+        }
+        return current
     }
 
     private var filtered: [Movement] {
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return source }
-        return source.filter {
-            $0.description.localizedCaseInsensitiveContains(query)
-                || (finance.category($0.categoryId)?.name.localizedCaseInsensitiveContains(query) ?? false)
-        }
+        effectiveFilter.apply(to: source, categories: finance.categories)
     }
 
-    private var months: [(key: MonthKey, items: [Movement])] {
-        Dictionary(grouping: filtered) { MonthKey(year: $0.bookedOn.year, month: $0.bookedOn.month) }
-            .map { (key: $0.key, items: $0.value) }
-            .sorted { $0.key > $1.key }
+    private var isFiltering: Bool {
+        filter.activeCount > 0 || !filter.search.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
     var body: some View {
+        let days = MovementDay.group(filtered, categories: finance.categories)
         List {
+            if filter.dates == .custom {
+                Section {
+                    DatePicker("Desde", selection: $customFrom, displayedComponents: .date)
+                    DatePicker("Hasta", selection: $customThrough, displayedComponents: .date)
+                }
+                .environment(\.locale, Locale(identifier: "es_ES"))
+            }
             if source.isEmpty {
                 EmptyHint(text: "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+            } else if isFiltering {
+                Section {
+                    filterSummary
+                }
             }
-            ForEach(months, id: \.key) { month in
-                Section(month.key.title) {
-                    ForEach(month.items) { movement in
+            ForEach(days) { day in
+                Section {
+                    ForEach(day.movements) { movement in
                         Button { editing = movement } label: {
-                            MovementRow(movement: movement, showsAccount: account == nil)
+                            MovementRow(movement: movement, showsAccount: account == nil, showsDate: false)
                         }
                         .buttonStyle(.plain)
                         .swipeActions {
@@ -267,10 +304,25 @@ struct MovementsView: View {
                             }
                         }
                     }
+                } header: {
+                    HStack {
+                        Text(day.day.dayHeader)
+                        Spacer()
+                        if day.total.minor != 0 {
+                            Text(day.total.signedText())
+                                .monospacedDigit()
+                        }
+                    }
+                    .accessibilityElement(children: .combine)
                 }
             }
+            if account == nil, finance.recent.count >= FinanceModel.recentLimit {
+                Text("Se muestran los últimos \(FinanceModel.recentLimit) movimientos. Para ver más antiguos, abre la cuenta o usa Informes.")
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
+            }
         }
-        .searchable(text: $search, prompt: "Buscar concepto o categoría")
+        .searchable(text: $filter.search, prompt: "Buscar concepto, categoría o importe")
         .brandBackground()
         .navigationTitle(account?.name ?? "Movimientos")
         .toolbar {
@@ -282,7 +334,7 @@ struct MovementsView: View {
                 Button("Transferencia", systemImage: "arrow.left.arrow.right") { transferring = true }
                     .disabled(finance.activeAccounts.count < 2)
             }
-            ToolbarItem(placement: .secondaryAction) { categoryMenu }
+            ToolbarItem(placement: .secondaryAction) { filterMenu }
         }
         .safeAreaInset(edge: .bottom) { undoBar }
         .task(id: finance.recent) { await reloadAccount() }
@@ -292,15 +344,59 @@ struct MovementsView: View {
         .sheet(isPresented: $transferring) { TransferFormView(fromId: account?.id) }
     }
 
-    private var categoryMenu: some View {
+    /// "12 movimientos · −340,20 € gastos · +1.200,00 € ingresos" de lo filtrado.
+    private var filterSummary: some View {
+        let report = filtered
+        let transfers = Set(finance.categories(for: .transfer).map(\.id))
+        let counted = report.filter { !($0.categoryId.map(transfers.contains) ?? false) }
+        let spent = Money(minor: counted.filter(\.amount.isNegative).reduce(0) { $0 + $1.amount.minor })
+        let earned = Money(minor: counted.filter { !$0.amount.isNegative }.reduce(0) { $0 + $1.amount.minor })
+        return VStack(alignment: .leading, spacing: Spacing.s4) {
+            Text(report.count == 1 ? "1 movimiento" : "\(report.count) movimientos")
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.label)
+            HStack(spacing: Spacing.s16) {
+                Text("Gastos " + spent.signedText())
+                Text("Ingresos " + earned.signedText())
+            }
+            .font(Typography.footnote)
+            .foregroundStyle(Palette.labelSecondary)
+            Button("Quitar filtros") {
+                filter = MovementFilter()
+            }
+            .font(Typography.footnote)
+        }
+        .accessibilityElement(children: .contain)
+    }
+
+    private var filterMenu: some View {
         Menu {
-            Picker("Categoría", selection: $categoryFilter) {
+            if account == nil {
+                Picker("Cuenta", selection: $filter.accountId) {
+                    Text("Todas las cuentas").tag(UUID?.none)
+                    ForEach(finance.accounts) { Text($0.name).tag(Optional($0.id)) }
+                }
+            }
+            Picker("Tipo", selection: $filter.kind) {
+                ForEach(MovementKindFilter.allCases) { Text($0.title).tag($0) }
+            }
+            Picker("Categoría", selection: $filter.categoryId) {
                 Text("Todas las categorías").tag(UUID?.none)
                 ForEach(finance.categories) { Text($0.name).tag(Optional($0.id)) }
             }
+            Picker("Fechas", selection: $filter.dates) {
+                ForEach(MovementDateFilter.allCases) { Text($0.title).tag($0) }
+            }
+            if filter.activeCount > 0 {
+                Divider()
+                Button("Quitar filtros", systemImage: "xmark.circle") {
+                    let search = filter.search
+                    filter = MovementFilter(search: search)
+                }
+            }
         } label: {
-            Label(finance.category(categoryFilter)?.name ?? "Filtrar por categoría",
-                  systemImage: categoryFilter == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+            Label(filter.activeCount == 0 ? "Filtrar" : "Filtros (\(filter.activeCount))",
+                  systemImage: filter.activeCount == 0 ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
         }
     }
 
@@ -354,6 +450,7 @@ struct AccountDetailView: View {
 
     @Environment(FinanceModel.self) private var finance
     @State private var editing = false
+    @State private var adjusting = false
     @State private var movements: [Movement] = []
 
     private var current: Account { finance.account(account.id) ?? account }
@@ -395,15 +492,29 @@ struct AccountDetailView: View {
         }
         .toolbar {
             ToolbarItem(placement: .secondaryAction) {
+                Button("Actualizar saldo", systemImage: "equal.circle") { adjusting = true }
+            }
+            ToolbarItem(placement: .secondaryAction) {
                 Button("Editar cuenta", systemImage: "pencil") { editing = true }
             }
         }
         .sheet(isPresented: $editing) { AccountFormView(account: current) }
+        .sheet(isPresented: $adjusting) { BalanceAdjustmentView(account: current) }
         .task(id: finance.recent) { movements = await finance.movements(of: current) }
     }
 }
 
 extension CalendarDay {
+    /// "Hoy", "Ayer" o "lunes, 3 de noviembre" para las cabeceras de la lista por días.
+    var dayHeader: String {
+        let today = CalendarDay()
+        if self == today { return "Hoy" }
+        if self == today.adding(days: -1) { return "Ayer" }
+        let style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "es_ES"))
+        let text = date().formatted(year == today.year ? style : style.year())
+        return text.prefix(1).uppercased() + text.dropFirst()
+    }
+
     /// "3 oct" para las filas.
     var shortText: String {
         date().formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "es_ES")))
@@ -484,7 +595,7 @@ struct AccountFormView: View {
     }
 
     private var parsedOpening: Money? {
-        openingBalance.trimmingCharacters(in: .whitespaces).isEmpty ? .zero : Money(parsing: openingBalance)
+        openingBalance.trimmingCharacters(in: .whitespaces).isEmpty ? .zero : Money(entered: openingBalance)
     }
 
     private var ownerId: UUID? {
@@ -555,8 +666,7 @@ struct MovementFormView: View {
                         Text("Ingreso").tag(false)
                     }
                     .pickerStyle(.segmented)
-                    TextField("Importe, p. ej. 12,50", text: $amount)
-                        .decimalInput()
+                    AmountField("Importe, p. ej. 12,50 o 25+7,40", text: $amount)
                     TextField("Concepto", text: $concept)
                         .conceptInput()
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
@@ -625,7 +735,7 @@ struct MovementFormView: View {
     }
 
     private func save() async {
-        guard let parsed = Money(parsing: amount), parsed.minor != 0 else {
+        guard let parsed = Money(entered: amount), parsed.minor != 0 else {
             error = "Escribe un importe, por ejemplo 12,50."
             return
         }
@@ -726,8 +836,7 @@ struct TransferFormView: View {
                     }
                 }
                 Section {
-                    TextField("Importe, p. ej. 200", text: $amount)
-                        .decimalInput()
+                    AmountField("Importe, p. ej. 200", text: $amount)
                     TextField("Concepto (opcional)", text: $concept)
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "es_ES"))
@@ -760,7 +869,7 @@ struct TransferFormView: View {
             error = "Elige dos cuentas distintas."
             return
         }
-        guard let money = Money(parsing: amount), money.minor > 0 else {
+        guard let money = Money(entered: amount), money.minor > 0 else {
             error = "Escribe un importe mayor que cero."
             return
         }
@@ -805,5 +914,61 @@ struct AccountBalanceChart: View {
         }
         .frame(height: 120)
         .accessibilityLabel("Saldo de la cuenta en los últimos 6 meses")
+    }
+}
+
+/// «Actualizar saldo»: escribes lo que marca el banco y se apunta un ajuste por la diferencia.
+struct BalanceAdjustmentView: View {
+    let account: Account
+
+    @Environment(FinanceModel.self) private var finance
+    @Environment(\.dismiss) private var dismiss
+    @State private var actual = ""
+    @State private var error: String?
+    @State private var isWorking = false
+
+    private var current: Money { finance.balance(of: account) }
+
+    private var difference: Money? {
+        Money(entered: actual).map { Money(minor: $0.minor - current.minor) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    LabeledContent("Saldo en la app", value: current.formatted())
+                    AmountField("Saldo real, p. ej. 1.250,00", text: $actual)
+                    if let difference, difference.minor != 0 {
+                        LabeledContent("Ajuste", value: difference.signedText())
+                    }
+                } footer: {
+                    Text("Se apunta un movimiento «Ajuste de saldo» por la diferencia, hoy. No cuenta como gasto ni como ingreso.")
+                }
+                if let error {
+                    Section { ErrorText(message: error) }
+                }
+            }
+            .formStyle(.grouped)
+            .brandBackground()
+            .navigationTitle("Actualizar saldo")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
+                }
+            }
+        }
+        .frame(minWidth: 360, minHeight: 300)
+    }
+
+    private func save() async {
+        guard let money = Money(entered: actual) else {
+            error = "Escribe el saldo, por ejemplo 1.250,00."
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        if await finance.adjustBalance(of: account, to: money) { dismiss() } else { error = finance.error }
     }
 }

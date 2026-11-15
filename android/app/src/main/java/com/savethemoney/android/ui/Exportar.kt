@@ -56,7 +56,7 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
         y += 30f
         pagina.canvas.drawText("Pagos de ${Fechas.mes(bills.month.atDay(1))} de ${bills.month.year}", margen, y, titulo)
         y += 24f
-        pagina.canvas.drawText("Total: ${Money.format(bills.total)}", margen, y, texto)
+        pagina.canvas.drawText("Total: ${Money.format(bills.total, options = Money.Display.Standard)}", margen, y, texto)
         y += 32f
 
         fun cabecera() {
@@ -86,7 +86,7 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
                 drawText("${l.due.dayOfMonth} de ${Fechas.mes(l.due)}", columnas[0], y, texto)
                 drawText(corta(l.name, columnas[2] - columnas[1] - 8), columnas[1], y, texto)
                 drawText(corta(l.accountName ?: "", derecha - columnas[2] - 76), columnas[2], y, texto)
-                drawText(Money.format(l.amount), derecha, y, derechaTexto)
+                drawText(Money.format(l.amount, options = Money.Display.Standard), derecha, y, derechaTexto)
                 drawRect(pagado - 22, y - 10, pagado - 10, y + 2, caja)
             }
             y += 10f
@@ -95,8 +95,8 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
         pagina.canvas.drawText("Suscripciones", margen, y, nota)
         pagina.canvas.drawText("Esenciales", 300f, y, nota)
         y += 16f
-        pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Subscription)), margen, y, texto)
-        pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Essential)), 300f, y, texto)
+        pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Subscription), options = Money.Display.Standard), margen, y, texto)
+        pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Essential), options = Money.Display.Standard), 300f, y, texto)
         pagina.canvas.drawText("Creado con Save the Money el ${hoy.dayOfMonth} de ${Fechas.mes(hoy)} de ${hoy.year}.", margen, alto - margen, nota)
         doc.finishPage(pagina)
         destino.outputStream().use(doc::writeTo)

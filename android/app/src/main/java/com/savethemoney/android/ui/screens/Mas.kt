@@ -1,5 +1,6 @@
 package com.savethemoney.android.ui.screens
 
+import com.savethemoney.android.ui.Vista
 import android.content.Context
 import android.net.Uri
 import android.provider.OpenableColumns
@@ -377,13 +378,37 @@ fun Pantalla30(nav: Nav) {
             )
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
         }
-        // No está en el diseño; va la última para no mover lo anterior.
+        // No está en el diseño; va al final para no mover lo anterior. Sólo en este dispositivo.
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListHeader("Vista")
+                InterruptorVista(StmIcons.visibilityOff, "Modo incógnito", "Oculta los importes; también con el ojo del Resumen", Vista.incognito, Vista::setIncognito)
+                InterruptorVista(StmIcons.savings, "Sin céntimos", "1.235 € en vez de 1.234,56 €", Vista.sinCentimos, Vista::setSinCentimos)
+                InterruptorVista(StmIcons.add, "Mostrar + en los ingresos", "+1.200,00 €", Vista.signoMas, Vista::setSignoMas)
+                InterruptorVista(StmIcons.trendingUp, "Ingresos en verde", "En las listas de movimientos", Vista.ingresosEnVerde, Vista::setIngresosEnVerde)
+            }
+            Text(
+                "Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.",
+                Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
+            )
+        }
         Spacer(Modifier.height(16.dp))
         ListCard {
             MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
         }
         Spacer(Modifier.height(16.dp))
     }
+}
+
+@Composable
+private fun InterruptorVista(icon: androidx.compose.ui.graphics.vector.ImageVector, titulo: String, detalle: String, activo: Boolean, cambia: (Boolean) -> Unit) {
+    ListItem(
+        titulo, detalle,
+        leading = { StmIcon(icon, Stm.colors.onSurfaceVariant) },
+        trailing = { StmSwitch(activo, cambia) },
+        onClick = { cambia(!activo) },
+    )
 }
 
 /** 31 Categorías: gastos o ingresos agrupados; tocar una para editarla. */

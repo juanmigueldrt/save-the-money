@@ -313,11 +313,11 @@ struct GoalFormView: View {
     private func amount(_ text: String) -> Money?? {
         let trimmed = text.trimmingCharacters(in: .whitespaces)
         if trimmed.isEmpty { return .some(nil) }
-        return Money(parsing: trimmed).map { .some($0) }
+        return Money(entered: trimmed).map { .some($0) }
     }
 
     private func save() async {
-        guard let targetMoney = Money(parsing: target), targetMoney.minor > 0 else {
+        guard let targetMoney = Money(entered: target), targetMoney.minor > 0 else {
             error = kind == .savings ? "Indica cuánto quieres juntar." : "Indica cuánto se debía."
             return
         }
@@ -394,7 +394,7 @@ struct ContributionFormView: View {
     }
 
     private func save() async {
-        guard let money = Money(parsing: amount), money.minor > 0 else {
+        guard let money = Money(entered: amount), money.minor > 0 else {
             error = "El importe no es válido."
             return
         }

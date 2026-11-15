@@ -119,6 +119,16 @@ class Session(
         refresh()
     }
 
+    /** Sólo el dueño; el nombre nuevo se ve enseguida en la app. */
+    suspend fun renameHousehold(household: Household, name: String) {
+        val renamed = backend.renameHousehold(household.id, name)
+        val s = state
+        if (s is State.Ready && s.household.id == renamed.id) {
+            finance?.household = renamed
+            state = s.copy(household = renamed)
+        }
+    }
+
     suspend fun leaveHousehold(household: Household) {
         backend.leave(household.id)
         refresh()

@@ -170,6 +170,15 @@ fun List<RecurringSeries>.upcoming(today: LocalDate, days: Long = 30): List<Upco
         .flatMap { s -> s.occurrences(today, today.plusDays(days)).map { UpcomingCharge(s, it) } }
         .sortedWith(compareBy({ it.due }, { it.series.name }))
 
+/**
+ * Lo que se pagará (o cobrará) en los próximos 12 meses con las series activas de esos tipos:
+ * cuenta cada cargo con su precio real (oferta incluida) y respeta la fecha de fin.
+ */
+fun List<RecurringSeries>.yearlyTotal(kinds: Set<RecurringKind>, from: LocalDate): Long {
+    val end = from.plusMonths(12).minusDays(1)
+    return filter { !it.isArchived && it.kind in kinds }.sumOf { s -> s.occurrences(from, end).sumOf(s::amountOn) }
+}
+
 /** Lo que suman al mes las series activas de ese tipo. */
 fun List<RecurringSeries>.monthlyTotal(kind: RecurringKind, day: LocalDate): Long =
     filter { !it.isArchived && it.kind == kind && it.endDay?.isBefore(day) != true }.sumOf { it.monthlyAmount(day) }

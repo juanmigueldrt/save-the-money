@@ -123,6 +123,17 @@ final class FinanceModel {
                                 importHash: movement.importHash))
     }
 
+    /// «Actualizar saldo»: apunta un ajuste para que el saldo de la cuenta sea `actual`.
+    /// Devuelve true también si ya coincidía (no hace falta apuntar nada).
+    @discardableResult
+    func adjustBalance(of account: Account, to actual: Money, on day: CalendarDay = CalendarDay()) async -> Bool {
+        guard let draft = BalanceAdjustment.draft(account: account, current: balance(of: account), actual: actual,
+                                                  on: day, categories: categories) else { return true }
+        return await add(draft)
+    }
+
+    var archivedAccounts: [Account] { accounts.filter(\.isArchived) }
+
     /// Transferencia entre dos cuentas: dos movimientos con la categoría de transferencia, que no cuentan como gasto.
     @discardableResult
     func transfer(from: Account, to: Account, amount: Money, on day: CalendarDay, description: String) async -> Bool {
