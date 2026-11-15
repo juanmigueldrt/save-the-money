@@ -39,6 +39,7 @@ targets:
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: Para escanear el QR con el que tu pareja te invita a su hogar.
         CFBundleURLTypes:
           - CFBundleURLName: savethemoney
             CFBundleURLSchemes: [savethemoney]

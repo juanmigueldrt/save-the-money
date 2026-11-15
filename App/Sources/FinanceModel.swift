@@ -100,10 +100,42 @@ final class FinanceModel {
         }
     }
 
+    /// El último movimiento borrado, para «Deshacer» (como en Android).
+    var lastDeleted: Movement?
+
     @discardableResult
     func delete(_ movement: Movement) async -> Bool {
-        await perform {
+        let done = await perform {
             try await service.deleteMovement(movement.id)
+            try await reloadAll()
+        }
+        if done { lastDeleted = movement }
+        return done
+    }
+
+    /// Vuelve a apuntar el último borrado (con otro id).
+    func undoDelete() async {
+        guard let movement = lastDeleted else { return }
+        lastDeleted = nil
+        await add(MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId,
+                                bookedOn: movement.bookedOn, amount: movement.amount,
+                                description: movement.description, notes: movement.notes,
+                                importHash: movement.importHash))
+    }
+
+    /// Transferencia entre dos cuentas: dos movimientos con la categoría de transferencia, que no cuentan como gasto.
+    @discardableResult
+    func transfer(from: Account, to: Account, amount: Money, on day: CalendarDay, description: String) async -> Bool {
+        guard from.id != to.id else { error = "Elige dos cuentas distintas."; return false }
+        guard amount.minor > 0 else { error = "El importe tiene que ser mayor que cero."; return false }
+        let category = categories(for: .transfer).first?.id
+        let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = text.isEmpty ? "Transferencia" : text
+        return await perform {
+            _ = try await service.addMovement(MovementDraft(accountId: from.id, categoryId: category, bookedOn: day,
+                                                            amount: -amount, description: title), in: household.id)
+            _ = try await service.addMovement(MovementDraft(accountId: to.id, categoryId: category, bookedOn: day,
+                                                            amount: amount, description: title), in: household.id)
             try await reloadAll()
         }
     }

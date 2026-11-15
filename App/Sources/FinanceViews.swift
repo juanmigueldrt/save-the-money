@@ -1,4 +1,5 @@
 import SwiftUI
+import Charts
 import STMCore
 import STMUI
 
@@ -26,6 +27,9 @@ struct SummaryView: View {
                             .titleFont(.largeTitle)
                             .foregroundStyle(finance.totalBalance.isNegative ? Palette.negativeText : Palette.label)
                             .contentTransition(.numericText())
+                        Text(netWorthChangeText)
+                            .font(Typography.subheadline)
+                            .foregroundStyle(Palette.labelSecondary)
                         Text("Lo que tienes menos lo que debes. Toca para ver cómo evoluciona.")
                             .font(Typography.footnote)
                             .foregroundStyle(Palette.labelSecondary)
@@ -35,6 +39,20 @@ struct SummaryView: View {
                     .card()
                 }
                 .buttonStyle(.plain)
+
+                VStack(alignment: .leading, spacing: Spacing.s8) {
+                    Eyebrow("Gastado este mes")
+                    Text(MonthSummary.spent(movements: finance.recent, categories: finance.categories).formatted())
+                        .titleFont(.title1)
+                        .foregroundStyle(Palette.label)
+                        .contentTransition(.numericText())
+                    Text("Sin contar traspasos entre tus cuentas.")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .card()
+                .accessibilityElement(children: .combine)
 
                 NextPaymentsCard()
 
@@ -96,6 +114,13 @@ struct SummaryView: View {
         .refreshable { await finance.load() }
         .sheet(isPresented: $addingAccount) { AccountFormView(account: nil) }
         .sheet(isPresented: $addingMovement) { MovementFormView(movement: nil, accountId: nil) }
+    }
+
+    /// "+120 € este mes", como en Android.
+    private var netWorthChangeText: String {
+        let change = MonthSummary.netWorthChange(accounts: finance.accounts, movements: finance.recent)
+        if change.minor == 0 { return "Igual que a final del mes pasado" }
+        return (change.isNegative ? "−" : "+") + Money(minor: abs(change.minor)).formatted() + " este mes"
     }
 }
 
@@ -185,8 +210,15 @@ struct MovementsView: View {
     @State private var search = ""
     @State private var editing: Movement?
     @State private var adding = false
+    @State private var transferring = false
+    /// Filtro por categoría, como en Android.
+    @State private var categoryFilter: UUID?
 
-    private var source: [Movement] { account == nil ? finance.recent : accountMovements }
+    private var source: [Movement] {
+        let all = account == nil ? finance.recent : accountMovements
+        guard let categoryFilter else { return all }
+        return all.filter { $0.categoryId == categoryFilter }
+    }
 
     private var filtered: [Movement] {
         let query = search.trimmingCharacters(in: .whitespaces)
@@ -219,6 +251,19 @@ struct MovementsView: View {
                             Button("Borrar", systemImage: "trash", role: .destructive) {
                                 Task { await delete(movement) }
                             }
+                            Button("Duplicar", systemImage: "plus.square.on.square") {
+                                Task { await duplicate(movement) }
+                            }
+                        }
+                        .contextMenu {
+                            Button("Editar", systemImage: "pencil") { editing = movement }
+                            Button("Duplicar", systemImage: "plus.square.on.square") {
+                                Task { await duplicate(movement) }
+                            }
+                            Divider()
+                            Button("Borrar", systemImage: "trash", role: .destructive) {
+                                Task { await delete(movement) }
+                            }
                         }
                     }
                 }
@@ -232,11 +277,56 @@ struct MovementsView: View {
                 Button("Nuevo movimiento", systemImage: "plus") { adding = true }
                     .disabled(finance.activeAccounts.isEmpty)
             }
+            ToolbarItem(placement: .secondaryAction) {
+                Button("Transferencia", systemImage: "arrow.left.arrow.right") { transferring = true }
+                    .disabled(finance.activeAccounts.count < 2)
+            }
+            ToolbarItem(placement: .secondaryAction) { categoryMenu }
         }
+        .safeAreaInset(edge: .bottom) { undoBar }
         .task(id: finance.recent) { await reloadAccount() }
         .refreshable { await finance.load() }
         .sheet(item: $editing) { MovementFormView(movement: $0, accountId: nil) }
         .sheet(isPresented: $adding) { MovementFormView(movement: nil, accountId: account?.id) }
+        .sheet(isPresented: $transferring) { TransferFormView(fromId: account?.id) }
+    }
+
+    private var categoryMenu: some View {
+        Menu {
+            Picker("Categoría", selection: $categoryFilter) {
+                Text("Todas las categorías").tag(UUID?.none)
+                ForEach(finance.categories) { Text($0.name).tag(Optional($0.id)) }
+            }
+        } label: {
+            Label(finance.category(categoryFilter)?.name ?? "Filtrar por categoría",
+                  systemImage: categoryFilter == nil ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+        }
+    }
+
+    /// «Movimiento eliminado · Deshacer», como el aviso de Android.
+    @ViewBuilder
+    private var undoBar: some View {
+        if finance.lastDeleted != nil {
+            HStack {
+                Text("Movimiento eliminado")
+                    .font(Typography.subheadline)
+                    .foregroundStyle(Palette.label)
+                Spacer()
+                Button("Deshacer") { Task { await finance.undoDelete() } }
+                    .font(Typography.subheadlineEmphasis)
+                Button("Cerrar", systemImage: "xmark") { finance.lastDeleted = nil }
+                    .labelStyle(.iconOnly)
+                    .foregroundStyle(Palette.labelSecondary)
+            }
+            .padding(Spacing.s16)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card))
+            .padding(Spacing.s16)
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .task(id: finance.lastDeleted?.id) {
+                try? await Task.sleep(for: .seconds(6))
+                if !Task.isCancelled { finance.lastDeleted = nil }
+            }
+        }
     }
 
     private func reloadAccount() async {
@@ -247,6 +337,14 @@ struct MovementsView: View {
     private func delete(_ movement: Movement) async {
         await finance.delete(movement)
     }
+
+    /// Copia el movimiento tal cual (sin la huella del CSV, para que no cuente como importado), como en Android.
+    private func duplicate(_ movement: Movement) async {
+        let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId,
+                                  bookedOn: movement.bookedOn, amount: movement.amount,
+                                  description: movement.description, notes: movement.notes)
+        if await finance.add(draft) { await reloadAccount() }
+    }
 }
 
 /// Detalle de una cuenta: saldo, sus movimientos y editarla.
@@ -255,6 +353,7 @@ struct AccountDetailView: View {
 
     @Environment(FinanceModel.self) private var finance
     @State private var editing = false
+    @State private var movements: [Movement] = []
 
     private var current: Account { finance.account(account.id) ?? account }
 
@@ -273,6 +372,10 @@ struct AccountDetailView: View {
             }
             .padding(Spacing.s16)
             .background(Palette.bgGrouped2)
+            AccountBalanceChart(account: current, movements: movements)
+                .padding(.horizontal, Spacing.s16)
+                .padding(.bottom, Spacing.s12)
+                .background(Palette.bgGrouped2)
             if current.kind == .creditCard {
                 NavigationLink {
                     CreditCardDetailView(account: current)
@@ -295,6 +398,7 @@ struct AccountDetailView: View {
             }
         }
         .sheet(isPresented: $editing) { AccountFormView(account: current) }
+        .task(id: finance.recent) { movements = await finance.movements(of: current) }
     }
 }
 
@@ -569,5 +673,114 @@ extension View {
         #else
         self
         #endif
+    }
+}
+
+/// Transferencia entre dos cuentas propias, como en Android.
+struct TransferFormView: View {
+    /// Cuenta de origen preseleccionada.
+    let fromId: UUID?
+
+    @Environment(FinanceModel.self) private var finance
+    @Environment(\.dismiss) private var dismiss
+    @State private var from: UUID?
+    @State private var to: UUID?
+    @State private var amount = ""
+    @State private var concept = ""
+    @State private var date = Date()
+    @State private var error: String?
+    @State private var isWorking = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    Picker("Desde", selection: $from) {
+                        ForEach(finance.activeAccounts) { Text($0.name).tag(Optional($0.id)) }
+                    }
+                    Picker("Hacia", selection: $to) {
+                        ForEach(finance.activeAccounts.filter { $0.id != from }) { Text($0.name).tag(Optional($0.id)) }
+                    }
+                }
+                Section {
+                    TextField("Importe, p. ej. 200", text: $amount)
+                        .decimalInput()
+                    TextField("Concepto (opcional)", text: $concept)
+                    DatePicker("Fecha", selection: $date, displayedComponents: .date)
+                        .environment(\.locale, Locale(identifier: "es_ES"))
+                } footer: {
+                    Text("Se apuntan dos movimientos con la categoría de transferencia. No cuentan como gasto ni como ingreso.")
+                }
+                if let error {
+                    Section { ErrorText(message: error) }
+                }
+            }
+            .formStyle(.grouped)
+            .brandBackground()
+            .navigationTitle("Transferencia")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
+                }
+            }
+            .onAppear {
+                if from == nil { from = fromId ?? finance.activeAccounts.first?.id }
+                if to == nil { to = finance.activeAccounts.first { $0.id != from }?.id }
+            }
+        }
+    }
+
+    private func save() async {
+        error = nil
+        guard let source = from.flatMap(finance.account), let target = to.flatMap(finance.account), source.id != target.id else {
+            error = "Elige dos cuentas distintas."
+            return
+        }
+        guard let money = Money(parsing: amount), money.minor > 0 else {
+            error = "Escribe un importe mayor que cero."
+            return
+        }
+        isWorking = true
+        defer { isWorking = false }
+        if await finance.transfer(from: source, to: target, amount: money, on: CalendarDay(date), description: concept) {
+            dismiss()
+        } else {
+            error = finance.error
+        }
+    }
+}
+
+/// Saldo de una cuenta al final de cada uno de los últimos 6 meses, como en Android.
+struct AccountBalanceChart: View {
+    let account: Account
+    let movements: [Movement]
+
+    private struct Point: Identifiable {
+        var month: MonthKey
+        var balance: Money
+        var id: MonthKey { month }
+    }
+
+    var body: some View {
+        let points = NetWorth.history(accounts: [account], movements: movements, months: 6, through: MonthKey(CalendarDay()))
+            .map { Point(month: $0.month, balance: $0.net) }
+        Chart(points) { point in
+            LineMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
+                     y: .value("Saldo", point.balance.decimal))
+                .foregroundStyle(Palette.accent)
+                .lineStyle(StrokeStyle(lineWidth: 2))
+            PointMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
+                      y: .value("Saldo", point.balance.decimal))
+                .foregroundStyle(Palette.accent)
+                .symbolSize(24)
+        }
+        .chartXAxis {
+            AxisMarks(values: .stride(by: .month)) { _ in
+                AxisValueLabel(format: .dateTime.month(.abbreviated))
+            }
+        }
+        .frame(height: 120)
+        .accessibilityLabel("Saldo de la cuenta en los últimos 6 meses")
     }
 }

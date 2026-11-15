@@ -9,10 +9,12 @@ import STMUI
 struct NetWorthView: View {
     @Environment(FinanceModel.self) private var finance
     @Environment(TrackingModel.self) private var tracking
+    @State private var range: NetWorthRange = .sixMonths
 
     var body: some View {
         let now = NetWorth.current(accounts: finance.accounts, balances: finance.balances)
-        let history = tracking.history(accounts: finance.accounts)
+        let history = tracking.history(accounts: finance.accounts, range: range)
+        let rangeChange = NetWorthRange.change(history)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
@@ -25,18 +27,19 @@ struct NetWorthView: View {
                         figure("Lo que tienes", now.assets)
                         figure("Lo que debes", now.liabilities)
                     }
-                    if let change = change(in: history) {
-                        Text(change)
-                            .font(Typography.subheadline)
-                            .foregroundStyle(Palette.labelSecondary)
+                    if history.count >= 2 {
+                        Text((rangeChange.isNegative ? "−" : "+") + Money(minor: abs(rangeChange.minor)).formatted() + " " + range.caption)
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(rangeChange.isNegative ? Palette.negativeText : Palette.positiveText)
                     }
                 }
                 .card()
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
-                    Text("Últimos 12 meses")
+                    Text("Evolución")
                         .titleFont(.title2)
                         .foregroundStyle(Palette.label)
+                    CapsuleSegmented("Tramo", selection: $range, options: NetWorthRange.allCases) { $0.title }
                     if finance.accounts.isEmpty {
                         EmptyHint(text: "Añade tus cuentas para ver cómo evoluciona tu patrimonio.")
                     } else {
@@ -50,12 +53,12 @@ struct NetWorthView: View {
                                 .lineStyle(StrokeStyle(lineWidth: 2))
                         }
                         .chartXAxis {
-                            AxisMarks(values: .stride(by: .month, count: 3)) { _ in
+                            AxisMarks(values: .stride(by: .month, count: max(1, history.count / 4))) { _ in
                                 AxisValueLabel(format: .dateTime.month(.abbreviated))
                             }
                         }
                         .chartHeight(200)
-                        .accessibilityLabel("Gráfico del patrimonio neto de los últimos 12 meses")
+                        .accessibilityLabel("Gráfico del patrimonio neto, \(range.caption)")
                     }
                 }
                 .card()
@@ -90,14 +93,6 @@ struct NetWorthView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
-    }
-
-    private func change(in history: [NetWorthPoint]) -> String? {
-        guard history.count >= 2 else { return nil }
-        let previous = history[history.count - 2], last = history[history.count - 1]
-        let diff = last.net - previous.net
-        guard diff.minor != 0 else { return "Igual que el mes pasado." }
-        return (diff.isNegative ? "Baja " : "Sube ") + Money(minor: abs(diff.minor)).formatted() + " desde el mes pasado."
     }
 
     @ViewBuilder
@@ -304,79 +299,27 @@ struct CreditScoreFormView: View {
 struct ReportsView: View {
     @Environment(FinanceModel.self) private var finance
     @Environment(TrackingModel.self) private var tracking
+    @State private var mode: ReportMode = .incomeAndExpenses
+
+    enum ReportMode: String, CaseIterable, Hashable {
+        case incomeAndExpenses, byCategory
+
+        var title: String {
+            switch self {
+            case .incomeAndExpenses: "Ingresos y gastos"
+            case .byCategory: "Por categoría"
+            }
+        }
+    }
 
     var body: some View {
-        @Bindable var tracking = tracking
-        let report = tracking.report(categories: finance.categories)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    CapsuleSegmented("Qué", selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
-                    HStack {
-                        Picker("Periodo", selection: $tracking.period) {
-                            ForEach(ReportPeriod.allCases) { Text($0.title).tag($0) }
-                        }
-                        Spacer()
-                        categoryMenu
-                    }
+                CapsuleSegmented("Informe", selection: $mode, options: ReportMode.allCases) { $0.title }
+                switch mode {
+                case .incomeAndExpenses: incomeAndExpenses
+                case .byCategory: byCategory
                 }
-                .card()
-
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    Eyebrow("\(tracking.kind.title) · \(tracking.period.title.lowercased())")
-                    Text(report.total.formatted())
-                        .titleFont(.largeTitle)
-                        .foregroundStyle(Palette.label)
-                        .contentTransition(.numericText())
-                    if report.byMonth.count > 1 {
-                        Text("Media de \(report.averagePerMonth.formatted()) al mes")
-                            .font(Typography.subheadline)
-                            .foregroundStyle(Palette.labelSecondary)
-                        Chart(report.byMonth) { item in
-                            BarMark(x: .value("Mes", item.month.firstDay.date(), unit: .month),
-                                    y: .value("Importe", item.amount.decimal))
-                                .foregroundStyle(Palette.accent)
-                                .cornerRadius(4)
-                        }
-                        .chartXAxis {
-                            AxisMarks(values: .stride(by: .month)) { _ in
-                                AxisValueLabel(format: .dateTime.month(.narrow))
-                            }
-                        }
-                        .chartHeight(180)
-                        .accessibilityLabel("Gráfico por meses")
-                    }
-                }
-                .card()
-
-                VStack(alignment: .leading, spacing: Spacing.s16) {
-                    Text("Por categoría")
-                        .titleFont(.title2)
-                        .foregroundStyle(Palette.label)
-                    if report.byCategory.isEmpty {
-                        EmptyHint(text: tracking.isLoading ? "Cargando…" : "No hay movimientos en este periodo.")
-                    }
-                    ForEach(report.byCategory) { row in
-                        VStack(alignment: .leading, spacing: Spacing.s8) {
-                            HStack {
-                                Label(row.title, systemImage: row.icon ?? "tag")
-                                    .font(Typography.subheadlineEmphasis)
-                                    .foregroundStyle(Palette.label)
-                                Spacer()
-                                Text(row.amount.formatted())
-                                    .font(Typography.subheadlineEmphasis)
-                                    .foregroundStyle(Palette.label)
-                            }
-                            ProgressBar(fraction: row.share)
-                            Text("\(Int((row.share * 100).rounded())) % · \(row.count) movimientos")
-                                .font(Typography.footnote)
-                                .foregroundStyle(Palette.labelSecondary)
-                        }
-                        .accessibilityElement(children: .combine)
-                    }
-                }
-                .card()
-
                 ErrorText(message: tracking.error)
             }
             .pageLayout()
@@ -384,7 +327,165 @@ struct ReportsView: View {
         .background(Palette.bgGrouped)
         .navigationTitle("Informes")
         .task(id: tracking.period) { await tracking.loadReport() }
-        .refreshable { await tracking.loadReport() }
+        .task(id: finance.recent) { await tracking.loadHistory() }
+        .refreshable {
+            await tracking.loadReport()
+            await tracking.loadHistory()
+        }
+    }
+
+    // MARK: Ingresos y gastos (últimos 6 meses), como en Android
+
+    private struct MonthBar: Identifiable {
+        var month: MonthKey
+        var kind: String
+        var amount: Money
+        var id: String { "\(month.year)-\(month.month)-\(kind)" }
+    }
+
+    @ViewBuilder
+    private var incomeAndExpenses: some View {
+        let range = ReportPeriod.last6Months.range()
+        let movements = tracking.allMovements
+        let income = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .income)
+        let spending = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .expense)
+        let bars = income.byMonth.map { MonthBar(month: $0.month, kind: "Ingresos", amount: $0.amount) }
+            + spending.byMonth.map { MonthBar(month: $0.month, kind: "Gastos", amount: $0.amount) }
+        let saving = income.averagePerMonth - spending.averagePerMonth
+        let rise = BiggestRise.find(movements: movements, categories: finance.categories, month: MonthKey(CalendarDay()))
+
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text("Ingresos y gastos")
+                    .titleFont(.title2)
+                    .foregroundStyle(Palette.label)
+                Spacer()
+                Text("Últimos 6 meses")
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
+            }
+            Chart(bars) { bar in
+                BarMark(x: .value("Mes", bar.month.firstDay.date(), unit: .month),
+                        y: .value("Importe", max(0, bar.amount.decimal)))
+                    .foregroundStyle(by: .value("Tipo", bar.kind))
+                    .position(by: .value("Tipo", bar.kind))
+                    .cornerRadius(4)
+            }
+            .chartForegroundStyleScale(["Ingresos": Palette.positive, "Gastos": Palette.accent])
+            .chartXAxis {
+                AxisMarks(values: .stride(by: .month)) { _ in
+                    AxisValueLabel(format: .dateTime.month(.abbreviated))
+                }
+            }
+            .chartHeight(180)
+            .accessibilityLabel("Gráfico de ingresos y gastos de los últimos 6 meses")
+        }
+        .card()
+
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            HStack {
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    Text("Ahorro medio")
+                        .font(Typography.headline)
+                        .foregroundStyle(Palette.label)
+                    Text("Lo que te queda cada mes")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+                Spacer()
+                Text((saving.isNegative ? "−" : "+") + Money(minor: abs(saving.minor)).formatted())
+                    .font(Typography.headline)
+                    .foregroundStyle(saving.isNegative ? Palette.negativeText : Palette.positiveText)
+            }
+            .accessibilityElement(children: .combine)
+            if let rise {
+                Divider()
+                VStack(alignment: .leading, spacing: Spacing.s4) {
+                    Text("Categoría que más sube")
+                        .font(Typography.headline)
+                        .foregroundStyle(Palette.label)
+                    Text(rise.title + (rise.percent.map { ", +\($0) %" } ?? "") + " vs. " + rise.previous.title.lowercased())
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .card()
+    }
+
+    // MARK: Por categoría
+
+    @ViewBuilder
+    private var byCategory: some View {
+        @Bindable var tracking = tracking
+        let report = tracking.report(categories: finance.categories)
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            CapsuleSegmented("Qué", selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
+            HStack {
+                Picker("Periodo", selection: $tracking.period) {
+                    ForEach(ReportPeriod.allCases) { Text($0.title).tag($0) }
+                }
+                Spacer()
+                categoryMenu
+            }
+        }
+        .card()
+
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Eyebrow("\(tracking.kind.title) · \(tracking.period.title.lowercased())")
+            Text(report.total.formatted())
+                .titleFont(.largeTitle)
+                .foregroundStyle(Palette.label)
+                .contentTransition(.numericText())
+            if report.byMonth.count > 1 {
+                Text("Media de \(report.averagePerMonth.formatted()) al mes")
+                    .font(Typography.subheadline)
+                    .foregroundStyle(Palette.labelSecondary)
+                Chart(report.byMonth) { item in
+                    BarMark(x: .value("Mes", item.month.firstDay.date(), unit: .month),
+                            y: .value("Importe", item.amount.decimal))
+                        .foregroundStyle(Palette.accent)
+                        .cornerRadius(4)
+                }
+                .chartXAxis {
+                    AxisMarks(values: .stride(by: .month)) { _ in
+                        AxisValueLabel(format: .dateTime.month(.narrow))
+                    }
+                }
+                .chartHeight(180)
+                .accessibilityLabel("Gráfico por meses")
+            }
+        }
+        .card()
+
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Text("Por categoría")
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
+            if report.byCategory.isEmpty {
+                EmptyHint(text: tracking.isLoading ? "Cargando…" : "No hay movimientos en este periodo.")
+            }
+            ForEach(report.byCategory) { row in
+                VStack(alignment: .leading, spacing: Spacing.s8) {
+                    HStack {
+                        Label(row.title, systemImage: row.icon ?? "tag")
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
+                        Spacer()
+                        Text(row.amount.formatted())
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
+                    }
+                    ProgressBar(fraction: row.share)
+                    Text("\(Int((row.share * 100).rounded())) % · \(row.count) movimientos")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+        .card()
     }
 
     private var categoryMenu: some View {

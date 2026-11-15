@@ -102,6 +102,46 @@ final class TrackingTests: XCTestCase {
         XCTAssertEqual(ReportPeriod.thisYear.range(today: day(2026, 3, 15)).lowerBound, day(2026, 1, 1))
     }
 
+    func testParityWithAndroidSummaryAndReports() {
+        let checking = Account(householdId: home, name: "Cuenta común", openingBalance: Money(minor: 100_000))
+        let savings = Account(householdId: home, name: "Ahorro")
+        let old = Account(householdId: home, name: "Antigua", archivedAt: Date())
+        let food = BudgetCategory(householdId: home, name: "Supermercado", kind: .expense, budgetGroup: .needs, icon: "cart")
+        let fun = BudgetCategory(householdId: home, name: "Ocio", kind: .expense, budgetGroup: .wants)
+        let transfer = BudgetCategory(householdId: home, name: "Transferencia", kind: .transfer)
+        let categories = [food, fun, transfer]
+        let movements = [
+            move(checking, -10_000, on: day(2026, 10, 5), food),
+            move(checking, -2_000, on: day(2026, 10, 6), fun),
+            move(checking, -4_000, on: day(2026, 11, 2), food),
+            move(checking, -5_000, on: day(2026, 11, 3), fun),
+            move(checking, -30_000, on: day(2026, 11, 4), transfer),
+            move(savings, 30_000, on: day(2026, 11, 4), transfer),
+            move(old, -99_000, on: day(2026, 11, 4)),
+            move(checking, -1_000, on: day(2026, 11, 20), food, "Después de hoy"),
+        ]
+        let today = day(2026, 11, 10)
+        let open = movements.filter { $0.accountId != old.id }
+        XCTAssertEqual(MonthSummary.spent(movements: open, categories: categories, today: today), Money(minor: 9_000),
+                       "sin traspasos ni lo de después de hoy")
+        XCTAssertEqual(MonthSummary.netWorthChange(accounts: [checking, savings, old], movements: movements, today: today),
+                       Money(minor: -9_000), "el traspaso se anula y la cuenta archivada no cuenta")
+
+        let rise = BiggestRise.find(movements: open, categories: categories, month: MonthKey(today))
+        XCTAssertEqual(rise?.title, "Ocio")
+        XCTAssertEqual(rise?.percent, 150)
+        XCTAssertEqual(rise?.previous, MonthKey(year: 2026, month: 10))
+        XCTAssertNil(BiggestRise.find(movements: [], categories: categories, month: MonthKey(today)))
+
+        let through = MonthKey(today)
+        XCTAssertEqual(NetWorthRange.oneMonth.months(firstMovement: nil, through: through), 2)
+        XCTAssertEqual(NetWorthRange.oneYear.months(firstMovement: nil, through: through), 13)
+        XCTAssertEqual(NetWorthRange.all.months(firstMovement: day(2025, 12, 31), through: through), 12)
+        XCTAssertEqual(NetWorthRange.all.months(firstMovement: day(2026, 11, 1), through: through), 2)
+        let history = NetWorth.history(accounts: [checking, savings], movements: movements, months: 2, through: through)
+        XCTAssertEqual(NetWorthRange.change(history), Money(minor: -10_000))
+    }
+
     func testFlexBudget() {
         let account = Account(householdId: home, name: "Cuenta común")
         let rent = BudgetCategory(householdId: home, name: "Vivienda", kind: .expense, budgetGroup: .needs)
