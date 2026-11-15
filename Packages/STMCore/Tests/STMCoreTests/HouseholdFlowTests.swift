@@ -46,6 +46,31 @@ final class HouseholdFlowTests: XCTestCase {
         }
     }
 
+    func testOwnerRemovesMember() async throws {
+        let backend = InMemoryBackend()
+        let password = "contrasena-de-prueba"
+        _ = try await backend.signUp(username: Username("ana"), password: password, displayName: "Ana")
+        let home = try await backend.createHousehold(name: "Casa de prueba")
+        let invite = try await backend.createInvite(for: home.id)
+        try await backend.signOut()
+        _ = try await backend.signUp(username: Username("bruno"), password: password, displayName: nil)
+        _ = try await backend.acceptInvite(XCTUnwrap(invite.inviteCode))
+        let members = try await backend.members(of: home.id)
+        let ana = try XCTUnwrap(members.first { $0.profile.username == "ana" }).profile.id
+        let bruno = try XCTUnwrap(members.first { $0.profile.username == "bruno" }).profile.id
+
+        do {
+            try await backend.removeMember(ana, from: home.id)
+            XCTFail("un miembro no puede quitar al dueño")
+        } catch {}
+        try await backend.signOut()
+
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        try await backend.removeMember(bruno, from: home.id)
+        let left = try await backend.members(of: home.id)
+        XCTAssertEqual(left.map(\.profile.username), ["ana"])
+    }
+
     func testExpiredInviteAndWrongPassword() async throws {
         let clock = Clock()
         let backend = InMemoryBackend(now: { clock.now })
