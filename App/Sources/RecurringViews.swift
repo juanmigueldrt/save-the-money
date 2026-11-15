@@ -204,6 +204,7 @@ struct RecurringFormView: View {
     @State private var introCharges = 3
     @State private var reminds = true
     @State private var remindDays = 1
+    @State private var createsPending = true
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -263,6 +264,11 @@ struct RecurringFormView: View {
                 } footer: {
                     Text("El aviso lo lanza este dispositivo a las 9:00. Puedes apagar todos los avisos en Más opciones.")
                 }
+                Section {
+                    Toggle("Apuntarlo como pendiente al llegar el día", isOn: $createsPending)
+                } footer: {
+                    Text("El día del cargo aparece en Resumen para confirmarlo con el importe real. Hasta entonces no cuenta en saldos ni presupuesto, y si llega antes por CSV se empareja solo.")
+                }
                 if let series {
                     Section {
                         Button(series.isArchived ? "Reactivar" : "Archivar (ya no se paga)") { Task { await toggleArchive() } }
@@ -282,10 +288,11 @@ struct RecurringFormView: View {
                     Button("Guardar") { Task { await save() } }.disabled(isWorking)
                 }
             }
-            .confirmationDialog("¿Borrar este pago fijo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                Button("Borrar", role: .destructive) { Task { await delete() } }
+            .confirmationDialog("¿Qué quieres hacer con este pago fijo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+                Button("Dejar de pagarlo desde hoy") { Task { await endToday() } }
+                Button("Borrarlo con sus pendientes", role: .destructive) { Task { await delete() } }
             } message: {
-                Text("Se borra para todo el hogar. Los movimientos ya apuntados no se tocan.")
+                Text("Si dejas de pagarlo, se guarda con fecha de fin y no habrá más cargos ni avisos. Si lo borras, desaparece con sus cargos pendientes. Los movimientos ya apuntados no se tocan en ningún caso.")
             }
         }
         .frame(minWidth: 360, minHeight: 480)
@@ -329,6 +336,7 @@ struct RecurringFormView: View {
         hasIntro = series.hasIntro
         introAmount = series.introAmount?.plainText ?? ""
         introCharges = series.introCharges ?? 3
+        createsPending = series.createsPending
     }
 
     private func build() -> RecurringSeries? {
@@ -347,6 +355,7 @@ struct RecurringFormView: View {
         item.accountId = accountId
         item.categoryId = categoryId
         item.remindDaysBefore = reminds ? remindDays : nil
+        item.createsPending = createsPending
         if hasIntro && kind != .income {
             guard let intro = Money(entered: introAmount), intro.minor > 0 else {
                 error = "El precio de oferta no es válido."
@@ -372,6 +381,13 @@ struct RecurringFormView: View {
     private func toggleArchive() async {
         guard var item = series else { return }
         item.archivedAt = item.isArchived ? nil : Date()
+        if await planning.save(item) { dismiss() } else { error = planning.error }
+    }
+
+    private func endToday() async {
+        guard var item = series else { return }
+        let today = planning.day
+        item.endsOn = max(item.startsOn, today)
         if await planning.save(item) { dismiss() } else { error = planning.error }
     }
 

@@ -12,6 +12,9 @@ struct MoreView: View {
     @Environment(PlanningModel.self) private var planning
     @AppStorage(LocalReminders.enabledKey) private var remindersEnabled = true
     @AppStorage(LocalBudgetAlerts.enabledKey) private var budgetAlertsEnabled = true
+    @AppStorage(HabitSettings.logReminderKey) private var logReminder: HabitSettings.LogReminder = .off
+    @AppStorage(HabitSettings.logHourKey) private var logHour = 21
+    @AppStorage(HabitSettings.weeklySummaryKey) private var weeklySummary = true
     @State private var themeError: String?
     @State private var csvFile: URL?
     @State private var isExporting = false
@@ -99,6 +102,23 @@ struct MoreView: View {
             } footer: {
                 Text("Los lanza este dispositivo: antes de cada pago fijo y cuando una categoría o grupo del presupuesto llega al 80 % o se pasa.")
             }
+
+            Section {
+                Picker("Recordarme apuntar gastos", selection: $logReminder) {
+                    ForEach(HabitSettings.LogReminder.allCases) { Text($0.title).tag($0) }
+                }
+                if logReminder != .off {
+                    Stepper("A las \(logHour):00", value: $logHour, in: 6...23)
+                }
+                Toggle("Resumen semanal los lunes", isOn: $weeklySummary)
+            } header: {
+                Text("Recordatorios")
+            } footer: {
+                Text("Un aviso para no olvidar apuntar lo gastado y, cada lunes a las 9:00, otro con el resumen de la semana anterior.")
+            }
+            .onChange(of: logReminder) { _, _ in Task { await planning.rescheduleHabits() } }
+            .onChange(of: logHour) { _, _ in Task { await planning.rescheduleHabits() } }
+            .onChange(of: weeklySummary) { _, _ in Task { await planning.rescheduleHabits() } }
 
             Section("Categorías") {
                 NavigationLink {

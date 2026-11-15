@@ -131,6 +131,8 @@ struct RootView: View {
             await budgets.checkAlerts(categories: finance.categories)
             // Las tarjetas: próximo cargo, avisos antes del cargo y del límite.
             await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+            // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
+            await planning.syncCharges(movements: finance.recent)
         }
     }
 

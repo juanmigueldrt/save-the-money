@@ -51,6 +51,47 @@ extension InMemoryBackend: RecurringService, GoalService {
         guard let series = recurring.first(where: { $0.id == seriesId }) else { return }
         try requirePlanningMember(of: series.householdId)
         recurring.removeAll { $0.id == seriesId }
+        chargeList.removeAll { $0.seriesId == seriesId }
+    }
+
+    public func recurringCharges(in householdId: UUID) async throws -> [RecurringCharge] {
+        try requirePlanningMember(of: householdId)
+        return chargeList.filter { $0.householdId == householdId }
+    }
+
+    public func createCharges(_ charges: [RecurringCharge]) async throws -> [RecurringCharge] {
+        var created: [RecurringCharge] = []
+        for charge in charges {
+            try requirePlanningMember(of: charge.householdId)
+            guard recurring.contains(where: { $0.id == charge.seriesId && $0.householdId == charge.householdId }) else {
+                throw AppError.unknown("serie de otro hogar")
+            }
+            if chargeList.contains(where: { $0.seriesId == charge.seriesId && $0.dueOn == charge.dueOn }) { continue }
+            chargeList.append(charge)
+            created.append(charge)
+        }
+        return created
+    }
+
+    public func confirmCharge(_ chargeId: UUID, with draft: MovementDraft) async throws -> Movement {
+        guard let index = chargeList.firstIndex(where: { $0.id == chargeId }) else { throw AppError.unknown("no existe") }
+        guard chargeList[index].isPending else { throw AppError.invalidInput("Ese cargo ya no está pendiente.") }
+        let movement = try await addMovement(draft, in: chargeList[index].householdId)
+        chargeList[index].status = .confirmed
+        chargeList[index].transactionId = movement.id
+        chargeList[index].amount = movement.amount
+        return movement
+    }
+
+    public func updateCharge(_ chargeId: UUID, status: ChargeStatus, transactionId: UUID?) async throws {
+        guard let index = chargeList.firstIndex(where: { $0.id == chargeId }) else { throw AppError.unknown("no existe") }
+        try requirePlanningMember(of: chargeList[index].householdId)
+        chargeList[index].status = status
+        chargeList[index].transactionId = status == .pending ? nil : transactionId
+    }
+
+    public func deleteCharge(_ chargeId: UUID) async throws {
+        chargeList.removeAll { $0.id == chargeId }
     }
 
     // MARK: GoalService

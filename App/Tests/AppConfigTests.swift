@@ -128,8 +128,12 @@ final class BudgetModelTests: XCTestCase {
 
 /// Guarda los avisos que se programarían, en vez de lanzarlos.
 private actor RecordingReminders: ReminderScheduling {
+    /// Los últimos avisos de pagos fijos (los de hábito van aparte, con su prefijo).
     private(set) var last: [PlannedReminder] = []
-    func replace(with reminders: [PlannedReminder], prefix: String) async { last = reminders }
+    private(set) var habits: [PlannedReminder] = []
+    func replace(with reminders: [PlannedReminder], prefix: String) async {
+        if prefix == HabitReminderPlanner.prefix { habits = reminders } else { last = reminders }
+    }
 }
 
 @MainActor

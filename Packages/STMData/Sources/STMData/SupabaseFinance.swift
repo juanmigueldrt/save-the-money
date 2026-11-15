@@ -7,7 +7,7 @@ import Supabase
 extension SupabaseBackend: FinanceService {
     private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
     private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
-    private static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
+    static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
     private static let importBatchSize = 500
 
