@@ -56,7 +56,7 @@ public struct CategoryLearner: Sendable {
     /// Gana el movimiento más reciente de cada concepto (si cambias de opinión, se nota).
     public init(movements: [Movement]) {
         var chosen: [String: (day: CalendarDay, id: UUID)] = [:]
-        for movement in movements where movement.isExpense {
+        for movement in movements where movement.isExpense && !movement.excluded {
             guard let category = movement.categoryId else { continue }
             let key = MerchantDirectory.learningKey(movement.description)
             guard !key.isEmpty else { continue }

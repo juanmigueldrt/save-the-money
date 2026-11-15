@@ -63,6 +63,7 @@ import android.content.Intent
 import com.savethemoney.android.data.ReportKind
 import com.savethemoney.android.data.ReportPeriod
 import com.savethemoney.android.data.SpendingReport
+import com.savethemoney.android.data.GroupedSpending
 import com.savethemoney.android.data.biggestRise
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BudgetTemplate
@@ -477,9 +478,19 @@ fun Pantalla18(nav: Nav) {
     val informe = SpendingReport(movimientos, finance.categories, period.range(hoy), kind, setOfNotNull(categoria))
     val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy), kind, setOfNotNull(categoria))
     val sube = biggestRise(movimientos, finance.categories, YearMonth.from(hoy))
+    val agrupacion = when (filter) {
+        2 -> GroupedSpending.Grouping.Tag
+        3 -> GroupedSpending.Grouping.Payee
+        else -> null
+    }
+    val agrupado = agrupacion?.let { GroupedSpending.report(it, movimientos, finance.categories, period.range(hoy)) }.orEmpty()
     val context = LocalContext.current
     val compartirInforme = {
-        val texto = if (filter == 1) {
+        val texto = if (agrupacion != null) {
+            "${agrupacion.title} · ${period.title.lowercase()}\n" + agrupado.joinToString("\n") {
+                (if (agrupacion == GroupedSpending.Grouping.Tag) "#" else "") + "${it.title}: ${Money.format(it.spent)}"
+            }
+        } else if (filter == 1) {
             textoInforme(informe, anterior, period, finance.category(categoria)?.name)
         } else {
             textoIngresosGastos(ingresos, gastos)
@@ -514,13 +525,52 @@ fun Pantalla18(nav: Nav) {
             } else {
                 Chip("Ingresos y gastos", selected = filter == 0, onClick = { filter = 0 })
                 Chip("Por categoría", selected = filter == 1, onClick = { filter = 1 })
-                if (filter == 1) {
-                    Chip(period.title, onClick = { selector = "periodo" })
-                    Chip(finance.category(categoria)?.name ?: "Todas", onClick = { selector = "categoria" })
-                }
+                Chip("Por etiqueta", selected = filter == 2, onClick = { filter = 2 })
+                Chip("Por beneficiario", selected = filter == 3, onClick = { filter = 3 })
+                if (filter >= 1) Chip(period.title, onClick = { selector = "periodo" })
+                if (filter == 1) Chip(finance.category(categoria)?.name ?: "Todas", onClick = { selector = "categoria" })
             }
         }
         Spacer(Modifier.height(16.dp))
+        if (agrupacion != null && !session.capture) {
+            val esEtiqueta = agrupacion == GroupedSpending.Grouping.Tag
+            val top = agrupado.maxOfOrNull { it.spent }?.coerceAtLeast(1) ?: 1
+            if (agrupado.isEmpty()) {
+                Text(
+                    if (esEtiqueta) "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento."
+                    else "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento.",
+                    style = StmType.bodyMedium, color = c.onSurfaceVariant,
+                )
+            } else {
+                ListCard {
+                    agrupado.forEachIndexed { i, fila ->
+                        if (i > 0) Divider()
+                        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                LeadIcon(if (esEtiqueta) StmIcons.flag else StmIcons.person)
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(if (esEtiqueta) "#${fila.title}" else fila.title, style = StmType.bodyLarge, color = c.onSurface)
+                                    Text(
+                                        if (fila.income > 0) "${fila.count} movimientos · ingresos ${Money.format(fila.income)}" else "${fila.count} movimientos",
+                                        style = StmType.bodySmall, color = c.onSurfaceVariant,
+                                    )
+                                }
+                                Text(Money.format(fila.spent), style = StmType.labelLarge, color = c.onSurface)
+                            }
+                            Spacer(Modifier.height(8.dp))
+                            Progress(fila.spent.toFloat() / top)
+                        }
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Un movimiento con varias etiquetas cuenta en cada una. No se incluyen transferencias ni excluidos.",
+                style = StmType.bodySmall, color = c.onSurfaceVariant,
+            )
+            return@StmScreen
+        }
         if (filter == 1 && !session.capture) {
             Segmented(ReportKind.entries.map { it.title }, kind.ordinal, {
                 kind = ReportKind.entries[it]

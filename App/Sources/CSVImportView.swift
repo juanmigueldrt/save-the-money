@@ -20,6 +20,10 @@ struct CSVImportView: View {
     @State private var marks: [Int: CSVRowMark] = [:]
     @State private var isImporting = false
     @State private var addingAccount = false
+    /// Revisión fila a fila (por número de línea): no importar, categoría elegida a mano, excluir.
+    @State private var review = CSVRowReview()
+    /// true si las columnas salen de un formato de banco ya usado.
+    @State private var usedSavedFormat = false
 
     /// Tamaño máximo del archivo: un extracto de varios años cabe de sobra.
     private static let maxBytes = 10 * 1024 * 1024
@@ -34,7 +38,11 @@ struct CSVImportView: View {
                                             learned: CategoryLearner(movements: finance.recent))
         let lines = Set(rows.map(\.line))
         marks = marks.filter { lines.contains($0.key) }
+        review.keep(lines)
     }
+
+    /// Las filas con lo decidido al revisarlas: sin las descartadas y con su categoría o «excluido».
+    private var reviewedRows: [CSVImportRow] { review.apply(to: rows) }
 
     private var cardAccounts: [Account] {
         finance.activeAccounts.filter { $0.kind == .creditCard && $0.id != accountId }
@@ -60,6 +68,13 @@ struct CSVImportView: View {
                 Text("Descarga los movimientos desde la web o la app de tu banco en formato CSV. El archivo no se sube: sólo se guardan los movimientos.")
             }
 
+            if usedSavedFormat {
+                Section {
+                    Label("Columnas como la última vez con este banco.", systemImage: "clock.arrow.circlepath")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+            }
             if let table, mapping != nil {
                 MappingSection(table: table, mapping: Binding($mapping)!)
             } else if table != nil {
@@ -69,7 +84,8 @@ struct CSVImportView: View {
             }
 
             if !rows.isEmpty {
-                PreviewSection(rows: rows, marks: $marks, cards: cardAccounts)
+                PreviewSection(rows: rows, marks: $marks, review: $review, cards: cardAccounts,
+                               categories: finance.categories)
             }
 
             if let result {
@@ -99,7 +115,7 @@ struct CSVImportView: View {
             load(picked)
         }
         .sheet(isPresented: $addingAccount) { AccountFormView(account: nil) }
-        .onAppear { if accountId == nil { accountId = finance.activeAccounts.first?.id } }
+        .onAppear { if accountId == nil { accountId = finance.defaultAccount?.id } }
         .onChange(of: finance.activeAccounts) { _, accounts in
             if accountId == nil { accountId = accounts.first?.id }
         }
@@ -107,10 +123,10 @@ struct CSVImportView: View {
         .onChange(of: accountId) { _, _ in result = nil; recompute() }
     }
 
-    private var validDrafts: [MovementDraft] { rows.compactMap(\.draft) }
+    private var validDrafts: [MovementDraft] { reviewedRows.compactMap(\.draft) }
 
     private var importPlan: CSVImportPlan {
-        CSVImportPlan.make(rows: rows, marks: marks, householdId: finance.household.id, existing: planning.series)
+        CSVImportPlan.make(rows: reviewedRows, marks: marks, householdId: finance.household.id, existing: planning.series)
     }
 
     private var importTitle: String {
@@ -146,8 +162,18 @@ struct CSVImportView: View {
             let parsed = CSVTable.parse(text)
             fileName = url.lastPathComponent
             marks = [:]
+            review = CSVRowReview()
             table = parsed
-            mapping = CSVMapping.detect(in: parsed)
+            if let saved = CSVSavedFormat.match(parsed, in: SavedCSVFormats.load()), let known = saved.mapping {
+                mapping = known
+                usedSavedFormat = true
+                if let account = saved.accountId, finance.activeAccounts.contains(where: { $0.id == account }) {
+                    accountId = account
+                }
+            } else {
+                mapping = CSVMapping.detect(in: parsed)
+                usedSavedFormat = false
+            }
             recompute()
         } catch {
             self.error = "No he podido abrir el archivo."
@@ -170,6 +196,24 @@ struct CSVImportView: View {
             if await planning.save(series) { createdSeries += 1 } else { error = planning.error }
         }
         result = imported
+        if let table, let mapping {
+            SavedCSVFormats.remember(CSVSavedFormat(table: table, mapping: mapping, accountId: accountId))
+        }
+    }
+}
+
+/// Formatos de banco recordados en este dispositivo (sólo columnas, nunca datos del archivo).
+enum SavedCSVFormats {
+    private static let key = "stm.csv.formats"
+
+    static func load() -> [CSVSavedFormat] {
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([CSVSavedFormat].self, from: data)) ?? []
+    }
+
+    static func remember(_ format: CSVSavedFormat) {
+        let list = CSVSavedFormat.remember(format, in: load())
+        if let data = try? JSONEncoder().encode(list) { UserDefaults.standard.set(data, forKey: key) }
     }
 }
 
@@ -229,7 +273,9 @@ private struct MappingSection: View {
 private struct PreviewSection: View {
     let rows: [CSVImportRow]
     @Binding var marks: [Int: CSVRowMark]
+    @Binding var review: CSVRowReview
     let cards: [Account]
+    let categories: [BudgetCategory]
 
     /// Al principio se ven 10; el resto, al pedirlo, para poder marcarlas todas.
     @State private var showsAll = false
@@ -241,7 +287,8 @@ private struct PreviewSection: View {
         Section {
             ForEach(showsAll ? valid : Array(valid.prefix(10))) { row in
                 if let draft = row.draft {
-                    PreviewRow(draft: draft, mark: binding(for: row.line), cards: cards)
+                    PreviewRow(draft: review.apply(to: draft, line: row.line), line: row.line,
+                               mark: binding(for: row.line), review: $review, cards: cards, categories: categories)
                 }
             }
             if valid.count > 10 && !showsAll {
@@ -249,9 +296,15 @@ private struct PreviewSection: View {
                     .font(Typography.subheadlineEmphasis)
             }
         } header: {
-            Text("Vista previa")
+            HStack {
+                Text("Revisa fila a fila")
+                Spacer()
+                if review.skipped.count > 0 {
+                    Text("\(review.skipped.count) sin importar")
+                }
+            }
         } footer: {
-            Text("Toca un gasto para marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).")
+            Text("Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).")
         }
         if !problems.isEmpty {
             Section("Filas que no se importarán (\(problems.count))") {
@@ -272,12 +325,39 @@ private struct PreviewSection: View {
 /// Una fila de la vista previa, con su marca si es un gasto.
 private struct PreviewRow: View {
     let draft: MovementDraft
+    let line: Int
     @Binding var mark: CSVRowMark
+    @Binding var review: CSVRowReview
     let cards: [Account]
+    let categories: [BudgetCategory]
+
+    private var isSkipped: Bool { review.skipped.contains(line) }
+
+    private var kind: CategoryKind { draft.amount.isNegative ? .expense : .income }
 
     var body: some View {
-        if draft.amount.isNegative {
-            Menu {
+        Menu {
+            Toggle("Importar esta fila", isOn: Binding {
+                !review.skipped.contains(line)
+            } set: { keep in
+                if keep { review.skipped.remove(line) } else { review.skipped.insert(line) }
+            })
+            Toggle("Excluir del presupuesto", isOn: Binding {
+                review.excluded.contains(line)
+            } set: { on in
+                if on { review.excluded.insert(line) } else { review.excluded.remove(line) }
+            })
+            Picker("Categoría", selection: Binding<UUID?> {
+                draft.categoryId
+            } set: { review.categories[line] = .some($0) }) {
+                Text("Sin categoría").tag(UUID?.none)
+                ForEach(categories.filter { $0.kind == kind || $0.kind == .transfer }) {
+                    Text($0.name).tag(Optional($0.id))
+                }
+            }
+            .pickerStyle(.menu)
+            if draft.amount.isNegative {
+                Divider()
                 Picker("Marcar como", selection: $mark) {
                     Label("Sin marcar", systemImage: "circle").tag(CSVRowMark.none)
                     Label("Recurrente", systemImage: "repeat").tag(CSVRowMark.recurring)
@@ -291,13 +371,11 @@ private struct PreviewRow: View {
                 if cards.isEmpty {
                     Text("Añade una tarjeta de crédito en Cuentas para marcar compras con tarjeta.")
                 }
-            } label: {
-                content
             }
-            .buttonStyle(.plain)
-        } else {
+        } label: {
             content
         }
+        .buttonStyle(.plain)
     }
 
     private var content: some View {
@@ -306,7 +384,8 @@ private struct PreviewRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(MovementText.display(draft.description))
                     .font(Typography.subheadline)
-                    .foregroundStyle(Palette.label)
+                    .foregroundStyle(isSkipped ? Palette.labelTertiary : Palette.label)
+                    .strikethrough(isSkipped)
                     .lineLimit(1)
                 Text(detail)
                     .font(Typography.footnote)
@@ -321,12 +400,20 @@ private struct PreviewRow: View {
     }
 
     private var detail: String {
+        if isSkipped { return "\(draft.bookedOn.shortText) · No se importará" }
+        var base = draft.bookedOn.shortText
+        if let name = categories.first(where: { $0.id == draft.categoryId })?.name { base += " · " + name }
+        if draft.excluded { base += " · Excluido" }
+        return base + markText
+    }
+
+    private var markText: String {
         switch mark {
-        case .none: return draft.bookedOn.shortText
+        case .none: return ""
         case .creditCard(let id):
             let name = cards.first { $0.id == id }?.name ?? "tarjeta"
-            return "\(draft.bookedOn.shortText) · Compra con \(name)"
-        default: return "\(draft.bookedOn.shortText) · \(mark.title), cada mes"
+            return " · Compra con \(name)"
+        default: return " · \(mark.title), cada mes"
         }
     }
 }

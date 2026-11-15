@@ -49,6 +49,15 @@ import com.savethemoney.android.data.MovementDateFilter
 import com.savethemoney.android.data.MovementDay
 import com.savethemoney.android.data.MovementFilter
 import com.savethemoney.android.data.MovementKindFilter
+import com.savethemoney.android.data.MovementStatusFilter
+import com.savethemoney.android.data.MovementBulkEdit
+import com.savethemoney.android.data.MovementTags
+import com.savethemoney.android.data.Payee
+import com.savethemoney.android.data.SimilarMovements
+import com.savethemoney.android.data.Change
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextDecoration
 import com.savethemoney.android.ui.Vista
 import com.savethemoney.android.ui.components.Calculadora
 import androidx.compose.foundation.layout.BoxScope
@@ -121,6 +130,9 @@ fun Pantalla05(nav: Nav) {
     var eligeFecha by remember { mutableStateOf<String?>(null) }
     val action = rememberAction()
     val filtro = finance.movementFilter
+    // Modo «Seleccionar»: tocar marca en vez de abrir, y abajo salen las acciones para todos.
+    var seleccionando by remember { mutableStateOf(false) }
+    var elegidos by remember { mutableStateOf(emptySet<String>()) }
     LaunchedEffect(Unit) {
         if (session.capture) finance.categories.firstOrNull { it.name == "Comida" }?.let { finance.movementFilter = MovementFilter(categoryId = it.id) }
     }
@@ -128,6 +140,11 @@ fun Pantalla05(nav: Nav) {
         .sortedByDescending { it.value }.mapNotNull { finance.category(it.key) }
     val visibles = filtro.apply(finance.recent, finance.categories, finance.today())
     val filtrando = filtro.activeCount > 0 || filtro.search.isNotBlank()
+    val marcados = visibles.filter { it.id in elegidos }
+    fun terminaSeleccion() {
+        seleccionando = false
+        elegidos = emptySet()
+    }
     val borrado = finance.lastDeleted
     LaunchedEffect(borrado) {
         if (borrado != null) {
@@ -138,7 +155,7 @@ fun Pantalla05(nav: Nav) {
     StmScreen(
         topBar = {
             MovimientosTopBar(nav, filtro.activeCount, onFiltros = { hoja = "filtros" }, onMas = { hoja = "mas" })
-            CampoBusqueda(filtro.search, { finance.movementFilter = filtro.copy(search = it) }, "Concepto, nota, categoría o importe")
+            CampoBusqueda(filtro.search, { finance.movementFilter = filtro.copy(search = it) }, "Concepto, beneficiario, #etiqueta o importe")
             Spacer(Modifier.height(12.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()),
@@ -152,9 +169,23 @@ fun Pantalla05(nav: Nav) {
             }
             Spacer(Modifier.height(12.dp))
         },
-        bottomBar = { NavBar(Tab.Inicio, nav::tab) },
-        fab = { Fab("Añadir") { nav.go(if (finance.activeAccounts.isEmpty()) 9 else 7) } },
-        snackbar = if (borrado != null || muestra) {
+        bottomBar = {
+            if (seleccionando) {
+                BarraSeleccion(
+                    marcados.size, todos = marcados.size == visibles.size && visibles.isNotEmpty(),
+                    onTodos = { elegidos = if (marcados.size == visibles.size) emptySet() else visibles.map { it.id }.toSet() },
+                    onRevisado = { action.run { finance.update(MovementBulkEdit(reviewed = true).changes(marcados)) } },
+                    onEditar = { hoja = "masiva" },
+                    onBorrar = { hoja = "borrar" },
+                )
+            } else {
+                NavBar(Tab.Inicio, nav::tab)
+            }
+        },
+        fab = if (seleccionando) null else { { Fab("Añadir") { nav.go(if (finance.activeAccounts.isEmpty()) 9 else 7) } } },
+        snackbar = if (action.error != null) {
+            { Snackbar(action.error!!) }
+        } else if (!seleccionando && (borrado != null || muestra)) {
             {
                 // El diseño deja 16 dp entre FAB y snackbar; StmScreen pone 12.
                 Spacer(Modifier.height(4.dp))
@@ -176,9 +207,36 @@ fun Pantalla05(nav: Nav) {
                     ) { hoja = "filtros" }
                 }
             }
+            "masiva" -> { { HojaEdicionMasiva(finance, marcados, { hoja = null }) { terminaSeleccion() } } }
+            "borrar" -> {
+                {
+                    StmDialog(
+                        if (marcados.size == 1) "¿Borrar 1 movimiento?" else "¿Borrar ${marcados.size} movimientos?",
+                        "No se puede deshacer.",
+                        icon = StmIcons.deleteForever,
+                        onDismiss = { hoja = null },
+                        actions = {
+                            Btn("Cancelar", { hoja = null }, kind = BtnKind.Text)
+                            Btn("Borrar", {
+                                hoja = null
+                                action.run {
+                                    finance.delete(marcados)
+                                    terminaSeleccion()
+                                }
+                            }, kind = BtnKind.Error)
+                        },
+                    )
+                }
+            }
             "mas" -> {
                 {
                     BottomSheet("Movimientos", onDismiss = { hoja = null }) {
+                        if (finance.recent.isNotEmpty()) {
+                            SheetItem(StmIcons.check, if (seleccionando) "Terminar selección" else "Seleccionar") {
+                                hoja = null
+                                if (seleccionando) terminaSeleccion() else seleccionando = true
+                            }
+                        }
                         if (filtrando) {
                             SheetItem(StmIcons.close, "Quitar filtros y búsqueda") {
                                 hoja = null
@@ -206,9 +264,13 @@ fun Pantalla05(nav: Nav) {
         if (visibles.isEmpty()) {
             Vacio(if (finance.recent.isEmpty()) "No hay movimientos. Apunta uno con Añadir o importa un CSV desde Más opciones." else "Nada coincide con la búsqueda o los filtros.")
         } else {
-            ListaMovimientos(visibles.take(MAX_FILAS), finance) { m ->
-                finance.selectedMovementId = m.id
-                nav.go(8)
+            ListaMovimientos(visibles.take(MAX_FILAS), finance, seleccion = if (seleccionando) elegidos else null) { m ->
+                if (seleccionando) {
+                    elegidos = if (m.id in elegidos) elegidos - m.id else elegidos + m.id
+                } else {
+                    finance.selectedMovementId = m.id
+                    nav.go(8)
+                }
             }
         }
     }
@@ -241,6 +303,24 @@ private fun BoxScope.HojaFiltros(finance: FinanceModel, abrir: (String?) -> Unit
             Spacer(Modifier.height(8.dp))
             ChipRow(Modifier.fillMaxWidth()) {
                 MovementKindFilter.entries.forEach { k -> Chip(k.title, selected = filtro.kind == k, onClick = { cambia(filtro.copy(kind = k)) }) }
+            }
+            Spacer(Modifier.height(16.dp))
+            Text("Estado", style = StmType.labelLarge, color = c.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            ChipRow(Modifier.fillMaxWidth()) {
+                MovementStatusFilter.entries.forEach { e -> Chip(e.title, selected = filtro.status == e, onClick = { cambia(filtro.copy(status = e)) }) }
+            }
+            val etiquetas = finance.knownTags
+            if (etiquetas.isNotEmpty() || filtro.tag != null) {
+                Spacer(Modifier.height(16.dp))
+                Text("Etiqueta", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                Spacer(Modifier.height(8.dp))
+                ChipRow(Modifier.fillMaxWidth()) {
+                    Chip("Todas las etiquetas", selected = filtro.tag == null, onClick = { cambia(filtro.copy(tag = null)) })
+                    (etiquetas + listOfNotNull(filtro.tag)).distinct().forEach { t ->
+                        Chip("#$t", selected = filtro.tag == t, onClick = { cambia(filtro.copy(tag = t)) })
+                    }
+                }
             }
             Spacer(Modifier.height(16.dp))
             FilledField(
@@ -284,7 +364,7 @@ private fun BoxScope.HojaFiltros(finance: FinanceModel, abrir: (String?) -> Unit
 @Composable
 private fun ResumenFiltro(items: List<Movement>, finance: FinanceModel, quitar: () -> Unit) {
     val c = Stm.colors
-    val contados = items.filter { finance.category(it.categoryId)?.kind != CategoryKind.Transfer }
+    val contados = items.filter { !it.excluded && finance.category(it.categoryId)?.kind != CategoryKind.Transfer }
     val gastos = contados.filter { it.isExpense }.sumOf { it.amountMinor }
     val ingresos = contados.filter { !it.isExpense }.sumOf { it.amountMinor }
     StmCard {
@@ -425,11 +505,17 @@ fun Pantalla07(nav: Nav) {
     var concepto by remember { mutableStateOf(base?.description ?: form.description) }
     var categoria by remember { mutableStateOf(base?.categoryId) }
     var autoCategoria by remember { mutableStateOf<String?>(null) }
-    var cuenta by remember { mutableStateOf(form.accountId ?: base?.accountId ?: finance.activeAccounts.firstOrNull()?.id) }
+    var cuenta by remember { mutableStateOf(form.accountId ?: base?.accountId ?: finance.defaultAccount?.id) }
     var destino by remember { mutableStateOf(form.toAccountId) }
     var fecha by remember { mutableStateOf(base?.day ?: finance.today()) }
     var notas by remember { mutableStateOf(base?.notes ?: "") }
     var conNotas by remember { mutableStateOf(notas.isNotEmpty()) }
+    var beneficiario by remember { mutableStateOf(base?.payee ?: "") }
+    var etiquetas by remember { mutableStateOf(MovementTags.text(base?.tags.orEmpty())) }
+    var excluido by remember { mutableStateOf(base?.excluded ?: false) }
+    var revisado by remember { mutableStateOf(base?.isReviewed ?: false) }
+    // Tras cambiar la categoría: otros con el mismo concepto a los que ofrecer el mismo cambio.
+    var parecidos by remember { mutableStateOf(emptyList<Movement>()) }
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf(false) }
     val action = rememberAction()
@@ -442,6 +528,8 @@ fun Pantalla07(nav: Nav) {
         val valor = Money.entered(importe)?.takeIf { it != 0L }?.let(::abs) ?: falla("Escribe un importe, por ejemplo 12,50.")
         val origen = cuenta ?: falla("Elige una cuenta.")
         val nota = notas.trim().ifEmpty { null }
+        val quien = Payee.clean(beneficiario)
+        val marcas = MovementTags.normalize(etiquetas)
         if (tipo == 2) {
             val hacia = destino ?: falla("Elige la cuenta de destino.")
             if (hacia == origen) falla("Elige dos cuentas distintas.")
@@ -449,21 +537,32 @@ fun Pantalla07(nav: Nav) {
             val texto = concepto.ifBlank { "Transferencia" }
             finance.importMovements(
                 listOf(
-                    MovementDraft(origen, cat, fecha, -valor, texto, nota),
-                    MovementDraft(hacia, cat, fecha, valor, texto, nota),
+                    MovementDraft(origen, cat, fecha, -valor, texto, nota, excluded = excluido, payee = quien, tags = marcas),
+                    MovementDraft(hacia, cat, fecha, valor, texto, nota, excluded = excluido, payee = quien, tags = marcas),
                 ),
             )
         } else {
-            val draft = MovementDraft(origen, categoria, fecha, if (tipo == 0) -valor else valor, concepto, nota)
+            val draft = MovementDraft(
+                origen, categoria, fecha, if (tipo == 0) -valor else valor, concepto, nota,
+                excluded = excluido, payee = quien, tags = marcas,
+            )
             draft.issue?.let(::falla)
             val editando = form.movement
             if (editando != null) {
-                finance.update(
-                    editando.copy(
-                        accountId = draft.accountId, categoryId = draft.categoryId, bookedOn = draft.bookedOn.toString(),
-                        amountMinor = draft.amountMinor, description = draft.description, notes = draft.notes,
-                    ),
+                val cambiado = editando.copy(
+                    accountId = draft.accountId, categoryId = draft.categoryId, bookedOn = draft.bookedOn.toString(),
+                    amountMinor = draft.amountMinor, description = draft.description, notes = draft.notes,
+                    excluded = draft.excluded, payee = draft.payee, tags = draft.tags,
+                    reviewedAt = if (revisado) editando.reviewedAt ?: Instant.now().toString() else null,
                 )
+                finance.update(cambiado)
+                if (editando.categoryId != draft.categoryId) {
+                    val iguales = SimilarMovements.matches(cambiado, finance.recent, draft.categoryId)
+                    if (iguales.isNotEmpty()) {
+                        parecidos = iguales
+                        return@run
+                    }
+                }
             } else {
                 finance.add(draft)
             }
@@ -478,7 +577,25 @@ fun Pantalla07(nav: Nav) {
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
-        overlay = selector?.let { campo ->
+        overlay = if (parecidos.isNotEmpty()) {
+            {
+                StmDialog(
+                    if (parecidos.size == 1) "Hay 1 movimiento con el mismo concepto" else "Hay ${parecidos.size} movimientos con el mismo concepto",
+                    "¿Quieres cambiar también su categoría a «${elegida?.name ?: "Sin categoría"}»?",
+                    icon = StmIcons.category,
+                    onDismiss = nav::back,
+                    actions = {
+                        Btn("Sólo este", nav::back, kind = BtnKind.Text)
+                        Btn("Ponerles la misma categoría", {
+                            action.run {
+                                finance.update(parecidos.map { it.copy(categoryId = categoria) })
+                                nav.back()
+                            }
+                        }, kind = BtnKind.Text)
+                    },
+                )
+            }
+        } else selector?.let { campo ->
             {
                 val cerrar = { selector = null }
                 when (campo) {
@@ -545,10 +662,43 @@ fun Pantalla07(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
         Spacer(Modifier.height(16.dp))
+        FilledField("Beneficiario (opcional)", beneficiario, { beneficiario = it })
+        val propuestos = if (beneficiario.isBlank()) emptyList() else finance.knownPayees
+            .filter { it.contains(beneficiario.trim(), ignoreCase = true) && !it.equals(beneficiario.trim(), ignoreCase = true) }.take(4)
+        if (propuestos.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            ChipRow(Modifier.fillMaxWidth()) { propuestos.forEach { p -> Chip(p, onClick = { beneficiario = p }, icon = StmIcons.person) } }
+        }
+        Spacer(Modifier.height(16.dp))
+        FilledField(
+            "Etiquetas, p. ej. viaje, regalos", etiquetas, { etiquetas = it },
+            supporting = "Las etiquetas sirven para juntar gastos de distintas categorías, como un viaje. Sepáralas con comas.",
+        )
+        val puestas = MovementTags.normalize(etiquetas)
+        val sugeridas = finance.knownTags.filter { it !in puestas }.take(6)
+        if (sugeridas.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            ChipRow(Modifier.fillMaxWidth()) {
+                sugeridas.forEach { t -> Chip("#$t", onClick = { etiquetas = MovementTags.text(puestas + t) }, icon = StmIcons.add) }
+            }
+        }
+        Spacer(Modifier.height(16.dp))
         ChipsMovimiento(conNotas) { conNotas = !conNotas }
         if (conNotas) {
             Spacer(Modifier.height(16.dp))
             FilledField("Notas", notas, { notas = it })
+        }
+        Spacer(Modifier.height(16.dp))
+        ListCard {
+            if (form.movement != null) {
+                FilaInterruptor("Revisado", null, revisado) { revisado = it }
+                Divider(inset = 16.dp)
+            }
+            FilaInterruptor(
+                "Excluir del presupuesto e informes",
+                "Un movimiento excluido sigue contando en el saldo de la cuenta, pero no en el presupuesto, los informes ni el flujo de caja.",
+                excluido,
+            ) { excluido = it }
         }
     }
     if (eligeFecha) SelectorFecha(fecha, { fecha = it }) { eligeFecha = false }
@@ -570,6 +720,18 @@ fun Pantalla08(nav: Nav) {
         overlay = {
             BottomSheet(MovementText.display(m.description), "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
                 SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
+                SheetItem(StmIcons.check, if (m.isReviewed) "Marcar sin revisar" else "Marcar revisado") {
+                    action.run {
+                        finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m)))
+                        nav.back()
+                    }
+                }
+                SheetItem(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar en el presupuesto" else "Excluir del presupuesto") {
+                    action.run {
+                        finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m)))
+                        nav.back()
+                    }
+                }
                 SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
                     finance.cards.selectedId = m.accountId
                     finance.cards.purchaseId = m.id
@@ -601,6 +763,8 @@ fun Pantalla09(nav: Nav) {
         mutableStateOf(editando?.openingMinor?.takeIf { it != 0L }?.let(Money::input) ?: if (session.capture) "1.500,00" else "")
     }
     var compartir by remember { mutableStateOf(editando?.isShared ?: true) }
+    var predeterminada by remember { mutableStateOf(editando?.isDefault ?: false) }
+    var patrimonio by remember { mutableStateOf(editando?.includeInNetWorth ?: true) }
     val action = rememberAction()
     val tipos = listOf(AccountKind.Checking, AccountKind.Savings, AccountKind.CreditCard, AccountKind.Cash, AccountKind.Investment)
         .let { if (tipo in it) it else it + tipo }
@@ -611,9 +775,15 @@ fun Pantalla09(nav: Nav) {
         val draft = AccountDraft(nombre, tipo, apertura, dueno)
         draft.issue?.let { throw AppError.InvalidInput(it) }
         if (editando != null) {
-            finance.updateAccount(editando.copy(name = draft.trimmedName, kind = tipo, openingMinor = apertura, ownerId = dueno))
+            finance.updateAccount(
+                editando.copy(
+                    name = draft.trimmedName, kind = tipo, openingMinor = apertura, ownerId = dueno,
+                    isDefault = predeterminada, includeInNetWorth = patrimonio,
+                ),
+            )
         } else {
-            finance.createAccount(draft)
+            val nueva = finance.createAccount(draft)
+            if (predeterminada || !patrimonio) finance.updateAccount(nueva.copy(isDefault = predeterminada, includeInNetWorth = patrimonio))
         }
         nav.back()
     }
@@ -650,6 +820,17 @@ fun Pantalla09(nav: Nav) {
                 },
             )
         }
+        Spacer(Modifier.height(16.dp))
+        ListCard {
+            FilaInterruptor("Cuenta predeterminada", null, predeterminada) { predeterminada = it }
+            Divider(inset = 16.dp)
+            FilaInterruptor("Contar en el patrimonio", null, patrimonio) { patrimonio = it }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "La predeterminada sale elegida al apuntar un movimiento. Sin «Contar en el patrimonio», la cuenta sigue con su saldo pero no suma en el patrimonio neto.",
+            style = StmType.bodySmall, color = c.onSurfaceVariant,
+        )
     }
 }
 
@@ -688,6 +869,14 @@ fun Pantalla34(nav: Nav) {
                             nav.back()
                         }
                     }
+                    ElementoMenu(StmIcons.check, if (m.isReviewed) "Sin revisar" else "Marcar revisado") {
+                        menu = false
+                        action.run { finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m))) }
+                    }
+                    ElementoMenu(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar" else "Excluir") {
+                        menu = false
+                        action.run { finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m))) }
+                    }
                     ElementoMenu(StmIcons.eventRepeat, "Aplazar") {
                         finance.cards.selectedId = m.accountId
                         finance.cards.purchaseId = m.id
@@ -717,6 +906,16 @@ fun Pantalla34(nav: Nav) {
         m.notes?.takeIf { it.isNotEmpty() }?.let {
             Spacer(Modifier.height(16.dp))
             Text(it, style = StmType.bodyMedium, color = Stm.colors.onSurfaceVariant)
+        }
+        val extra = listOfNotNull(
+            m.payee,
+            m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
+            if (m.isReviewed) "Revisado" else null,
+            if (m.excluded) "Excluido del presupuesto" else null,
+        )
+        if (extra.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text(extra.joinToString(" · "), style = StmType.bodyMedium, color = Stm.colors.onSurfaceVariant)
         }
     }
 }
@@ -781,7 +980,14 @@ private fun MovimientosTopBar(nav: Nav, filtros: Int = 0, onFiltros: (() -> Unit
 
 /** Movimientos agrupados por día ("Hoy", "Ayer", "3 de noviembre") con lo que suma cada día, sin transferencias. */
 @Composable
-fun ListaMovimientos(items: List<Movement>, finance: FinanceModel, totales: Boolean = true, onClick: (Movement) -> Unit) {
+fun ListaMovimientos(
+    items: List<Movement>,
+    finance: FinanceModel,
+    totales: Boolean = true,
+    /** En modo «Seleccionar», los elegidos; nulo fuera de ese modo. */
+    seleccion: Set<String>? = null,
+    onClick: (Movement) -> Unit,
+) {
     ListCard {
         MovementDay.group(items, finance.categories).forEach { (dia, delDia, total) ->
             Row(Modifier.fillMaxWidth().padding(end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -792,28 +998,200 @@ fun ListaMovimientos(items: List<Movement>, finance: FinanceModel, totales: Bool
             }
             delDia.forEachIndexed { i, m ->
                 if (i > 0) Divider()
-                FilaMovimiento(m, finance, onClick = { onClick(m) })
+                FilaMovimiento(m, finance, elegido = seleccion?.contains(m.id), onClick = { onClick(m) })
             }
         }
     }
 }
 
 @Composable
-private fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String? = null, onClick: () -> Unit) {
+private fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String? = null, elegido: Boolean? = null, onClick: () -> Unit) {
     val c = Stm.colors
     val cat = finance.category(m.categoryId)
     val icono = iconoCategoria(cat)
+    val partes = listOfNotNull(
+        detalle ?: cat?.name ?: "Sin categoría",
+        if (detalle == null) finance.account(m.accountId)?.name else null,
+        m.payee,
+        m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
+    )
     ListItem(
         MovementText.display(m.description),
-        detalle ?: listOfNotNull(cat?.name ?: "Sin categoría", finance.account(m.accountId)?.name).joinToString(" · "),
-        trailingText = Money.format(m.amountMinor, signed = true),
-        trailingColor = if (!m.isExpense && Vista.ingresosEnVerde) c.success else c.onSurface,
+        partes.joinToString(" · "),
+        trailing = {
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    Money.format(m.amountMinor, signed = true), style = StmType.labelLarge, textAlign = TextAlign.End,
+                    color = when {
+                        m.excluded -> c.onSurfaceVariant
+                        !m.isExpense && Vista.ingresosEnVerde -> c.success
+                        else -> c.onSurface
+                    },
+                    textDecoration = if (m.excluded) TextDecoration.LineThrough else null,
+                )
+                if (m.excluded || m.isReviewed) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        if (m.excluded) StmIcon(StmIcons.visibilityOff, c.onSurfaceVariant, size = 16.dp, contentDescription = "Excluido del presupuesto")
+                        if (m.isReviewed) StmIcon(StmIcons.check, c.success, size = 16.dp, contentDescription = "Revisado")
+                    }
+                }
+            }
+        },
         leading = {
-            if (m.isExpense) MerchantLogo(m.description, icono)
-            else MerchantLogo(m.description, icono, c.successContainer, c.onSuccessContainer)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (elegido != null) {
+                    Box(
+                        Modifier.width(24.dp).height(24.dp).clip(CircleShape)
+                            .let { if (elegido) it.background(c.primary) else it.border(2.dp, c.outline, CircleShape) },
+                        contentAlignment = Alignment.Center,
+                    ) { if (elegido) StmIcon(StmIcons.check, c.onPrimary, size = 16.dp, contentDescription = "Elegido") }
+                    Spacer(Modifier.width(12.dp))
+                }
+                if (m.isExpense) MerchantLogo(m.description, icono)
+                else MerchantLogo(m.description, icono, c.successContainer, c.onSuccessContainer)
+            }
         },
         onClick = onClick,
     )
+}
+
+/** Interruptor con texto y, si hace falta, una explicación debajo. */
+@Composable
+internal fun FilaInterruptor(label: String, nota: String?, checked: Boolean, onChange: (Boolean) -> Unit) {
+    ListItem(
+        label, nota, supportingLines = 3,
+        trailing = {
+            Box(Modifier.width(40.dp).wrapContentWidth(Alignment.Start, unbounded = true)) { StmSwitch(checked, onChange) }
+        },
+        onClick = { onChange(!checked) },
+    )
+}
+
+/** Abajo, en modo «Seleccionar»: cuántos hay y qué hacer con todos. */
+@Composable
+private fun BarraSeleccion(
+    cuantos: Int,
+    todos: Boolean,
+    onTodos: () -> Unit,
+    onRevisado: () -> Unit,
+    onEditar: () -> Unit,
+    onBorrar: () -> Unit,
+) {
+    val c = Stm.colors
+    Column(Modifier.fillMaxWidth().background(c.surfaceContainer).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(if (cuantos == 1) "1 seleccionado" else "$cuantos seleccionados", Modifier.weight(1f), style = StmType.titleSmall, color = c.onSurface)
+            Btn(if (todos) "Ninguno" else "Todos", onTodos, kind = BtnKind.Text)
+        }
+        Spacer(Modifier.height(8.dp))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Btn("Revisado", onRevisado, kind = BtnKind.Tonal, icon = StmIcons.check, enabled = cuantos > 0)
+            Btn("Editar", onEditar, kind = BtnKind.Outlined, icon = StmIcons.tune, enabled = cuantos > 0)
+            Spacer(Modifier.weight(1f))
+            Btn("Borrar", onBorrar, kind = BtnKind.Error, icon = StmIcons.delete, enabled = cuantos > 0)
+        }
+    }
+}
+
+/**
+ * Cambiar varios movimientos a la vez: fecha, categoría, cuenta, beneficiario, etiquetas, revisado y excluido.
+ * Lo que no se toca se queda como estaba en cada uno.
+ */
+@Composable
+private fun BoxScope.HojaEdicionMasiva(finance: FinanceModel, movimientos: List<Movement>, cerrar: () -> Unit, hecho: () -> Unit) {
+    val c = Stm.colors
+    val action = rememberAction()
+    var cambiaFecha by remember { mutableStateOf(false) }
+    var fecha by remember { mutableStateOf(movimientos.firstOrNull()?.day ?: finance.today()) }
+    var cambiaCategoria by remember { mutableStateOf(false) }
+    var categoria by remember { mutableStateOf<String?>(null) }
+    var cambiaCuenta by remember { mutableStateOf(false) }
+    var cuenta by remember { mutableStateOf(finance.defaultAccount?.id) }
+    var cambiaBeneficiario by remember { mutableStateOf(false) }
+    var beneficiario by remember { mutableStateOf("") }
+    var anadir by remember { mutableStateOf("") }
+    var quitar by remember { mutableStateOf("") }
+    var revisado by remember { mutableStateOf<Boolean?>(null) }
+    var excluido by remember { mutableStateOf<Boolean?>(null) }
+    var selector by remember { mutableStateOf<String?>(null) }
+    var eligeFecha by remember { mutableStateOf(false) }
+    val edicion = MovementBulkEdit(
+        bookedOn = if (cambiaFecha) fecha else null,
+        categoryId = if (cambiaCategoria) Change.Set(categoria) else Change.Keep,
+        accountId = if (cambiaCuenta) cuenta else null,
+        excluded = excluido, reviewed = revisado,
+        payee = if (cambiaBeneficiario) Change.Set(Payee.clean(beneficiario)) else Change.Keep,
+        addTags = MovementTags.normalize(anadir), removeTags = MovementTags.normalize(quitar),
+    )
+    when (selector) {
+        "categoria" -> SelectorSheet(
+            "Categoría",
+            listOf<Pair<String, () -> Unit>>("Sin categoría" to { categoria = null }) + finance.categories.map { cat -> cat.name to { categoria = cat.id } },
+        ) { selector = null }
+        "cuenta" -> SelectorSheet("Cuenta", finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }) { selector = null }
+        else -> BottomSheet(if (movimientos.size == 1) "Editar 1 movimiento" else "Editar ${movimientos.size} movimientos", onDismiss = cerrar) {
+            Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
+                FilaInterruptor("Cambiar la fecha", null, cambiaFecha) { cambiaFecha = it }
+                if (cambiaFecha) {
+                    FilledField("Fecha", Fechas.largo(fecha, finance.today()), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+                }
+                FilaInterruptor("Cambiar la categoría", null, cambiaCategoria) { cambiaCategoria = it }
+                if (cambiaCategoria) {
+                    FilledField("Categoría", finance.category(categoria)?.name ?: "Sin categoría", modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+                }
+                FilaInterruptor("Cambiar la cuenta", null, cambiaCuenta) { cambiaCuenta = it }
+                if (cambiaCuenta) {
+                    FilledField("Cuenta", finance.account(cuenta)?.name ?: "Elige una cuenta", modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+                }
+                FilaInterruptor("Cambiar el beneficiario", null, cambiaBeneficiario) { cambiaBeneficiario = it }
+                if (cambiaBeneficiario) {
+                    FilledField("Beneficiario (vacío lo quita)", beneficiario, { beneficiario = it }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+                }
+                Column(Modifier.padding(16.dp)) {
+                    val usadas = MovementTags.all(movimientos)
+                    FilledField(
+                        "Añadir etiquetas, p. ej. viaje", anadir, { anadir = it },
+                        supporting = if (usadas.isEmpty()) null else "Ahora llevan: " + usadas.joinToString(" ") { "#$it" },
+                    )
+                    Spacer(Modifier.height(16.dp))
+                    FilledField("Quitar etiquetas", quitar, { quitar = it })
+                    Spacer(Modifier.height(16.dp))
+                    Text("Revisado", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    ChipRow(Modifier.fillMaxWidth()) {
+                        listOf(null to "No cambiar", true to "Marcar revisados", false to "Marcar sin revisar").forEach { (v, t) ->
+                            Chip(t, selected = revisado == v, onClick = { revisado = v })
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text("Presupuesto e informes", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                    Spacer(Modifier.height(8.dp))
+                    ChipRow(Modifier.fillMaxWidth()) {
+                        listOf(null to "No cambiar", true to "Excluir", false to "Volver a contar").forEach { (v, t) ->
+                            Chip(t, selected = excluido == v, onClick = { excluido = v })
+                        }
+                    }
+                    action.error?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = StmType.bodySmall, color = c.error)
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
+                        Btn("Cancelar", cerrar, kind = BtnKind.Text)
+                        Btn("Guardar", {
+                            action.run {
+                                MovementTags.issue(edicion.addTags)?.let { throw AppError.InvalidInput(it) }
+                                finance.update(edicion.changes(movimientos))
+                                cerrar()
+                                hecho()
+                            }
+                        }, enabled = !edicion.isEmpty)
+                    }
+                }
+            }
+        }
+    }
+    if (eligeFecha) SelectorFecha(fecha, { fecha = it }) { eligeFecha = false }
 }
 
 /** Texto gris para listas vacías. */

@@ -99,7 +99,7 @@ class BudgetReport(
         val spentByCategory = mutableMapOf<String, Long>()
         var loose = 0L
         for (m in movements) {
-            if (m.day !in period) continue
+            if (m.excluded || m.day !in period) continue
             val category = m.categoryId?.let(byId::get)
             when (category?.kind) {
                 CategoryKind.Transfer -> Unit

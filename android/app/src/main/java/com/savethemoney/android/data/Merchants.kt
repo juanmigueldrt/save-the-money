@@ -39,7 +39,7 @@ class CategoryLearner(movements: List<Movement>) {
     init {
         val chosen = HashMap<String, Pair<LocalDate, String>>()
         for (m in movements) {
-            if (!m.isExpense) continue
+            if (!m.isExpense || m.excluded) continue
             val category = m.categoryId ?: continue
             val key = MerchantDirectory.learningKey(m.description)
             if (key.isEmpty()) continue

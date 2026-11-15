@@ -100,6 +100,32 @@ final class FinanceModel {
         }
     }
 
+    /// Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final.
+    @discardableResult
+    func update(_ movements: [Movement]) async -> Bool {
+        guard !movements.isEmpty else { return true }
+        return await perform {
+            for movement in movements { _ = try await service.updateMovement(movement) }
+            try await reloadAll()
+        }
+    }
+
+    /// Borra varios a la vez (sin «Deshacer»: la vista pide confirmación antes).
+    @discardableResult
+    func delete(_ movements: [Movement]) async -> Bool {
+        await perform {
+            for movement in movements { try await service.deleteMovement(movement.id) }
+            try await reloadAll()
+        }
+    }
+
+    /// La cuenta que sale elegida al apuntar: la predeterminada o la primera activa.
+    var defaultAccount: Account? { accounts.defaultAccount }
+
+    /// Etiquetas y beneficiarios usados, para sugerir al escribir.
+    var knownTags: [String] { MovementTags.all(in: recent) }
+    var knownPayees: [String] { Payee.all(in: recent) }
+
     /// El último movimiento borrado, para «Deshacer» (como en Android).
     var lastDeleted: Movement?
 
@@ -120,7 +146,8 @@ final class FinanceModel {
         await add(MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId,
                                 bookedOn: movement.bookedOn, amount: movement.amount,
                                 description: movement.description, notes: movement.notes,
-                                importHash: movement.importHash))
+                                importHash: movement.importHash, excluded: movement.excluded,
+                                payee: movement.payee, tags: movement.tags))
     }
 
     /// «Actualizar saldo»: apunta un ajuste para que el saldo de la cuenta sea `actual`.

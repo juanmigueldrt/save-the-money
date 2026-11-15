@@ -146,7 +146,7 @@ public struct BudgetReport: Hashable, Sendable {
         self.month = month
         period = month.period(startDay: startDay)
         let range = period
-        let inPeriod = movements.filter { range.contains($0.bookedOn) }
+        let inPeriod = movements.filter { !$0.excluded && range.contains($0.bookedOn) }
         let byId = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
 
         var income = 0

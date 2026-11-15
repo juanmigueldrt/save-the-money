@@ -182,6 +182,8 @@ struct MovementRow: View {
         var parts = showsDate ? [movement.bookedOn.shortText] : []
         if let category = finance.category(movement.categoryId) { parts.append(category.name) }
         if showsAccount, let account = finance.account(movement.accountId) { parts.append(account.name) }
+        if let payee = movement.payee { parts.append(payee) }
+        if !movement.tags.isEmpty { parts.append(movement.tags.map { "#" + $0 }.joined(separator: " ")) }
         return parts.joined(separator: " · ")
     }
 
@@ -208,9 +210,27 @@ struct MovementRow: View {
                     .lineLimit(1)
             }
             Spacer()
-            Text(showsPlusSign ? movement.amount.signedText() : movement.amount.formatted())
-                .font(Typography.headline)
-                .foregroundStyle(amountColor)
+            VStack(alignment: .trailing, spacing: 2) {
+                Text(showsPlusSign ? movement.amount.signedText() : movement.amount.formatted())
+                    .font(Typography.headline)
+                    .foregroundStyle(movement.excluded ? Palette.labelSecondary : amountColor)
+                    .strikethrough(movement.excluded)
+                if movement.excluded || movement.isReviewed {
+                    HStack(spacing: Spacing.s4) {
+                        if movement.excluded {
+                            Image(systemName: "eye.slash")
+                                .accessibilityLabel("Excluido del presupuesto")
+                        }
+                        if movement.isReviewed {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(Palette.positiveText)
+                                .accessibilityLabel("Revisado")
+                        }
+                    }
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
+                }
+            }
         }
         .accessibilityElement(children: .combine)
     }
@@ -240,6 +260,13 @@ struct MovementsView: View {
     @State private var editing: Movement?
     @State private var adding = false
     @State private var transferring = false
+    /// Modo «Seleccionar»: tocar marca en vez de abrir, y abajo salen las acciones para todos.
+    @State private var selecting = false
+    @State private var selection = Set<UUID>()
+    @State private var bulkEditing = false
+    @State private var confirmingBulkDelete = false
+
+    private var selectedMovements: [Movement] { filtered.filter { selection.contains($0.id) } }
 
     private var source: [Movement] { account == nil ? finance.recent : accountMovements }
 
@@ -281,10 +308,28 @@ struct MovementsView: View {
             ForEach(days) { day in
                 Section {
                     ForEach(day.movements) { movement in
-                        Button { editing = movement } label: {
-                            MovementRow(movement: movement, showsAccount: account == nil, showsDate: false)
+                        Button {
+                            if selecting { toggleSelection(movement) } else { editing = movement }
+                        } label: {
+                            HStack(spacing: Spacing.s12) {
+                                if selecting {
+                                    Image(systemName: selection.contains(movement.id) ? "checkmark.circle.fill" : "circle")
+                                        .font(Typography.headline)
+                                        .foregroundStyle(selection.contains(movement.id) ? Palette.accent : Palette.labelSecondary)
+                                        .accessibilityHidden(true)
+                                }
+                                MovementRow(movement: movement, showsAccount: account == nil, showsDate: false)
+                            }
                         }
                         .buttonStyle(.plain)
+                        .accessibilityAddTraits(selecting && selection.contains(movement.id) ? .isSelected : [])
+                        .swipeActions(edge: .leading) {
+                            Button(movement.isReviewed ? "Sin revisar" : "Revisado",
+                                   systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
+                            }
+                            .tint(Palette.positive)
+                        }
                         .swipeActions {
                             Button("Borrar", systemImage: "trash", role: .destructive) {
                                 Task { await delete(movement) }
@@ -295,6 +340,14 @@ struct MovementsView: View {
                         }
                         .contextMenu {
                             Button("Editar", systemImage: "pencil") { editing = movement }
+                            Button(movement.isReviewed ? "Marcar sin revisar" : "Marcar revisado",
+                                   systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
+                            }
+                            Button(movement.excluded ? "Volver a contar en el presupuesto" : "Excluir del presupuesto",
+                                   systemImage: movement.excluded ? "eye" : "eye.slash") {
+                                Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])) }
+                            }
                             Button("Duplicar", systemImage: "plus.square.on.square") {
                                 Task { await duplicate(movement) }
                             }
@@ -322,7 +375,7 @@ struct MovementsView: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
         }
-        .searchable(text: $filter.search, prompt: "Buscar concepto, categoría o importe")
+        .searchable(text: $filter.search, prompt: "Buscar concepto, beneficiario, #etiqueta o importe")
         .brandBackground()
         .navigationTitle(account?.name ?? "Movimientos")
         .toolbar {
@@ -335,8 +388,33 @@ struct MovementsView: View {
                     .disabled(finance.activeAccounts.count < 2)
             }
             ToolbarItem(placement: .secondaryAction) { filterMenu }
+            ToolbarItem(placement: .secondaryAction) {
+                Button(selecting ? "Terminar selección" : "Seleccionar",
+                       systemImage: selecting ? "checkmark.circle.badge.xmark" : "checkmark.circle") {
+                    selecting.toggle()
+                    selection = []
+                }
+                .disabled(source.isEmpty)
+            }
         }
-        .safeAreaInset(edge: .bottom) { undoBar }
+        .safeAreaInset(edge: .bottom) { selecting ? AnyView(selectionBar) : AnyView(undoBar) }
+        .sheet(isPresented: $bulkEditing) {
+            BulkEditView(movements: selectedMovements) { selection = []; selecting = false }
+        }
+        .confirmationDialog(selection.count == 1 ? "¿Borrar 1 movimiento?" : "¿Borrar \(selection.count) movimientos?",
+                            isPresented: $confirmingBulkDelete, titleVisibility: .visible) {
+            Button("Borrar", role: .destructive) {
+                Task {
+                    if await finance.delete(selectedMovements) {
+                        selection = []
+                        selecting = false
+                        await reloadAccount()
+                    }
+                }
+            }
+        } message: {
+            Text("No se puede deshacer.")
+        }
         .task(id: finance.recent) { await reloadAccount() }
         .refreshable { await finance.load() }
         .sheet(item: $editing) { MovementFormView(movement: $0, accountId: nil) }
@@ -387,6 +465,16 @@ struct MovementsView: View {
             Picker("Fechas", selection: $filter.dates) {
                 ForEach(MovementDateFilter.allCases) { Text($0.title).tag($0) }
             }
+            Picker("Estado", selection: $filter.status) {
+                ForEach(MovementStatusFilter.allCases) { Text($0.title).tag($0) }
+            }
+            let tags = MovementTags.all(in: source)
+            if !tags.isEmpty || filter.tag != nil {
+                Picker("Etiqueta", selection: $filter.tag) {
+                    Text("Todas las etiquetas").tag(String?.none)
+                    ForEach(tags, id: \.self) { Text("#" + $0).tag(Optional($0)) }
+                }
+            }
             if filter.activeCount > 0 {
                 Divider()
                 Button("Quitar filtros", systemImage: "xmark.circle") {
@@ -426,6 +514,40 @@ struct MovementsView: View {
         }
     }
 
+    private func toggleSelection(_ movement: Movement) {
+        if selection.contains(movement.id) { selection.remove(movement.id) } else { selection.insert(movement.id) }
+    }
+
+    /// Abajo, en modo «Seleccionar»: cuántos hay y qué hacer con todos.
+    private var selectionBar: some View {
+        let chosen = selectedMovements
+        return VStack(spacing: Spacing.s8) {
+            HStack {
+                Text(chosen.count == 1 ? "1 seleccionado" : "\(chosen.count) seleccionados")
+                    .font(Typography.subheadlineEmphasis)
+                    .foregroundStyle(Palette.label)
+                Spacer()
+                Button(chosen.count == filtered.count && !filtered.isEmpty ? "Ninguno" : "Todos") {
+                    selection = chosen.count == filtered.count ? [] : Set(filtered.map(\.id))
+                }
+                .font(Typography.subheadline)
+            }
+            HStack(spacing: Spacing.s16) {
+                Button("Revisado", systemImage: "checkmark.circle") {
+                    Task { await finance.update(MovementBulkEdit(reviewed: true).changes(for: chosen)); await reloadAccount() }
+                }
+                Button("Editar", systemImage: "slider.horizontal.3") { bulkEditing = true }
+                Spacer()
+                Button("Borrar", systemImage: "trash", role: .destructive) { confirmingBulkDelete = true }
+            }
+            .font(Typography.subheadline)
+            .disabled(chosen.isEmpty)
+        }
+        .padding(Spacing.s16)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: Radius.card))
+        .padding(Spacing.s16)
+    }
+
     private func reloadAccount() async {
         guard let account else { return }
         accountMovements = await finance.movements(of: account)
@@ -439,7 +561,8 @@ struct MovementsView: View {
     private func duplicate(_ movement: Movement) async {
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId,
                                   bookedOn: movement.bookedOn, amount: movement.amount,
-                                  description: movement.description, notes: movement.notes)
+                                  description: movement.description, notes: movement.notes,
+                                  excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
         if await finance.add(draft) { await reloadAccount() }
     }
 }
@@ -536,6 +659,8 @@ struct AccountFormView: View {
     @State private var kind: AccountKind = .checking
     @State private var openingBalance = ""
     @State private var isShared = true
+    @State private var isDefault = false
+    @State private var includeInNetWorth = true
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -553,6 +678,12 @@ struct AccountFormView: View {
                     Toggle("Compartida con el hogar", isOn: $isShared)
                 } footer: {
                     Text("El saldo inicial es lo que había en la cuenta antes del primer movimiento que apuntes o importes.")
+                }
+                Section {
+                    Toggle("Cuenta predeterminada", isOn: $isDefault)
+                    Toggle("Contar en el patrimonio", isOn: $includeInNetWorth)
+                } footer: {
+                    Text("La predeterminada sale elegida al apuntar un movimiento. Sin «Contar en el patrimonio», la cuenta sigue con su saldo pero no suma en el patrimonio neto.")
                 }
                 if let account {
                     Section {
@@ -592,6 +723,8 @@ struct AccountFormView: View {
         kind = account.kind
         openingBalance = account.openingBalance.minor == 0 ? "" : account.openingBalance.plainText
         isShared = account.isShared
+        isDefault = account.isDefault
+        includeInNetWorth = account.includeInNetWorth
     }
 
     private var parsedOpening: Money? {
@@ -616,9 +749,18 @@ struct AccountFormView: View {
             updated.kind = kind
             updated.openingBalance = opening
             updated.ownerId = draft.ownerId
+            updated.isDefault = isDefault
+            updated.includeInNetWorth = includeInNetWorth
             ok = await finance.updateAccount(updated)
         } else {
             ok = await finance.createAccount(draft)
+            // Las dos opciones nuevas se guardan después de crearla (el alta sólo lleva lo básico).
+            if ok, isDefault || !includeInNetWorth,
+               var created = finance.accounts.last(where: { $0.name == draft.trimmedName && $0.kind == kind }) {
+                created.isDefault = isDefault
+                created.includeInNetWorth = includeInNetWorth
+                await finance.updateAccount(created)
+            }
         }
         if ok { dismiss() } else { error = finance.error }
     }
@@ -652,10 +794,27 @@ struct MovementFormView: View {
     /// Categoría puesta sola por el comercio reconocido (se cambia si el concepto cambia).
     @State private var autoCategory: UUID?
     @State private var notes = ""
+    @State private var payee = ""
+    @State private var tagsText = ""
+    @State private var excluded = false
+    @State private var reviewed = false
     @State private var error: String?
     @State private var isWorking = false
+    /// Tras cambiar la categoría: otros con el mismo concepto a los que ofrecer el mismo cambio.
+    @State private var similar: [Movement] = []
 
     private var kind: CategoryKind { isExpense ? .expense : .income }
+
+    private var payeeSuggestions: [String] {
+        let text = payee.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return [] }
+        return finance.knownPayees.filter { $0.localizedCaseInsensitiveContains(text) && $0 != text }.prefix(3).map { $0 }
+    }
+
+    private var tagSuggestions: [String] {
+        let current = Set(MovementTags.normalize(tagsText))
+        return finance.knownTags.filter { !current.contains($0) }.prefix(6).map { $0 }
+    }
 
     var body: some View {
         NavigationStack {
@@ -684,6 +843,40 @@ struct MovementFormView: View {
                     TextField("Notas (opcional)", text: $notes, axis: .vertical)
                         .lineLimit(1...4)
                 }
+                Section {
+                    TextField("Beneficiario (opcional)", text: $payee)
+                    ForEach(payeeSuggestions, id: \.self) { suggestion in
+                        Button(suggestion) { payee = suggestion }
+                            .font(Typography.subheadline)
+                    }
+                    TextField("Etiquetas, p. ej. viaje, regalos", text: $tagsText)
+                        .autocorrectionDisabled()
+                    if !tagSuggestions.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: Spacing.s8) {
+                                ForEach(tagSuggestions, id: \.self) { tag in
+                                    Button("#" + tag) {
+                                        let current = MovementTags.normalize(tagsText)
+                                        tagsText = MovementTags.text(current + [tag])
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .font(Typography.footnote)
+                                    .accessibilityLabel("Añadir etiqueta \(tag)")
+                                }
+                            }
+                        }
+                    }
+                } footer: {
+                    Text("Las etiquetas sirven para juntar gastos de distintas categorías, como un viaje. Sepáralas con comas.")
+                }
+                Section {
+                    if movement != nil {
+                        Toggle("Revisado", isOn: $reviewed)
+                    }
+                    Toggle("Excluir del presupuesto e informes", isOn: $excluded)
+                } footer: {
+                    Text("Un movimiento excluido sigue contando en el saldo de la cuenta, pero no en el presupuesto, los informes ni el flujo de caja.")
+                }
                 if movement != nil {
                     Section {
                         Button("Borrar movimiento", role: .destructive) { Task { await delete() } }
@@ -703,6 +896,27 @@ struct MovementFormView: View {
                 }
             }
             .onChange(of: concept) { _, newValue in suggestCategory(for: newValue) }
+            .confirmationDialog(similar.count == 1 ? "Hay 1 movimiento con el mismo concepto"
+                                                   : "Hay \(similar.count) movimientos con el mismo concepto",
+                                isPresented: Binding(get: { !similar.isEmpty }, set: { if !$0 { similar = []; dismiss() } }),
+                                titleVisibility: .visible) {
+                Button("Ponerles la misma categoría") {
+                    let category = selectedCategory
+                    let changed = similar.map { movement -> Movement in
+                        var copy = movement
+                        copy.categoryId = category
+                        return copy
+                    }
+                    Task {
+                        await finance.update(changed)
+                        similar = []
+                        dismiss()
+                    }
+                }
+                Button("Sólo este", role: .cancel) { similar = []; dismiss() }
+            } message: {
+                Text("¿Quieres cambiar también su categoría a «\(finance.category(selectedCategory)?.name ?? "Sin categoría")»?")
+            }
             .onChange(of: isExpense) { _, _ in
                 if let current = finance.category(selectedCategory), current.kind != .transfer, current.kind != kind {
                     selectedCategory = nil
@@ -714,7 +928,7 @@ struct MovementFormView: View {
     }
 
     private func fill() {
-        selectedAccount = accountId ?? finance.activeAccounts.first?.id
+        selectedAccount = accountId ?? finance.defaultAccount?.id
         guard let movement else { return }
         isExpense = movement.isExpense
         amount = Money(minor: abs(movement.amount.minor)).plainText
@@ -723,6 +937,10 @@ struct MovementFormView: View {
         selectedAccount = movement.accountId
         selectedCategory = movement.categoryId
         notes = movement.notes ?? ""
+        payee = movement.payee ?? ""
+        tagsText = MovementTags.text(movement.tags)
+        excluded = movement.excluded
+        reviewed = movement.isReviewed
     }
 
     /// Si el concepto es de un comercio conocido y no hay categoría elegida a mano, la pone sola.
@@ -744,7 +962,8 @@ struct MovementFormView: View {
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let draft = MovementDraft(accountId: accountId, categoryId: selectedCategory, bookedOn: CalendarDay(date),
                                   amount: signed, description: concept,
-                                  notes: trimmedNotes.isEmpty ? nil : trimmedNotes)
+                                  notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
+                                  excluded: excluded, payee: Payee.clean(payee), tags: MovementTags.normalize(tagsText))
         if let issue = draft.issue { error = issue; return }
 
         isWorking = true
@@ -758,7 +977,18 @@ struct MovementFormView: View {
             updated.amount = draft.amount
             updated.description = draft.description
             updated.notes = draft.notes
+            updated.excluded = draft.excluded
+            updated.payee = draft.payee
+            updated.tags = draft.tags
+            updated.reviewedAt = reviewed ? (movement.reviewedAt ?? Date()) : nil
             ok = await finance.update(updated)
+            if ok, movement.categoryId != draft.categoryId {
+                let matches = SimilarMovements.matches(for: updated, in: finance.recent, categoryId: draft.categoryId)
+                if !matches.isEmpty {
+                    similar = matches
+                    return
+                }
+            }
         } else {
             ok = await finance.add(draft)
         }
@@ -857,7 +1087,7 @@ struct TransferFormView: View {
                 }
             }
             .onAppear {
-                if from == nil { from = fromId ?? finance.activeAccounts.first?.id }
+                if from == nil { from = fromId ?? finance.defaultAccount?.id }
                 if to == nil { to = finance.activeAccounts.first { $0.id != from }?.id }
             }
         }

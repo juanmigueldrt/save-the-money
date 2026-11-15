@@ -19,13 +19,13 @@ data class NetWorthPoint(val month: YearMonth, val assets: Long, val liabilities
 }
 
 object NetWorth {
-    /** Patrimonio de hoy con los saldos actuales, sin las cuentas archivadas. */
+    /** Patrimonio de hoy con los saldos actuales, sin las cuentas archivadas ni las que no cuentan en el patrimonio. */
     fun current(accounts: List<Account>, balances: Map<String, Long>, today: LocalDate): NetWorthPoint =
-        NetWorthPoint.of(YearMonth.from(today), accounts.filter { !it.isArchived }.map { balances[it.id] ?: it.openingMinor })
+        NetWorthPoint.of(YearMonth.from(today), accounts.filter { !it.isArchived && it.includeInNetWorth }.map { balances[it.id] ?: it.openingMinor })
 
     /** Patrimonio al final de cada uno de los últimos [months] meses, rehecho con el saldo inicial y los movimientos. */
     fun history(accounts: List<Account>, movements: List<Movement>, months: Int, through: YearMonth): List<NetWorthPoint> {
-        val active = accounts.filter { !it.isArchived }
+        val active = accounts.filter { !it.isArchived && it.includeInNetWorth }
         val byAccount = movements.groupBy { it.accountId }
         return (months - 1 downTo 0).map { offset ->
             val month = through.minusMonths(offset.toLong())
@@ -176,7 +176,7 @@ class SpendingReport(
         val months = mutableMapOf<YearMonth, Long>()
         var sum = 0L
         for (m in movements) {
-            if (m.day !in range) continue
+            if (m.excluded || m.day !in range) continue
             val category = byId[m.categoryId]
             if (category?.kind == CategoryKind.Transfer) continue
             val matches = when (kind) {

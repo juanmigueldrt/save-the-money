@@ -6,7 +6,7 @@ import Supabase
 /// presupuesto y límites en una sola transacción con los permisos de quien llama.
 extension SupabaseBackend: BudgetService {
     private static let budgetColumns = "id,household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
-    private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash"
+    private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
 
     public func budget(for month: MonthKey, in householdId: UUID) async throws -> Budget? {
         let rows: [BudgetRow] = try await mapped {
