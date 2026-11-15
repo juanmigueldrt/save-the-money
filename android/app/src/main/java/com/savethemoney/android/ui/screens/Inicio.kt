@@ -114,8 +114,14 @@ fun Pantalla04(nav: Nav) {
                 Modifier.weight(1f),
             ) { nav.go(if (session.capture) 11 else 20) }
         }
-        // El calendario no está en el diseño: en las capturas se queda fuera.
+        // «Puedes gastar hoy», el presupuesto extra favorito y el calendario no están en el diseño: en las capturas se quedan fuera.
         if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            GastarHoyCard(finance.budgets, finance) { nav.tab(Tab.Presupuesto) }
+            if (finance.budgets.extraBudgets.any { it.isFavorite }) {
+                Spacer(Modifier.height(16.dp))
+                FavoritoExtraCard(finance.budgets, finance, nav)
+            }
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListItem(

@@ -369,31 +369,37 @@ object ReminderPlanner {
     internal val MESES = listOf("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 }
 
-/** Aviso de que una categoría o grupo llega al 80 % o se pasa; el id es estable por mes y umbral. */
+/** Aviso de que una categoría o grupo llega al % de aviso o se pasa; el id es estable por periodo y umbral. */
 data class BudgetAlert(val id: String, val title: String, val body: String)
 
 object BudgetAlertPlanner {
-    private const val PREFIX = "stm.budget."
+    const val PREFIX = "stm.budget."
 
-    fun alerts(report: BudgetReport, month: YearMonth): List<BudgetAlert> {
+    fun alerts(report: BudgetReport): List<BudgetAlert> {
+        // Por periodo: el id lleva el primer día, para que cada periodo avise una vez.
+        val start = report.period.start
+        val key = if (start.dayOfMonth == 1) YearMonth.from(report.period.endInclusive).toString() else start.toString()
+        val thresholds = listOf(report.warnPercent.coerceIn(50, 100), 100)
         val porCategoria = report.lines.mapNotNull { line ->
             val limit = line.limit?.takeIf { it > 0 } ?: return@mapNotNull null
-            alert("$PREFIX$month.${line.category.id}", line.category.name, line.spent, limit)
+            alert("$PREFIX$key.${line.category.id}", line.category.name, line.spent, line.available ?: limit, thresholds)
         }
         val porGrupo = report.groups.filter { it.allocated > 0 && it.group != BudgetGroup.Savings }.mapNotNull {
-            alert("$PREFIX$month.${it.group.name.lowercase()}", it.group.title, it.spent, it.allocated)
+            alert("$PREFIX$key.${it.group.name.lowercase()}", it.group.title, it.spent, it.allocated, thresholds)
         }
         return porCategoria + porGrupo
     }
 
-    private fun alert(id: String, name: String, spent: Long, limit: Long): BudgetAlert? {
+    private fun alert(id: String, name: String, spent: Long, limit: Long, thresholds: List<Int>): BudgetAlert? {
+        if (limit <= 0) return null
         val percent = spent * 100 / limit
+        val reached = thresholds.lastOrNull { percent >= it } ?: return null
         val s = Money.format(spent)
         val l = Money.format(limit)
-        return when {
-            percent >= 100 -> BudgetAlert("$id.100", "Te has pasado en $name", "Llevas $s de $l este mes.")
-            percent >= 80 -> BudgetAlert("$id.80", "$name: ya llevas el $percent %", "Has gastado $s de $l. Quedan ${Money.format(limit - spent)}.")
-            else -> null
+        return if (reached >= 100) {
+            BudgetAlert("$id.$reached", "Te has pasado en $name", "Llevas $s de $l en este periodo.")
+        } else {
+            BudgetAlert("$id.$reached", "$name: ya llevas el $percent %", "Has gastado $s de $l. Quedan ${Money.format(limit - spent)}.")
         }
     }
 }

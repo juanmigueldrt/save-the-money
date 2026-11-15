@@ -3,7 +3,6 @@ package com.savethemoney.android.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
-import java.time.YearMonth
 import java.util.UUID
 
 // Finance.swift y FinanceService de STMCore, con los mismos nombres de columna que Supabase.
@@ -237,11 +236,21 @@ interface FinanceService {
     /** Guarda varios de golpe. Los que ya estaban (misma huella en la cuenta) se ignoran. */
     suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult
 
-    suspend fun budget(householdId: String, month: YearMonth): Budget?
+    /** El presupuesto propio que empieza ese día, o nulo si aún no se ha hecho. */
+    suspend fun budget(householdId: String, startingOn: LocalDate): Budget?
 
-    /** El último presupuesto anterior a [month], para proponerlo. */
-    suspend fun latestBudget(householdId: String, month: YearMonth): Budget?
+    /** El último presupuesto propio que empieza antes de ese día, para proponerlo. */
+    suspend fun latestBudget(householdId: String, before: LocalDate): Budget?
     suspend fun saveBudget(budget: Budget): Budget
+
+    /** Cuándo cobra quien ha entrado (nulo si aún no lo ha dicho). Es privado de cada persona. */
+    suspend fun paySchedule(): PaySchedule?
+    suspend fun savePaySchedule(schedule: PaySchedule): PaySchedule
+
+    /** Presupuestos extra propios del hogar, el favorito primero. */
+    suspend fun extraBudgets(householdId: String): List<ExtraBudget>
+    suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget
+    suspend fun deleteExtraBudget(id: String)
     suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement>
 
     suspend fun recurringSeries(householdId: String): List<RecurringSeries>
@@ -419,17 +428,45 @@ class InMemoryFinance : FinanceService {
 
     private val budgets = mutableListOf<Budget>()
 
-    override suspend fun budget(householdId: String, month: YearMonth) =
-        budgets.firstOrNull { it.householdId == householdId && it.month == month }
+    override suspend fun budget(householdId: String, startingOn: LocalDate) =
+        budgets.firstOrNull { it.householdId == householdId && it.period.start == startingOn }
 
-    override suspend fun latestBudget(householdId: String, month: YearMonth) =
-        budgets.filter { it.householdId == householdId && it.month < month }.maxByOrNull { it.month }
+    override suspend fun latestBudget(householdId: String, before: LocalDate) =
+        budgets.filter { it.householdId == householdId && it.period.start < before }.maxByOrNull { it.period.start }
 
     override suspend fun saveBudget(budget: Budget): Budget {
         budget.issue?.let(::fail)
-        budgets.removeAll { it.householdId == budget.householdId && it.month == budget.month }
+        budgets.removeAll { it.householdId == budget.householdId && it.period.start == budget.period.start }
         budgets += budget
         return budget
+    }
+
+    private var schedule: PaySchedule? = null
+    private val extras = mutableListOf<ExtraBudget>()
+
+    override suspend fun paySchedule() = schedule
+
+    override suspend fun savePaySchedule(schedule: PaySchedule): PaySchedule {
+        schedule.issue?.let(::fail)
+        this.schedule = schedule
+        return schedule
+    }
+
+    override suspend fun extraBudgets(householdId: String) =
+        extras.filter { it.householdId == householdId }.sortedWith(compareBy<ExtraBudget> { !it.isFavorite }.thenByDescending { it.startsOn })
+
+    override suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget {
+        budget.issue?.let(::fail)
+        val saved = budget.copy(name = budget.trimmedName)
+        // Un favorito por persona, como el disparador del servidor.
+        if (saved.isFavorite) extras.replaceAll { if (it.isFavorite) it.copy(isFavorite = false) else it }
+        val index = extras.indexOfFirst { it.id == saved.id }
+        if (index >= 0) extras[index] = saved else extras += saved
+        return saved
+    }
+
+    override suspend fun deleteExtraBudget(id: String) {
+        extras.removeAll { it.id == id }
     }
 
     override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate) =

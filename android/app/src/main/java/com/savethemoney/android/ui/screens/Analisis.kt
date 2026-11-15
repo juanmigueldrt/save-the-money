@@ -66,6 +66,7 @@ import com.savethemoney.android.data.SpendingReport
 import com.savethemoney.android.data.GroupedSpending
 import com.savethemoney.android.data.biggestRise
 import com.savethemoney.android.data.BudgetGroup
+import com.savethemoney.android.data.BudgetPeriod
 import com.savethemoney.android.data.BudgetTemplate
 import com.savethemoney.android.data.CashFlow
 import com.savethemoney.android.data.CategoryKind
@@ -101,6 +102,7 @@ import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmIcon
 import com.savethemoney.android.ui.components.StmScreen
+import com.savethemoney.android.ui.components.StmSwitch
 import com.savethemoney.android.ui.components.Tab
 import com.savethemoney.android.ui.components.TopBar
 import com.savethemoney.android.ui.components.tap
@@ -124,13 +126,14 @@ fun Pantalla14(nav: Nav) {
     val budgets = finance.budgets
     val scope = rememberCoroutineScope()
     var eligiendo by remember { mutableStateOf(false) }
+    var eligiendoPeriodo by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { budgets.load() }
     val report = budgets.report(finance.categories)
     val template = (budgets.budget ?: budgets.proposal)?.template ?: BudgetTemplate.FiftyThirtyTwenty
     val hoy = finance.today()
     // Cada grupo ocupa lo gastado sobre lo repartido; si no hay base, se reparte el arco entre lo gastado.
     val total = maxOf(report.base, report.groups.sumOf { it.spent }).coerceAtLeast(1).toFloat()
-    val restantes = if (hoy in budgets.period) ChronoUnit.DAYS.between(hoy, budgets.period.endInclusive) else null
+    val restantes = if (budgets.isCurrentPeriod) ChronoUnit.DAYS.between(hoy, budgets.period.end) else null
     val lineas = report.lines.filter { it.category.budgetGroup != null }
     StmScreen(
         topBar = {
@@ -138,19 +141,37 @@ fun Pantalla14(nav: Nav) {
                 IconBtn(StmIcons.edit, { nav.go(15) }, contentDescription = "Editar presupuesto")
                 IconBtn(StmIcons.moreVert, { eligiendo = true }, contentDescription = "Más opciones")
             }
-            LargeTitle("Presupuesto", "${tituloMes(budgets.month, hoy)} · plantilla ${template.needs}/${template.wants}/${template.savings}")
+            LargeTitle("Presupuesto", "${budgets.period.title} · plantilla ${template.needs}/${template.wants}/${template.savings}")
         },
         bottomBar = { NavBar(Tab.Presupuesto, nav::tab) },
         snackbar = budgets.error?.let { e -> { Snackbar(e) } },
         overlay = if (eligiendo) {
-            { SelectorMes(budgets, hoy, { eligiendo = false }) { m -> scope.launch { budgets.show(m) } } }
+            {
+                SelectorSheet(
+                    "Presupuesto",
+                    listOf(
+                        "Día de cobro" to { nav.go(44) },
+                        "Nuevo presupuesto extra" to { budgets.edit(null); nav.go(45) },
+                        "Elegir periodo" to { eligiendoPeriodo = true },
+                    ),
+                    { eligiendo = false },
+                )
+            }
+        } else if (eligiendoPeriodo) {
+            { SelectorPeriodos(budgets, { eligiendoPeriodo = false }) }
         } else null,
     ) {
+        SelectorPeriodo(budgets)
+        Spacer(Modifier.height(16.dp))
+        if (budgets.isCurrentPeriod && !session.capture) {
+            GastarHoyCard(budgets, finance)
+            Spacer(Modifier.height(16.dp))
+        }
         if (budgets.budget == null) {
             StmCard {
                 Text(
-                    budgets.proposal?.let { "Aún no hay presupuesto para este mes. Puedes partir del de ${Fechas.mes(it.month.atDay(1))}." }
-                        ?: "Aún no hay presupuesto para este mes. Mientras tanto, se reparten los ingresos reales con 50/30/20.",
+                    budgets.proposal?.let { "Aún no hay presupuesto para este periodo. Puedes partir del de ${it.period.title.lowercase()}." }
+                        ?: "Aún no hay presupuesto para este periodo. Mientras tanto, se reparten los ingresos reales con 50/30/20.",
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
@@ -176,6 +197,20 @@ fun Pantalla14(nav: Nav) {
                 }
             }
         }
+        if (budgets.budget != null) {
+            val insights = budgets.insights(finance.categories)
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListItem(
+                    if (insights.unbudgeted < 0) "Límites por encima de lo previsto" else "Queda por presupuestar",
+                    trailingText = Money.format(insights.unbudgeted),
+                )
+                if (budgets.isCurrentPeriod) {
+                    Divider(inset = 16.dp)
+                    ListItem("Al ritmo de hoy gastarás", trailingText = Money.format(insights.projectedSpent))
+                }
+            }
+        }
         if (lineas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             StmCard {
@@ -196,6 +231,10 @@ fun Pantalla14(nav: Nav) {
                 Text("Ponles categoría en Movimientos para que cuenten en su grupo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            ExtrasSection(budgets, finance, nav)
+        }
     }
 }
 
@@ -212,6 +251,9 @@ fun Pantalla15(nav: Nav) {
     var income by remember(inicial) { mutableStateOf(if (inicial.expectedIncome == 0L) "" else Money.input(inicial.expectedIncome)) }
     var template by remember(inicial) { mutableStateOf(inicial.template) }
     val limites = remember(inicial) { mutableStateMapOf<String, String>().apply { inicial.limits.forEach { (k, v) -> put(k, Money.input(v)) } } }
+    var arrastre by remember(inicial) { mutableStateOf(inicial.carryOver) }
+    var aviso by remember(inicial) { mutableIntStateOf(inicial.warnPercent) }
+    var propuesta by remember { mutableStateOf<String?>(null) }
     val base = Money.entered(income)?.coerceAtLeast(0) ?: 0
     val reparto = template.allocate(base)
     val gastos = finance.categories(CategoryKind.Expense)
@@ -223,18 +265,18 @@ fun Pantalla15(nav: Nav) {
                 Money.entered(text)?.takeIf { it >= 0 }
                     ?: throw AppError.InvalidInput("El límite de ${finance.category(id)?.name ?: "una categoría"} no es un importe válido.")
             }.filterValues { it > 0 }
-            budgets.save(inicial.copy(expectedIncome = expected, template = template, limits = parsed))
+            budgets.save(inicial.copy(expectedIncome = expected, template = template, limits = parsed, carryOver = arrastre, warnPercent = aviso))
             nav.back()
         }
     }
     LaunchedEffect(Unit) { if (budgets.budget == null && budgets.proposal == null) budgets.load() }
     StmScreen(
         topBar = {
-            TopBar("Presupuesto de ${Fechas.mes(inicial.month.atDay(1))}", navIcon = StmIcons.close, onNav = nav::back) {
+            TopBar("Presupuesto · ${inicial.period.title}", navIcon = StmIcons.close, onNav = nav::back) {
                 Btn("Guardar", guardar, kind = BtnKind.Text, enabled = !action.busy)
             }
         },
-        snackbar = action.error?.let { e -> { Snackbar(e) } },
+        snackbar = (action.error ?: propuesta)?.let { e -> { Snackbar(e) } },
     ) {
         Spacer(Modifier.height(8.dp))
         Segmented(listOf("Por categorías", "Flexible"), mode, { mode = it })
@@ -253,7 +295,41 @@ fun Pantalla15(nav: Nav) {
             )
         }
         Spacer(Modifier.height(16.dp))
+        ListCard {
+            ListHeader("Arrastre y avisos")
+            ListItem("Pasar lo que sobre al siguiente periodo", trailing = { StmSwitch(arrastre) { arrastre = it } })
+            Divider(inset = 16.dp)
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Avisarme al", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                Stepper("$aviso % del límite", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Con el arrastre, lo que sobre en una categoría se suma a su límite del siguiente periodo, y lo que te pases se resta.",
+            style = StmType.bodySmall, color = c.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
         if (mode == 0) {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                SmallTonalBtn("Proponer límites (media de 3 periodos)") {
+                    val sugeridos = budgets.suggestedLimits(finance.categories)
+                    if (sugeridos.isEmpty()) {
+                        propuesta = "Aún no hay gastos en los periodos anteriores para proponer límites."
+                    } else {
+                        propuesta = null
+                        limites.clear()
+                        sugeridos.forEach { (k, v) -> limites[k] = Money.input(v) }
+                    }
+                }
+                if (limites.values.any { it.isNotBlank() }) SmallTonalBtn("Vaciar límites") { limites.clear() }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "La propuesta usa lo que gastaste de media en cada categoría en los 3 periodos anteriores. Puedes cambiarla antes de guardar.",
+                style = StmType.bodySmall, color = c.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
             ListCard {
                 BudgetGroup.entries.forEach { group ->
                     val filas = gastos.filter { it.budgetGroup == group }
@@ -309,20 +385,23 @@ fun Pantalla16(nav: Nav) {
     val report = budgets.report(finance.categories, months)
     val flow = CashFlow(report)
     val hoy = finance.today()
-    val titulo = if (months == 1) tituloMes(budgets.month, hoy) else "${tituloMes(budgets.month.minusMonths(months - 1L), hoy)} – ${tituloMes(budgets.month, hoy)}"
+    val rango = budgets.range(months)
+    val titulo = if (months == 1) budgets.period.title else BudgetPeriod(rango.start, rango.endInclusive).title
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null) {
-                IconBtn(StmIcons.calendarMonth, { eligiendo = true }, contentDescription = "Elegir mes")
+                IconBtn(StmIcons.calendarMonth, { eligiendo = true }, contentDescription = "Elegir periodo")
             }
             LargeTitle("Flujo de caja", titulo)
         },
         bottomBar = { NavBar(Tab.Flujo, nav::tab) },
         snackbar = budgets.error?.let { e -> { Snackbar(e) } },
         overlay = if (eligiendo) {
-            { SelectorMes(budgets, hoy, { eligiendo = false }) { m -> scope.launch { budgets.show(m) } } }
+            { SelectorPeriodos(budgets, { eligiendo = false }) }
         } else null,
     ) {
+        SelectorPeriodo(budgets)
+        Spacer(Modifier.height(16.dp))
         SegmentedWrap(listOf("Mes", "Trimestre", "Año"), period) { period = it }
         Spacer(Modifier.height(16.dp))
         StmCard {
@@ -875,7 +954,7 @@ private fun LegendItem(color: Color, label: String) {
 private fun CategoryLine(line: CategoryLine, onClick: () -> Unit) {
     val c = Stm.colors
     val icon = iconoCategoria(line.category)
-    val limit = line.limit
+    val limit = line.available
     val detail = when {
         limit == null -> Money.format(line.spent, decimals = false)
         line.isOver -> "${Money.format(line.spent - limit, decimals = false)} por encima"
@@ -896,6 +975,14 @@ private fun CategoryLine(line: CategoryLine, onClick: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             if (line.isOver) Progress(f * 334 / 348, color = c.error, track = c.errorContainer) else Progress(f * 334 / 348)
         }
+        if (line.carried != 0L) {
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (line.carried < 0) "Incluye ${Money.format(-line.carried)} de menos del periodo anterior"
+                else "Incluye ${Money.format(line.carried)} que sobró del periodo anterior",
+                style = StmType.bodySmall, color = c.onSurfaceVariant,
+            )
+        }
     }
 }
 
@@ -915,13 +1002,10 @@ private fun LeadIconGrupo(icon: ImageVector, group: BudgetGroup) {
     }
 }
 
-/** "Noviembre", y el año si no es el actual. */
-private fun tituloMes(month: YearMonth, hoy: LocalDate): String =
-    Fechas.mesTitulo(month.atDay(1)) + if (month.year != hoy.year) " de ${month.year}" else ""
-
 @Composable
-private fun BoxScope.SelectorMes(budgets: BudgetModel, hoy: LocalDate, cerrar: () -> Unit, elegir: (YearMonth) -> Unit) {
-    SelectorSheet("Elegir mes", budgets.months().map { m -> tituloMes(m, hoy) to { cerrar(); elegir(m) } }, onDismiss = cerrar)
+private fun BoxScope.SelectorPeriodos(budgets: BudgetModel, cerrar: () -> Unit) {
+    val scope = rememberCoroutineScope()
+    SelectorSheet("Elegir periodo", budgets.periods().map { p -> p.title to { scope.launch { budgets.show(p) }; Unit } }, onDismiss = cerrar)
 }
 
 /** Importe editable de una fila: gris y alineado a la derecha, como el importe del diseño. */
