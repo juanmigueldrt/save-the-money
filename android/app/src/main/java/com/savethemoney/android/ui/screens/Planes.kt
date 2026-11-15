@@ -206,6 +206,7 @@ fun Pantalla21(nav: Nav) {
     var charges by remember(base) { mutableIntStateOf(base?.introCharges ?: 3) }
     var remind by remember(base) { mutableStateOf(base == null || base.remindDaysBefore != null) }
     var dias by remember(base) { mutableIntStateOf(base?.remindDaysBefore ?: 1) }
+    var pendiente by remember(base) { mutableStateOf(base?.createsPending ?: true) }
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf<String?>(null) }
     var confirmar by remember { mutableStateOf(false) }
@@ -222,6 +223,7 @@ fun Pantalla21(nav: Nav) {
             name = name, kind = tipos[kind], amountMinor = dinero, accountId = cuenta, categoryId = categoria,
             every = cada.every, unit = cada.unit, startsOn = fecha.toString(), endsOn = if (conFin) fin.toString() else null,
             remindDaysBefore = if (remind) dias else null, introMinor = oferta, introCharges = if (conOferta) charges else null,
+            createsPending = pendiente,
         )
         planning.save(item)
         nav.back()
@@ -238,20 +240,28 @@ fun Pantalla21(nav: Nav) {
             confirmar && editando != null -> {
                 {
                     StmDialog(
-                        "¿Borrar este pago fijo?",
-                        "Se borra para todo el hogar. Los movimientos ya apuntados no se tocan.",
+                        "¿Qué quieres hacer con este pago fijo?",
+                        "Si dejas de pagarlo, se guarda con fecha de fin y no habrá más cargos ni avisos. Si lo borras, " +
+                            "desaparece con sus cargos pendientes. Los movimientos ya apuntados no se tocan en ningún caso.",
                         icon = StmIcons.deleteForever,
                         onDismiss = { confirmar = false },
-                        actions = {
-                            Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text)
-                            Btn("Borrar", {
-                                action.run {
-                                    planning.delete(editando)
-                                    nav.back()
-                                }
-                            }, kind = BtnKind.Error)
-                        },
-                    )
+                        actions = { Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text) },
+                    ) {
+                        Spacer(Modifier.height(16.dp))
+                        Btn("Dejar de pagarlo desde hoy", {
+                            action.run {
+                                planning.save(editando.copy(endsOn = maxOf(editando.startDay, finance.today()).toString()))
+                                nav.back()
+                            }
+                        }, Modifier.fillMaxWidth(), kind = BtnKind.Tonal)
+                        Spacer(Modifier.height(8.dp))
+                        Btn("Borrarlo con sus pendientes", {
+                            action.run {
+                                planning.delete(editando)
+                                nav.back()
+                            }
+                        }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
+                    }
                 }
             }
             selector != null -> {
@@ -329,6 +339,15 @@ fun Pantalla21(nav: Nav) {
             }
             FilledField("Cuenta", finance.account(cuenta)?.name ?: "Sin cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
             FilledField("Categoría", finance.category(categoria)?.name ?: "Sin categoría", trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+            ListCard {
+                ListItem(
+                    "Apuntarlo como pendiente al llegar el día",
+                    "El día del cargo aparece en Resumen para confirmarlo con el importe real. Hasta entonces no cuenta en saldos " +
+                        "ni presupuesto, y si llega antes por CSV se empareja solo.",
+                    supportingLines = 4,
+                    trailing = { StmSwitch(pendiente) { pendiente = it } },
+                )
+            }
             ListCard {
                 ListItem("Tiene fecha de fin", trailing = { StmSwitch(conFin) { conFin = it } })
             }

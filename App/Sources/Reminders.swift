@@ -25,7 +25,9 @@ struct LocalReminders: ReminderScheduling {
         let ours = pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
         center.removePendingNotificationRequests(withIdentifiers: ours)
 
-        guard UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true, !reminders.isEmpty else { return }
+        // Los de hábito tienen sus propios interruptores (HabitSettings); el resto, el de «Avisos de pagos fijos».
+        let enabled = prefix == HabitReminderPlanner.prefix || (UserDefaults.standard.object(forKey: Self.enabledKey) as? Bool ?? true)
+        guard enabled, !reminders.isEmpty else { return }
         let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
         guard granted else { return }
 
@@ -42,6 +44,40 @@ struct LocalReminders: ReminderScheduling {
             let trigger = UNCalendarNotificationTrigger(dateMatching: when, repeats: false)
             try? await center.add(UNNotificationRequest(identifier: reminder.id, content: content, trigger: trigger))
         }
+    }
+}
+
+/// Recordatorio para apuntar gastos y resumen semanal: se eligen en Más opciones y se guardan
+/// sólo en este dispositivo.
+struct HabitSettings {
+    enum LogReminder: String, CaseIterable, Identifiable {
+        case off, daily, weekly
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .off: "No"
+            case .daily: "Cada día"
+            case .weekly: "Los domingos"
+            }
+        }
+    }
+
+    static let logReminderKey = "habitLogReminder"
+    static let logHourKey = "habitLogHour"
+    static let weeklySummaryKey = "habitWeeklySummary"
+
+    var logReminder: LogReminder
+    var logHour: Int
+    var weeklySummary: Bool
+
+    static var current: HabitSettings {
+        let defaults = UserDefaults.standard
+        return HabitSettings(
+            logReminder: LogReminder(rawValue: defaults.string(forKey: logReminderKey) ?? "") ?? .off,
+            logHour: defaults.object(forKey: logHourKey) as? Int ?? 21,
+            weeklySummary: defaults.object(forKey: weeklySummaryKey) as? Bool ?? true)
     }
 }
 

@@ -40,6 +40,8 @@ struct SummaryView: View {
                 }
                 .buttonStyle(.plain)
 
+                PendingChargesCard()
+
                 SpendTodayCard()
 
                 VStack(alignment: .leading, spacing: Spacing.s8) {
@@ -59,6 +61,8 @@ struct SummaryView: View {
                 NextPaymentsCard()
 
                 FavoriteExtraBudgetCard()
+
+                WeeklySummaryCard()
 
                 AdaptiveColumns {
                     VStack(alignment: .leading, spacing: Spacing.s16) {

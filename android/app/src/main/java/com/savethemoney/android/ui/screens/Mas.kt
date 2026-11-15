@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.data.HabitSettings
 import com.savethemoney.android.data.AmountColumns
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.BudgetCategory
@@ -309,6 +310,12 @@ fun Pantalla30(nav: Nav) {
     val action = rememberAction()
     var alerts by remember(finance) { mutableStateOf(finance?.planning?.alertsEnabled ?: true) }
     var limites by remember(finance) { mutableStateOf(finance?.planning?.budgetAlertsEnabled ?: true) }
+    var habitos by remember(finance) { mutableStateOf(finance?.planning?.habits ?: HabitSettings()) }
+    var eligeHabito by remember { mutableStateOf(false) }
+    val cambiaHabitos = { nuevos: HabitSettings ->
+        habitos = nuevos
+        finance?.planning?.habits = nuevos
+    }
     StmScreen(
         topBar = { MasHeader() },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
@@ -317,6 +324,14 @@ fun Pantalla30(nav: Nav) {
             {
                 SelectorSheet(
                     "Tema", AppTheme.entries.map { t -> t.title to { action.run { session.setTheme(t) } } }, { eligeTema = false },
+                )
+            }
+        } else if (eligeHabito) {
+            {
+                SelectorSheet(
+                    "Recordarme apuntar gastos",
+                    HabitSettings.LogReminder.entries.map { r -> r.title to { cambiaHabitos(habitos.copy(logReminder = r)) } },
+                    { eligeHabito = false },
                 )
             }
         } else {
@@ -380,6 +395,34 @@ fun Pantalla30(nav: Nav) {
                 },
             )
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
+        }
+        // Fase D, como en iOS: recordatorio para apuntar gastos y resumen semanal. Sólo en este dispositivo.
+        if (!session.capture && finance != null) {
+            Spacer(Modifier.height(16.dp))
+            ListCard {
+                ListHeader("Recordatorios")
+                ListItem(
+                    "Recordarme apuntar gastos", habitos.logReminder.title,
+                    leading = { StmIcon(StmIcons.notifications, Stm.colors.onSurfaceVariant) },
+                    trailing = { StmIcon(StmIcons.arrowDropDown, Stm.colors.onSurfaceVariant) },
+                    onClick = { eligeHabito = true },
+                )
+                if (habitos.logReminder != HabitSettings.LogReminder.Off) {
+                    Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Hora", Modifier.weight(1f), style = StmType.bodyLarge, color = Stm.colors.onSurface)
+                        Stepper(
+                            "A las ${habitos.logHour}:00",
+                            { cambiaHabitos(habitos.copy(logHour = (habitos.logHour - 1).coerceAtLeast(6))) },
+                            { cambiaHabitos(habitos.copy(logHour = (habitos.logHour + 1).coerceAtMost(23))) },
+                        )
+                    }
+                }
+                ListItem(
+                    "Resumen semanal los lunes", "A las 9:00, con la semana anterior",
+                    leading = { StmIcon(StmIcons.calendarMonth, Stm.colors.onSurfaceVariant) },
+                    trailing = { StmSwitch(habitos.weeklySummary) { cambiaHabitos(habitos.copy(weeklySummary = it)) } },
+                )
+            }
         }
         // No está en el diseño; va al final para no mover lo anterior. Sólo en este dispositivo.
         if (!session.capture) {

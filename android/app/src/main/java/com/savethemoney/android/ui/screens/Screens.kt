@@ -30,6 +30,8 @@ fun ScreenFor(number: Int, nav: Nav) {
         43 -> Pantalla43(nav)
         // Fuera del diseño: día de cobro y presupuestos extra (fase C), como en iOS.
         44 -> Pantalla44(nav); 45 -> Pantalla45(nav)
+        // Fuera del diseño: confirmar un pago fijo pendiente y resumen semanal (fase D), como en iOS.
+        46 -> Pantalla46(nav); 47 -> Pantalla47(nav)
     }
 }
 

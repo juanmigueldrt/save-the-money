@@ -20,6 +20,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var paySchedules: [UUID: PaySchedule] = [:]
     var extraBudgetList: [ExtraBudget] = []
     var recurring: [RecurringSeries] = []
+    var chargeList: [RecurringCharge] = []
     var goalList: [Goal] = []
     var goalContributions: [GoalContribution] = []
     var scoresByUser: [UUID: [CreditScore]] = [:]

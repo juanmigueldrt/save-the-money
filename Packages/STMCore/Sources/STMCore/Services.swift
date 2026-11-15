@@ -120,6 +120,16 @@ public protocol RecurringService: Sendable {
     func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries
     func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries
     func deleteRecurring(_ seriesId: UUID) async throws
+
+    /// Cargos propios de los pagos fijos (pendientes, confirmados y saltados).
+    func recurringCharges(in householdId: UUID) async throws -> [RecurringCharge]
+    /// Apunta cargos pendientes; los que ya existen (misma serie y día) se ignoran.
+    func createCharges(_ charges: [RecurringCharge]) async throws -> [RecurringCharge]
+    /// Crea el movimiento del cargo y lo marca como confirmado. Devuelve el movimiento.
+    func confirmCharge(_ chargeId: UUID, with draft: MovementDraft) async throws -> Movement
+    /// Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta.
+    func updateCharge(_ chargeId: UUID, status: ChargeStatus, transactionId: UUID?) async throws
+    func deleteCharge(_ chargeId: UUID) async throws
 }
 
 /// Metas de ahorro y de deudas, con sus aportaciones.

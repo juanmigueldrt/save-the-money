@@ -119,6 +119,7 @@ extension InMemoryBackend: FinanceService {
         goalContributions.removeAll { goalIds.contains($0.goalId) }
         goalList.removeAll { $0.householdId == householdId }
         recurring.removeAll { $0.householdId == householdId }
+        chargeList.removeAll { $0.householdId == householdId }
         budgets.removeAll { $0.householdId == householdId }
         extraBudgetList.removeAll { $0.householdId == householdId }
         financeMovements.removeAll { $0.householdId == householdId }
@@ -186,6 +187,9 @@ extension InMemoryBackend: FinanceService {
         _ = try requireMember(of: movement.householdId)
         financeMovements.removeAll { $0.id == movementId }
         installmentList.removeAll { $0.movementId == movementId }
+        for index in chargeList.indices where chargeList[index].transactionId == movementId {
+            chargeList[index].transactionId = nil
+        }
     }
 
     public func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult {

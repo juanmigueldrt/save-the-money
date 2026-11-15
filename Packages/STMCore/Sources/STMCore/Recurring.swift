@@ -154,11 +154,16 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
     public var introAmount: Money?
     /// Cuántos cargos, desde el primero, van al precio de oferta.
     public var introCharges: Int?
+    /// Si al llegar cada cargo se apunta como pendiente de confirmar.
+    public var createsPending: Bool
+    /// Desde qué día crea cargos pendientes (nil: lo pone el servidor, hoy).
+    public var pendingFrom: CalendarDay?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: RecurringKind = .subscription,
                 amount: Money, accountId: UUID? = nil, categoryId: UUID? = nil,
                 recurrence: Recurrence = .monthly, startsOn: CalendarDay, endsOn: CalendarDay? = nil,
-                remindDaysBefore: Int? = 1, archivedAt: Date? = nil, introAmount: Money? = nil, introCharges: Int? = nil) {
+                remindDaysBefore: Int? = 1, archivedAt: Date? = nil, introAmount: Money? = nil, introCharges: Int? = nil,
+                createsPending: Bool = true, pendingFrom: CalendarDay? = nil) {
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -173,6 +178,8 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
         self.archivedAt = archivedAt
         self.introAmount = introAmount
         self.introCharges = introCharges
+        self.createsPending = createsPending
+        self.pendingFrom = pendingFrom
     }
 
     public var isArchived: Bool { archivedAt != nil }
@@ -335,6 +342,8 @@ extension RecurringSeries {
         case archivedAt = "archived_at"
         case introAmountMinor = "intro_amount_minor"
         case introCharges = "intro_charges"
+        case createsPending = "creates_pending"
+        case pendingFrom = "pending_from"
     }
 
     public init(from decoder: Decoder) throws {
@@ -353,6 +362,8 @@ extension RecurringSeries {
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
         introAmount = try c.decodeIfPresent(Int.self, forKey: .introAmountMinor).map { Money(minor: $0) }
         introCharges = try c.decodeIfPresent(Int.self, forKey: .introCharges)
+        createsPending = try c.decodeIfPresent(Bool.self, forKey: .createsPending) ?? true
+        pendingFrom = try c.decodeIfPresent(CalendarDay.self, forKey: .pendingFrom)
     }
 
     /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).
@@ -371,5 +382,7 @@ extension RecurringSeries {
         try c.encode(archivedAt.map(ServerDate.init), forKey: .archivedAt)
         try c.encode(introAmount?.minor, forKey: .introAmountMinor)
         try c.encode(introCharges, forKey: .introCharges)
+        try c.encode(createsPending, forKey: .createsPending)
+        try c.encodeIfPresent(pendingFrom, forKey: .pendingFrom)
     }
 }

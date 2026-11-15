@@ -16,6 +16,10 @@ final class PlanningModel {
     private(set) var series: [RecurringSeries] = []
     private(set) var goals: [Goal] = []
     private(set) var contributions: [GoalContribution] = []
+    /// Cargos de los pagos fijos (pendientes, confirmados y saltados).
+    private(set) var charges: [RecurringCharge] = []
+    /// Los últimos movimientos que se han visto, para emparejar los pendientes al recargar.
+    private var knownMovements: [Movement] = []
     private(set) var isLoading = false
     var error: String?
 
@@ -37,6 +41,9 @@ final class PlanningModel {
     var day: CalendarDay { today() }
 
     var upcoming: [UpcomingCharge] { series.upcoming(from: today(), days: 30) }
+
+    /// Cargos que han llegado y esperan que los confirmes.
+    var pending: [PendingCharge] { PendingCharges.pending(charges: charges, series: series) }
 
     func monthlyTotal(of kind: RecurringKind) -> Money { series.monthlyTotal(of: kind, on: today()) }
 
@@ -62,9 +69,56 @@ final class PlanningModel {
             async let series = recurringService.recurringSeries(in: id)
             async let goals = goalService.goals(in: id)
             async let contributions = goalService.contributions(in: id)
-            (self.series, self.goals, self.contributions) = try await (series, goals, contributions)
+            async let charges = recurringService.recurringCharges(in: id)
+            (self.series, self.goals, self.contributions, self.charges) = try await (series, goals, contributions, charges)
         }
+        await syncCharges(movements: knownMovements)
         await reschedule()
+    }
+
+    // MARK: Cargos pendientes
+
+    /// Apunta los cargos que han llegado y empareja los pendientes con movimientos ya apuntados
+    /// (del CSV o a mano), para que no se dupliquen.
+    func syncCharges(movements: [Movement]) async {
+        knownMovements = movements
+        guard !series.isEmpty else { return }
+        let missing = PendingCharges.missing(series: series, existing: charges, today: today())
+        if !missing.isEmpty, let created = try? await recurringService.createCharges(missing) {
+            charges.append(contentsOf: created)
+            // Si otro dispositivo los creó a la vez, se vuelven a leer.
+            if created.count < missing.count, let all = try? await recurringService.recurringCharges(in: household.id) {
+                charges = all
+            }
+        }
+        for match in PendingCharges.matches(charges: charges, series: series, movements: movements) {
+            guard (try? await recurringService.updateCharge(match.charge, status: .confirmed, transactionId: match.movement)) != nil,
+                  let index = charges.firstIndex(where: { $0.id == match.charge }) else { continue }
+            charges[index].status = .confirmed
+            charges[index].transactionId = match.movement
+        }
+    }
+
+    /// Crea el movimiento del cargo. Devuelve false si falla (el error queda en `error`).
+    @discardableResult
+    func confirm(_ item: PendingCharge, with draft: MovementDraft) async -> Bool {
+        await perform {
+            let movement = try await recurringService.confirmCharge(item.charge.id, with: draft)
+            if let index = charges.firstIndex(where: { $0.id == item.charge.id }) {
+                charges[index].status = .confirmed
+                charges[index].transactionId = movement.id
+                charges[index].amount = movement.amount
+            }
+        }
+    }
+
+    /// Ese cargo no se ha cobrado (o no se va a cobrar).
+    @discardableResult
+    func skip(_ item: PendingCharge) async -> Bool {
+        await perform {
+            try await recurringService.updateCharge(item.charge.id, status: .skipped, transactionId: nil)
+            if let index = charges.firstIndex(where: { $0.id == item.charge.id }) { charges[index].status = .skipped }
+        }
     }
 
     // MARK: Pagos recurrentes
@@ -88,6 +142,7 @@ final class PlanningModel {
         let ok = await perform {
             try await recurringService.deleteRecurring(item.id)
             series.removeAll { $0.id == item.id }
+            charges.removeAll { $0.seriesId == item.id }
         }
         if ok { await reschedule() }
         return ok
@@ -95,6 +150,21 @@ final class PlanningModel {
 
     func reschedule() async {
         await reminders.replace(with: ReminderPlanner.plan(series, today: today()), prefix: ReminderPlanner.prefix)
+        await rescheduleHabits()
+    }
+
+    /// Recordatorio para apuntar gastos y aviso del resumen semanal, según Más opciones.
+    func rescheduleHabits() async {
+        let settings = HabitSettings.current
+        var plan: [PlannedReminder] = []
+        if settings.logReminder != .off {
+            plan += HabitReminderPlanner.logReminders(today: today(), hour: settings.logHour,
+                                                      weekly: settings.logReminder == .weekly)
+        }
+        if settings.weeklySummary {
+            plan += HabitReminderPlanner.weeklySummary(today: today())
+        }
+        await reminders.replace(with: plan, prefix: HabitReminderPlanner.prefix)
     }
 
     // MARK: Metas

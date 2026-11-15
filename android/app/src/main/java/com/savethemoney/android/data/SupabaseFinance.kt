@@ -288,6 +288,50 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         Unit
     }
 
+    // Cargos pendientes: de quien los crea; se borran con su serie (on delete cascade).
+
+    override suspend fun recurringCharges(householdId: String): List<RecurringCharge> = backend.mapped {
+        client.from("recurring_charges").select(Columns.raw(CHARGE)) {
+            filter { eq("household_id", householdId) }
+            order("due_on", Order.DESCENDING)
+            limit(500)
+        }.decodeList()
+    }
+
+    override suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge> {
+        if (charges.isEmpty()) return emptyList()
+        return backend.mapped {
+            // ON CONFLICT (series_id, due_on) DO NOTHING: si otro dispositivo ya lo creó, no vuelve.
+            client.from("recurring_charges").upsert(charges.map { NewChargeRow(it.householdId, it.seriesId, it.dueOn, it.amountMinor) }) {
+                onConflict = "series_id,due_on"
+                ignoreDuplicates = true
+                select(Columns.raw(CHARGE))
+            }.decodeList()
+        }
+    }
+
+    /** confirm_recurring_charge crea el movimiento y enlaza el cargo en una sola transacción. */
+    override suspend fun confirmCharge(chargeId: String, draft: MovementDraft): Movement = backend.mapped {
+        draft.issue?.let(::fail)
+        val movementId = client.postgrest.rpc("confirm_recurring_charge", buildJsonObject {
+            put("charge", chargeId)
+            put("account", draft.accountId)
+            put("booked", draft.bookedOn.toString())
+            put("amount", draft.amountMinor)
+            put("category", draft.categoryId)
+            put("label", draft.description.trim())
+        }).decodeAs<String>()
+        client.from("transactions").select(Columns.raw(MOVEMENT)) { filter { eq("id", movementId) } }.decodeSingle()
+    }
+
+    override suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?) = backend.mapped {
+        client.from("recurring_charges").update(buildJsonObject {
+            put("status", status.name.lowercase())
+            put("transaction_id", if (status == ChargeStatus.Pending) null else transactionId)
+        }) { filter { eq("id", chargeId) } }
+        Unit
+    }
+
     override suspend fun goals(householdId: String): List<Goal> = backend.mapped {
         client.from("goals").select(Columns.raw(GOAL)) {
             filter { eq("household_id", householdId) }
@@ -561,7 +605,8 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     private companion object {
-        const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges"
+        const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges,creates_pending,pending_from"
+        const val CHARGE = "id,household_id,series_id,due_on,amount_minor,status,transaction_id"
         const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
         const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
         const val BUDGET = "household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
@@ -616,6 +661,8 @@ private fun RecurringSeries.columns() = buildJsonObject {
     put("archived_at", archivedAt)
     put("intro_amount_minor", introMinor)
     put("intro_charges", introCharges)
+    put("creates_pending", createsPending)
+    pendingFrom?.let { put("pending_from", it) }
 }
 
 private val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
@@ -754,6 +801,14 @@ private data class NewMovementRow(
         )
     }
 }
+
+@Serializable
+private data class NewChargeRow(
+    @SerialName("household_id") val householdId: String,
+    @SerialName("series_id") val seriesId: String,
+    @SerialName("due_on") val dueOn: String,
+    @SerialName("amount_minor") val amountMinor: Long,
+)
 
 @Serializable
 private data class MovementChanges(
