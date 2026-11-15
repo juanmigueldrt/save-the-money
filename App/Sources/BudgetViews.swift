@@ -2,37 +2,6 @@ import SwiftUI
 import STMCore
 import STMUI
 
-/// Selector de mes compartido por presupuesto y flujo: ‹ Noviembre de 2026 ›.
-struct MonthSwitcher: View {
-    @Environment(BudgetModel.self) private var budgets
-
-    var body: some View {
-        HStack {
-            Button("Mes anterior", systemImage: "chevron.left") {
-                Task { await budgets.show(budgets.month.adding(months: -1)) }
-            }
-            .labelStyle(.iconOnly)
-            Spacer()
-            VStack(spacing: 2) {
-                Text(budgets.month.title)
-                    .titleFont(.title2)
-                    .foregroundStyle(Palette.label)
-                Text("\(budgets.period.lowerBound.shortText) – \(budgets.period.upperBound.shortText)")
-                    .font(Typography.footnote)
-                    .foregroundStyle(Palette.labelSecondary)
-            }
-            Spacer()
-            Button("Mes siguiente", systemImage: "chevron.right") {
-                Task { await budgets.show(budgets.month.adding(months: 1)) }
-            }
-            .labelStyle(.iconOnly)
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(Palette.label)
-        .card()
-    }
-}
-
 /// Presupuesto del mes: los tres semicírculos 50/30/20 y los límites por categoría.
 struct BudgetView: View {
     enum Mode: String, CaseIterable {
@@ -50,13 +19,16 @@ struct BudgetView: View {
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
     @State private var editing = false
+    @State private var editingSchedule = false
     @AppStorage("budgetMode") private var mode: Mode = .template
 
     var body: some View {
         let report = budgets.report(categories: finance.categories)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                MonthSwitcher()
+                PeriodSwitcher()
+
+                if budgets.isCurrentPeriod { SpendTodayCard() }
 
                 CapsuleSegmented("Tipo de presupuesto", selection: $mode, options: Mode.allCases) { $0.title }
 
@@ -67,8 +39,8 @@ struct BudgetView: View {
                 if budgets.budget == nil {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text(budgets.proposal == nil
-                             ? "Aún no hay presupuesto para este mes. Mientras tanto, se reparten los ingresos reales con 50/30/20."
-                             : "Aún no hay presupuesto para este mes. Puedes partir del de \(budgets.proposal!.month.title.lowercased()).")
+                             ? "Aún no hay presupuesto para este periodo. Mientras tanto, se reparten los ingresos reales con 50/30/20."
+                             : "Aún no hay presupuesto para este periodo. Puedes partir del de \(budgets.proposal!.period.title.lowercased()).")
                             .font(Typography.subheadline)
                             .foregroundStyle(Palette.labelSecondary)
                         Button("Crear presupuesto") { editing = true }
@@ -83,12 +55,21 @@ struct BudgetView: View {
                             ForEach(report.groups, id: \.group) { SemicircleGauge(progress: $0) }
                         }
                         Divider()
-                        SummaryLine(title: "Ingresos del mes", amount: report.income)
+                        SummaryLine(title: "Ingresos del periodo", amount: report.income)
                         SummaryLine(title: budgets.budget == nil ? "Base del reparto (ingresos reales)" : "Ingresos previstos",
                                     amount: report.base)
                         SummaryLine(title: "Gastado", amount: report.totalSpent)
                         SummaryLine(title: report.remaining.isNegative ? "Gastado de más" : "Te queda",
                                     amount: report.remaining, highlight: true)
+                        if budgets.budget != nil {
+                            let insights = budgets.insights(categories: finance.categories)
+                            Divider()
+                            SummaryLine(title: insights.unbudgeted.isNegative ? "Límites por encima de lo previsto" : "Queda por presupuestar",
+                                        amount: insights.unbudgeted)
+                            if budgets.isCurrentPeriod {
+                                SummaryLine(title: "Al ritmo de hoy gastarás", amount: insights.projectedSpent)
+                            }
+                        }
                     }
                     .card()
                 }
@@ -116,6 +97,8 @@ struct BudgetView: View {
                     .card()
                 }
 
+                ExtraBudgetsSection()
+
                 ErrorText(message: budgets.error)
             }
             .pageLayout()
@@ -126,9 +109,13 @@ struct BudgetView: View {
             ToolbarItem(placement: .primaryAction) {
                 Button("Editar presupuesto", systemImage: "slider.horizontal.3") { editing = true }
             }
+            ToolbarItem(placement: .secondaryAction) {
+                Button("Día de cobro", systemImage: "calendar.badge.clock") { editingSchedule = true }
+            }
         }
         .refreshable { await budgets.load() }
         .sheet(isPresented: $editing) { BudgetFormView(initial: budgets.draft) }
+        .sheet(isPresented: $editingSchedule) { PayScheduleView() }
     }
 }
 
@@ -164,8 +151,8 @@ struct CategoryLineRow: View {
                     .foregroundStyle(Palette.label)
                 Spacer()
                 Group {
-                    if let limit = line.limit {
-                        Text("\(line.spent.formatted()) de \(limit.formatted())")
+                    if let available = line.available {
+                        Text("\(line.spent.formatted()) de \(available.formatted())")
                     } else {
                         Text(line.spent.formatted())
                     }
@@ -182,6 +169,13 @@ struct CategoryLineRow: View {
                     }
                 }
                 .frame(height: 6)
+            }
+            if line.carried.minor != 0 {
+                Text(line.carried.isNegative
+                     ? "Incluye \(Money(minor: -line.carried.minor).formatted()) de menos del periodo anterior"
+                     : "Incluye \(line.carried.formatted()) que sobró del periodo anterior")
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.labelSecondary)
             }
         }
         .accessibilityElement(children: .combine)
@@ -200,6 +194,8 @@ struct BudgetFormView: View {
     @State private var wants = 30
     @State private var savings = 20
     @State private var limits: [UUID: String] = [:]
+    @State private var carryOver = false
+    @State private var warnPercent = 80
     @State private var error: String?
     @State private var isWorking = false
 
@@ -225,6 +221,21 @@ struct BudgetFormView: View {
                     Text(total == 100 ? "Suma 100 %." : "Ahora suma \(total) %. Tiene que sumar 100 %.")
                         .foregroundStyle(total == 100 ? Palette.labelSecondary : Palette.negativeText)
                 }
+                Section {
+                    Toggle("Pasar lo que sobre al siguiente periodo", isOn: $carryOver)
+                    Stepper("Avisarme al \(warnPercent) % del límite", value: $warnPercent, in: 50...100, step: 5)
+                } header: {
+                    Text("Arrastre y avisos")
+                } footer: {
+                    Text("Con el arrastre, lo que sobre en una categoría se suma a su límite del siguiente periodo, y lo que te pases se resta.")
+                }
+                Section {
+                    Button("Proponer límites (media de 3 periodos)") { suggest() }
+                    Button("Vaciar límites", role: .destructive) { limits = [:] }
+                        .disabled(limits.values.allSatisfy { $0.trimmingCharacters(in: .whitespaces).isEmpty })
+                } footer: {
+                    Text("La propuesta usa lo que gastaste de media en cada categoría en los 3 periodos anteriores. Puedes cambiarla antes de guardar.")
+                }
                 ForEach(BudgetGroup.allCases, id: \.self) { group in
                     Section("Límites de \(group.title.lowercased()) (opcional)") {
                         ForEach(finance.categories(for: .expense).filter { $0.budgetGroup == group }) { category in
@@ -245,7 +256,7 @@ struct BudgetFormView: View {
             }
             .formStyle(.grouped)
             .brandBackground()
-            .navigationTitle(initial.month.title)
+            .navigationTitle(initial.period.title)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
@@ -265,6 +276,18 @@ struct BudgetFormView: View {
         income = initial.expectedIncome.minor == 0 ? "" : initial.expectedIncome.plainText
         (needs, wants, savings) = (initial.template.needs, initial.template.wants, initial.template.savings)
         limits = initial.limits.mapValues(\.plainText)
+        carryOver = initial.carryOver
+        warnPercent = initial.warnPercent
+    }
+
+    private func suggest() {
+        let suggested = budgets.suggestedLimits(categories: finance.categories)
+        guard !suggested.isEmpty else {
+            error = "Aún no hay gastos en los periodos anteriores para proponer límites."
+            return
+        }
+        error = nil
+        limits = suggested.mapValues(\.plainText)
     }
 
     private func save() async {
@@ -290,6 +313,8 @@ struct BudgetFormView: View {
         budget.expectedIncome = expected
         budget.template = BudgetTemplate(needs: needs, wants: wants, savings: savings)
         budget.limits = parsed
+        budget.carryOver = carryOver
+        budget.warnPercent = warnPercent
 
         isWorking = true
         defer { isWorking = false }
@@ -309,7 +334,7 @@ struct CashFlowView: View {
         let flow = CashFlow(report: report)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                MonthSwitcher()
+                PeriodSwitcher()
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
                         SummaryLine(title: "Entra", amount: report.income)
@@ -317,7 +342,7 @@ struct CashFlowView: View {
                         SummaryLine(title: "Sale", amount: report.totalSpent)
                     }
                     if flow.isEmpty {
-                        EmptyHint(text: "No hay movimientos este mes. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
+                        EmptyHint(text: "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
                     } else {
                         SankeyDiagram(flow: flow)
                             .chartHeight(max(320, CGFloat(flow.nodes.filter { $0.column == 2 }.count) * 34))

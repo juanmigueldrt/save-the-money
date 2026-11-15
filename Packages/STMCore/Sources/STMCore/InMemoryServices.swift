@@ -17,6 +17,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
     var budgets: [Budget] = []
+    var paySchedules: [UUID: PaySchedule] = [:]
+    var extraBudgetList: [ExtraBudget] = []
     var recurring: [RecurringSeries] = []
     var goalList: [Goal] = []
     var goalContributions: [GoalContribution] = []
