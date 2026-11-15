@@ -28,6 +28,7 @@ targets:
     supportedDestinations: [iOS, macOS]
     sources:
       - App/Sources
+      - App/Assets.xcassets
     info:
       path: App/Info.plist
       properties:
