@@ -50,8 +50,9 @@ data class StmColors(
 
 /** Los 6 modos del diseño: claro y oscuro, con contraste normal, medio y alto. */
 object Palettes {
+    // primary = «accent-text» del manual v2, igual que en iPhone y Mac (#B5410E claro, #FF8A55 oscuro).
     val claro = StmColors(
-        primary = Color(0xFFAA3700),
+        primary = Color(0xFFB5410E),
         onPrimary = Color(0xFFFFFFFF),
         primaryContainer = Color(0xFFFF692D),
         onPrimaryContainer = Color(0xFF22201D),
@@ -95,7 +96,7 @@ object Palettes {
     )
 
     val oscuro = StmColors(
-        primary = Color(0xFFFFB59B),
+        primary = Color(0xFFFF8A55),
         onPrimary = Color(0xFF5C1A00),
         primaryContainer = Color(0xFFFF692D),
         onPrimaryContainer = Color(0xFF22201D),

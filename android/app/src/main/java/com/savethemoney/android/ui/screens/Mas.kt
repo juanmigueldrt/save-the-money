@@ -301,6 +301,7 @@ fun Pantalla30(nav: Nav) {
     var eligeTema by remember { mutableStateOf(false) }
     val action = rememberAction()
     var alerts by remember(finance) { mutableStateOf(finance?.planning?.alertsEnabled ?: true) }
+    var limites by remember(finance) { mutableStateOf(finance?.planning?.budgetAlertsEnabled ?: true) }
     StmScreen(
         topBar = { MasHeader() },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
@@ -349,14 +350,25 @@ fun Pantalla30(nav: Nav) {
                 },
                 onClick = { eligeTema = true },
             )
+            // Dos interruptores, como en iOS y Mac.
             ListItem(
-                "Avisos de cobros y límites",
+                "Avisos de pagos fijos", "Antes de cada cargo",
                 leading = { StmIcon(StmIcons.notifications, Stm.colors.onSurfaceVariant) },
                 trailing = {
                     StmSwitch(alerts) {
                         alerts = it
                         finance?.planning?.alertsEnabled = it
                         finance?.cards?.reschedule()
+                    }
+                },
+            )
+            ListItem(
+                "Avisos de límites del presupuesto", "Al llegar al 80 % o pasarse",
+                leading = { StmIcon(StmIcons.donutLarge, Stm.colors.onSurfaceVariant) },
+                trailing = {
+                    StmSwitch(limites) {
+                        limites = it
+                        finance?.planning?.budgetAlertsEnabled = it
                     }
                 },
             )
