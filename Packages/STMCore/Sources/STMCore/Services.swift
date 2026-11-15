@@ -87,13 +87,31 @@ public protocol FinanceService: Sendable {
 
 /// Presupuesto mensual y los movimientos de un periodo para calcularlo.
 public protocol BudgetService: Sendable {
-    /// El presupuesto de ese mes, o nil si aún no se ha hecho.
-    func budget(for month: MonthKey, in householdId: UUID) async throws -> Budget?
-    /// El último presupuesto anterior a ese mes, para proponerlo como punto de partida.
-    func latestBudget(before month: MonthKey, in householdId: UUID) async throws -> Budget?
+    /// El presupuesto propio que empieza ese día, o nil si aún no se ha hecho.
+    func budget(startingOn day: CalendarDay, in householdId: UUID) async throws -> Budget?
+    /// El último presupuesto propio que empieza antes de ese día, para proponerlo como punto de partida.
+    func latestBudget(before day: CalendarDay, in householdId: UUID) async throws -> Budget?
     func saveBudget(_ budget: Budget) async throws -> Budget
+    /// Cuándo cobra quien ha entrado (nil si aún no lo ha dicho). Es privado de cada persona.
+    func paySchedule() async throws -> PaySchedule?
+    func savePaySchedule(_ schedule: PaySchedule) async throws -> PaySchedule
+    /// Presupuestos extra propios del hogar.
+    func extraBudgets(in householdId: UUID) async throws -> [ExtraBudget]
+    func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget
+    func deleteExtraBudget(_ id: UUID) async throws
     /// Todos los movimientos del hogar entre dos días, ambos incluidos.
     func movements(in householdId: UUID, from: CalendarDay, through: CalendarDay) async throws -> [Movement]
+}
+
+extension BudgetService {
+    /// El presupuesto del mes natural (compatibilidad con lo de antes de los periodos).
+    public func budget(for month: MonthKey, in householdId: UUID) async throws -> Budget? {
+        try await budget(startingOn: month.firstDay, in: householdId)
+    }
+
+    public func latestBudget(before month: MonthKey, in householdId: UUID) async throws -> Budget? {
+        try await latestBudget(before: month.firstDay, in: householdId)
+    }
 }
 
 /// Pagos recurrentes del hogar: suscripciones, gastos esenciales e ingresos fijos.

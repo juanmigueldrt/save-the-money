@@ -40,6 +40,8 @@ struct SummaryView: View {
                 }
                 .buttonStyle(.plain)
 
+                SpendTodayCard()
+
                 VStack(alignment: .leading, spacing: Spacing.s8) {
                     Eyebrow("Gastado este mes")
                     Text(MonthSummary.spent(movements: finance.recent, categories: finance.categories).formatted())
@@ -55,6 +57,8 @@ struct SummaryView: View {
                 .accessibilityElement(children: .combine)
 
                 NextPaymentsCard()
+
+                FavoriteExtraBudgetCard()
 
                 AdaptiveColumns {
                     VStack(alignment: .leading, spacing: Spacing.s16) {

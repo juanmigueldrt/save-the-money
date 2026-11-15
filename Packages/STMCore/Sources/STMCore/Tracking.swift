@@ -420,30 +420,36 @@ public enum BudgetAlertPlanner {
     public static let thresholds = [80, 100]
 
     public static func alerts(for report: BudgetReport) -> [BudgetAlert] {
-        let month = String(format: "%04d-%02d", report.month.year, report.month.month)
+        // Por periodo: el id lleva el primer día, para que cada periodo avise una vez.
+        let month = report.period.lowerBound.day == 1
+            ? String(format: "%04d-%02d", report.month.year, report.month.month)
+            : report.period.lowerBound.iso
+        let thresholds = [min(max(report.warnPercent, 50), 100), 100]
         var alerts: [BudgetAlert] = []
         for line in report.lines {
             guard let limit = line.limit, limit.minor > 0 else { continue }
             if let alert = alert(id: "\(prefix)\(month).\(line.category.id.uuidString)", name: line.category.name,
-                                 spent: line.spent, limit: limit) {
+                                 spent: line.spent, limit: line.available ?? limit, thresholds: thresholds) {
                 alerts.append(alert)
             }
         }
         for group in report.groups where group.allocated.minor > 0 && group.group != .savings {
             if let alert = alert(id: "\(prefix)\(month).\(group.group.rawValue)", name: group.group.title,
-                                 spent: group.spent, limit: group.allocated) {
+                                 spent: group.spent, limit: group.allocated, thresholds: thresholds) {
                 alerts.append(alert)
             }
         }
         return alerts
     }
 
-    private static func alert(id: String, name: String, spent: Money, limit: Money) -> BudgetAlert? {
+    private static func alert(id: String, name: String, spent: Money, limit: Money,
+                              thresholds: [Int] = BudgetAlertPlanner.thresholds) -> BudgetAlert? {
+        guard limit.minor > 0 else { return nil }
         let percent = spent.minor * 100 / limit.minor
         guard let reached = thresholds.last(where: { percent >= $0 }) else { return nil }
         if reached >= 100 {
             return BudgetAlert(id: "\(id).\(reached)", title: "Te has pasado en \(name)",
-                               body: "Llevas \(spent.formatted()) de \(limit.formatted()) este mes.")
+                               body: "Llevas \(spent.formatted()) de \(limit.formatted()) en este periodo.")
         }
         return BudgetAlert(id: "\(id).\(reached)", title: "\(name): ya llevas el \(percent) %",
                            body: "Has gastado \(spent.formatted()) de \(limit.formatted()). Quedan \((limit - spent).formatted()).")

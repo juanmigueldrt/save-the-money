@@ -136,37 +136,40 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         ImportResult(inserted, drafts.size - inserted)
     }
 
-    override suspend fun budget(householdId: String, month: YearMonth): Budget? = backend.mapped {
+    override suspend fun budget(householdId: String, startingOn: LocalDate): Budget? = backend.mapped {
         client.from("budgets").select(Columns.raw(BUDGET)) {
             filter {
                 eq("household_id", householdId)
-                eq("month", month.atDay(1).toString())
+                eq("month", startingOn.toString())
             }
             limit(1)
         }.decodeList<BudgetRow>().firstOrNull()?.budget
     }
 
-    override suspend fun latestBudget(householdId: String, month: YearMonth): Budget? = backend.mapped {
+    override suspend fun latestBudget(householdId: String, before: LocalDate): Budget? = backend.mapped {
         client.from("budgets").select(Columns.raw(BUDGET)) {
             filter {
                 eq("household_id", householdId)
-                lt("month", month.atDay(1).toString())
+                lt("month", before.toString())
             }
             order("month", Order.DESCENDING)
             limit(1)
         }.decodeList<BudgetRow>().firstOrNull()?.budget
     }
 
-    /** save_budget hace presupuesto y límites en una sola transacción con los permisos de quien llama. */
+    /** save_period_budget hace presupuesto y límites en una sola transacción con los permisos de quien llama. */
     override suspend fun saveBudget(budget: Budget): Budget = backend.mapped {
         budget.issue?.let(::fail)
-        client.postgrest.rpc("save_budget", buildJsonObject {
+        client.postgrest.rpc("save_period_budget", buildJsonObject {
             put("target_household", budget.householdId)
-            put("target_month", budget.month.atDay(1).toString())
+            put("starts_on", budget.period.start.toString())
+            put("ends_on", budget.period.end.toString())
             put("expected_income", budget.expectedIncome)
             put("needs", budget.template.needs)
             put("wants", budget.template.wants)
             put("savings", budget.template.savings)
+            put("carry", budget.carryOver)
+            put("warn", budget.warnPercent)
             putJsonArray("lines") {
                 budget.limits.filterValues { it > 0 }.toSortedMap().forEach { (category, limit) ->
                     addJsonObject {
@@ -176,7 +179,59 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
                 }
             }
         })
-        budget(budget.householdId, budget.month) ?: budget
+        budget(budget.householdId, budget.period.start) ?: budget
+    }
+
+    override suspend fun paySchedule(): PaySchedule? = backend.mapped {
+        client.from("pay_schedules").select(Columns.raw("frequency,day1,day2,anchor_on")) { limit(1) }
+            .decodeList<PayScheduleRow>().firstOrNull()?.schedule
+    }
+
+    override suspend fun savePaySchedule(schedule: PaySchedule): PaySchedule = backend.mapped {
+        schedule.issue?.let(::fail)
+        // La fila es de quien llama (user_id por defecto = auth.uid()). Los null van explícitos
+        // para quitar el segundo día o la fecha al cambiar de frecuencia.
+        client.from("pay_schedules").upsert(buildJsonObject {
+            put("frequency", schedule.frequency.raw)
+            put("day1", schedule.day1)
+            put("day2", if (schedule.frequency == PayFrequency.TwiceMonthly) schedule.day2 else null)
+            put("anchor_on", if (schedule.frequency.usesAnchor) schedule.anchor?.toString() else null)
+        }) { onConflict = "user_id" }
+        schedule
+    }
+
+    override suspend fun extraBudgets(householdId: String): List<ExtraBudget> = backend.mapped {
+        client.from("extra_budgets").select(Columns.raw(EXTRA)) {
+            filter { eq("household_id", householdId) }
+            order("is_favorite", Order.DESCENDING)
+            order("starts_on", Order.DESCENDING)
+        }.decodeList<ExtraRow>().map { it.extra }
+    }
+
+    /** Se actualiza por id; si no había fila, se crea. */
+    override suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget = backend.mapped {
+        budget.issue?.let(::fail)
+        val changes = buildJsonObject {
+            put("name", budget.trimmedName)
+            put("limit_minor", budget.limit)
+            put("starts_on", budget.startsOn.toString())
+            put("ends_on", budget.endsOn?.toString())
+            putJsonArray("category_ids") { budget.categoryIds.forEach { add(JsonPrimitive(it)) } }
+            putJsonArray("account_ids") { budget.accountIds.forEach { add(JsonPrimitive(it)) } }
+            put("is_favorite", budget.isFavorite)
+        }
+        client.from("extra_budgets").update(changes) {
+            select(Columns.raw(EXTRA))
+            filter { eq("id", budget.id) }
+        }.decodeList<ExtraRow>().firstOrNull()?.extra
+            ?: client.from("extra_budgets").insert(JsonObject(changes + mapOf("id" to JsonPrimitive(budget.id), "household_id" to JsonPrimitive(budget.householdId)))) {
+                select(Columns.raw(EXTRA))
+            }.decodeSingle<ExtraRow>().extra
+    }
+
+    override suspend fun deleteExtraBudget(id: String) = backend.mapped {
+        client.from("extra_budgets").delete { filter { eq("id", id) } }
+        Unit
     }
 
     /** El servidor devuelve como mucho 1000 filas por petición (max_rows): se pide por páginas. */
@@ -509,7 +564,8 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges"
         const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
         const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
-        const val BUDGET = "household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
+        const val BUDGET = "household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
+        const val EXTRA = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
         const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
@@ -584,17 +640,54 @@ private fun Goal.columns() = buildJsonObject {
 private data class BudgetRow(
     @SerialName("household_id") val householdId: String,
     val month: String,
+    @SerialName("ends_on") val endsOn: String? = null,
     @SerialName("expected_income_minor") val expectedIncome: Long,
     @SerialName("needs_pct") val needs: Int,
     @SerialName("wants_pct") val wants: Int,
     @SerialName("savings_pct") val savings: Int,
+    @SerialName("carry_over") val carryOver: Boolean? = null,
+    @SerialName("warn_pct") val warnPct: Int? = null,
     @SerialName("budget_lines") val lines: List<Line>,
 ) {
     @Serializable
     data class Line(@SerialName("category_id") val categoryId: String, @SerialName("limit_minor") val limit: Long)
 
-    val budget: Budget? get() = if (needs + wants + savings != 100) null else Budget(
-        householdId, YearMonth.parse(month.take(7)), expectedIncome, BudgetTemplate(needs, wants, savings), lines.associate { it.categoryId to it.limit },
+    val budget: Budget? get() {
+        if (needs + wants + savings != 100) return null
+        val start = LocalDate.parse(month.take(10))
+        val period = endsOn?.let { BudgetPeriod(start, LocalDate.parse(it.take(10))) } ?: BudgetPeriod(YearMonth.from(start))
+        return Budget(
+            householdId, period, expectedIncome, BudgetTemplate(needs, wants, savings), lines.associate { it.categoryId to it.limit },
+            carryOver ?: false, warnPct ?: 80,
+        )
+    }
+}
+
+@Serializable
+private data class PayScheduleRow(
+    val frequency: String,
+    val day1: Int,
+    val day2: Int? = null,
+    @SerialName("anchor_on") val anchorOn: String? = null,
+) {
+    val schedule: PaySchedule? get() = PayFrequency.of(frequency)?.let { PaySchedule(it, day1, day2, anchorOn?.let { d -> LocalDate.parse(d.take(10)) }) }
+}
+
+@Serializable
+private data class ExtraRow(
+    val id: String,
+    @SerialName("household_id") val householdId: String,
+    val name: String,
+    @SerialName("limit_minor") val limit: Long,
+    @SerialName("starts_on") val startsOn: String,
+    @SerialName("ends_on") val endsOn: String? = null,
+    @SerialName("category_ids") val categoryIds: List<String> = emptyList(),
+    @SerialName("account_ids") val accountIds: List<String> = emptyList(),
+    @SerialName("is_favorite") val isFavorite: Boolean = false,
+) {
+    val extra: ExtraBudget get() = ExtraBudget(
+        id, householdId, name, limit, LocalDate.parse(startsOn.take(10)), endsOn?.let { LocalDate.parse(it.take(10)) },
+        categoryIds, accountIds, isFavorite,
     )
 }
 

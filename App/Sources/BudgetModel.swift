@@ -2,8 +2,8 @@ import Foundation
 import Observation
 import STMCore
 
-/// Presupuesto y flujo de caja del mes elegido. Lo comparten la pantalla de
-/// presupuesto y la de flujo, para que las dos miren el mismo mes.
+/// Presupuesto y flujo de caja del periodo elegido (de un cobro al siguiente). Lo comparten
+/// la pantalla de presupuesto, la de flujo y el Resumen, para que todas miren el mismo periodo.
 @Observable
 @MainActor
 final class BudgetModel {
@@ -12,12 +12,20 @@ final class BudgetModel {
     private let alerts: any BudgetAlerting
     private let today: () -> CalendarDay
 
-    private(set) var month: MonthKey
-    /// El presupuesto guardado de este mes.
+    /// Cuándo cobra quien ha entrado. Sin guardar: cada mes desde el día de inicio del hogar.
+    private(set) var schedule: PaySchedule
+    /// true si la persona ya ha dicho cuándo cobra.
+    private(set) var hasOwnSchedule = false
+    private(set) var period: BudgetPeriod
+    /// El presupuesto guardado de este periodo.
     private(set) var budget: Budget?
-    /// Si no hay presupuesto este mes, el del último mes que lo tenga, para proponerlo.
+    /// Si no hay presupuesto en este periodo, el último que haya, para proponerlo.
     private(set) var proposal: Budget?
+    /// Presupuesto y movimientos del periodo anterior, para el arrastre.
+    private(set) var previousBudget: Budget?
+    /// Movimientos de este periodo y de los 3 anteriores (para arrastre y presupuesto inteligente).
     private(set) var movements: [Movement] = []
+    private(set) var extraBudgets: [ExtraBudget] = []
     private(set) var isLoading = false
     var error: String?
 
@@ -27,10 +35,26 @@ final class BudgetModel {
         self.service = service
         self.alerts = alerts
         self.today = today
-        month = MonthKey.containing(today(), startDay: household.monthStartDay)
+        let fallback = PaySchedule.monthly(startDay: household.monthStartDay)
+        schedule = fallback
+        period = fallback.period(containing: today())
     }
 
-    /// Avisa de los límites del mes en curso que se acercan o se pasan.
+    /// El mes del periodo (para lo que aún va por meses).
+    var month: MonthKey { period.month }
+
+    /// Los 3 periodos anteriores, del más reciente al más antiguo.
+    var previousPeriods: [BudgetPeriod] {
+        var list: [BudgetPeriod] = []
+        var current = period
+        for _ in 0..<3 {
+            current = schedule.period(before: current)
+            list.append(current)
+        }
+        return list
+    }
+
+    /// Avisa de los límites del periodo en curso que se acercan o se pasan.
     func checkAlerts(categories: [BudgetCategory]) async {
         guard budget != nil, period.contains(today()) else { return }
         await alerts.notify(BudgetAlertPlanner.alerts(for: report(categories: categories)))
@@ -40,38 +64,77 @@ final class BudgetModel {
         FlexBudget(report: report(categories: categories), series: series, today: today())
     }
 
-    var period: ClosedRange<CalendarDay> { month.period(startDay: household.monthStartDay) }
+    /// Arrastre que llega del periodo anterior (vacío si este presupuesto no arrastra).
+    func carried(categories: [BudgetCategory]) -> [UUID: Money] {
+        guard budget?.carryOver == true, let previousBudget,
+              let before = previousPeriods.first, previousBudget.period == before else { return [:] }
+        // Lo arrastrado al anterior no se encadena aquí: basta con un periodo hacia atrás.
+        let previous = BudgetReport(budget: previousBudget, period: before, categories: categories, movements: movements)
+        return BudgetCarryOver.amounts(previous: previous)
+    }
 
     func report(categories: [BudgetCategory]) -> BudgetReport {
-        BudgetReport(budget: budget, month: month, startDay: household.monthStartDay,
-                     categories: categories, movements: movements)
+        BudgetReport(budget: budget, period: period, categories: categories, movements: movements,
+                     carried: carried(categories: categories))
     }
 
-    /// Punto de partida del formulario: el de este mes, el anterior o uno vacío 50/30/20.
+    func insights(categories: [BudgetCategory]) -> PeriodInsights {
+        PeriodInsights(report: report(categories: categories), budget: budget, today: today())
+    }
+
+    /// Límites propuestos con la media de los 3 periodos anteriores.
+    func suggestedLimits(categories: [BudgetCategory]) -> [UUID: Money] {
+        SmartBudget.suggestedLimits(movements: movements, categories: categories, periods: previousPeriods)
+    }
+
+    /// Punto de partida del formulario: el de este periodo, el último o uno vacío 50/30/20.
     var draft: Budget {
-        budget ?? proposal?.copied(to: month) ?? Budget(householdId: household.id, month: month)
+        budget ?? proposal?.copied(to: period) ?? Budget(householdId: household.id, period: period)
     }
 
-    func show(_ month: MonthKey) async {
-        self.month = month
+    var isCurrentPeriod: Bool { period.contains(today()) }
+
+    func showPrevious() async { await show(schedule.period(before: period)) }
+    func showNext() async { await show(schedule.period(after: period)) }
+    func showCurrent() async { await show(schedule.period(containing: today())) }
+
+    func show(_ period: BudgetPeriod) async {
+        self.period = period
         await load()
     }
 
+    /// Lo de antes de los periodos: el mes que contiene ese mes.
+    func show(_ month: MonthKey) async {
+        await show(schedule.period(containing: month.period(startDay: household.monthStartDay).upperBound))
+    }
+
     func load() async {
-        let service = service, id = household.id, month = month, period = period
+        let service = service, id = household.id
         isLoading = true
         defer { isLoading = false }
         error = nil
         do {
-            async let budget = service.budget(for: month, in: id)
-            async let previous = service.latestBudget(before: month, in: id)
-            async let movements = service.movements(in: id, from: period.lowerBound, through: period.upperBound)
-            let (current, last, list) = try await (budget, previous, movements)
-            // Si el usuario ya cambió de mes mientras cargaba, no se pisa.
-            guard month == self.month else { return }
+            if let saved = try await service.paySchedule(), saved != schedule || !hasOwnSchedule {
+                let wasCurrent = period.contains(today())
+                schedule = saved
+                hasOwnSchedule = true
+                // Con otro día de cobro, el periodo en pantalla se recalcula.
+                period = wasCurrent ? saved.period(containing: today()) : saved.period(containing: period.end)
+            }
+            let period = period, previous = previousPeriods
+            let from = previous.last?.start ?? period.start
+            async let budget = service.budget(startingOn: period.start, in: id)
+            async let last = service.latestBudget(before: period.start, in: id)
+            async let movements = service.movements(in: id, from: from, through: period.end)
+            async let extras = service.extraBudgets(in: id)
+            let (current, latest, list, extraList) = try await (budget, last, movements, extras)
+            // Si el usuario ya cambió de periodo mientras cargaba, no se pisa.
+            guard period == self.period else { return }
             self.budget = current
-            proposal = current == nil ? last : nil
+            proposal = current == nil ? latest : nil
+            previousBudget = latest
             self.movements = list
+            extraBudgets = extraList
         } catch let appError as AppError {
             error = appError.errorDescription
         } catch {
@@ -81,10 +144,53 @@ final class BudgetModel {
 
     @discardableResult
     func save(_ budget: Budget) async -> Bool {
+        await perform {
+            self.budget = try await self.service.saveBudget(budget)
+            self.proposal = nil
+        }
+    }
+
+    @discardableResult
+    func save(_ schedule: PaySchedule) async -> Bool {
+        let ok = await perform {
+            self.schedule = try await self.service.savePaySchedule(schedule)
+            self.hasOwnSchedule = true
+            self.period = schedule.period(containing: self.today())
+        }
+        if ok { await load() }
+        return ok
+    }
+
+    @discardableResult
+    func save(_ extra: ExtraBudget) async -> Bool {
+        await perform {
+            _ = try await self.service.saveExtraBudget(extra)
+            self.extraBudgets = try await self.service.extraBudgets(in: self.household.id)
+        }
+    }
+
+    @discardableResult
+    func delete(_ extra: ExtraBudget) async -> Bool {
+        await perform {
+            try await self.service.deleteExtraBudget(extra.id)
+            self.extraBudgets.removeAll { $0.id == extra.id }
+        }
+    }
+
+    /// Movimientos que puede necesitar un presupuesto extra (sus fechas pueden salirse del periodo).
+    func movements(for extra: ExtraBudget) async -> [Movement] {
+        let end = extra.endsOn ?? today()
+        do {
+            return try await service.movements(in: household.id, from: extra.startsOn, through: max(end, extra.startsOn))
+        } catch {
+            return []
+        }
+    }
+
+    private func perform(_ operation: () async throws -> Void) async -> Bool {
         error = nil
         do {
-            self.budget = try await service.saveBudget(budget)
-            proposal = nil
+            try await operation()
             return true
         } catch let appError as AppError {
             error = appError.errorDescription

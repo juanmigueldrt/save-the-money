@@ -5,15 +5,16 @@ import Supabase
 /// Presupuestos sobre Supabase. Se guardan con la función save_budget, que hace
 /// presupuesto y límites en una sola transacción con los permisos de quien llama.
 extension SupabaseBackend: BudgetService {
-    private static let budgetColumns = "id,household_id,month,expected_income_minor,needs_pct,wants_pct,savings_pct,budget_lines(category_id,limit_minor)"
+    private static let budgetColumns = "id,household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
+    private static let extraColumns = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
     private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
 
-    public func budget(for month: MonthKey, in householdId: UUID) async throws -> Budget? {
+    public func budget(startingOn day: CalendarDay, in householdId: UUID) async throws -> Budget? {
         let rows: [BudgetRow] = try await mapped {
             try await client.from("budgets")
                 .select(Self.budgetColumns)
                 .eq("household_id", value: householdId.uuidString)
-                .eq("month", value: month.firstDay.iso)
+                .eq("month", value: day.iso)
                 .limit(1)
                 .execute()
                 .value
@@ -21,12 +22,12 @@ extension SupabaseBackend: BudgetService {
         return rows.first?.budget
     }
 
-    public func latestBudget(before month: MonthKey, in householdId: UUID) async throws -> Budget? {
+    public func latestBudget(before day: CalendarDay, in householdId: UUID) async throws -> Budget? {
         let rows: [BudgetRow] = try await mapped {
             try await client.from("budgets")
                 .select(Self.budgetColumns)
                 .eq("household_id", value: householdId.uuidString)
-                .lt("month", value: month.firstDay.iso)
+                .lt("month", value: day.iso)
                 .order("month", ascending: false)
                 .limit(1)
                 .execute()
@@ -39,9 +40,74 @@ extension SupabaseBackend: BudgetService {
         if let issue = budget.issue { throw AppError.invalidInput(issue) }
         let params = SaveBudgetParams(budget)
         try await mapped {
-            try await client.rpc("save_budget", params: params).execute()
+            try await client.rpc("save_period_budget", params: params).execute()
         }
-        return try await self.budget(for: budget.month, in: budget.householdId) ?? budget
+        return try await self.budget(startingOn: budget.period.start, in: budget.householdId) ?? budget
+    }
+
+    public func paySchedule() async throws -> PaySchedule? {
+        let rows: [PayScheduleRow] = try await mapped {
+            try await client.from("pay_schedules")
+                .select("frequency,day1,day2,anchor_on")
+                .limit(1)
+                .execute()
+                .value
+        }
+        return rows.first?.schedule
+    }
+
+    public func savePaySchedule(_ schedule: PaySchedule) async throws -> PaySchedule {
+        if let issue = schedule.issue { throw AppError.invalidInput(issue) }
+        let row = PayScheduleRow(schedule)
+        try await mapped {
+            // La fila es de quien llama (user_id por defecto = auth.uid()).
+            try await client.from("pay_schedules")
+                .upsert(row, onConflict: "user_id")
+                .execute()
+        }
+        return schedule
+    }
+
+    public func extraBudgets(in householdId: UUID) async throws -> [ExtraBudget] {
+        try await mapped {
+            try await client.from("extra_budgets")
+                .select(Self.extraColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .order("is_favorite", ascending: false)
+                .order("starts_on", ascending: false)
+                .execute()
+                .value
+        }
+    }
+
+    public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
+        if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        let updated: [ExtraBudget] = try await mapped {
+            try await client.from("extra_budgets")
+                .update(ExtraBudgetChanges(budget))
+                .eq("id", value: budget.id.uuidString)
+                .select(Self.extraColumns)
+                .execute()
+                .value
+        }
+        if let first = updated.first { return first }
+        return try await mapped {
+            try await client.from("extra_budgets")
+                .insert(budget)
+                .select(Self.extraColumns)
+                .single()
+                .execute()
+                .value
+        }
+    }
+
+    public func deleteExtraBudget(_ id: UUID) async throws {
+        try await mapped {
+            try await client.from("extra_budgets")
+                .delete()
+                .eq("id", value: id.uuidString)
+                .execute()
+        }
     }
 
     public func movements(in householdId: UUID, from: CalendarDay, through: CalendarDay) async throws -> [Movement] {
@@ -81,6 +147,9 @@ private struct BudgetRow: Decodable {
 
     var householdId: UUID
     var month: CalendarDay
+    var endsOn: CalendarDay?
+    var carryOver: Bool?
+    var warnPct: Int?
     var expectedIncomeMinor: Int
     var needsPct: Int
     var wantsPct: Int
@@ -90,6 +159,9 @@ private struct BudgetRow: Decodable {
     enum CodingKeys: String, CodingKey {
         case month
         case householdId = "household_id"
+        case endsOn = "ends_on"
+        case carryOver = "carry_over"
+        case warnPct = "warn_pct"
         case expectedIncomeMinor = "expected_income_minor"
         case needsPct = "needs_pct"
         case wantsPct = "wants_pct"
@@ -99,9 +171,11 @@ private struct BudgetRow: Decodable {
 
     var budget: Budget? {
         guard needsPct + wantsPct + savingsPct == 100 else { return nil }
-        return Budget(householdId: householdId, month: MonthKey(month), expectedIncome: Money(minor: expectedIncomeMinor),
+        let period = endsOn.map { BudgetPeriod(start: month, end: $0) } ?? BudgetPeriod(month: MonthKey(month))
+        return Budget(householdId: householdId, period: period, expectedIncome: Money(minor: expectedIncomeMinor),
                       template: BudgetTemplate(needs: needsPct, wants: wantsPct, savings: savingsPct),
-                      limits: Dictionary(budgetLines.map { ($0.categoryId, Money(minor: $0.limitMinor)) }, uniquingKeysWith: { a, _ in a }))
+                      limits: Dictionary(budgetLines.map { ($0.categoryId, Money(minor: $0.limitMinor)) }, uniquingKeysWith: { a, _ in a }),
+                      carryOver: carryOver ?? false, warnPercent: warnPct ?? 80)
     }
 }
 
@@ -117,7 +191,10 @@ private struct SaveBudgetParams: Encodable, Sendable {
     }
 
     var targetHousehold: UUID
-    var targetMonth: String
+    var startsOn: String
+    var endsOn: String
+    var carry: Bool
+    var warn: Int
     var expectedIncome: Int
     var needs: Int
     var wants: Int
@@ -126,7 +203,10 @@ private struct SaveBudgetParams: Encodable, Sendable {
 
     init(_ budget: Budget) {
         targetHousehold = budget.householdId
-        targetMonth = budget.month.firstDay.iso
+        startsOn = budget.period.start.iso
+        endsOn = budget.period.end.iso
+        carry = budget.carryOver
+        warn = budget.warnPercent
         expectedIncome = budget.expectedIncome.minor
         needs = budget.template.needs
         wants = budget.template.wants
@@ -138,9 +218,71 @@ private struct SaveBudgetParams: Encodable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case needs, wants, savings, lines
+        case needs, wants, savings, lines, carry, warn
         case targetHousehold = "target_household"
-        case targetMonth = "target_month"
+        case startsOn = "starts_on"
+        case endsOn = "ends_on"
         case expectedIncome = "expected_income"
+    }
+}
+
+private struct PayScheduleRow: Codable, Sendable {
+    var frequency: String
+    var day1: Int
+    var day2: Int?
+    var anchorOn: CalendarDay?
+
+    init(_ schedule: PaySchedule) {
+        frequency = schedule.frequency.rawValue
+        day1 = schedule.day1
+        day2 = schedule.frequency == .twiceMonthly ? schedule.day2 : nil
+        anchorOn = schedule.frequency.usesAnchor ? schedule.anchor : nil
+    }
+
+    var schedule: PaySchedule? {
+        guard let kind = PayFrequency(rawValue: frequency) else { return nil }
+        return PaySchedule(frequency: kind, day1: day1, day2: day2, anchor: anchorOn)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case frequency, day1, day2
+        case anchorOn = "anchor_on"
+    }
+
+    // null explícito para poder quitar el segundo día o la fecha al cambiar de frecuencia.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(frequency, forKey: .frequency)
+        try c.encode(day1, forKey: .day1)
+        try c.encode(day2, forKey: .day2)
+        try c.encode(anchorOn, forKey: .anchorOn)
+    }
+}
+
+/// Lo que se puede cambiar de un presupuesto extra (ni el id ni el hogar).
+private struct ExtraBudgetChanges: Encodable, Sendable {
+    var budget: ExtraBudget
+
+    init(_ budget: ExtraBudget) { self.budget = budget }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case limitMinor = "limit_minor"
+        case startsOn = "starts_on"
+        case endsOn = "ends_on"
+        case categoryIds = "category_ids"
+        case accountIds = "account_ids"
+        case isFavorite = "is_favorite"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(budget.trimmedName, forKey: .name)
+        try c.encode(budget.limit.minor, forKey: .limitMinor)
+        try c.encode(budget.startsOn, forKey: .startsOn)
+        try c.encode(budget.endsOn, forKey: .endsOn)
+        try c.encode(budget.categoryIds, forKey: .categoryIds)
+        try c.encode(budget.accountIds, forKey: .accountIds)
+        try c.encode(budget.isFavorite, forKey: .isFavorite)
     }
 }

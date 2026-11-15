@@ -106,7 +106,7 @@ class PlanningTest {
         assertEquals(10, flex.daysLeft)
         assertEquals(3_800L, flex.perDay)
 
-        val avisos = BudgetAlertPlanner.alerts(r, nov)
+        val avisos = BudgetAlertPlanner.alerts(r)
         assertEquals(listOf("stm.budget.2026-11.c.80", "stm.budget.2026-11.o.100"), avisos.map { it.id })
         assertEquals("Te has pasado en Ocio", avisos[1].title)
     }

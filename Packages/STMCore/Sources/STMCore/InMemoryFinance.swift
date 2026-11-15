@@ -120,6 +120,7 @@ extension InMemoryBackend: FinanceService {
         goalList.removeAll { $0.householdId == householdId }
         recurring.removeAll { $0.householdId == householdId }
         budgets.removeAll { $0.householdId == householdId }
+        extraBudgetList.removeAll { $0.householdId == householdId }
         financeMovements.removeAll { $0.householdId == householdId }
         financeAccounts.removeAll { $0.householdId == householdId }
         financeCategories.removeAll { $0.householdId == householdId }

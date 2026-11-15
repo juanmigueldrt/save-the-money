@@ -43,37 +43,83 @@ data class BudgetTemplate(val needs: Int, val wants: Int, val savings: Int) {
     }
 }
 
-/** Presupuesto de un hogar para un mes; [limits] va por id de categoría de gasto, en positivo. */
+/**
+ * Presupuesto de una persona para un periodo (de un cobro al siguiente); [limits] va por id de
+ * categoría de gasto, en positivo.
+ */
 data class Budget(
     val householdId: String,
-    val month: YearMonth,
+    val period: BudgetPeriod,
     val expectedIncome: Long = 0,
     val template: BudgetTemplate = BudgetTemplate.FiftyThirtyTwenty,
     val limits: Map<String, Long> = emptyMap(),
+    /** Pasar lo que sobra (o lo que te pasas) de cada categoría al periodo siguiente. */
+    val carryOver: Boolean = false,
+    /** % del límite a partir del que avisa (el 100 % avisa siempre). */
+    val warnPercent: Int = 80,
 ) {
+    /** Presupuesto del mes natural. */
+    constructor(
+        householdId: String,
+        month: YearMonth,
+        expectedIncome: Long = 0,
+        template: BudgetTemplate = BudgetTemplate.FiftyThirtyTwenty,
+        limits: Map<String, Long> = emptyMap(),
+    ) : this(householdId, BudgetPeriod(month), expectedIncome, template, limits)
+
+    /** El mes al que se asocia (el del último día del periodo). */
+    val month: YearMonth get() = period.month
+
+    /** «Vaciar límites»: sin límites por categoría (el reparto y los ingresos se quedan). */
+    fun cleared() = copy(limits = emptyMap())
+
     val issue: String? get() = when {
         expectedIncome < 0 -> "Los ingresos previstos no pueden ser negativos."
         limits.values.any { it < 0 } -> "Los límites no pueden ser negativos."
+        warnPercent !in 50..100 -> "El aviso tiene que estar entre el 50 % y el 100 %."
         else -> null
     }
 }
 
 data class GroupProgress(val group: BudgetGroup, val allocated: Long, val spent: Long)
 
-data class CategoryLine(val category: BudgetCategory, val limit: Long?, val spent: Long) {
-    val isOver: Boolean get() = limit != null && spent > limit
+data class CategoryLine(
+    val category: BudgetCategory,
+    val limit: Long?,
+    val spent: Long,
+    /** Lo que viene arrastrado del periodo anterior (positivo sobró, negativo te pasaste). */
+    val carried: Long = 0,
+) {
+    /** Límite más arrastre: lo que de verdad hay para gastar este periodo. */
+    val available: Long? get() = limit?.let { maxOf(0, it + carried) }
 
-    /** Fracción gastada del límite, entre 0 y 1; nula si no tiene límite. */
-    val fraction: Float? get() = limit?.takeIf { it > 0 }?.let { (spent.toDouble() / it).coerceIn(0.0, 1.0).toFloat() }
+    val isOver: Boolean get() = available?.let { spent > it } ?: false
+
+    /** Fracción gastada de lo disponible, entre 0 y 1; nula si no tiene límite. */
+    val fraction: Float? get() {
+        val available = available ?: return null
+        if (available <= 0) return if (spent > 0) 1f else 0f
+        return (spent.toDouble() / available).coerceIn(0.0, 1.0).toFloat()
+    }
 }
 
-/** Lo gastado frente a lo previsto en [period]. Se calcula siempre a partir de los movimientos. */
+/**
+ * Lo gastado frente a lo previsto en [period]. Se calcula siempre a partir de los movimientos.
+ * [carried] es el arrastre por categoría ([BudgetCarryOver.amounts]); sólo cuenta si el presupuesto arrastra.
+ */
 class BudgetReport(
     budget: Budget?,
     val period: ClosedRange<LocalDate>,
     categories: List<BudgetCategory>,
     movements: List<Movement>,
+    carried: Map<String, Long> = emptyMap(),
 ) {
+    /** Arrastre del periodo anterior por categoría (vacío si el presupuesto no arrastra). */
+    val carried: Map<String, Long> = if (budget?.carryOver == true) carried else emptyMap()
+
+    /** % a partir del que avisa. */
+    val warnPercent: Int = budget?.warnPercent ?: 80
+
     /** Ingresos reales del periodo, sin transferencias entre cuentas. */
     val income: Long
 
@@ -136,7 +182,7 @@ class BudgetReport(
             .mapNotNull { category ->
                 val limit = budget?.limits?.get(category.id)
                 val spent = spentByCategory[category.id] ?: 0
-                if (limit == null && spent == 0L) null else CategoryLine(category, limit, spent)
+                if (limit == null && spent == 0L) null else CategoryLine(category, limit, spent, if (limit == null) 0 else this.carried[category.id] ?: 0)
             }
             .sortedWith(compareBy<CategoryLine> { (it.category.budgetGroup ?: BudgetGroup.Wants).ordinal }.thenBy(collator) { it.category.name })
     }
