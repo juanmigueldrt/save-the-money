@@ -21,6 +21,8 @@ interface Backend {
     suspend fun revokeInvite(inviteId: String)
     suspend fun acceptInvite(code: InviteCode): Household
     suspend fun leave(householdId: String)
+    /** Solo el dueño del hogar puede quitar a otro miembro. */
+    suspend fun removeMember(householdId: String, userId: String)
 }
 
 fun HouseholdInvite.isUsable(now: Instant = Instant.now()): Boolean =
@@ -135,6 +137,15 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         val user = requireUser()
         memberships.removeAll { it.userId == user && it.householdId == householdId }
         users[user]?.let { if (it.profile.defaultHouseholdId == householdId) it.profile = it.profile.copy(defaultHouseholdId = null) }
+    }
+
+    override suspend fun removeMember(householdId: String, userId: String) {
+        val user = requireUser()
+        if (memberships.none { it.userId == user && it.householdId == householdId && it.role == MemberRole.Owner }) {
+            throw AppError.InvalidInput("Solo quien creó el hogar puede quitar a alguien.")
+        }
+        memberships.removeAll { it.userId == userId && it.householdId == householdId }
+        users[userId]?.let { if (it.profile.defaultHouseholdId == householdId) it.profile = it.profile.copy(defaultHouseholdId = null) }
     }
 
     private fun setDefaultIfMissing(user: String, household: String) {

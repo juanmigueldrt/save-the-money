@@ -56,6 +56,23 @@ class CoreTest {
     }
 
     @Test
+    fun onlyOwnerRemovesMembers() = runBlocking {
+        val backend = InMemoryBackend()
+        val ana = backend.signUp(Username.parse("ana").getOrThrow(), "0123456789", "Ana")
+        val home = backend.createHousehold("Casa de Ana")
+        val code = InviteCode.parse(backend.createInvite(home.id).code)!!
+        backend.signOut()
+        val leo = backend.signUp(Username.parse("leo").getOrThrow(), "0123456789", null)
+        backend.acceptInvite(code)
+        // Un miembro no puede quitar al dueño
+        assertTrue(runCatching { backend.removeMember(home.id, ana) }.exceptionOrNull() is AppError.InvalidInput)
+        backend.signOut()
+        backend.signIn(Username.parse("ana").getOrThrow(), "0123456789")
+        backend.removeMember(home.id, leo)
+        assertEquals(listOf(ana), backend.members(home.id).map { it.profile.id })
+    }
+
+    @Test
     fun wrongPasswordAndDuplicateUser() = runBlocking {
         val backend = InMemoryBackend()
         val ana = Username.parse("ana").getOrThrow()

@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -37,6 +38,7 @@ import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Divider
 import com.savethemoney.android.ui.components.IconBtn
+import com.savethemoney.android.ui.components.StmDialog
 import com.savethemoney.android.ui.components.LargeTitle
 import com.savethemoney.android.ui.components.LeadIcon
 import com.savethemoney.android.ui.components.ListCard
@@ -226,6 +228,17 @@ private fun OptionCard(
 @Composable
 fun Pantalla28(nav: Nav) {
     val c = Stm.colors
+    val session = LocalSession.current
+    val me = session.profile?.id
+    var recarga by remember { mutableIntStateOf(0) }
+    val members by produceState(emptyList<HouseholdMember>(), session.household, recarga) {
+        value = session.household?.let { h -> runCatching { session.backend.members(h.id) }.getOrDefault(emptyList()) }.orEmpty()
+            .sortedBy { it.profile.id != me }
+    }
+    val soyDueno = members.any { it.profile.id == me && it.role == MemberRole.Owner }
+    var quitando by remember { mutableStateOf<HouseholdMember?>(null) }
+    var saliendo by remember { mutableStateOf(false) }
+    val action = rememberAction()
     StmScreen(
         topBar = {
             // Barra de 60 dp con título mediano debajo (no coincide con TopBar + LargeTitle).
@@ -237,13 +250,44 @@ fun Pantalla28(nav: Nav) {
             Text("Hogar", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
+        overlay = quitando?.let { m ->
+            {
+                StmDialog(
+                    "¿Quitar a ${m.profile.name} del hogar?",
+                    "Dejará de tener acceso a este hogar. Puedes volver a invitarle.",
+                    icon = StmIcons.personRemove,
+                    onDismiss = { quitando = null },
+                    actions = {
+                        Btn("Cancelar", { quitando = null }, kind = BtnKind.Text)
+                        Btn("Quitar", {
+                            val h = session.household ?: return@Btn
+                            action.run {
+                                session.backend.removeMember(h.id, m.profile.id)
+                                quitando = null
+                                recarga++
+                            }
+                        }, kind = BtnKind.Error, enabled = !action.busy)
+                    },
+                ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
+            }
+        } ?: if (saliendo) {
+            {
+                StmDialog(
+                    "¿Salir del hogar?",
+                    "Dejarás de ver este hogar. Para volver, alguien tendrá que invitarte otra vez.",
+                    icon = StmIcons.logout,
+                    onDismiss = { saliendo = false },
+                    actions = {
+                        Btn("Cancelar", { saliendo = false }, kind = BtnKind.Text)
+                        Btn("Salir", {
+                            val h = session.household ?: return@Btn
+                            action.run { session.leaveHousehold(h) }
+                        }, kind = BtnKind.Error, enabled = !action.busy)
+                    },
+                ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
+            }
+        } else null,
     ) {
-        val session = LocalSession.current
-        val me = session.profile?.id
-        val members by produceState(emptyList<HouseholdMember>(), session.household) {
-            value = session.household?.let { h -> runCatching { session.backend.members(h.id) }.getOrDefault(emptyList()) }.orEmpty()
-                .sortedBy { it.profile.id != me }
-        }
         ListCard {
             ListHeader("Miembros")
             members.forEachIndexed { i, m ->
@@ -252,8 +296,10 @@ fun Pantalla28(nav: Nav) {
                 ListItem(
                     m.profile.name, if (m.profile.id == me) "Tú · $role" else role.replaceFirstChar { it.uppercase() },
                     leading = { Avatar(m.profile.name.take(1).uppercase()) },
-                    // El diseño deja 24 dp a la derecha del icono final.
-                    trailing = if (m.profile.id == me) null else ({ StmIcon(StmIcons.moreVert, c.onSurfaceVariant, Modifier.padding(end = 8.dp)) }),
+                    // Solo el dueño puede quitar a otros; el diseño deja 24 dp a la derecha del icono final.
+                    trailing = if (m.profile.id == me || !soyDueno) null else ({
+                        IconBtn(StmIcons.personRemove, { quitando = m }, contentDescription = "Quitar del hogar")
+                    }),
                 )
             }
         }
@@ -269,6 +315,10 @@ fun Pantalla28(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         Btn("Invitar a alguien", { nav.go(29) }, Modifier.fillMaxWidth(), icon = StmIcons.personAdd, large = true)
+        if (members.any { it.profile.id == me } && !soyDueno) {
+            Spacer(Modifier.height(8.dp))
+            Btn("Salir del hogar", { saliendo = true }, Modifier.fillMaxWidth(), kind = BtnKind.Text, color = c.error)
+        }
     }
 }
 

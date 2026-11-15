@@ -127,6 +127,18 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         Unit
     }
 
+    override suspend fun removeMember(householdId: String, userId: String) = mapped {
+        // Sin permiso, RLS no borra nada y no da error: se pide la fila borrada para saberlo.
+        val removed = client.from("household_members").delete {
+            select(Columns.raw("id"))
+            filter {
+                eq("household_id", householdId)
+                eq("user_id", userId)
+            }
+        }.decodeList<kotlinx.serialization.json.JsonObject>()
+        if (removed.isEmpty()) throw AppError.InvalidInput("Solo quien creó el hogar puede quitar a alguien.")
+    }
+
     /** Convierte cualquier error en un AppError con mensaje en español. Nunca registra datos del usuario. */
     internal suspend fun <T> mapped(block: suspend () -> T): T = try {
         block()
