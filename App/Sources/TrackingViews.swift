@@ -343,12 +343,14 @@ struct ReportsView: View {
     @State private var mode: ReportMode = .incomeAndExpenses
 
     enum ReportMode: String, CaseIterable, Hashable {
-        case incomeAndExpenses, byCategory
+        case incomeAndExpenses, byCategory, byTag, byPayee
 
         var title: String {
             switch self {
             case .incomeAndExpenses: "Ingresos y gastos"
             case .byCategory: "Por categoría"
+            case .byTag: "Por etiqueta"
+            case .byPayee: "Por beneficiario"
             }
         }
     }
@@ -360,6 +362,8 @@ struct ReportsView: View {
                 switch mode {
                 case .incomeAndExpenses: incomeAndExpenses
                 case .byCategory: byCategory
+                case .byTag: grouped(.tag)
+                case .byPayee: grouped(.payee)
                 }
                 ErrorText(message: tracking.error)
             }
@@ -530,6 +534,58 @@ struct ReportsView: View {
                 }
                 .accessibilityElement(children: .combine)
             }
+        }
+        .card()
+    }
+
+    // MARK: Por etiqueta y por beneficiario
+
+    @ViewBuilder
+    private func grouped(_ grouping: GroupedSpending.Grouping) -> some View {
+        @Bindable var tracking = tracking
+        let rows = GroupedSpending.report(grouping, movements: tracking.reportMovements,
+                                          categories: finance.categories, range: tracking.reportRange)
+        let top = max(1, rows.map(\.spent.minor).max() ?? 1)
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Picker("Periodo", selection: $tracking.period) {
+                ForEach(ReportPeriod.allCases) { Text($0.title).tag($0) }
+            }
+        }
+        .card()
+
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Text(grouping.title)
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
+            if rows.isEmpty {
+                EmptyHint(text: tracking.isLoading ? "Cargando…" : grouping == .tag
+                          ? "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento."
+                          : "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento.")
+            }
+            ForEach(rows) { row in
+                VStack(alignment: .leading, spacing: Spacing.s8) {
+                    HStack {
+                        Label(grouping == .tag ? "#" + row.title : row.title,
+                              systemImage: grouping == .tag ? "number" : "person")
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
+                        Spacer()
+                        Text(row.spent.formatted())
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.label)
+                    }
+                    ProgressBar(fraction: Double(row.spent.minor) / Double(top))
+                    Text(row.income.minor > 0
+                         ? "\(row.count) movimientos · ingresos \(row.income.formatted())"
+                         : "\(row.count) movimientos")
+                        .font(Typography.footnote)
+                        .foregroundStyle(Palette.labelSecondary)
+                }
+                .accessibilityElement(children: .combine)
+            }
+            Text("Un movimiento con varias etiquetas cuenta en cada una. No se incluyen transferencias ni excluidos.")
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
         }
         .card()
     }

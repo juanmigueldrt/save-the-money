@@ -199,4 +199,23 @@ final class PhaseBTests: XCTestCase {
         let data = try JSONEncoder().encode(saved)
         XCTAssertEqual(try JSONDecoder().decode([CSVSavedFormat].self, from: data), saved)
     }
+
+    func testCSVRowReview() throws {
+        let table = CSVTable.parse("Fecha;Concepto;Importe\n01/11/2026;CAFE;-1,50\n02/11/2026;REGALO;-30\n03/11/2026;NOMINA;1000\n")
+        let mapping = try XCTUnwrap(CSVMapping.detect(in: table))
+        let rows = CSVImporter.rows(in: table, mapping: mapping, accountId: account)
+        let gift = UUID()
+        var review = CSVRowReview()
+        review.skipped.insert(rows[0].line)
+        review.excluded.insert(rows[1].line)
+        review.categories[rows[1].line] = .some(gift)
+        let result = review.apply(to: rows)
+        XCTAssertEqual(result.map(\.draft?.description), ["REGALO", "NOMINA"])
+        XCTAssertEqual(result[0].draft?.excluded, true)
+        XCTAssertEqual(result[0].draft?.categoryId, gift)
+        XCTAssertEqual(result[1].draft?.excluded, false)
+        review.keep([rows[1].line])
+        XCTAssertTrue(review.skipped.isEmpty)
+        XCTAssertEqual(review.excluded, [rows[1].line])
+    }
 }

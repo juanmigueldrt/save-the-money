@@ -283,3 +283,43 @@ public struct CSVSavedFormat: Codable, Hashable, Sendable {
         Array(([format] + saved.filter { $0.fingerprint != format.fingerprint }).prefix(20))
     }
 }
+
+// MARK: - Revisar un CSV fila a fila
+
+/// Lo decidido para cada fila de un CSV antes de importarlo, por número de línea.
+public struct CSVRowReview: Hashable, Sendable {
+    /// Filas que no se importan.
+    public var skipped: Set<Int> = []
+    /// Filas que se importan como excluidas del presupuesto.
+    public var excluded: Set<Int> = []
+    /// Categoría elegida a mano (`.some(nil)` = sin categoría).
+    public var categories: [Int: UUID?] = [:]
+
+    public init() {}
+
+    /// El borrador de una fila con lo decidido.
+    public func apply(to draft: MovementDraft, line: Int) -> MovementDraft {
+        var copy = draft
+        if let category = categories[line] { copy.categoryId = category }
+        if excluded.contains(line) { copy.excluded = true }
+        return copy
+    }
+
+    /// Las filas que se van a importar, ya con sus cambios. Las de problema se dejan como están.
+    public func apply(to rows: [CSVImportRow]) -> [CSVImportRow] {
+        rows.compactMap { row in
+            guard let draft = row.draft else { return row }
+            if skipped.contains(row.line) { return nil }
+            var copy = row
+            copy.draft = apply(to: draft, line: row.line)
+            return copy
+        }
+    }
+
+    /// Olvida lo decidido para filas que ya no están (otro archivo u otras columnas).
+    public mutating func keep(_ lines: Set<Int>) {
+        skipped.formIntersection(lines)
+        excluded.formIntersection(lines)
+        categories = categories.filter { lines.contains($0.key) }
+    }
+}
