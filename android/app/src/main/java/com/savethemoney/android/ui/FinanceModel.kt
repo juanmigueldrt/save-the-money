@@ -19,6 +19,7 @@ import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.MovementTags
 import com.savethemoney.android.data.Payee
+import com.savethemoney.android.data.PendingCharge
 import com.savethemoney.android.data.defaultAccount
 import com.savethemoney.android.data.NoNotifier
 import com.savethemoney.android.data.Notifier
@@ -131,6 +132,7 @@ class FinanceModel(
             }
             error = null
             planning.load()
+            planning.syncCharges(recent)
             budgets.load()
             budgets.checkAlerts(categories)
             cards.load(accounts, balances, categories)
@@ -225,6 +227,14 @@ class FinanceModel(
     private suspend fun reloadAll() {
         reloadAccounts()
         recent = service.movements(household.id, null, RECENT_LIMIT)
+        // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
+        planning.syncCharges(recent)
+    }
+
+    /** Confirma un pago fijo pendiente: crea su movimiento y recarga saldos y movimientos. */
+    suspend fun confirm(item: PendingCharge, draft: MovementDraft) {
+        planning.confirm(item, draft)
+        reloadAll()
     }
 
     private companion object {

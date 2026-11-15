@@ -12,6 +12,8 @@ import android.net.Uri
 import com.savethemoney.android.MainActivity
 import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetAlert
+import com.savethemoney.android.data.HabitReminderPlanner
+import com.savethemoney.android.data.HabitSettings
 import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.data.PlannedReminder
 import kotlinx.serialization.encodeToString
@@ -36,10 +38,22 @@ class LocalNotifier(private val context: Context) : Notifier {
         get() = prefs.getBoolean(KEY_BUDGET, prefs.getBoolean(KEY_ENABLED, true))
         set(value) = prefs.edit().putBoolean(KEY_BUDGET, value).apply()
 
+    override var habits: HabitSettings
+        get() = HabitSettings(
+            HabitSettings.LogReminder.entries.firstOrNull { it.name == prefs.getString(KEY_LOG, null) } ?: HabitSettings.LogReminder.Off,
+            prefs.getInt(KEY_LOG_HOUR, 21), prefs.getBoolean(KEY_WEEKLY, true),
+        )
+        set(value) = prefs.edit().putString(KEY_LOG, value.logReminder.name).putInt(KEY_LOG_HOUR, value.logHour)
+            .putBoolean(KEY_WEEKLY, value.weeklySummary).apply()
+
     override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) {
-        val (old, others) = pending().partition { !enabled || it.id.startsWith(prefix) }
+        // Los de hábito tienen sus propios interruptores; el resto, el de «Avisos de pagos fijos».
+        val habit = prefix == HabitReminderPlanner.PREFIX
+        val (old, others) = pending().partition {
+            it.id.startsWith(prefix) || (!enabled && !habit && !it.id.startsWith(HabitReminderPlanner.PREFIX))
+        }
         old.forEach { alarms.cancel(alarm(it)) }
-        prefs.edit().putString(KEY_PENDING, Json.encodeToString(if (enabled) others + reminders else emptyList())).apply()
+        prefs.edit().putString(KEY_PENDING, Json.encodeToString(others + if (enabled || habit) reminders else emptyList())).apply()
         arm()
     }
 
@@ -94,6 +108,9 @@ class LocalNotifier(private val context: Context) : Notifier {
         private const val KEY_BUDGET = "limites"
         private const val KEY_PENDING = "pendientes"
         private const val KEY_SENT = "enviados"
+        private const val KEY_LOG = "habito_apuntar"
+        private const val KEY_LOG_HOUR = "habito_hora"
+        private const val KEY_WEEKLY = "habito_semanal"
         const val EXTRA_TITLE = "titulo"
         const val EXTRA_BODY = "cuerpo"
     }

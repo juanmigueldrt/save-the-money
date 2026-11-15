@@ -71,6 +71,10 @@ data class RecurringSeries(
     @SerialName("archived_at") val archivedAt: String? = null,
     @SerialName("intro_amount_minor") val introMinor: Long? = null,
     @SerialName("intro_charges") val introCharges: Int? = null,
+    /** Si al llegar cada cargo se apunta como pendiente de confirmar. */
+    @SerialName("creates_pending") val createsPending: Boolean = true,
+    /** Desde qué día crea cargos pendientes (nulo: lo pone el servidor, hoy). */
+    @SerialName("pending_from") val pendingFrom: String? = null,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val hasIntro: Boolean get() = introMinor != null && (introCharges ?: 0) > 0
@@ -78,6 +82,7 @@ data class RecurringSeries(
     val recurrence: Recurrence get() = Recurrence(every, unit)
     val startDay: LocalDate get() = LocalDate.parse(startsOn.take(10))
     val endDay: LocalDate? get() = endsOn?.let { LocalDate.parse(it.take(10)) }
+    val pendingDay: LocalDate? get() = pendingFrom?.let { LocalDate.parse(it.take(10)) }
 
     /** Lo que se cobra un día de cargo concreto: la oferta o el precio normal. */
     fun amountOn(due: LocalDate): Long {
@@ -412,6 +417,9 @@ interface Notifier {
     /** «Avisos de límites del presupuesto» de Más opciones, como en iOS: al 80 % y al pasarse. */
     var budgetAlertsEnabled: Boolean
 
+    /** «Recordatorios» de Más opciones: apuntar gastos y resumen semanal; no dependen de [enabled]. */
+    var habits: HabitSettings
+
     /** Sustituye los avisos pendientes cuyo id empieza por [prefix]; sin prefijo, todos. */
     fun replaceReminders(reminders: List<PlannedReminder>, prefix: String = "")
     fun budgetAlerts(alerts: List<BudgetAlert>)
@@ -420,6 +428,7 @@ interface Notifier {
 object NoNotifier : Notifier {
     override var enabled = true
     override var budgetAlertsEnabled = true
+    override var habits = HabitSettings()
     override fun replaceReminders(reminders: List<PlannedReminder>, prefix: String) = Unit
     override fun budgetAlerts(alerts: List<BudgetAlert>) = Unit
 }

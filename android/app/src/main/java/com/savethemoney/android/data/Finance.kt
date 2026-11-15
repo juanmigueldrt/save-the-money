@@ -257,6 +257,18 @@ interface FinanceService {
     suspend fun createRecurring(series: RecurringSeries): RecurringSeries
     suspend fun updateRecurring(series: RecurringSeries): RecurringSeries
     suspend fun deleteRecurring(seriesId: String)
+
+    /** Cargos propios de los pagos fijos (pendientes, confirmados y saltados). */
+    suspend fun recurringCharges(householdId: String): List<RecurringCharge>
+
+    /** Apunta cargos pendientes; los que ya existen (misma serie y día) se ignoran. */
+    suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge>
+
+    /** Crea el movimiento del cargo y lo marca como confirmado. Devuelve el movimiento. */
+    suspend fun confirmCharge(chargeId: String, draft: MovementDraft): Movement
+
+    /** Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta. */
+    suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?)
     suspend fun goals(householdId: String): List<Goal>
     suspend fun createGoal(goal: Goal): Goal
     suspend fun updateGoal(goal: Goal): Goal
@@ -491,6 +503,32 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun deleteRecurring(seriesId: String) {
         series.removeAll { it.id == seriesId }
+        charges.removeAll { it.seriesId == seriesId }
+    }
+
+    private val charges = mutableListOf<RecurringCharge>()
+
+    override suspend fun recurringCharges(householdId: String) = charges.filter { it.householdId == householdId }.sortedByDescending { it.dueOn }
+
+    override suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge> =
+        charges.distinctBy { it.seriesId to it.dueOn }
+            .filter { new -> this.charges.none { it.seriesId == new.seriesId && it.dueOn == new.dueOn } }
+            .map { it.copy(id = id(), status = ChargeStatus.Pending, transactionId = null) }
+            .also { this.charges += it }
+
+    override suspend fun confirmCharge(chargeId: String, draft: MovementDraft): Movement {
+        val i = charges.indexOfFirst { it.id == chargeId }
+        if (i < 0) fail("El cargo no existe.")
+        if (!charges[i].isPending) fail("El cargo ya no está pendiente.")
+        val movement = build(draft, charges[i].householdId).also { movements += it }
+        charges[i] = charges[i].copy(status = ChargeStatus.Confirmed, transactionId = movement.id, amountMinor = movement.amountMinor)
+        return movement
+    }
+
+    override suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?) {
+        charges.replaceAll {
+            if (it.id == chargeId) it.copy(status = status, transactionId = if (status == ChargeStatus.Pending) null else transactionId) else it
+        }
     }
 
     override suspend fun goals(householdId: String) = goals.filter { it.householdId == householdId }
