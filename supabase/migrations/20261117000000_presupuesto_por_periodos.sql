@@ -70,6 +70,22 @@ where h.id = b.household_id;
 alter table public.budgets alter column ends_on set not null;
 alter table public.budgets add constraint budgets_period_check check (ends_on >= month);
 
+-- Quien guarde sin fecha de fin (versiones antiguas o inserciones directas): el mes natural.
+create function private.default_budget_ends_on() returns trigger
+language plpgsql set search_path = '' as $$
+begin
+  if new.ends_on is null then
+    new.ends_on := (date_trunc('month', new.month) + interval '1 month' - interval '1 day')::date;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function private.default_budget_ends_on() from public, anon, authenticated;
+
+create trigger budgets_default_ends_on before insert or update on public.budgets
+  for each row execute function private.default_budget_ends_on();
+
 grant insert (ends_on, carry_over, warn_pct), update (ends_on, carry_over, warn_pct) on public.budgets to authenticated;
 
 -- Guardar un presupuesto de un periodo, con sus límites, en una transacción.
