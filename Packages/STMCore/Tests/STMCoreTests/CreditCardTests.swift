@@ -212,3 +212,31 @@ final class CreditCardTests: XCTestCase {
         XCTAssertNil(after.first?.payFromAccountId)
     }
 }
+
+final class CardPurchaseKindTests: XCTestCase {
+    func testRecurringSeriesFromPurchaseStartsPendingNextDay() {
+        let day = CalendarDay(year: 2026, month: 11, day: 16)!
+        let purchase = Movement(householdId: UUID(), accountId: UUID(), categoryId: UUID(), bookedOn: day,
+                                amount: Money(minor: -1299), description: "Plataforma de música")
+        let series = RecurringSeries.fromPurchase(purchase)
+        XCTAssertEqual(series.name, "Plataforma de música")
+        XCTAssertEqual(series.kind, .subscription)
+        XCTAssertEqual(series.amount.minor, 1299)
+        XCTAssertEqual(series.accountId, purchase.accountId)
+        XCTAssertEqual(series.categoryId, purchase.categoryId)
+        XCTAssertEqual(series.recurrence, .monthly)
+        XCTAssertEqual(series.startsOn, day)
+        // El cargo de hoy ya es el movimiento: no sale como pendiente; el del mes que viene, sí.
+        XCTAssertTrue(PendingCharges.missing(series: [series], existing: [], today: day).isEmpty)
+        let next = PendingCharges.missing(series: [series], existing: [], today: day.adding(months: 1))
+        XCTAssertEqual(next.map(\.dueOn), [day.adding(months: 1)])
+        XCTAssertEqual(next.first?.amount.minor, -1299)
+    }
+
+    func testInstallmentLimits() {
+        XCTAssertEqual(CardInstallment.allowedMonths, 2...48)
+        XCTAssertNil(CardInstallment(householdId: UUID(), accountId: UUID(), movementId: UUID(), months: 24).issue)
+        XCTAssertNotNil(CardInstallment(householdId: UUID(), accountId: UUID(), movementId: UUID(), months: 60).issue)
+        XCTAssertEqual(CardPurchaseKind.allCases.map(\.title), ["Normal", "A plazos", "Recurrente"])
+    }
+}

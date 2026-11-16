@@ -503,3 +503,38 @@ extension BudgetAlertPlanner {
                            body: "Te quedan \(summary.available.formatted()) de \(summary.terms.creditLimit.formatted()). El aviso salta al \(percent) %.")
     }
 }
+
+// MARK: - Tipo de compra al apuntar un gasto con tarjeta
+
+/// Al apuntar un gasto en una tarjeta: una compra normal, una a plazos o un pago que se repite.
+public enum CardPurchaseKind: String, CaseIterable, Sendable {
+    case normal, installments, recurring
+
+    public var title: String {
+        switch self {
+        case .normal: "Normal"
+        case .installments: "A plazos"
+        case .recurring: "Recurrente"
+        }
+    }
+}
+
+extension CardInstallment {
+    /// Plazos que se pueden elegir al apuntar una compra (lo mismo que admite la base de datos).
+    public static let allowedMonths = 2...48
+    /// Muchos contratos sólo aplazan compras de este importe o más (sólo se avisa, no se bloquea).
+    public static let usualMinimum = Money(minor: 5_000)
+}
+
+extension RecurringSeries {
+    /// El pago fijo que nace de un gasto apuntado con tarjeta: mismo nombre, importe, cuenta y
+    /// categoría, empezando ese día. Ese primer cargo ya es el movimiento, así que los pendientes
+    /// empiezan al día siguiente.
+    public static func fromPurchase(_ movement: Movement, recurrence: Recurrence = .monthly) -> RecurringSeries {
+        RecurringSeries(householdId: movement.householdId, name: movement.description,
+                        kind: movement.amount.isNegative ? .subscription : .income,
+                        amount: Money(minor: abs(movement.amount.minor), currency: movement.amount.currency),
+                        accountId: movement.accountId, categoryId: movement.categoryId, recurrence: recurrence,
+                        startsOn: movement.bookedOn, pendingFrom: movement.bookedOn.adding(days: 1))
+    }
+}

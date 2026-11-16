@@ -86,10 +86,17 @@ final class FinanceModel {
 
     @discardableResult
     func add(_ draft: MovementDraft) async -> Bool {
-        await perform {
-            _ = try await service.addMovement(draft, in: household.id)
+        await addMovement(draft) != nil
+    }
+
+    /// Como `add`, pero devuelve el movimiento creado (para aplazarlo o hacerlo recurrente).
+    func addMovement(_ draft: MovementDraft) async -> Movement? {
+        var created: Movement?
+        _ = await perform {
+            created = try await service.addMovement(draft, in: household.id)
             try await reloadAll()
         }
+        return created
     }
 
     @discardableResult
