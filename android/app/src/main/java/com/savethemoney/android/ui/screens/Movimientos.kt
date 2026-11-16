@@ -67,6 +67,9 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import com.savethemoney.android.data.AccountKind
+import com.savethemoney.android.data.CardInstallment
+import com.savethemoney.android.data.CardPurchase
+import com.savethemoney.android.data.Recurrence
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.Money
@@ -518,8 +521,13 @@ fun Pantalla07(nav: Nav) {
     var parecidos by remember { mutableStateOf(emptyList<Movement>()) }
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf(false) }
+    // Sólo gasto nuevo en una tarjeta: normal (0), a plazos (1) o recurrente (2).
+    var compra by remember { mutableIntStateOf(0) }
+    var plazos by remember { mutableIntStateOf(CardPurchase.DEFAULT_MONTHS) }
+    var cadaCompra by remember { mutableStateOf(Recurrence.Monthly) }
     val action = rememberAction()
     val cuentas = finance.activeAccounts.map { it.name to it.id }
+    val enTarjeta = form.movement == null && tipo == 0 && finance.account(cuenta)?.kind == AccountKind.CreditCard
     val tipoCategoria = if (tipo == 1) CategoryKind.Income else CategoryKind.Expense
     val elegida = finance.category(categoria)
 
@@ -563,6 +571,8 @@ fun Pantalla07(nav: Nav) {
                         return@run
                     }
                 }
+            } else if (enTarjeta && compra != 0) {
+                finance.addCardPurchase(draft, if (compra == 1) CardPurchase.Installments(plazos) else CardPurchase.Recurring(cadaCompra))
             } else {
                 finance.add(draft)
             }
@@ -606,6 +616,7 @@ fun Pantalla07(nav: Nav) {
                         cerrar,
                     )
                     "cuenta" -> SelectorSheet("Cuenta", cuentas.map { (n, id) -> n to { cuenta = id } }, cerrar)
+                    "cadaCompra" -> SelectorSheet("Frecuencia", Recurrence.Common.map { rec -> rec.title to { cadaCompra = rec } }, cerrar)
                     else -> SelectorSheet("Cuenta de destino", cuentas.map { (n, id) -> n to { destino = id } }, cerrar)
                 }
             }
@@ -659,6 +670,47 @@ fun Pantalla07(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         FilledField("Cuenta", finance.account(cuenta)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+        if (enTarjeta) {
+            Spacer(Modifier.height(16.dp))
+            Text("Tipo de compra", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Spacer(Modifier.height(8.dp))
+            Segmented(listOf("Normal", "A plazos", "Recurrente"), compra, { compra = it })
+            if (compra == 1) {
+                Spacer(Modifier.height(16.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Plazos", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Stepper(
+                        "$plazos meses",
+                        { plazos = (plazos - 1).coerceAtLeast(CardPurchase.MONTHS.first) },
+                        { plazos = (plazos + 1).coerceAtMost(CardPurchase.MONTHS.last) },
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                ChipRow(Modifier.fillMaxWidth()) {
+                    CardInstallment.commonMonths.forEach { m -> Chip("$m meses", selected = m == plazos, onClick = { plazos = m }) }
+                }
+                val principal = Money.entered(importe)?.let(::abs) ?: 0L
+                val tin = finance.cards.terms[cuenta]?.installmentRate ?: 14.0
+                val cuota = CardPurchase.quote(principal, plazos, tin)
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "${Money.format(cuota.monthly)} al mes · total ${Money.format(cuota.total)} · intereses ${Money.format(cuota.interest)} " +
+                        "(TIN ${tin.toString().removeSuffix(".0").replace('.', ',')} %)",
+                    style = StmType.bodyMedium, color = c.onSurface,
+                )
+                if (principal in 1 until CardPurchase.USUAL_MINIMUM) {
+                    Text("Muchos contratos sólo aplazan compras de 50 € o más", style = StmType.bodySmall, color = c.error)
+                }
+            } else if (compra == 2) {
+                Spacer(Modifier.height(16.dp))
+                FilledField("Cada", cadaCompra.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cadaCompra" })
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Se crea un pago fijo con este concepto, importe y categoría. Los próximos cargos saldrán como pendientes de confirmar.",
+                    style = StmType.bodySmall, color = c.onSurfaceVariant,
+                )
+            }
+        }
         Spacer(Modifier.height(16.dp))
         FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
         Spacer(Modifier.height(16.dp))
