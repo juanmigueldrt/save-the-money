@@ -11,6 +11,7 @@ import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.BalanceAdjustment
 import com.savethemoney.android.data.MovementFilter
 import com.savethemoney.android.data.BudgetCategory
+import com.savethemoney.android.data.CardPurchase
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
@@ -229,6 +230,28 @@ class FinanceModel(
         recent = service.movements(household.id, null, RECENT_LIMIT)
         // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
         planning.syncCharges(recent)
+    }
+
+    /**
+     * Gasto nuevo en una tarjeta: lo apunta y, según [purchase], lo aplaza con el TIN de la tarjeta
+     * o crea su pago fijo. Se valida todo antes de guardar nada.
+     */
+    suspend fun addCardPurchase(draft: MovementDraft, purchase: CardPurchase) {
+        draft.issue?.let { throw AppError.InvalidInput(it) }
+        val rate = cards.terms[draft.accountId]?.installmentRate ?: 14.0
+        val check = Movement("", household.id, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor, draft.description)
+        when (purchase) {
+            is CardPurchase.Installments -> CardPurchase.installment(check, purchase.months, rate).issue
+            is CardPurchase.Recurring -> CardPurchase.series(check, purchase.recurrence).issue
+            CardPurchase.Normal -> null
+        }?.let { throw AppError.InvalidInput(it) }
+        val movement = service.addMovement(draft, household.id)
+        when (purchase) {
+            is CardPurchase.Installments -> service.saveInstallment(CardPurchase.installment(movement, purchase.months, rate))
+            is CardPurchase.Recurring -> planning.save(CardPurchase.series(movement, purchase.recurrence))
+            CardPurchase.Normal -> Unit
+        }
+        reloadAll()
     }
 
     /** Confirma un pago fijo pendiente: crea su movimiento y recarga saldos y movimientos. */

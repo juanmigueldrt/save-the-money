@@ -792,10 +792,16 @@ struct MovementFormView: View {
     let accountId: UUID?
 
     @Environment(FinanceModel.self) private var finance
+    @Environment(CreditCardModel.self) private var cards
+    @Environment(PlanningModel.self) private var planning
     @Environment(\.dismiss) private var dismiss
     @State private var isExpense = true
     @State private var amount = ""
     @State private var concept = ""
+    /// Sólo al apuntar un gasto nuevo con tarjeta: normal, a plazos o recurrente.
+    @State private var purchaseKind = CardPurchaseKind.normal
+    @State private var months = 3
+    @State private var recurrence = Recurrence.monthly
     @State private var date = Date()
     @State private var selectedAccount: UUID?
     @State private var selectedCategory: UUID?
@@ -812,6 +818,13 @@ struct MovementFormView: View {
     @State private var similar: [Movement] = []
 
     private var kind: CategoryKind { isExpense ? .expense : .income }
+
+    /// La tarjeta elegida, si se está apuntando un gasto nuevo en una tarjeta de crédito.
+    private var newCardPurchase: Account? {
+        guard movement == nil, isExpense, let id = selectedAccount, let account = finance.account(id),
+              account.kind == .creditCard else { return nil }
+        return account
+    }
 
     private var payeeSuggestions: [String] {
         let text = payee.trimmingCharacters(in: .whitespaces)
@@ -850,6 +863,9 @@ struct MovementFormView: View {
                     }
                     TextField("Notas (opcional)", text: $notes, axis: .vertical)
                         .lineLimit(1...4)
+                }
+                if let card = newCardPurchase {
+                    cardPurchaseSection(card)
                 }
                 Section {
                     TextField("Beneficiario (opcional)", text: $payee)
@@ -935,6 +951,56 @@ struct MovementFormView: View {
         .onAppear(perform: fill)
     }
 
+    @ViewBuilder
+    private func cardPurchaseSection(_ card: Account) -> some View {
+        Section {
+            Picker("Tipo de compra", selection: $purchaseKind) {
+                ForEach(CardPurchaseKind.allCases, id: \.self) { Text($0.title).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            switch purchaseKind {
+            case .normal:
+                EmptyView()
+            case .installments:
+                Stepper("\(months) plazos", value: $months, in: CardInstallment.allowedMonths)
+                HStack(spacing: Spacing.s8) {
+                    ForEach(CardInstallment.commonMonths, id: \.self) { option in
+                        Button("\(option)") { months = option }
+                            .buttonStyle(.bordered)
+                            .tint(option == months ? Palette.accent : nil)
+                            .accessibilityLabel("\(option) plazos")
+                    }
+                }
+                if let parsed = Money(entered: amount), parsed.minor != 0 {
+                    let principal = Money(minor: abs(parsed.minor))
+                    let rate = cards.terms[card.id]?.installmentRate ?? 14
+                    let quota = CardInstallment.payment(principal: principal, months: months, rate: rate)
+                    let total = Money(minor: quota.minor * months)
+                    LabeledContent("Cuota al mes", value: quota.formatted())
+                    LabeledContent("Total", value: total.formatted())
+                    LabeledContent("Intereses (\(CardText.percent(rate)) TIN)", value: (total - principal).formatted())
+                }
+            case .recurring:
+                Picker("Se repite", selection: $recurrence) {
+                    ForEach(Recurrence.common, id: \.self) { Text($0.title).tag($0) }
+                }
+            }
+        } footer: {
+            switch purchaseKind {
+            case .normal:
+                Text("Se paga entero en el próximo cargo de la tarjeta.")
+            case .installments:
+                if let parsed = Money(entered: amount), abs(parsed.minor) < CardInstallment.usualMinimum.minor {
+                    Text("Muchos contratos sólo aplazan compras de 50 € o más. La cuota se suma a cada cargo de la tarjeta.")
+                } else {
+                    Text("La cuota se suma a cada cargo de la tarjeta.")
+                }
+            case .recurring:
+                Text("Además se crea un pago fijo con esta tarjeta. Los próximos cargos saldrán como pendientes de confirmar.")
+            }
+        }
+    }
+
     private func fill() {
         selectedAccount = accountId ?? finance.defaultAccount?.id
         guard let movement else { return }
@@ -996,6 +1062,18 @@ struct MovementFormView: View {
                     similar = matches
                     return
                 }
+            }
+        } else if let card = newCardPurchase, purchaseKind != .normal {
+            guard let created = await finance.addMovement(draft) else { error = finance.error; return }
+            switch purchaseKind {
+            case .installments:
+                ok = await cards.deferPurchase(created, months: months, in: card)
+                if !ok { error = "El gasto se ha guardado, pero no se ha podido aplazar: \(cards.error ?? "inténtalo desde la tarjeta.")"; return }
+            case .recurring:
+                ok = await planning.save(RecurringSeries.fromPurchase(created, recurrence: recurrence))
+                if !ok { error = "El gasto se ha guardado, pero no se ha podido crear el pago fijo: \(planning.error ?? "créalo en Pagos fijos.")"; return }
+            case .normal:
+                ok = true
             }
         } else {
             ok = await finance.add(draft)

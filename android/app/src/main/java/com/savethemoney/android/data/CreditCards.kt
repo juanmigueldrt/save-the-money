@@ -330,3 +330,40 @@ object CardAlerts {
         )
     }
 }
+
+/** Tipo de compra al apuntar un gasto nuevo en una tarjeta: normal, a plazos o recurrente. */
+sealed interface CardPurchase {
+    data object Normal : CardPurchase
+    data class Installments(val months: Int) : CardPurchase
+    data class Recurring(val recurrence: Recurrence) : CardPurchase
+
+    /** Cuota al mes, total e intereses de aplazar [principal] (en positivo). */
+    data class Quote(val monthly: Long, val total: Long, val interest: Long)
+
+    companion object {
+        /** Muchos contratos sólo aplazan desde aquí; no se bloquea, sólo se avisa. */
+        const val USUAL_MINIMUM = 5_000L
+        const val DEFAULT_MONTHS = 3
+        val MONTHS = 2..48
+
+        fun quote(principal: Long, months: Int, rate: Double): Quote {
+            val monthly = CardInstallment.payment(principal, months, rate)
+            val total = monthly * months
+            return Quote(monthly, total, maxOf(0, total - principal))
+        }
+
+        /** El aplazado del gasto recién guardado. */
+        fun installment(movement: Movement, months: Int, rate: Double) =
+            CardInstallment("", movement.householdId, movement.accountId, movement.id, months, rate)
+
+        /**
+         * El pago fijo del gasto recién guardado: empieza ese día y crea pendientes desde el día
+         * siguiente, para que el cargo que ya está apuntado no salga además como pendiente.
+         */
+        fun series(movement: Movement, recurrence: Recurrence) = RecurringSeries(
+            "", movement.householdId, movement.description.trim(), RecurringKind.Subscription, -movement.amountMinor,
+            movement.accountId, movement.categoryId, recurrence.every, recurrence.unit, movement.day.toString(),
+            createsPending = true, pendingFrom = movement.day.plusDays(1).toString(),
+        )
+    }
+}
