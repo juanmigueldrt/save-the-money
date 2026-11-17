@@ -74,6 +74,9 @@ struct RootView: View {
     @State private var investments: InvestmentModel
     @State private var cards: CreditCardModel
     @State private var addingMovement = false
+    /// Cambia en cada «Nuevo gasto» de Atajos para que el formulario salga siempre vacío.
+    @State private var newMovementForm = UUID()
+    @State private var router = QuickActionRouter.shared
     @State private var addingAccount = false
     @State private var importingCSV = false
 
@@ -99,7 +102,7 @@ struct RootView: View {
         .frame(minWidth: 900, minHeight: 600)
         #endif
         // Las hojas de los menús van dentro de los .environment para recibir los modelos.
-        .sheet(isPresented: $addingMovement) { MovementFormView(movement: nil, accountId: nil) }
+        .sheet(isPresented: $addingMovement) { MovementFormView(movement: nil, accountId: nil).id(newMovementForm) }
         .sheet(isPresented: $addingAccount) { AccountFormView(account: nil) }
         .sheet(isPresented: $importingCSV) {
             NavigationStack {
@@ -112,6 +115,9 @@ struct RootView: View {
             .frame(minWidth: 560, minHeight: 520)
             #endif
         }
+        // Atajos, Siri o un enlace savethemoney://nuevo-gasto: también si llegó antes de que
+        // esta pantalla estuviera lista (app cerrada o cargando la sesión).
+        .onChange(of: router.request, initial: true) { _, _ in handleQuickAction() }
         .focusedSceneValue(\.appActions, actions)
         .environment(finance)
         .environment(budgets)
@@ -133,6 +139,18 @@ struct RootView: View {
             await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
             // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
             await planning.syncCharges(movements: finance.recent)
+        }
+    }
+
+    private func handleQuickAction() {
+        guard let action = router.take() else { return }
+        switch action {
+        case .newExpense:
+            // Cierra las otras hojas de esta pantalla y abre el formulario vacío, como gasto.
+            addingAccount = false
+            importingCSV = false
+            newMovementForm = UUID()
+            addingMovement = true
         }
     }
 

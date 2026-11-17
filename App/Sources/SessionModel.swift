@@ -109,7 +109,9 @@ final class SessionModel {
     }
 
     func handle(url: URL) {
-        if let code = InviteCode(url.absoluteString) {
+        if let action = QuickAction(url: url) {
+            QuickActionRouter.shared.open(action)
+        } else if let code = InviteCode(url.absoluteString) {
             pendingInvite = code
         }
     }
