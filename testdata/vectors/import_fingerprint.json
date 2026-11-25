@@ -1,0 +1,51 @@
+{
+  "_source": "Hash input written by hand from the documented format '<ISO day>|<amount minor>|<text folded: lowercase, no accents, ß→ss, spaces collapsed and trimmed; empty → \"Sin concepto\">|<occurrence of that key so far>'; digest with Python hashlib.sha256.",
+  "vectors": [
+    {
+      "name": "Banco inventado, separador ;",
+      "csv": "Fecha;Concepto;Importe\n05/03/2026;Supermercado Lúpulo;-23,45\n05/03/2026;SUPERMERCADO LUPULO;-23,45\n05/03/2026;  supermercado   lúpulo ;-23,45\n06/03/2026;Café   Ñandú;-3,10\n07/03/2026;Nómina Ejemplo SL;1.500,00\n08/03/2026;Straße Bäckerei;-7,80\n08/03/2026;東京ラーメン;-12,00\n09/03/2026;Café ☕ Ölmühle;-4,20\n09/03/2026;;-5,00\n05/03/2026;Supermercado Lúpulo;-23,46\n",
+      "rows": [
+        {
+          "hashInput": "2026-03-05|-2345|supermercado lupulo|0",
+          "importHash": "03ceab3435b9b7f6781c2b1cd8696ebaed61da7872e1e3972d12025a15381167"
+        },
+        {
+          "hashInput": "2026-03-05|-2345|supermercado lupulo|1",
+          "importHash": "fa3becf43bbed3687cec0d96f24e7597bf561ae704f845ae50bdc63dd62bd0de"
+        },
+        {
+          "hashInput": "2026-03-05|-2345|supermercado lupulo|2",
+          "importHash": "8279f1d9d628a116fbccff178112ddbbee4090bde9b9036e75b66d0fd0726b15"
+        },
+        {
+          "hashInput": "2026-03-06|-310|cafe nandu|0",
+          "importHash": "7898a37a0d37284236f430c428bc654d21d9a19880f5caf549590464f42b9998"
+        },
+        {
+          "hashInput": "2026-03-07|150000|nomina ejemplo sl|0",
+          "importHash": "2c26869a04ae87065fd56da50cf62bd779469c58d86913bcd2c4144850ad15ae"
+        },
+        {
+          "hashInput": "2026-03-08|-780|strasse backerei|0",
+          "importHash": "da888f48c31cc19325cb67cd325b5d5f11660887428b9d898bf469e86c06a5c5"
+        },
+        {
+          "hashInput": "2026-03-08|-1200|東京ラーメン|0",
+          "importHash": "0b2561404bf9d4a9f3d07a4913d02601a520d63dddba6db949782006e1f3d30c"
+        },
+        {
+          "hashInput": "2026-03-09|-420|cafe ☕ olmuhle|0",
+          "importHash": "39dfe39b0bc794741d5cabd124c31f8362f1b97483e540b0c4757d97cb5bebc2"
+        },
+        {
+          "hashInput": "2026-03-09|-500|sin concepto|0",
+          "importHash": "ec9a994cbbc5082bda5365a0a16660443c0e30518992ab42e775fbe4c75e8468"
+        },
+        {
+          "hashInput": "2026-03-05|-2346|supermercado lupulo|0",
+          "importHash": "a2ca2c2a87d94ea61927c0081e8f104374caf0855457a876023432c8e84af160"
+        }
+      ]
+    }
+  ]
+}

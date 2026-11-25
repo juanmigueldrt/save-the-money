@@ -1,0 +1,124 @@
+{
+  "_source": "payment: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200 (rate = annual TIN %), rate 0 → P/n, computed with Python decimal (60 digits) and rounded half up; 0 when months ≤ 0 or principal ≤ 0. statementDates: worked out by hand from the rule in CreditCardTerms.",
+  "installments": [
+    {
+      "principal": 120000,
+      "months": 12,
+      "rate": 0,
+      "payment": 10000
+    },
+    {
+      "principal": 100000,
+      "months": 3,
+      "rate": 0,
+      "payment": 33333
+    },
+    {
+      "principal": 100000,
+      "months": 2,
+      "rate": 0,
+      "payment": 50000
+    },
+    {
+      "principal": 120000,
+      "months": 12,
+      "rate": 14,
+      "payment": 10774
+    },
+    {
+      "principal": 50000,
+      "months": 6,
+      "rate": 20,
+      "payment": 8826
+    },
+    {
+      "principal": 99999,
+      "months": 9,
+      "rate": 14,
+      "payment": 11769
+    },
+    {
+      "principal": 250000,
+      "months": 48,
+      "rate": 60,
+      "payment": 13830
+    },
+    {
+      "principal": 1,
+      "months": 3,
+      "rate": 14,
+      "payment": 0
+    },
+    {
+      "principal": 35990,
+      "months": 3,
+      "rate": 9.5,
+      "payment": 12187
+    },
+    {
+      "principal": 0,
+      "months": 12,
+      "rate": 14,
+      "payment": 0
+    },
+    {
+      "principal": -5000,
+      "months": 12,
+      "rate": 14,
+      "payment": 0
+    },
+    {
+      "principal": 10000,
+      "months": 0,
+      "rate": 14,
+      "payment": 0
+    }
+  ],
+  "statementDates": [
+    {
+      "statementDay": 10,
+      "paymentDay": 5,
+      "paymentDelayMonths": 1,
+      "purchase": "2026-03-09",
+      "closing": "2026-03-10",
+      "payment": "2026-04-05",
+      "cycleStart": "2026-02-10"
+    },
+    {
+      "statementDay": 10,
+      "paymentDay": 5,
+      "paymentDelayMonths": 1,
+      "purchase": "2026-03-10",
+      "closing": "2026-04-10",
+      "payment": "2026-05-05",
+      "cycleStart": "2026-03-10"
+    },
+    {
+      "statementDay": 28,
+      "paymentDay": 3,
+      "paymentDelayMonths": 2,
+      "purchase": "2026-12-29",
+      "closing": "2027-01-28",
+      "payment": "2027-03-03",
+      "cycleStart": "2026-12-28"
+    },
+    {
+      "statementDay": 28,
+      "paymentDay": 20,
+      "paymentDelayMonths": 0,
+      "purchase": "2028-02-28",
+      "closing": "2028-03-28",
+      "payment": "2028-03-20",
+      "cycleStart": "2028-02-28"
+    },
+    {
+      "statementDay": 1,
+      "paymentDay": 1,
+      "paymentDelayMonths": 1,
+      "purchase": "2026-01-31",
+      "closing": "2026-02-01",
+      "payment": "2026-03-01",
+      "cycleStart": "2026-01-01"
+    }
+  ]
+}
