@@ -234,7 +234,7 @@ struct GoalFormView: View {
     @State private var starting = ""
     @State private var monthlyPlan = ""
     @State private var hasDate = false
-    @State private var targetOn = Calendar.current.date(byAdding: .year, value: 1, to: Date()) ?? Date()
+    @State private var targetOn = CalendarDay.gregorian.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var accountId: UUID?
     @State private var error: String?
     @State private var isWorking = false
