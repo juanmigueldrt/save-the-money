@@ -53,7 +53,15 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         userId()
     }
 
-    override suspend fun signOut() = mapped { client.auth.signOut() }
+    // supabase-kt 3.2.6 solo borra la sesión local si la llamada al servidor sale bien:
+    // sin red quedaría guardada y la app volvería a entrar sola.
+    override suspend fun signOut() = mapped {
+        try {
+            client.auth.signOut()
+        } finally {
+            client.auth.clearSession()
+        }
+    }
 
     private fun userId(): String = client.auth.currentUserOrNull()?.id ?: throw AppError.NotSignedIn
 
