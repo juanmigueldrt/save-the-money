@@ -78,19 +78,22 @@ final class TrackingModel {
 
     // MARK: Informes
 
-    var reportRange: ClosedRange<CalendarDay> { period.range(today: today()) }
+    /// Los periodos de los informes empiezan el día de inicio de mes del hogar, como el presupuesto.
+    var reportRange: ClosedRange<CalendarDay> { period.range(today: today(), monthStartDay: household.monthStartDay) }
 
-    var previousRange: ClosedRange<CalendarDay> { period.previousRange(today: today()) }
+    var previousRange: ClosedRange<CalendarDay> {
+        period.previousRange(today: today(), monthStartDay: household.monthStartDay)
+    }
 
     func report(categories: [BudgetCategory]) -> SpendingReport {
         SpendingReport(movements: reportMovements, categories: categories, range: reportRange, kind: kind,
-                       categoryIds: categoryFilter)
+                       categoryIds: categoryFilter, monthStartDay: household.monthStartDay)
     }
 
     /// El mismo informe del periodo anterior, para comparar.
     func previousReport(categories: [BudgetCategory]) -> SpendingReport {
         SpendingReport(movements: reportMovements, categories: categories, range: previousRange, kind: kind,
-                       categoryIds: categoryFilter)
+                       categoryIds: categoryFilter, monthStartDay: household.monthStartDay)
     }
 
     func loadReport() async {

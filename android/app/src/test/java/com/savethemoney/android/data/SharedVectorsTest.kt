@@ -32,6 +32,8 @@ class SharedVectorsTest {
     private fun JsonElement.str(key: String): String = this[key]!!.jsonPrimitive.content
     private fun JsonElement.int(key: String): Int = this[key]!!.jsonPrimitive.int
     private fun JsonElement.date(key: String): LocalDate = LocalDate.parse(str(key))
+    private fun JsonElement.long(key: String): Long = this[key]!!.jsonPrimitive.long
+    private fun JsonElement.rango(key: String): String = this[key]!!.jsonArray.joinToString("..") { it.jsonPrimitive.content }
 
     @Test
     fun moneyParsing() {
@@ -132,6 +134,28 @@ class SharedVectorsTest {
             val period = schedule.period(v.date("day"))
             assertEquals("${v.str("frequency")} ${v.str("day1")} el ${v.str("day")}",
                 "${v.str("start")}..${v.str("end")}", "${period.start}..${period.end}")
+        }
+    }
+
+    @Test
+    fun reportPeriods() {
+        val file = Json.parseToJsonElement(File("../../testdata/vectors/report_periods.json").readText())
+        val inicio = file.int("monthStartDay")
+        val hoy = file.date("today")
+        val movimientos = file["movements"]!!.jsonArray.mapIndexed { i, m ->
+            Movement("m$i", "hogar", "cuenta", null, m.str("day"), m.long("minor"), "Gasto")
+        }
+        for (v in file["vectors"]!!.jsonArray) {
+            val preset = ReportPeriod.entries.first { it.name.replaceFirstChar { c -> c.lowercase() } == v.str("preset") }
+            val range = preset.range(hoy, inicio)
+            assertEquals(preset.name, v.rango("range"), "${range.start}..${range.endInclusive}")
+            val report = SpendingReport(movimientos, emptyList(), range, monthStartDay = inicio)
+            assertEquals(preset.name, v.long("total"), report.total)
+            assertEquals(preset.name, v["months"]!!.jsonArray.map { "${it.str("month")}=${it.long("minor")}" },
+                report.byMonth.map { "${it.month}=${it.amount}" })
+            val previous = preset.previousRange(hoy, inicio)
+            assertEquals(preset.name, v.rango("previousRange"), "${previous.start}..${previous.endInclusive}")
+            assertEquals(preset.name, v.long("previousTotal"), SpendingReport(movimientos, emptyList(), previous, monthStartDay = inicio).total)
         }
     }
 
