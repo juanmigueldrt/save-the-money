@@ -51,7 +51,7 @@ object AmountExpression {
         for (ch in cleaned) {
             val token: Token? = when (ch) {
                 in '0'..'9', ',', '.' -> { number.append(ch); continue }
-                ' ', ' ' -> continue
+                ' ', '\u00A0', '\u202F' -> continue
                 '+' -> Token.Op('+')
                 '-', Money.MINUS -> Token.Op('-')
                 '*', '×', 'x', 'X' -> Token.Op('*')
