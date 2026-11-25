@@ -68,8 +68,10 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         // Para capturas: adb shell am start -n …/.MainActivity --ei pantalla 14 (modo demo con datos de muestra)
-        val capture = intent.getIntExtra("pantalla", 0).takeIf { it in 1..SCREEN_COUNT }
-        session = (application as StmApp).session(capture != null)
+        val requested = capturaPedida(BuildConfig.CAPTURAS, intent.getIntExtra("pantalla", 0))
+        session = (application as StmApp).session(requested != null)
+        // La actividad es exportada: si el proceso ya tenía una sesión real, el extra no abre pantallas ni siembra datos.
+        val capture = requested.takeIf { session.capture }
         handleLink(intent)
         // Las capturas comparan con el diseño: siempre con la vista normal.
         if (capture == null) com.savethemoney.android.ui.Vista.load(getSharedPreferences("ajustes", MODE_PRIVATE))
@@ -111,6 +113,9 @@ class MainActivity : ComponentActivity() {
         intent.dataString?.let(InviteCode::parse)?.let { session.pendingInvite = it }
     }
 }
+
+/** Pantalla que pide el extra de capturas, o nulo si el gancho no va compilado o el número no existe. */
+internal fun capturaPedida(habilitado: Boolean, extra: Int): Int? = extra.takeIf { habilitado && it in 1..SCREEN_COUNT }
 
 /** Una sola sesión por proceso, para que sobreviva a girar la pantalla o recrear la actividad. */
 class StmApp : android.app.Application() {

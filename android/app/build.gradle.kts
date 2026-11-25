@@ -55,8 +55,11 @@ android {
             // -Pentrega: APK reducido con R8 (el de 37 MB no se puede enviar al móvil).
             isMinifyEnabled = project.hasProperty("entrega")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
+            // Gancho de capturas (--ei pantalla N): solo en la depuración local, nunca en un APK que va a un móvil.
+            buildConfigField("boolean", "CAPTURAS", (!project.hasProperty("entrega")).toString())
         }
         release {
+            buildConfigField("boolean", "CAPTURAS", "false")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"))
