@@ -138,6 +138,12 @@ data class CreditCardSummary(
      * de la tarjeta no son de fiar.
      */
     val unresolvedInstallments: List<String>,
+    /**
+     * Abonos sin categoría de los extractos sin cobrar: no se sabe si son un pago de la tarjeta o una devolución.
+     * Hasta que se clasifiquen cuentan como un pago: bajan la deuda, pero no los cargos. Si no está vacío, hay que
+     * pedir que se les ponga categoría.
+     */
+    val uncategorizedCredits: List<String>,
 ) {
     val next: CardPayment? get() = payments.firstOrNull()
     val isOverAlert: Boolean get() = terms.alertPercent != null && usedFraction * 100 >= terms.alertPercent
@@ -163,7 +169,10 @@ object CreditCardCalculator {
         val unresolved = own.filter { it.movementId !in byId }.map { it.id }
         val deferred = plans.map { it.second.id }.toSet()
         // Compras normales y devoluciones, sin pagos de la tarjeta ni compras aplazadas.
-        val charges = mine.filter { it.id !in deferred && !isCardPayment(it, transferCategories) }
+        // Un abono sin categoría no es una devolución: si fuera el pago del extracto anterior, dejaría el cargo a 0.
+        val credits = mine.filter { it.amountMinor > 0 && it.categoryId == null }
+        val unclassified = credits.map { it.id }.toSet()
+        val charges = mine.filter { it.id !in deferred && it.id !in unclassified && !isCardPayment(it, transferCategories) }
 
         val used = max(0, -balance)
         val openStatement = terms.statementClosing(today)
@@ -197,6 +206,9 @@ object CreditCardCalculator {
 
         // Capital de los aplazados cuyas cuotas aún no se han cobrado: se pagan aparte, en su cuota.
         val firstUnpaid = statements[0]
+        // Solo se avisa de los abonos que caen en un extracto sin cobrar: los anteriores ya no cambian ningún cargo.
+        val firstStart = terms.cycleStart(firstUnpaid)
+        val uncategorized = credits.filter { !it.day.isBefore(firstStart) }.map { it.id }
         val deferredPending = plans.sumOf { (plan, movement) ->
             val paid = max(0, min(plan.months, monthsBetween(terms.statementClosing(movement.day), firstUnpaid)))
             amortization(-movement.amountMinor, plan.months, plan.rate).drop(paid).sumOf { it.principal }
@@ -241,7 +253,7 @@ object CreditCardCalculator {
 
         return CreditCardSummary(
             terms, today, used, terms.creditLimit - used, used.toDouble() / max(terms.creditLimit, 1), openStatement, spentThisCycle,
-            payments, revolvingAtStart, payments.sumOf { it.interest }, payoff, unresolved,
+            payments, revolvingAtStart, payments.sumOf { it.interest }, payoff, unresolved, uncategorized,
         )
     }
 

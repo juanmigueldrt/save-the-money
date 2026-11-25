@@ -105,6 +105,11 @@ private fun desglose(p: CardPayment, modo: CardPaymentMode): String {
     return if (p.interest > 0) "$texto (incluye ${Money.format(p.interest)} de intereses)" else texto
 }
 
+/** Aviso de abonos sin categoría: no se sabe si son un pago de la tarjeta o una devolución. */
+private fun avisoAbonos(n: Int) =
+    (if (n == 1) "Hay 1 abono sin categoría" else "Hay $n abonos sin categoría") +
+        ". Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
+
 private fun Double.barra() = toFloat().coerceIn(0f, 1f)
 
 private class Vista10(
@@ -391,6 +396,7 @@ fun Pantalla11(nav: Nav) {
         trasExtracto = {
             val alerta = s.terms.alertPercent
             if (s.isOverAlert && alerta != null) nota("Has pasado del $alerta % del límite. Te quedan ${Money.format(s.available)}.", c.error)
+            if (s.uncategorizedCredits.isNotEmpty()) nota(avisoAbonos(s.uncategorizedCredits.size), c.error)
         },
         trasCalendario = {
             nota("Lo que gastas entra en el extracto del día ${s.terms.statementDay}, que se cobra $retraso.", c.onSurfaceVariant)

@@ -293,6 +293,10 @@ public struct CreditCardSummary: Hashable, Sendable {
     /// cuota ni el capital: no salen en `payments` y su deuda queda dentro de `revolvingBalance`.
     /// Si no está vacío, las cifras de la tarjeta no son de fiar.
     public var unresolvedInstallments: [UUID] = []
+    /// Abonos sin categoría de los extractos sin cobrar: no se sabe si son un pago de la tarjeta o una
+    /// devolución. Hasta que se clasifiquen cuentan como un pago: bajan la deuda, pero no los cargos.
+    /// Si no está vacío, hay que pedir que se les ponga categoría.
+    public var uncategorizedCredits: [UUID] = []
 
     public var next: CardPayment? { payments.first }
     public var isOverAlert: Bool {
@@ -304,6 +308,7 @@ public struct CreditCardSummary: Hashable, Sendable {
         lhs.terms == rhs.terms && lhs.today == rhs.today && lhs.used == rhs.used && lhs.payments == rhs.payments
             && lhs.payoff?.months == rhs.payoff?.months && lhs.payoff?.interest == rhs.payoff?.interest
             && lhs.unresolvedInstallments == rhs.unresolvedInstallments
+            && lhs.uncategorizedCredits == rhs.uncategorizedCredits
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -335,7 +340,12 @@ public enum CreditCardCalculator {
         let unresolved = own.filter { byId[$0.movementId] == nil }.map(\.id)
         let deferred = Set(plans.map { $0.1.id })
         // Compras normales y devoluciones (sin pagos de la tarjeta ni compras aplazadas), en positivo = se debe.
-        let charges = mine.filter { !deferred.contains($0.id) && !isCardPayment($0, transferCategories) }
+        // Un abono sin categoría no es una devolución: si fuera el pago del extracto anterior, dejaría el cargo a 0.
+        let credits = mine.filter { $0.amount.minor > 0 && $0.categoryId == nil }
+        let unclassified = Set(credits.map(\.id))
+        let charges = mine.filter {
+            !deferred.contains($0.id) && !unclassified.contains($0.id) && !isCardPayment($0, transferCategories)
+        }
 
         let used = Money(minor: max(0, -balance.minor))
         let openStatement = terms.statementClosing(for: today)
@@ -371,6 +381,9 @@ public enum CreditCardCalculator {
 
         // Capital de los aplazados cuyas cuotas aún no se han cobrado: se pagan aparte, en su cuota.
         let firstUnpaid = statements[0]
+        // Sólo se avisa de los abonos que caen en un extracto sin cobrar: los anteriores ya no cambian ningún cargo.
+        let firstStart = terms.cycleStart(forStatement: firstUnpaid)
+        let uncategorized = credits.filter { $0.bookedOn >= firstStart }.map(\.id)
         let deferredPending = plans.reduce(0) { sum, pair in
             let (plan, movement) = pair
             let first = terms.statementClosing(for: movement.bookedOn)
@@ -429,7 +442,7 @@ public enum CreditCardCalculator {
             usedFraction: Double(used.minor) / Double(limit), openStatement: openStatement,
             spentThisCycle: spentThisCycle, payments: payments, revolvingBalance: Money(minor: revolvingAtStart),
             interestInPayments: Money(minor: payments.map(\.interest.minor).reduce(0, +)), payoff: payoff,
-            unresolvedInstallments: unresolved)
+            unresolvedInstallments: unresolved, uncategorizedCredits: uncategorized)
     }
 
     static func isCardPayment(_ movement: Movement, _ transferCategories: Set<UUID>) -> Bool {
