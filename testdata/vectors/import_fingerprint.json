@@ -1,5 +1,5 @@
 {
-  "_source": "Hash input written by hand from the documented format '<ISO day>|<amount minor>|<text folded: lowercase, no accents, ß→ss, spaces collapsed and trimmed; empty → \"Sin concepto\">|<occurrence of that key so far>'; digest with Python hashlib.sha256.",
+  "_source": "Hash input written by hand from the documented format '<ISO day>|<amount minor>|<text folded: lowercase, no accents, ß→ss, spaces collapsed and trimmed; empty → \"Sin concepto\">|<occurrence of that key so far>'; digest with Python hashlib.sha256. A null hash is a row listed as not importable.",
   "vectors": [
     {
       "name": "Banco inventado, separador ;",
@@ -44,6 +44,76 @@
         {
           "hashInput": "2026-03-05|-2346|supermercado lupulo|0",
           "importHash": "a2ca2c2a87d94ea61927c0081e8f104374caf0855457a876023432c8e84af160"
+        }
+      ]
+    },
+    {
+      "name": "Archivo en formato inglés con cabecera: «1,234» es 1234,00 y «1.250» no se importa",
+      "csv": "Date,Description,Amount\n2026-03-05,Grocery Store,-12.50\n2026-03-06,Salary,\"1,234\"\n2026-03-07,Rent,\"-1,234.56\"\n2026-03-08,Coffee,-1.5\n2026-03-09,Bonus,\"2,000,000\"\n2026-03-10,Refund,1.250\n",
+      "rows": [
+        {
+          "hashInput": "2026-03-05|-1250|grocery store|0",
+          "importHash": "5230559f5bb76233afb5b13a6224c76d90ee2d6b5b4d26470991f688d56e13e9"
+        },
+        {
+          "hashInput": "2026-03-06|123400|salary|0",
+          "importHash": "7470cad2098e872bb4feae69909b8e6bf9e4bdba3ba53a517e0b6b5d93abbea1"
+        },
+        {
+          "hashInput": "2026-03-07|-123456|rent|0",
+          "importHash": "00180314c4e5f5659e41cd9d2fc4f697f8860f8a13b901cec82a6ceb4f473d39"
+        },
+        {
+          "hashInput": "2026-03-08|-150|coffee|0",
+          "importHash": "c169a626ebba88b420c24f23ba8193cef6fee818cc85f61b82a7b9daee71a344"
+        },
+        {
+          "hashInput": "2026-03-09|200000000|bonus|0",
+          "importHash": "661a9faf301009ad6d7c17d718dfb5b14da2d507bf921d067d3ac62ec0069fdd"
+        },
+        {
+          "hashInput": null,
+          "importHash": null
+        }
+      ]
+    },
+    {
+      "name": "Archivo en formato inglés sin cabecera, casi todo del tipo «1,234»",
+      "csv": "05/03/2026;Grocery Store;1,234\n06/03/2026;Salary;2,500\n07/03/2026;Rent;-1,234.56\n",
+      "rows": [
+        {
+          "hashInput": "2026-03-05|123400|grocery store|0",
+          "importHash": "cfe6f094017da887bc117a3106bfa7e8e78c7f798b47c750e8576d90439e215f"
+        },
+        {
+          "hashInput": "2026-03-06|250000|salary|0",
+          "importHash": "16e05d3d8745177a58b0b704b9cd27e4564878ac0ff63d43d3b28171327a7e50"
+        },
+        {
+          "hashInput": "2026-03-07|-123456|rent|0",
+          "importHash": "00180314c4e5f5659e41cd9d2fc4f697f8860f8a13b901cec82a6ceb4f473d39"
+        }
+      ]
+    },
+    {
+      "name": "Archivo mezclado, sin formato decidible: se aplica la regla común y «1,234» no se importa",
+      "csv": "Fecha;Concepto;Importe\n05/03/2026;Uno;-12,50\n06/03/2026;Dos;-3.10\n07/03/2026;Tres;1,234\n08/03/2026;Cuatro;1.250\n",
+      "rows": [
+        {
+          "hashInput": "2026-03-05|-1250|uno|0",
+          "importHash": "87587915c66bbcac023f9766aeb63bb7f344d77f6ce27226cef7a4f35cca7081"
+        },
+        {
+          "hashInput": "2026-03-06|-310|dos|0",
+          "importHash": "530476a05f5ae238c7cafded1b4e5e9f7004caf90ed7418d8806014a08323575"
+        },
+        {
+          "hashInput": null,
+          "importHash": null
+        },
+        {
+          "hashInput": "2026-03-08|125000|cuatro|0",
+          "importHash": "2210b5fcc3737f1364539cee75f62132dd88998456aadee0dbbb21f5f0059366"
         }
       ]
     }
