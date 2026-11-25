@@ -1,5 +1,5 @@
 {
-  "_source": "payment: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200 (rate = annual TIN %), rate 0 → P/n, computed with Python decimal (60 digits) and rounded half up; 0 when months ≤ 0 or principal ≤ 0. statementDates: worked out by hand from the rule in CreditCardTerms. summaries (ORC-78): full-payment card, limit 300000, a 120000 purchase in 24 instalments at 14 % made 13 months before today; quota 5762 and the interest/principal rows from the same French schedule in Python decimal (row interest = remaining·r rounded half up, principal = quota − interest); 12 quotas already charged = 55835 principal paid (movement \"capital\", a card payment), 64165 pending. balance is the account balance (all movements, also those not listed). revolvingBalance = used − open-cycle purchases − pending instalment principal. unresolved = plans whose purchase is not in movements: no quota, and their principal stays in revolvingBalance (the wrong figures the flag warns about).",
+  "_source": "payment: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200 (rate = annual TIN %), rate 0 → P/n, computed with Python decimal (60 digits) and rounded half up; 0 when months ≤ 0 or principal ≤ 0. statementDates: worked out by hand from the rule in CreditCardTerms. summaries (ORC-78): full-payment card, limit 300000, a 120000 purchase in 24 instalments at 14 % made 13 months before today; quota 5762 and the interest/principal rows from the same French schedule in Python decimal (row interest = remaining·r rounded half up, principal = quota − interest); 12 quotas already charged = 55835 principal paid (movement \"capital\", a card payment), 64165 pending. balance is the account balance (all movements, also those not listed). revolvingBalance = used − open-cycle purchases − pending instalment principal. unresolved = plans whose purchase is not in movements: no quota, and their principal stays in revolvingBalance (the wrong figures the flag warns about). summaries (ORC-79): same card, no instalments; 50000 of September purchases, 30000 of October purchases and a +50000 credit on 2026-10-05. The September statement (closed 2026-10-01, charged 2026-11-01) is already paid, so the first charge is the October statement, due 2026-12-01. A credit with no category is neither a refund nor a known payment: it is left out of the charges like a payment (charge = 30000, not max(0, 30000 − 50000) = 0) and counted in uncategorized. Controls: the same credit with a transfer category (\"payment\") is a payment, and a +4000 credit with a non-transfer category (\"refund\") is a refund: charge = 30000 − 4000 = 26000, uncategorized = 0. uncategorized = credits with no category dated on or after the start of the first unpaid statement cycle.",
   "installments": [
     {
       "principal": 120000,
@@ -139,6 +139,7 @@
       "used": 99165,
       "revolvingBalance": 30000,
       "unresolved": 0,
+      "uncategorized": 0,
       "payments": [
         { "due": "2026-12-01", "amount": 35762, "purchases": 30000, "installments": 5762, "interest": 749 },
         { "due": "2027-01-01", "amount": 10762, "purchases": 5000, "installments": 5762, "interest": 690 },
@@ -164,9 +165,63 @@
       "used": 99165,
       "revolvingBalance": 94165,
       "unresolved": 1,
+      "uncategorized": 0,
       "payments": [
         { "due": "2026-12-01", "amount": 30000, "purchases": 30000, "installments": 0, "interest": 0 },
         { "due": "2027-01-01", "amount": 5000, "purchases": 5000, "installments": 0, "interest": 0 },
+        { "due": "2027-02-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-03-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-04-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-05-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 }
+      ]
+    },
+    {
+      "name": "ORC-79: un abono sin categoría no baja el cargo del extracto y se avisa",
+      "today": "2026-11-20",
+      "statementDay": 1,
+      "paymentDay": 1,
+      "paymentDelayMonths": 1,
+      "balance": -30000,
+      "movements": [
+        { "key": "septiembre", "day": "2026-09-12", "amount": -50000 },
+        { "key": "abono", "day": "2026-10-05", "amount": 50000 },
+        { "key": "octubre", "day": "2026-10-10", "amount": -30000 }
+      ],
+      "installments": [],
+      "used": 30000,
+      "revolvingBalance": 30000,
+      "unresolved": 0,
+      "uncategorized": 1,
+      "payments": [
+        { "due": "2026-12-01", "amount": 30000, "purchases": 30000, "installments": 0, "interest": 0 },
+        { "due": "2027-01-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-02-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-03-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-04-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-05-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 }
+      ]
+    },
+    {
+      "name": "ORC-79: una devolución con categoría baja el cargo; un pago con categoría de transferencia, no",
+      "today": "2026-11-20",
+      "statementDay": 1,
+      "paymentDay": 1,
+      "paymentDelayMonths": 1,
+      "balance": -26000,
+      "movements": [
+        { "key": "septiembre", "day": "2026-09-12", "amount": -50000 },
+        { "key": "pago", "day": "2026-10-05", "amount": 50000, "payment": true },
+        { "key": "octubre", "day": "2026-10-10", "amount": -30000 },
+        { "key": "devolucion", "day": "2026-10-20", "amount": 4000, "refund": true }
+      ],
+      "installments": [],
+      "used": 26000,
+      "revolvingBalance": 26000,
+      "unresolved": 0,
+      "uncategorized": 0,
+      "payments": [
+        { "due": "2026-12-01", "amount": 26000, "purchases": 26000, "installments": 0, "interest": 0 },
+        { "due": "2027-01-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
         { "due": "2027-02-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
         { "due": "2027-03-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
         { "due": "2027-04-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },

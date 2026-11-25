@@ -181,6 +181,12 @@ enum CardText {
         // Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces.
         return payment.interest.minor > 0 ? "\(text) (incluye \(payment.interest.formatted()) de intereses)" : text
     }
+
+    /// Aviso de abonos sin categoría: no se sabe si son un pago de la tarjeta o una devolución.
+    static func uncategorizedCredits(_ count: Int) -> String {
+        let credits = count == 1 ? "Hay 1 abono sin categoría" : "Hay \(count) abonos sin categoría"
+        return "\(credits). Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
+    }
 }
 
 /// Detalle de una tarjeta: calendario de cargos, coste del pago aplazado y compras a plazos.
@@ -200,6 +206,13 @@ struct CreditCardDetailView: View {
                     CardOverview(name: account.name, summary: summary).card()
                     if summary.isOverAlert, let percent = summary.terms.alertPercent {
                         Label("Has pasado del \(percent) % del límite. Te quedan \(summary.available.formatted()).",
+                              systemImage: "exclamationmark.triangle")
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.negativeText)
+                            .card()
+                    }
+                    if !summary.uncategorizedCredits.isEmpty {
+                        Label(CardText.uncategorizedCredits(summary.uncategorizedCredits.count),
                               systemImage: "exclamationmark.triangle")
                             .font(Typography.subheadlineEmphasis)
                             .foregroundStyle(Palette.negativeText)
