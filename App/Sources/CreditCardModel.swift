@@ -79,7 +79,12 @@ final class CreditCardModel {
             self.installments = loadedInstallments
             var loaded: [UUID: [Movement]] = [:]
             for account in cardAccounts {
-                loaded[account.id] = try await finance.movements(in: id, accountId: account.id, limit: FinanceModel.recentLimit)
+                var list = try await finance.movements(in: id, accountId: account.id, limit: FinanceModel.recentLimit)
+                // La compra de un aplazado cuenta aunque ya no esté entre las recientes.
+                let known = Set(list.map(\.id))
+                let missing = loadedInstallments.filter { $0.accountId == account.id && !known.contains($0.movementId) }
+                if !missing.isEmpty { list += try await finance.movements(in: id, ids: missing.map(\.movementId)) }
+                loaded[account.id] = list
             }
             movements = loaded
         }
