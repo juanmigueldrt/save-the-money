@@ -1,0 +1,65 @@
+{
+  "_source": "Digests computed with Python hashlib.sha256 over the UTF-8 bytes of text repeated `repeat` times.",
+  "vectors": [
+    {
+      "text": "",
+      "repeat": 1,
+      "utf8Bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "text": "abc",
+      "repeat": 1,
+      "utf8Bytes": 3,
+      "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    },
+    {
+      "text": "a",
+      "repeat": 55,
+      "utf8Bytes": 55,
+      "sha256": "9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318"
+    },
+    {
+      "text": "a",
+      "repeat": 56,
+      "utf8Bytes": 56,
+      "sha256": "b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a"
+    },
+    {
+      "text": "a",
+      "repeat": 64,
+      "utf8Bytes": 64,
+      "sha256": "ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb"
+    },
+    {
+      "text": "a",
+      "repeat": 119,
+      "utf8Bytes": 119,
+      "sha256": "31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb"
+    },
+    {
+      "text": "a",
+      "repeat": 120,
+      "utf8Bytes": 120,
+      "sha256": "2f3d335432c70b580af0e8e1b3674a7c020d683aa5f73aaaedfdc55af904c21c"
+    },
+    {
+      "text": "a",
+      "repeat": 1000,
+      "utf8Bytes": 1000,
+      "sha256": "41edece42d63e8d9bf515a9ba6932e1c20cbc9f5a5d134645adb5db1b9737ea3"
+    },
+    {
+      "text": "ñ",
+      "repeat": 60,
+      "utf8Bytes": 120,
+      "sha256": "d3384da81e399af55ee53466f7dafa97fbf338b1a9ee88205e1635737d6b3cd0"
+    },
+    {
+      "text": "Ñandú €☕",
+      "repeat": 1,
+      "utf8Bytes": 14,
+      "sha256": "939c96286ea45f647aaecdc188d1b0a2d5cfb5c4e78f604004cf479972f0e059"
+    }
+  ]
+}

@@ -113,3 +113,6 @@ dependencies {
     implementation("androidx.camera:camera-view:1.6.2")
     testImplementation("junit:junit:4.13.2")
 }
+
+// Los vectores compartidos con iOS viven fuera del módulo: sin esto, cambiar uno no vuelve a lanzar las pruebas.
+tasks.withType<Test>().configureEach { inputs.dir(rootProject.file("../testdata/vectors")) }

@@ -1,0 +1,92 @@
+{
+  "_source": "Worked out by hand from the rule: charge n falls on startsOn + n·every units, always counted from startsOn (weeks = 7 days, years = 12 months); when the target month is shorter, the last day of that month. Charges after endsOn are dropped. Expenses are negative, income positive; the first introCharges charges cost introAmount. Amounts are integer cents.",
+  "vectors": [
+    {
+      "name": "Mensual el 31: se queda en el último día de cada mes y vuelve al 31",
+      "series": { "kind": "subscription", "amount": 999, "every": 1, "unit": "month", "startsOn": "2026-01-31" },
+      "from": "2026-01-01", "through": "2026-06-30",
+      "payments": [
+        { "day": "2026-01-31", "amount": -999 },
+        { "day": "2026-02-28", "amount": -999 },
+        { "day": "2026-03-31", "amount": -999 },
+        { "day": "2026-04-30", "amount": -999 },
+        { "day": "2026-05-31", "amount": -999 },
+        { "day": "2026-06-30", "amount": -999 }
+      ]
+    },
+    {
+      "name": "Mensual el 30 en febrero bisiesto",
+      "series": { "kind": "essential", "amount": 45000, "every": 1, "unit": "month", "startsOn": "2028-01-30" },
+      "from": "2028-02-01", "through": "2028-03-31",
+      "payments": [
+        { "day": "2028-02-29", "amount": -45000 },
+        { "day": "2028-03-30", "amount": -45000 }
+      ]
+    },
+    {
+      "name": "Cada dos semanas",
+      "series": { "kind": "subscription", "amount": 1500, "every": 2, "unit": "week", "startsOn": "2026-10-19" },
+      "from": "2026-11-01", "through": "2026-11-30",
+      "payments": [
+        { "day": "2026-11-02", "amount": -1500 },
+        { "day": "2026-11-16", "amount": -1500 },
+        { "day": "2026-11-30", "amount": -1500 }
+      ]
+    },
+    {
+      "name": "Anual desde un 29 de febrero",
+      "series": { "kind": "essential", "amount": 12000, "every": 1, "unit": "year", "startsOn": "2024-02-29" },
+      "from": "2025-01-01", "through": "2028-12-31",
+      "payments": [
+        { "day": "2025-02-28", "amount": -12000 },
+        { "day": "2026-02-28", "amount": -12000 },
+        { "day": "2027-02-28", "amount": -12000 },
+        { "day": "2028-02-29", "amount": -12000 }
+      ]
+    },
+    {
+      "name": "Trimestral con fecha de fin",
+      "series": { "kind": "essential", "amount": 8750, "every": 3, "unit": "month", "startsOn": "2026-01-15", "endsOn": "2026-09-30" },
+      "from": "2026-01-01", "through": "2026-12-31",
+      "payments": [
+        { "day": "2026-01-15", "amount": -8750 },
+        { "day": "2026-04-15", "amount": -8750 },
+        { "day": "2026-07-15", "amount": -8750 }
+      ]
+    },
+    {
+      "name": "Ingreso fijo: importe positivo",
+      "series": { "kind": "income", "amount": 150000, "every": 1, "unit": "month", "startsOn": "2026-01-28" },
+      "from": "2026-02-01", "through": "2026-02-28",
+      "payments": [
+        { "day": "2026-02-28", "amount": 150000 }
+      ]
+    },
+    {
+      "name": "Precio de oferta los dos primeros cargos",
+      "series": { "kind": "subscription", "amount": 1299, "every": 1, "unit": "month", "startsOn": "2026-01-10", "introAmount": 499, "introCharges": 2 },
+      "from": "2026-01-01", "through": "2026-04-30",
+      "payments": [
+        { "day": "2026-01-10", "amount": -499 },
+        { "day": "2026-02-10", "amount": -499 },
+        { "day": "2026-03-10", "amount": -1299 },
+        { "day": "2026-04-10", "amount": -1299 }
+      ]
+    },
+    {
+      "name": "Oferta: una ventana que empieza después cuenta los cargos desde el inicio",
+      "series": { "kind": "subscription", "amount": 1299, "every": 1, "unit": "month", "startsOn": "2026-01-10", "introAmount": 499, "introCharges": 2 },
+      "from": "2026-02-01", "through": "2026-03-31",
+      "payments": [
+        { "day": "2026-02-10", "amount": -499 },
+        { "day": "2026-03-10", "amount": -1299 }
+      ]
+    },
+    {
+      "name": "Ventana antes del inicio: nada",
+      "series": { "kind": "subscription", "amount": 999, "every": 1, "unit": "month", "startsOn": "2026-06-01" },
+      "from": "2026-01-01", "through": "2026-05-31",
+      "payments": []
+    }
+  ]
+}
