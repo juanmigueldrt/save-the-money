@@ -1,8 +1,8 @@
 import Foundation
 
 extension InMemoryBackend: BudgetService {
-    private func requireBudgetMember(of householdId: UUID) throws {
-        let user = try requireUser()
+    private func requireBudgetMember(of householdId: UUID, _ operation: String = #function) throws {
+        let user = try requireUser(operation)
         guard isMember(user, of: householdId) else { throw AppError.unknown("no es miembro") }
     }
 

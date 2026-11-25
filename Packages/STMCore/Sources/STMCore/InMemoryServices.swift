@@ -40,6 +40,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func currentUserId() async -> UUID? { currentUser }
 
     public func signUp(username: Username, password: String, displayName: String?) async throws -> UUID {
+        try throwIfInjected(#function)
         guard !users.values.contains(where: { $0.profile.username == username.value }) else {
             throw AppError.usernameTaken
         }
@@ -51,17 +52,49 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     }
 
     public func signIn(username: Username, password: String) async throws -> UUID {
+        try throwIfInjected(#function)
         guard let account = users.values.first(where: { $0.profile.username == username.value }),
               account.password == password else { throw AppError.invalidCredentials }
         currentUser = account.profile.id
         return account.profile.id
     }
 
-    public func signOut() async throws { currentUser = nil }
+    public func signOut() async throws {
+        try throwIfInjected(#function)
+        currentUser = nil
+    }
+
+    // MARK: Fallos a propósito (sólo pruebas)
+
+    /// Un fallo pedido por una prueba: la llamada `operation` (nil: cualquiera) lanza `error`
+    /// después de dejar pasar `remaining` llamadas que coinciden, y sigue fallando hasta `clearFailures()`.
+    private struct InjectedFailure { var operation: String?; var remaining: Int; var error: any Error }
+    private var injectedFailures: [InjectedFailure] = []
+
+    /// Hace fallar las llamadas, como si se cortara la red o se cancelara la tarea.
+    /// `operation` es el nombre del método, p. ej. "addMovement(_:in:)". `after: 1` deja pasar
+    /// la primera llamada y falla desde la segunda (el segundo paso de un flujo).
+    /// Sin llamar a esto (el modo demo nunca lo hace) nada cambia.
+    public func failCalls(_ operation: String? = nil, after successes: Int = 0, with error: any Error = AppError.network) {
+        injectedFailures.append(InjectedFailure(operation: operation, remaining: successes, error: error))
+    }
+
+    public func clearFailures() { injectedFailures = [] }
+
+    func throwIfInjected(_ operation: String) throws {
+        guard let index = injectedFailures.firstIndex(where: { $0.operation == nil || $0.operation == operation }) else { return }
+        if injectedFailures[index].remaining > 0 {
+            injectedFailures[index].remaining -= 1
+            return
+        }
+        throw injectedFailures[index].error
+    }
 
     // MARK: HouseholdService
 
-    func requireUser() throws -> UUID {
+    /// Toda llamada con datos pasa por aquí, así que también es donde saltan los fallos pedidos.
+    func requireUser(_ operation: String = #function) throws -> UUID {
+        try throwIfInjected(operation)
         guard let currentUser else { throw AppError.notSignedIn }
         return currentUser
     }

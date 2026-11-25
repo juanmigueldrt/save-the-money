@@ -31,7 +31,21 @@ jobs:
     container: swift:6.0-jammy
     steps:
       - uses: actions/checkout@v4
-      - run: swift test --package-path Packages/STMCore
+      - run: swift test --package-path Packages/STMCore --enable-code-coverage
+      - name: Cobertura de STMCore
+        run: |
+          BIN=$(swift build --package-path Packages/STMCore --show-bin-path)
+          # En Linux el .xctest es el ejecutable de las pruebas (STMCorePackageTests.xctest).
+          TESTS=$(ls -d "$BIN"/*.xctest | head -n 1)
+          llvm-cov report "$TESTS" -instr-profile="$BIN/codecov/default.profdata" \
+            -ignore-filename-regex='(/Tests/|/\.build/)' > coverage.txt
+          LINES=$(awk '$1 == "TOTAL" { print $10 }' coverage.txt)
+          {
+            echo "### Cobertura de STMCore: $LINES de líneas"
+            echo '```'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   supabase:
     name: Supabase (migraciones y RLS)
