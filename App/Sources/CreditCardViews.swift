@@ -595,6 +595,8 @@ struct CardPaymentFormView: View {
     @State private var from: UUID?
     @State private var error: String?
     @State private var isWorking = false
+    /// Uno por formulario: si «Apuntar» se repite tras un fallo de red, el pago no se guarda dos veces.
+    @State private var transferId = UUID()
 
     var body: some View {
         NavigationStack {
@@ -639,17 +641,15 @@ struct CardPaymentFormView: View {
 
     private func save() async {
         guard let money = Money(entered: amount), money.minor > 0 else { error = "El importe no es válido."; return }
-        guard let from else { error = "Elige la cuenta desde la que pagas."; return }
-        let transfer = finance.categories(for: .transfer).first?.id
-        let date = CalendarDay(day)
+        guard let source = finance.accounts.first(where: { $0.id == from }) else {
+            error = "Elige la cuenta desde la que pagas."
+            return
+        }
         isWorking = true
         defer { isWorking = false }
-        let out = MovementDraft(accountId: from, categoryId: transfer, bookedOn: date, amount: -money,
-                                description: "Pago de \(account.name)")
-        let inbound = MovementDraft(accountId: account.id, categoryId: transfer, bookedOn: date, amount: money,
-                                    description: "Pago de la tarjeta")
-        guard await finance.add(out) else { error = finance.error; return }
-        guard await finance.add(inbound) else { error = finance.error; return }
+        let paid = await finance.transfer(id: transferId, from: source, to: account, amount: money, on: CalendarDay(day),
+                                          description: "Pago de \(account.name)", toDescription: "Pago de la tarjeta")
+        guard paid else { error = finance.error; return }
         dismiss()
     }
 }

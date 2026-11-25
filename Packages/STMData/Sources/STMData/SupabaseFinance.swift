@@ -171,6 +171,17 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    /// `create_transfer` guarda las dos patas en una sola transacción y no repite una ya guardada.
+    public func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement] {
+        if let issue = transfer.issue { throw AppError.invalidInput(issue) }
+        return try await mapped {
+            try await client.rpc("create_transfer", params: TransferParams(transfer, householdId: householdId))
+                .select(Self.movementColumns)
+                .execute()
+                .value
+        }
+    }
+
     public func updateMovement(_ movement: Movement) async throws -> Movement {
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
                                   amount: movement.amount, description: movement.description, notes: movement.notes,
@@ -315,6 +326,52 @@ private struct CategoryRow: Encodable, Sendable {
         try c.encode(category.trimmedName, forKey: .name)
         try c.encode(category.kind == .expense ? category.budgetGroup : nil, forKey: .budgetGroup)
         try c.encode(category.icon, forKey: .icon)
+    }
+}
+
+/// Parámetros de `create_transfer`. La categoría se manda aunque sea nula: la función no tiene valor por defecto.
+private struct TransferParams: Encodable, Sendable {
+    var transfer: UUID
+    var household: UUID
+    var fromAccount: UUID
+    var toAccount: UUID
+    var booked: CalendarDay
+    var amount: Int
+    var category: UUID?
+    var fromLabel: String
+    var toLabel: String
+
+    init(_ draft: TransferDraft, householdId: UUID) {
+        transfer = draft.id
+        household = householdId
+        fromAccount = draft.fromAccountId
+        toAccount = draft.toAccountId
+        booked = draft.bookedOn
+        amount = draft.amount.minor
+        category = draft.categoryId
+        fromLabel = draft.fromDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        toLabel = draft.toDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(transfer, forKey: .transfer)
+        try c.encode(household, forKey: .household)
+        try c.encode(fromAccount, forKey: .fromAccount)
+        try c.encode(toAccount, forKey: .toAccount)
+        try c.encode(booked, forKey: .booked)
+        try c.encode(amount, forKey: .amount)
+        try c.encode(category, forKey: .category)
+        try c.encode(fromLabel, forKey: .fromLabel)
+        try c.encode(toLabel, forKey: .toLabel)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case transfer, household, booked, amount, category
+        case fromAccount = "from_account"
+        case toAccount = "to_account"
+        case fromLabel = "from_label"
+        case toLabel = "to_label"
     }
 }
 

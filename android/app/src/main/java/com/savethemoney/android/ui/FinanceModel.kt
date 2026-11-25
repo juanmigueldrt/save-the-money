@@ -161,6 +161,21 @@ class FinanceModel(
     }
 
     suspend fun add(draft: MovementDraft) { service.addMovement(draft, household.id); reloadAll() }
+
+    /** Las dos patas de una transferencia (o el pago de una tarjeta): se guardan las dos o ninguna, y repetirla no duplica. */
+    suspend fun transfer(draft: com.savethemoney.android.data.TransferDraft) {
+        try {
+            service.addTransfer(draft, household.id)
+        } catch (e: AppError) {
+            // Puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
+            try {
+                reloadAll()
+            } catch (_: AppError) {
+            }
+            throw e
+        }
+        reloadAll()
+    }
     suspend fun update(movement: Movement) { update(listOf(movement)) }
 
     /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
@@ -197,7 +212,7 @@ class FinanceModel(
         lastDeleted = null
     }
 
-    /** También para las dos patas de una transferencia: van en una sola petición. */
+    /** Varios movimientos de golpe (CSV). Las transferencias van por [transfer]. */
     suspend fun importMovements(drafts: List<MovementDraft>): ImportResult =
         service.importMovements(drafts, household.id).also { reloadAll() }
 

@@ -528,6 +528,8 @@ fun Pantalla07(nav: Nav) {
     var plazos by remember { mutableIntStateOf(CardPurchase.DEFAULT_MONTHS) }
     var cadaCompra by remember { mutableStateOf(Recurrence.Monthly) }
     val action = rememberAction()
+    // Uno por formulario: si «Guardar» se repite tras un fallo de red, la transferencia no se guarda dos veces.
+    val idTransferencia = remember { java.util.UUID.randomUUID().toString() }
     val cuentas = finance.activeAccounts.map { it.name to it.id }
     val enTarjeta = form.movement == null && tipo == 0 && finance.account(cuenta)?.kind == AccountKind.CreditCard
     val tipoCategoria = if (tipo == 1) CategoryKind.Income else CategoryKind.Expense
@@ -545,10 +547,9 @@ fun Pantalla07(nav: Nav) {
             if (hacia == origen) falla("Elige dos cuentas distintas.")
             val cat = finance.categories(CategoryKind.Transfer).firstOrNull()?.id
             val texto = concepto.ifBlank { "Transferencia" }
-            finance.importMovements(
-                listOf(
-                    MovementDraft(origen, cat, fecha, -valor, texto, nota, excluded = excluido, payee = quien, tags = marcas),
-                    MovementDraft(hacia, cat, fecha, valor, texto, nota, excluded = excluido, payee = quien, tags = marcas),
+            finance.transfer(
+                com.savethemoney.android.data.TransferDraft(
+                    idTransferencia, origen, hacia, cat, fecha, valor, texto, texto, nota, excluido, quien, marcas,
                 ),
             )
         } else {

@@ -165,6 +165,36 @@ extension InMemoryBackend: FinanceService {
         return movement
     }
 
+    public func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement] {
+        _ = try requireMember(of: householdId)
+        if let issue = transfer.issue { throw AppError.invalidInput(issue) }
+        if let stored = transferLegs[transfer.id] {
+            let legs = financeMovements.filter { stored.contains($0.id) }
+            // Como el servidor: repetirla solo vale con las mismas cuentas, importe y día.
+            guard legs.map(\.accountId) == [transfer.fromAccountId, transfer.toAccountId],
+                  legs.map(\.amount) == [-transfer.amount, transfer.amount],
+                  legs.allSatisfy({ $0.bookedOn == transfer.bookedOn }) else {
+                throw AppError.invalidInput(TransferDraft.storedWithOtherData)
+            }
+            return legs
+        }
+        let legs = try transfer.legs.map { try validated($0, in: householdId) }
+        // Cada pata pasa por el mismo punto de fallo que `addMovement`: si falla la segunda,
+        // se deshace la primera, como la transacción del servidor.
+        let before = financeMovements
+        do {
+            for leg in legs {
+                try throwIfInjected("addMovement(_:in:)")
+                financeMovements.append(leg)
+            }
+        } catch {
+            financeMovements = before
+            throw error
+        }
+        transferLegs[transfer.id] = legs.map(\.id)
+        return legs
+    }
+
     public func updateMovement(_ movement: Movement) async throws -> Movement {
         guard let index = financeMovements.firstIndex(where: { $0.id == movement.id }) else { throw AppError.unknown("movimiento") }
         let householdId = financeMovements[index].householdId
