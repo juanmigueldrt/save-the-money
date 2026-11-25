@@ -55,6 +55,7 @@ import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.SCREEN_COUNT
 import com.savethemoney.android.ui.screens.ScreenFor
+import com.savethemoney.android.ui.screens.SinConexion
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmTheme
 import kotlinx.coroutines.launch
@@ -148,13 +149,14 @@ fun App(capture: Int? = null) {
     val nav = remember { Nav(capture ?: 1) }
     LaunchedEffect(Unit) {
         if (capture != null) seedSample(session.backend, session.financeService)
-        session.refresh()
+        session.start()
     }
     if (capture == null) {
         LaunchedEffect(session.state) {
             when (session.state) {
                 Session.State.Loading -> Unit
                 Session.State.SignedOut -> if (nav.current !in 1..2) nav.reset(1)
+                is Session.State.Offline -> Unit
                 is Session.State.NeedsHousehold -> nav.reset(3)
                 is Session.State.Ready -> if (nav.current in 1..3) nav.reset(4)
             }
@@ -165,7 +167,7 @@ fun App(capture: Int? = null) {
     val hayAvisos = capture == null && (
         session.finance?.planning?.activeSeries.orEmpty().any { it.remindDaysBefore != null } ||
             session.finance?.cards?.terms.orEmpty().values.any { it.remindDaysBefore != null || it.alertPercent != null }
-        )
+    )
     LaunchedEffect(hayAvisos) {
         val permiso = Manifest.permission.POST_NOTIFICATIONS
         if (hayAvisos && Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(permiso) != PackageManager.PERMISSION_GRANTED) {
@@ -174,6 +176,10 @@ fun App(capture: Int? = null) {
     }
     if (session.state == Session.State.Loading) {
         Box(Modifier.fillMaxSize().background(Stm.colors.surface))
+        return
+    }
+    (session.state as? Session.State.Offline)?.let {
+        SinConexion(it.message)
         return
     }
     BackHandler(enabled = nav.canGoBack) { nav.back() }

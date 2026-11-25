@@ -40,6 +40,72 @@ final class SessionModelTests: XCTestCase {
         XCTAssertEqual(session.state, .signedOut)
     }
 
+    func testArrancarSinRedConSesionMuestraSinConexionYReintenta() async throws {
+        let services = AppServices.demo()
+        let backend = try XCTUnwrap(services.auth as? InMemoryBackend)
+        let first = SessionModel(services: services)
+        try await first.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await first.createHousehold(name: "Casa de prueba")
+
+        // La app vuelve a abrirse sin red: la sesión guardada sigue ahí, no se pide entrar otra vez.
+        await backend.failCalls()
+        let session = SessionModel(services: services)
+        await session.start()
+        XCTAssertEqual(session.state, .offline(AppError.network.errorDescription ?? ""))
+
+        await backend.clearFailures()
+        await session.start()
+        guard case .ready(_, let home) = session.state else {
+            return XCTFail("al volver la red debería entrar, no \(session.state)")
+        }
+        XCTAssertEqual(home.name, "Casa de prueba")
+    }
+
+    func testFalloAlCargarTrasCrearHogarSeAvisa() async throws {
+        let services = AppServices.demo()
+        let backend = try XCTUnwrap(services.auth as? InMemoryBackend)
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+
+        // El hogar se crea, pero la carga posterior falla: se avisa y no vuelve a «Tu hogar».
+        await backend.failCalls("myProfile()")
+        do {
+            try await session.createHousehold(name: "Casa de prueba")
+            XCTFail("debería avisar del fallo")
+        } catch {
+            XCTAssertEqual(error as? AppError, .network)
+        }
+        XCTAssertEqual(session.state, .offline(AppError.network.errorDescription ?? ""))
+    }
+
+    func testFalloAlCargarTrasEntrarSeAvisa() async throws {
+        let services = AppServices.demo()
+        let backend = try XCTUnwrap(services.auth as? InMemoryBackend)
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        await session.signOut()
+
+        await backend.failCalls("households()")
+        do {
+            try await session.signIn(username: "ana", password: "contrasena-de-prueba")
+            XCTFail("debería avisar del fallo")
+        } catch {
+            XCTAssertEqual(error as? AppError, .network)
+        }
+        XCTAssertEqual(session.state, .offline(AppError.network.errorDescription ?? ""))
+    }
+
+    func testSesionRechazadaLlevaAlLogin() async throws {
+        let services = AppServices.demo()
+        let backend = try XCTUnwrap(services.auth as? InMemoryBackend)
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+
+        await backend.failCalls(with: AppError.notSignedIn)
+        try await session.refresh()
+        XCTAssertEqual(session.state, .signedOut)
+    }
+
     func testInviteLinkIsRemembered() {
         let session = SessionModel(services: .demo())
         session.handle(url: URL(string: "savethemoney://unirse/4K9Q2X")!)

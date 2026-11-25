@@ -30,6 +30,9 @@ class Session(
     sealed interface State {
         data object Loading : State
         data object SignedOut : State
+
+        /** Hay sesión guardada pero no se ha podido cargar (sin red o fallo del servidor); el texto es el aviso. */
+        data class Offline(val message: String) : State
         data class NeedsHousehold(val profile: Profile) : State
         data class Ready(val profile: Profile, val household: Household) : State
     }
@@ -51,6 +54,20 @@ class Session(
     }
     val household: Household? get() = (state as? State.Ready)?.household
 
+    /** Al abrir la app y en «Reintentar»: el fallo ya queda en el estado. */
+    suspend fun start() {
+        try {
+            refresh()
+        } catch (_: AppError) {
+            // Ya se ve en el estado: login o «sin conexión».
+        }
+    }
+
+    /**
+     * Sólo AppError.NotSignedIn (no hay sesión o el servidor la rechaza) lleva al login.
+     * Cualquier otro fallo no descarta la sesión guardada: se lanza para avisar y, si aún no
+     * había un hogar abierto, se pasa a «sin conexión» con reintento.
+     */
     suspend fun refresh() {
         if (backend.currentUserId() == null) {
             finance = null
@@ -65,8 +82,9 @@ class Session(
         } catch (e: AppError.NotSignedIn) {
             State.SignedOut
         } catch (e: AppError) {
-            // Sin conexión con sesión abierta: se queda donde estaba si ya había cargado.
-            if (state == State.Loading) State.SignedOut else state
+            // Con un hogar ya abierto se queda donde estaba; quien llamó enseña el aviso.
+            if (state !is State.Ready) state = State.Offline(e.message)
+            throw e
         }
         if (next is State.Ready) {
             // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros.

@@ -53,6 +53,8 @@ struct AppRootView: View {
                     .background(Palette.bgGrouped)
             case .signedOut:
                 AuthFlowView()
+            case .offline(let message):
+                OfflineView(message: message)
             case .needsHousehold(let profile):
                 HouseholdOnboardingView(profile: profile)
             case .ready(let profile, let household):
@@ -77,6 +79,40 @@ struct AppRootView: View {
         }
         .animation(.default, value: session.state)
         .preferredColorScheme(session.theme.colorScheme)
+    }
+}
+
+/// Hay sesión guardada pero no se ha podido cargar: aviso y «Reintentar», sin pedir entrar otra vez.
+struct OfflineView: View {
+    let message: String
+    @Environment(SessionModel.self) private var session
+    @State private var isWorking = false
+
+    var body: some View {
+        VStack(spacing: Spacing.s16) {
+            Text(message)
+                .font(Typography.body)
+                .foregroundStyle(Palette.label)
+                .multilineTextAlignment(.center)
+            Button("Reintentar") {
+                isWorking = true
+                Task {
+                    await session.start()
+                    isWorking = false
+                }
+            }
+            .buttonStyle(PrimaryButtonStyle())
+            .disabled(isWorking)
+            // Salida por si el fallo no se arregla reintentando.
+            Button("Cerrar sesión") { Task { await session.signOut() } }
+                .font(Typography.subheadlineEmphasis)
+                .foregroundStyle(Palette.labelSecondary)
+                .buttonStyle(.plain)
+        }
+        .padding(Spacing.s24)
+        .formWidth()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Palette.bgGrouped)
     }
 }
 

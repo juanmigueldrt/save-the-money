@@ -54,7 +54,7 @@ enum ScreenshotMode {
         } catch {
             // Si algo falla, la app queda en la pantalla de entrar, como sin este modo.
         }
-        await session.refresh()
+        await session.start()
     }
 
     /// Una tarjeta inventada con el mes pasado por pagar, compras de este mes y una compra aplazada.

@@ -162,6 +162,24 @@ fun Pantalla02(nav: Nav) {
     }
 }
 
+/** Hay sesión guardada pero no se ha podido cargar: aviso y «Reintentar», sin pedir entrar otra vez. */
+@Composable
+fun SinConexion(message: String) {
+    val c = Stm.colors
+    val session = LocalSession.current
+    val action = rememberAction()
+    StmScreen {
+        Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(message, style = StmType.bodyLarge, color = c.onSurface, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(16.dp))
+            Btn("Reintentar", { action.run { session.start() } }, Modifier.fillMaxWidth(), large = true, enabled = !action.busy)
+            Spacer(Modifier.height(8.dp))
+            // Salida por si el fallo no se arregla reintentando.
+            Btn("Cerrar sesión", { action.run { session.signOut() } }, kind = BtnKind.Text, enabled = !action.busy)
+        }
+    }
+}
+
 /** 03 Tu hogar: crear un hogar nuevo o unirse con código o QR. */
 @Composable
 fun Pantalla03(nav: Nav) {
