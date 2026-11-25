@@ -74,7 +74,8 @@ class FinanceModel(
     var lastDeleted by mutableStateOf<Movement?>(null)
 
     // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
-    var selectedMovementId by mutableStateOf<String?>(null)
+    /** El movimiento que se tocó, tal cual salía en su lista: la de una cuenta puede traer movimientos que no están en [recent]. */
+    var tappedMovement by mutableStateOf<Movement?>(null)
     var selectedAccountId by mutableStateOf<String?>(null)
     var movementForm: MovementForm? = null
     var accountToEdit: Account? = null
@@ -88,8 +89,9 @@ class FinanceModel(
     var movementFilter by mutableStateOf(MovementFilter())
     /** Patrimonio: saldo de las cuentas activas que cuentan en el patrimonio. */
     val totalBalance: Long get() = activeAccounts.filter { it.includeInNetWorth }.sumOf(::balance)
-    val selectedMovement: Movement? get() = recent.firstOrNull { it.id == selectedMovementId } ?: recent.firstOrNull()
-    val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId } ?: activeAccounts.firstOrNull()
+    /** El tocado, con lo último de [recent] si está ahí; nunca otro. Nulo si no se tocó ninguno o se borró. */
+    val selectedMovement: Movement? get() = tappedMovement?.let { t -> recent.firstOrNull { it.id == t.id } ?: t }
+    val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId }
 
     fun balance(account: Account): Long = balances[account.id] ?: account.openingMinor
     fun account(id: String?): Account? = accounts.firstOrNull { it.id == id }
@@ -159,18 +161,19 @@ class FinanceModel(
     }
 
     suspend fun add(draft: MovementDraft) { service.addMovement(draft, household.id); reloadAll() }
-    suspend fun update(movement: Movement) { service.updateMovement(movement); reloadAll() }
+    suspend fun update(movement: Movement) { update(listOf(movement)) }
 
     /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
     suspend fun update(movements: List<Movement>) {
         if (movements.isEmpty()) return
-        movements.forEach { service.updateMovement(it) }
+        movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
         reloadAll()
     }
 
     /** Borra varios a la vez (sin «Deshacer»: la pantalla pide confirmación antes). */
     suspend fun delete(movements: List<Movement>) {
         movements.forEach { service.deleteMovement(it.id) }
+        if (movements.any { it.id == tappedMovement?.id }) tappedMovement = null
         reloadAll()
     }
 
@@ -183,6 +186,7 @@ class FinanceModel(
 
     suspend fun delete(movement: Movement) {
         service.deleteMovement(movement.id)
+        if (movement.id == tappedMovement?.id) tappedMovement = null
         reloadAll()
         lastDeleted = movement
     }

@@ -271,7 +271,7 @@ fun Pantalla05(nav: Nav) {
                 if (seleccionando) {
                     elegidos = if (m.id in elegidos) elegidos - m.id else elegidos + m.id
                 } else {
-                    finance.selectedMovementId = m.id
+                    finance.tappedMovement = m
                     nav.go(8)
                 }
             }
@@ -387,8 +387,10 @@ private fun ResumenFiltro(items: List<Movement>, finance: FinanceModel, quitar: 
 /** 06 Cuenta: saldo, acciones, evolución en 6 meses y sus movimientos por mes. */
 @Composable
 fun Pantalla06(nav: Nav) {
-    val finance = LocalSession.current.finance ?: return
-    val account = finance.selectedAccount ?: return
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    // Solo las capturas abren la cuenta sin elegirla: ahí vale la primera de muestra.
+    val account = finance.selectedAccount ?: finance.activeAccounts.firstOrNull().takeIf { session.capture } ?: return
     val c = Stm.colors
     var lista by remember(account.id) { mutableStateOf(emptyList<Movement>()) }
     var opciones by remember { mutableStateOf(false) }
@@ -485,7 +487,7 @@ fun Pantalla06(nav: Nav) {
                 items.forEachIndexed { i, m ->
                     if (i > 0) Divider()
                     FilaMovimiento(m, finance, Fechas.corto(m.day)) {
-                        finance.selectedMovementId = m.id
+                        finance.tappedMovement = m
                         nav.go(34)
                     }
                 }
@@ -759,8 +761,10 @@ fun Pantalla07(nav: Nav) {
 /** 08 Acciones del movimiento: la lista de 05 con la hoja de acciones abierta. */
 @Composable
 fun Pantalla08(nav: Nav) {
-    val finance = LocalSession.current.finance ?: return
-    val m = finance.selectedMovement ?: return
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    // Solo las capturas abren el detalle sin tocar un movimiento: ahí vale el primero de muestra.
+    val m = finance.selectedMovement ?: finance.recent.firstOrNull().takeIf { session.capture } ?: return
     val action = rememberAction()
     val editar = {
         finance.movementForm = MovementForm(movement = m)
@@ -889,8 +893,10 @@ fun Pantalla09(nav: Nav) {
 /** 34 Detalle de movimiento con el menú de acciones abierto. */
 @Composable
 fun Pantalla34(nav: Nav) {
-    val finance = LocalSession.current.finance ?: return
-    val m = finance.selectedMovement ?: return
+    val session = LocalSession.current
+    val finance = session.finance ?: return
+    // Solo las capturas abren el detalle sin tocar un movimiento: ahí vale el primero de muestra.
+    val m = finance.selectedMovement ?: finance.recent.firstOrNull().takeIf { session.capture } ?: return
     var menu by remember { mutableStateOf(true) }
     val action = rememberAction()
     val cat = finance.category(m.categoryId)

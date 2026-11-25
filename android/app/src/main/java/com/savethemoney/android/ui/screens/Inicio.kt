@@ -144,7 +144,7 @@ fun Pantalla04(nav: Nav) {
             Vacio("Todavía no hay movimientos.")
         } else {
             ListaMovimientos(finance.recent.take(3), finance) { m ->
-                finance.selectedMovementId = m.id
+                finance.tappedMovement = m
                 nav.go(34)
             }
         }
