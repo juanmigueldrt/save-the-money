@@ -1,5 +1,5 @@
 {
-  "_source": "payment: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200 (rate = annual TIN %), rate 0 → P/n, computed with Python decimal (60 digits) and rounded half up; 0 when months ≤ 0 or principal ≤ 0. statementDates: worked out by hand from the rule in CreditCardTerms.",
+  "_source": "payment: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200 (rate = annual TIN %), rate 0 → P/n, computed with Python decimal (60 digits) and rounded half up; 0 when months ≤ 0 or principal ≤ 0. statementDates: worked out by hand from the rule in CreditCardTerms. summaries (ORC-78): full-payment card, limit 300000, a 120000 purchase in 24 instalments at 14 % made 13 months before today; quota 5762 and the interest/principal rows from the same French schedule in Python decimal (row interest = remaining·r rounded half up, principal = quota − interest); 12 quotas already charged = 55835 principal paid (movement \"capital\", a card payment), 64165 pending. balance is the account balance (all movements, also those not listed). revolvingBalance = used − open-cycle purchases − pending instalment principal. unresolved = plans whose purchase is not in movements: no quota, and their principal stays in revolvingBalance (the wrong figures the flag warns about).",
   "installments": [
     {
       "principal": 120000,
@@ -119,6 +119,59 @@
       "closing": "2026-02-01",
       "payment": "2026-03-01",
       "cycleStart": "2026-01-01"
+    }
+  ],
+  "summaries": [
+    {
+      "name": "compra de 1.200 € a 24 meses, 13 meses después",
+      "today": "2026-11-20",
+      "statementDay": 1,
+      "paymentDay": 1,
+      "paymentDelayMonths": 1,
+      "balance": -99165,
+      "movements": [
+        { "key": "aplazada", "day": "2025-10-15", "amount": -120000 },
+        { "key": "capital", "day": "2026-11-01", "amount": 55835, "payment": true },
+        { "key": "octubre", "day": "2026-10-10", "amount": -30000 },
+        { "key": "noviembre", "day": "2026-11-05", "amount": -5000 }
+      ],
+      "installments": [{ "movement": "aplazada", "months": 24, "rate": 14 }],
+      "used": 99165,
+      "revolvingBalance": 30000,
+      "unresolved": 0,
+      "payments": [
+        { "due": "2026-12-01", "amount": 35762, "purchases": 30000, "installments": 5762, "interest": 749 },
+        { "due": "2027-01-01", "amount": 10762, "purchases": 5000, "installments": 5762, "interest": 690 },
+        { "due": "2027-02-01", "amount": 5762, "purchases": 0, "installments": 5762, "interest": 631 },
+        { "due": "2027-03-01", "amount": 5762, "purchases": 0, "installments": 5762, "interest": 571 },
+        { "due": "2027-04-01", "amount": 5762, "purchases": 0, "installments": 5762, "interest": 511 },
+        { "due": "2027-05-01", "amount": 5762, "purchases": 0, "installments": 5762, "interest": 449 }
+      ]
+    },
+    {
+      "name": "la compra del aplazado no está entre los movimientos: se avisa",
+      "today": "2026-11-20",
+      "statementDay": 1,
+      "paymentDay": 1,
+      "paymentDelayMonths": 1,
+      "balance": -99165,
+      "movements": [
+        { "key": "capital", "day": "2026-11-01", "amount": 55835, "payment": true },
+        { "key": "octubre", "day": "2026-10-10", "amount": -30000 },
+        { "key": "noviembre", "day": "2026-11-05", "amount": -5000 }
+      ],
+      "installments": [{ "movement": "aplazada", "months": 24, "rate": 14 }],
+      "used": 99165,
+      "revolvingBalance": 94165,
+      "unresolved": 1,
+      "payments": [
+        { "due": "2026-12-01", "amount": 30000, "purchases": 30000, "installments": 0, "interest": 0 },
+        { "due": "2027-01-01", "amount": 5000, "purchases": 5000, "installments": 0, "interest": 0 },
+        { "due": "2027-02-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-03-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-04-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 },
+        { "due": "2027-05-01", "amount": 0, "purchases": 0, "installments": 0, "interest": 0 }
+      ]
     }
   ]
 }

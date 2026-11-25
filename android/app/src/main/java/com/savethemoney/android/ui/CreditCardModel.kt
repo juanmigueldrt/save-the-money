@@ -75,7 +75,13 @@ class CreditCardModel(
         try {
             terms = service.creditCards(household.id).associateBy { it.accountId }
             installments = service.cardInstallments(household.id)
-            movements = cardAccounts.associate { it.id to service.movements(household.id, it.id, RECENT_LIMIT) }
+            movements = cardAccounts.associate { account ->
+                val recent = service.movements(household.id, account.id, RECENT_LIMIT)
+                // La compra de un aplazado cuenta aunque ya no esté entre las recientes.
+                val known = recent.map { it.id }.toSet()
+                val missing = installments.filter { it.accountId == account.id && it.movementId !in known }.map { it.movementId }
+                account.id to if (missing.isEmpty()) recent else recent + service.movements(household.id, missing)
+            }
             error = null
         } catch (e: CancellationException) {
             throw e

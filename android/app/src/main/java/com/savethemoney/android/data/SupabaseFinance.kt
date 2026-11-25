@@ -100,6 +100,16 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }.decodeList()
     }
 
+    override suspend fun movements(householdId: String, ids: List<String>): List<Movement> = backend.mapped {
+        if (ids.isEmpty()) return@mapped emptyList()
+        client.from("transactions").select(Columns.raw(MOVEMENT)) {
+            filter {
+                eq("household_id", householdId)
+                isIn("id", ids)
+            }
+        }.decodeList()
+    }
+
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement = backend.mapped {
         draft.issue?.let(::fail)
         client.from("transactions").insert(NewMovementRow.of(draft, householdId)) { select(Columns.raw(MOVEMENT)) }.decodeSingle()

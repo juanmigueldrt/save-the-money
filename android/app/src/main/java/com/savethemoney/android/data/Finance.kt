@@ -229,6 +229,9 @@ interface FinanceService {
     suspend fun deleteCategory(categoryId: String)
 
     suspend fun movements(householdId: String, accountId: String?, limit: Int): List<Movement>
+
+    /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
+    suspend fun movements(householdId: String, ids: List<String>): List<Movement>
     suspend fun addMovement(draft: MovementDraft, householdId: String): Movement
     suspend fun updateMovement(movement: Movement): Movement
     suspend fun deleteMovement(movementId: String)
@@ -406,6 +409,9 @@ class InMemoryFinance : FinanceService {
         .asReversed()
         .sortedByDescending { it.bookedOn }
         .take(limit)
+
+    override suspend fun movements(householdId: String, ids: List<String>) =
+        movements.filter { it.householdId == householdId && it.id in ids }
 
     override suspend fun addMovement(draft: MovementDraft, householdId: String) =
         build(draft, householdId).also { movements += it }

@@ -92,6 +92,44 @@ final class CreditCardTests: XCTestCase {
         XCTAssertEqual(CardInstallment.payment(principal: Money(minor: 30_000), months: 3, rate: 0), Money(minor: 10_000))
     }
 
+    /// ORC-78: la app sólo carga los 500 movimientos más recientes de la tarjeta, y la compra aplazada puede
+    /// ser más antigua. Mismos números que `summaries` de testdata/vectors/card_installments.json.
+    func testInstallmentSurvivesMoreThan500LaterMovements() {
+        let purchase = move(-120_000, on: day(2025, 10, 15))
+        let plan = CardInstallment(householdId: home, accountId: card, movementId: purchase.id, months: 24, rate: 14)
+        let short = [purchase, move(55_835, on: day(2026, 11, 1), payment: true),
+                     move(-30_000, on: day(2026, 10, 10)), move(-5_000, on: day(2026, 11, 5))]
+        // 520 movimientos posteriores a la compra, en extractos ya pagados: no cambian lo que se debe.
+        let filler = (0..<260).flatMap { _ in
+            [move(-1_000, on: day(2026, 3, 10)), move(1_000, on: day(2026, 4, 1), payment: true)]
+        }
+        let today = day(2026, 11, 20)
+        let expected = summary(terms(), short, installments: [plan], today: today)
+        XCTAssertEqual(expected.used, Money(minor: 99_165))
+        XCTAssertEqual(expected.revolvingBalance, Money(minor: 30_000))
+        XCTAssertEqual(expected.payments.map(\.installments.minor), [5_762, 5_762, 5_762, 5_762, 5_762, 5_762])
+        XCTAssertEqual(expected.payments.map(\.amount.minor), [35_762, 10_762, 5_762, 5_762, 5_762, 5_762])
+        XCTAssertEqual(expected.payments.map(\.interest.minor), [749, 690, 631, 571, 511, 449])
+        XCTAssertEqual(expected.unresolvedInstallments, [])
+
+        let recent = Array((short + filler).sorted { $0.bookedOn > $1.bookedOn }.prefix(500))
+        XCTAssertFalse(recent.contains(purchase))
+        func cardSummary(_ movements: [Movement]) -> CreditCardSummary {
+            CreditCardCalculator.summary(terms: terms(), balance: Money(minor: -99_165), movements: movements,
+                                         installments: [plan], transferCategories: [transfer], today: today)
+        }
+        // Sólo con los recientes falta la compra: no se puede calcular el aplazado, y el resumen lo dice.
+        let cut = cardSummary(recent)
+        XCTAssertEqual(cut.unresolvedInstallments, [plan.id])
+        XCTAssertEqual(cut.revolvingBalance, Money(minor: 94_165))
+        XCTAssertEqual(cut.payments.map(\.installments.minor), [0, 0, 0, 0, 0, 0])
+        // Con la compra pedida aparte (lo que hace la app), sale lo mismo que con el historial corto.
+        let full = cardSummary(recent + [purchase])
+        XCTAssertEqual(full.unresolvedInstallments, [])
+        XCTAssertEqual(full.revolvingBalance, expected.revolvingBalance)
+        XCTAssertEqual(full.payments, expected.payments)
+    }
+
     func testMinimumPaymentWithInterest() throws {
         let movements = [move(-100_000, on: day(2026, 9, 5))]
         let s = summary(terms(.minimum), movements, today: day(2026, 11, 4))

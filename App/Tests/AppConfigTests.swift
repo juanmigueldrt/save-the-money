@@ -323,4 +323,65 @@ final class CreditCardModelTests: XCTestCase {
         let invalid = await cards.save(CreditCardTerms(accountId: card.id, householdId: home.id, creditLimit: .zero))
         XCTAssertFalse(invalid)
     }
+
+    /// ORC-78: la compra aplazada ya no está entre los 500 movimientos más recientes de la tarjeta.
+    /// Mismos números que `summaries` de testdata/vectors/card_installments.json.
+    func testInstallmentOlderThanTheRecentMovements() async throws {
+        let services = AppServices.demo()
+        let session = SessionModel(services: services)
+        try await session.signUp(SignUpForm(username: "ana", password: "contrasena-de-prueba", passwordConfirmation: "contrasena-de-prueba"))
+        try await session.createHousehold(name: "Casa de prueba")
+        guard case .ready(_, let home) = session.state else { return XCTFail("sin hogar") }
+        func day(_ y: Int, _ m: Int, _ d: Int) throws -> CalendarDay { try XCTUnwrap(CalendarDay(year: y, month: m, day: d)) }
+        let today = try day(2026, 11, 20)
+
+        let service = services.finance
+        let card = try await service.createAccount(AccountDraft(name: "Tarjeta", kind: .creditCard), in: home.id)
+        let categories = try await service.categories(in: home.id)
+        let transfer = try XCTUnwrap(categories.first { $0.kind == .transfer })
+        func add(_ minor: Int, on date: CalendarDay, payment: Bool = false) async throws -> Movement {
+            try await service.addMovement(
+                MovementDraft(accountId: card.id, categoryId: payment ? transfer.id : nil, bookedOn: date,
+                              amount: Money(minor: minor), description: payment ? "Pago de la tarjeta" : "Compra de prueba"),
+                in: home.id)
+        }
+        let purchase = try await add(-120_000, on: try day(2025, 10, 15))
+        _ = try await services.creditCards.saveCreditCard(
+            CreditCardTerms(accountId: card.id, householdId: home.id, creditLimit: Money(minor: 300_000)))
+        let plan = try await services.creditCards.saveInstallment(
+            CardInstallment(householdId: home.id, accountId: card.id, movementId: purchase.id, months: 24, rate: 14))
+        // 520 movimientos posteriores a la compra, en extractos ya pagados, y las 12 cuotas ya cobradas.
+        for _ in 0..<260 {
+            _ = try await add(-1_000, on: try day(2026, 3, 10))
+            _ = try await add(1_000, on: try day(2026, 4, 1), payment: true)
+        }
+        _ = try await add(55_835, on: try day(2026, 11, 1), payment: true)
+        _ = try await add(-30_000, on: try day(2026, 10, 10))
+        _ = try await add(-5_000, on: try day(2026, 11, 5))
+
+        let finance = FinanceModel(household: home, service: service)
+        await finance.load()
+        let recent = try await service.movements(in: home.id, accountId: card.id, limit: FinanceModel.recentLimit)
+        XCTAssertFalse(recent.contains { $0.id == purchase.id }, "la compra queda fuera de los recientes")
+
+        let cards = CreditCardModel(household: home, service: services.creditCards, finance: service, today: { today })
+        await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+        XCTAssertNil(cards.error)
+        let summary = try XCTUnwrap(cards.summary(for: card))
+        XCTAssertEqual(summary.used, Money(minor: 99_165))
+        XCTAssertEqual(summary.unresolvedInstallments, [])
+        XCTAssertEqual(summary.revolvingBalance, Money(minor: 30_000))
+        XCTAssertEqual(summary.payments.map(\.installments.minor), [5_762, 5_762, 5_762, 5_762, 5_762, 5_762])
+        XCTAssertEqual(summary.payments.map(\.amount.minor), [35_762, 10_762, 5_762, 5_762, 5_762, 5_762])
+        XCTAssertEqual(summary.payments.map(\.interest.minor), [749, 690, 631, 571, 511, 449])
+        XCTAssertTrue(cards.movements(of: card).contains { $0.id == purchase.id }, "la pantalla también encuentra la compra")
+
+        // Si no se puede traer la compra, no se calla: hay error y el resumen dice qué aplazado falta.
+        let backend = try XCTUnwrap(service as? InMemoryBackend)
+        await backend.failCalls("movements(in:ids:)")
+        let offline = CreditCardModel(household: home, service: services.creditCards, finance: service, today: { today })
+        await offline.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+        XCTAssertNotNil(offline.error)
+        XCTAssertEqual(offline.summary(for: card)?.unresolvedInstallments, [plan.id])
+    }
 }

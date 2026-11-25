@@ -132,6 +132,12 @@ data class CreditCardSummary(
     val interestInPayments: Long,
     /** Sin compras nuevas: meses hasta pagar la deuda. Nulo si no hay deuda o la cuota no cubre los intereses. */
     val payoff: Payoff?,
+    /**
+     * Aplazados cuya compra no está entre los movimientos recibidos. Sin la compra no se sabe ni la cuota ni el
+     * capital: no salen en [payments] y su deuda queda dentro de [revolvingBalance]. Si no está vacío, las cifras
+     * de la tarjeta no son de fiar.
+     */
+    val unresolvedInstallments: List<String>,
 ) {
     val next: CardPayment? get() = payments.firstOrNull()
     val isOverAlert: Boolean get() = terms.alertPercent != null && usedFraction * 100 >= terms.alertPercent
@@ -140,6 +146,7 @@ data class CreditCardSummary(
 object CreditCardCalculator {
     /**
      * @param balance saldo actual de la cuenta de la tarjeta (negativo = se debe).
+     * @param movements movimientos de la tarjeta: los de los extractos sin cobrar y la compra de cada aplazado, por antigua que sea.
      * @param transferCategories categorías de tipo transferencia: un positivo con una de ellas es un pago de la tarjeta.
      */
     fun summary(
@@ -149,9 +156,11 @@ object CreditCardCalculator {
         val total = max(count, 1)
         val mine = movements.filter { it.accountId == terms.accountId }
         val byId = mine.reversed().associateBy { it.id }
-        val plans = installments.filter { it.accountId == terms.accountId }.mapNotNull { plan ->
+        val own = installments.filter { it.accountId == terms.accountId }
+        val plans = own.mapNotNull { plan ->
             byId[plan.movementId]?.takeIf { it.amountMinor < 0 }?.let { plan to it }
         }
+        val unresolved = own.filter { it.movementId !in byId }.map { it.id }
         val deferred = plans.map { it.second.id }.toSet()
         // Compras normales y devoluciones, sin pagos de la tarjeta ni compras aplazadas.
         val charges = mine.filter { it.id !in deferred && !isCardPayment(it, transferCategories) }
@@ -232,7 +241,7 @@ object CreditCardCalculator {
 
         return CreditCardSummary(
             terms, today, used, terms.creditLimit - used, used.toDouble() / max(terms.creditLimit, 1), openStatement, spentThisCycle,
-            payments, revolvingAtStart, payments.sumOf { it.interest }, payoff,
+            payments, revolvingAtStart, payments.sumOf { it.interest }, payoff, unresolved,
         )
     }
 
