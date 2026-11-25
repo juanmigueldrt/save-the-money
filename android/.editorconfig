@@ -1,0 +1,42 @@
+# ktlint (ORC-68). This code base does not follow ktlint_official layout, so the
+# layout and wrapping rules are off. Rules that catch real problems (unused and wildcard
+# imports, naming, blank lines, indent...) stay on. Names: https://pinterest.github.io/ktlint/latest/rules/configuration-ktlint/
+root = true
+
+[*.{kt,kts}]
+# Compose functions are named in PascalCase.
+ktlint_function_naming_ignore_when_annotated_with = Composable
+
+# Line wrapping and signature layout: the code keeps arguments, parameters and chains on long lines.
+ktlint_standard_argument-list-wrapping = disabled
+ktlint_standard_binary-expression-wrapping = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_enum-wrapping = disabled
+ktlint_standard_function-literal = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_if-else-wrapping = disabled
+ktlint_standard_max-line-length = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_parameter-list-wrapping = disabled
+ktlint_standard_property-wrapping = disabled
+ktlint_standard_statement-wrapping = disabled
+ktlint_standard_wrapping = disabled
+
+# Braces on one-line if/when/loops.
+ktlint_standard_if-else-bracing = disabled
+ktlint_standard_multiline-if-else = disabled
+ktlint_standard_multiline-loop = disabled
+ktlint_standard_when-entry-bracing = disabled
+
+# Blank lines between declarations and when branches, and annotation placement.
+ktlint_standard_annotation = disabled
+ktlint_standard_blank-line-before-declaration = disabled
+ktlint_standard_blank-line-between-when-conditions = disabled
+ktlint_standard_spacing-between-declarations-with-annotations = disabled
+ktlint_standard_spacing-between-declarations-with-comments = disabled
+ktlint_standard_try-catch-finally-spacing = disabled
+
+# The code does not use trailing commas.
+ktlint_standard_trailing-comma-on-call-site = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled

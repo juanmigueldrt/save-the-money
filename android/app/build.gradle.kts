@@ -5,6 +5,13 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jlleitschuh.gradle.ktlint")
+}
+
+// Los hallazgos que ya había viven en config/ktlint/baseline.xml (ruta por defecto); sólo fallan los nuevos.
+// Regenerarla: ./gradlew ktlintGenerateBaseline
+ktlint {
+    version.set("1.8.0")
 }
 
 // Supabase: URL y clave anon en local.properties (git lo ignora). Sin clave, la app arranca en modo demo.
@@ -72,6 +79,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    // Los avisos que ya había viven en la línea base; sólo fallan los nuevos. Regenerarla: ./gradlew updateLintBaseline
+    lint { baseline = file("lint-baseline.xml") }
 }
 
 // Una release nunca debe apuntar al Supabase local ni salir con la clave de depuración:

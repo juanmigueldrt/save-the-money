@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<baseline version="1.0">
+    <file name="src/main/java/com/savethemoney/android/MainActivity.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="168" column="1" source="standard:indent" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/data/SupabaseFinance.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/FinanceModel.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="77" column="5" source="standard:no-consecutive-comments" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/PlanningModel.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/Session.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/components/Components.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="303" column="1" source="standard:no-consecutive-blank-lines" />
+        <error line="607" column="1" source="standard:no-consecutive-blank-lines" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/icons/StmIcons.kt">
+        <error line="4" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Acceso.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Analisis.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Inicio.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Mas.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Movimientos.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Pendientes.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Periodos.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Planes.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Screens.kt">
+        <error line="38" column="1" source="standard:no-consecutive-blank-lines" />
+    </file>
+    <file name="src/main/java/com/savethemoney/android/ui/screens/Tarjetas.kt">
+        <error line="3" column="1" source="standard:import-ordering" />
+        <error line="89" column="1" source="standard:no-consecutive-blank-lines" />
+    </file>
+    <file name="src/test/java/com/savethemoney/android/data/MerchantTest.kt">
+        <error line="72" column="13" source="standard:property-naming" />
+    </file>
+    <file name="src/test/java/com/savethemoney/android/data/PhaseCTest.kt">
+        <error line="23" column="17" source="standard:property-naming" />
+    </file>
+    <file name="src/test/java/com/savethemoney/android/data/TrackingTest.kt">
+        <error line="65" column="13" source="standard:property-naming" />
+        <error line="97" column="13" source="standard:property-naming" />
+    </file>
+</baseline>
