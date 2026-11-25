@@ -1,0 +1,14 @@
+# SwiftLint con las reglas por defecto. La línea base oculta los avisos que ya había
+# (ORC-68): sólo fallan los nuevos (CI usa --strict, así que un aviso nuevo también falla).
+# La línea base guarda rutas absolutas: se generó como si el repo estuviera en /repo, que es
+# donde CI lo monta. Al regenerarla con --write-baseline, cambia el prefijo de las rutas a file:///repo/.
+# Estilo de la casa: líneas largas y nombres cortos (ok, id, x...).
+disabled_rules:
+  - line_length
+  - identifier_name
+included:
+  - App
+  - Packages
+excluded:
+  - "**/.build"
+baseline: .swiftlint-baseline.json
