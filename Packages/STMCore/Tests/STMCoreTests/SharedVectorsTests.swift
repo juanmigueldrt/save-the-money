@@ -183,16 +183,16 @@ final class SharedVectorsTests: XCTestCase {
     }
 
     func testImportFingerprint() throws {
-        struct File: Decodable { var vectors: [V] }
-        struct V: Decodable { var name: String; var csv: String; var rows: [R] }
-        struct R: Decodable { var hashInput: String; var importHash: String }
+        struct File: Decodable { var vectors: [Vector] }
+        struct Vector: Decodable { var name: String; var csv: String; var rows: [Row] }
+        struct Row: Decodable { var hashInput: String?; var importHash: String? }
         let file: File = try load("import_fingerprint.json")
         XCTAssertFalse(file.vectors.isEmpty)
         for v in file.vectors {
             let table = CSVTable.parse(v.csv)
             let mapping = try XCTUnwrap(CSVMapping.detect(in: table), v.name)
             let hashes = CSVImporter.rows(in: table, mapping: mapping, accountId: UUID()).map { $0.draft?.importHash }
-            XCTAssertEqual(hashes, v.rows.map { $0.importHash as String? }, v.name)
+            XCTAssertEqual(hashes, v.rows.map(\.importHash), v.name)
         }
     }
 

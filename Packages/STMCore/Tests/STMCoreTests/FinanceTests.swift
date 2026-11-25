@@ -35,6 +35,28 @@ final class FinanceTests: XCTestCase {
         XCTAssertEqual(BudgetCategory.defaults(for: UUID()).count, 20, "las mismas que siembra el servidor")
     }
 
+    func testCalendarDayEsGregorianoAunqueElDispositivoUseOtro() throws {
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = .current
+        let instant = try XCTUnwrap(gregorian.date(from: DateComponents(year: 2026, month: 11, day: 26, hour: 12)))
+
+        // El mismo instante leído en calendario budista y japonés: los años no son 2026.
+        let budista = Calendar(identifier: .buddhist)
+        XCTAssertEqual(budista.component(.year, from: instant), 2569)
+        let japones = Calendar(identifier: .japanese)
+        XCTAssertNotEqual(japones.component(.year, from: instant), 2026)
+
+        XCTAssertEqual(CalendarDay(instant), CalendarDay(year: 2026, month: 11, day: 26))
+        XCTAssertEqual(CalendarDay(instant, calendar: CalendarDay.gregorian), CalendarDay(year: 2026, month: 11, day: 26))
+    }
+
+    func testCalendarDayIdaYVueltaConFechaGregoriana() throws {
+        let day = try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 26))
+        XCTAssertEqual(CalendarDay(day.date()), day)
+        XCTAssertEqual(CalendarDay.gregorian.component(.day, from: day.date()), 26)
+        XCTAssertEqual(CalendarDay.gregorian.component(.year, from: day.date()), 2026)
+    }
+
     func testOtherHouseholdsAreInvisible() async throws {
         let backend = InMemoryBackend()
         _ = try await backend.signUp(username: Username("ana"), password: "contrasena-de-prueba", displayName: nil)

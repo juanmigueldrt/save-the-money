@@ -30,6 +30,7 @@ class PhaseATest {
         assertEquals(1_260L, AmountExpression.evaluate("20−7,40"))
         assertEquals(-300L, AmountExpression.evaluate("-5+2"))
         assertEquals(123_500L, AmountExpression.evaluate("1.234,56+0,44"))
+        assertEquals(123_500L, AmountExpression.evaluate("1\u202F234,56+0,44"))
         assertNull(AmountExpression.evaluate("10/0"))
         assertNull(AmountExpression.evaluate("10+"))
         assertNull(AmountExpression.evaluate("(10+2"))
