@@ -49,7 +49,7 @@ public enum AmountExpression {
             switch ch {
             case "0"..."9", ",", ".":
                 number.append(ch)
-            case " ", "\u{00A0}":
+            case " ", "\u{00A0}", "\u{202F}":
                 continue
             case "+":
                 guard flush() else { return nil }; tokens.append(.op("+"))
