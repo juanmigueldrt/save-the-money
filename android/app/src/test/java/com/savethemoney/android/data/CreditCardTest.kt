@@ -1,5 +1,6 @@
 package com.savethemoney.android.data
 
+import com.savethemoney.android.ui.FinanceModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
@@ -68,6 +69,73 @@ class CreditCardTest {
         assertEquals(0L, s.interestInPayments)
         assertNull(s.payoff)
         assertFalse(s.isOverAlert)
+    }
+
+    /**
+     * ORC-78: la app solo carga los 500 movimientos más recientes de la tarjeta, y la compra aplazada puede ser
+     * más antigua. Mismos números que summaries de testdata/vectors/card_installments.json.
+     */
+    @Test fun installmentSurvivesMoreThan500LaterMovements() {
+        val purchase = move(-120_000, day(2025, 10, 15))
+        val plan = CardInstallment("p", home, card, purchase.id, 24, 14.0)
+        val short = listOf(purchase, move(55_835, day(2026, 11, 1), payment = true), move(-30_000, day(2026, 10, 10)), move(-5_000, day(2026, 11, 5)))
+        // 520 movimientos posteriores a la compra, en extractos ya pagados: no cambian lo que se debe.
+        val filler = (0 until 260).flatMap { listOf(move(-1_000, day(2026, 3, 10)), move(1_000, day(2026, 4, 1), payment = true)) }
+        val today = day(2026, 11, 20)
+        val expected = summary(terms(), short, listOf(plan), today)
+        assertEquals(99_165L, expected.used)
+        assertEquals(30_000L, expected.revolvingBalance)
+        assertEquals(List(6) { 5_762L }, expected.payments.map { it.installments })
+        assertEquals(listOf(35_762L, 10_762L, 5_762L, 5_762L, 5_762L, 5_762L), expected.payments.map { it.amount })
+        assertEquals(listOf(749L, 690L, 631L, 571L, 511L, 449L), expected.payments.map { it.interest })
+        assertEquals(emptyList<String>(), expected.unresolvedInstallments)
+
+        val recent = (short + filler).sortedByDescending { it.bookedOn }.take(500)
+        assertFalse(purchase in recent)
+        fun cardSummary(movements: List<Movement>) =
+            CreditCardCalculator.summary(terms(), -99_165, movements, listOf(plan), setOf(transfer), today)
+        // Solo con los recientes falta la compra: no se puede calcular el aplazado, y el resumen lo dice.
+        val cut = cardSummary(recent)
+        assertEquals(listOf("p"), cut.unresolvedInstallments)
+        assertEquals(94_165L, cut.revolvingBalance)
+        assertEquals(List(6) { 0L }, cut.payments.map { it.installments })
+        // Con la compra pedida aparte (lo que hace la app), sale lo mismo que con el historial corto.
+        val full = cardSummary(recent + purchase)
+        assertEquals(emptyList<String>(), full.unresolvedInstallments)
+        assertEquals(expected.revolvingBalance, full.revolvingBalance)
+        assertEquals(expected.payments, full.payments)
+    }
+
+    /** Lo mismo, cargando por el modelo con el servicio en memoria. */
+    @Test fun modelLoadsInstallmentPurchaseOutsideTheRecentMovements() = runBlocking {
+        val service = InMemoryFinance()
+        val account = service.createAccount(AccountDraft("Tarjeta", AccountKind.CreditCard), home)
+        val pay = service.categories(home).first { it.kind == CategoryKind.Transfer }.id
+        suspend fun add(amount: Long, on: LocalDate, payment: Boolean = false) =
+            service.addMovement(MovementDraft(account.id, if (payment) pay else null, on, amount, if (payment) "Pago de la tarjeta" else "Compra de prueba"), home)
+        val purchase = add(-120_000, day(2025, 10, 15))
+        service.saveCreditCard(CreditCardTerms(account.id, home, 300_000))
+        service.saveInstallment(CardInstallment("", home, account.id, purchase.id, 24, 14.0))
+        repeat(260) {
+            add(-1_000, day(2026, 3, 10))
+            add(1_000, day(2026, 4, 1), payment = true)
+        }
+        add(55_835, day(2026, 11, 1), payment = true)
+        add(-30_000, day(2026, 10, 10))
+        add(-5_000, day(2026, 11, 5))
+        assertFalse(service.movements(home, account.id, 500).any { it.id == purchase.id })
+
+        val model = FinanceModel(Household(home, "Casa"), service, { day(2026, 11, 20) })
+        model.load()
+        val s = model.cards.summary(account)!!
+        assertNull(model.cards.error)
+        assertEquals(99_165L, s.used)
+        assertEquals(emptyList<String>(), s.unresolvedInstallments)
+        assertEquals(30_000L, s.revolvingBalance)
+        assertEquals(List(6) { 5_762L }, s.payments.map { it.installments })
+        assertEquals(listOf(35_762L, 10_762L, 5_762L, 5_762L, 5_762L, 5_762L), s.payments.map { it.amount })
+        assertEquals(listOf(749L, 690L, 631L, 571L, 511L, 449L), s.payments.map { it.interest })
+        assertTrue(model.cards.movements(account).any { it.id == purchase.id })
     }
 
     @Test fun installmentsAddToEachPayment() {

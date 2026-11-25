@@ -76,6 +76,8 @@ public protocol FinanceService: Sendable {
 
     /// Movimientos más recientes primero. Con `accountId`, sólo los de esa cuenta.
     func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement]
+    /// Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen.
+    func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement]
     /// Todos los movimientos del hogar, para exportarlos. El servidor los da por páginas.
     func allMovements(in householdId: UUID) async throws -> [Movement]
     func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement

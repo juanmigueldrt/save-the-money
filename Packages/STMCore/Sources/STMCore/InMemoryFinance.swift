@@ -137,6 +137,11 @@ extension InMemoryBackend: FinanceService {
             .map { $0 }
     }
 
+    public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
+        _ = try requireMember(of: householdId)
+        return financeMovements.filter { $0.householdId == householdId && ids.contains($0.id) }
+    }
+
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
         _ = try requireMember(of: householdId)
         return financeMovements.filter { $0.householdId == householdId }

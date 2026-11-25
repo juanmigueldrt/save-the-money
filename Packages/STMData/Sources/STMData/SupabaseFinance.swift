@@ -138,6 +138,18 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
+        guard !ids.isEmpty else { return [] }
+        return try await mapped {
+            try await client.from("transactions")
+                .select(Self.movementColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .in("id", values: ids.map(\.uuidString))
+                .execute()
+                .value
+        }
+    }
+
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
         // El servidor devuelve como mucho 1000 filas por petición (max_rows).
         let pageSize = 1000
