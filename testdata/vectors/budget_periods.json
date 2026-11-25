@@ -1,0 +1,29 @@
+{
+  "_source": "Worked out by hand from the rule: a period runs from the last payday on or before `day` to the day before the next payday. Monthly and twice_monthly paydays are those days of each month, or the month's last day when the month is shorter; weekly/biweekly paydays are anchor ± multiples of 7/14 days; yearly is the anchor's day and month each year, clamped the same way.",
+  "vectors": [
+    { "frequency": "monthly", "day1": 1, "day": "2026-02-15", "start": "2026-02-01", "end": "2026-02-28" },
+    { "frequency": "monthly", "day1": 1, "day": "2028-02-10", "start": "2028-02-01", "end": "2028-02-29" },
+    { "frequency": "monthly", "day1": 25, "day": "2026-11-25", "start": "2026-11-25", "end": "2026-12-24" },
+    { "frequency": "monthly", "day1": 25, "day": "2026-11-24", "start": "2026-10-25", "end": "2026-11-24" },
+    { "frequency": "monthly", "day1": 15, "day": "2026-12-20", "start": "2026-12-15", "end": "2027-01-14" },
+    { "frequency": "monthly", "day1": 15, "day": "2027-01-10", "start": "2026-12-15", "end": "2027-01-14" },
+    { "frequency": "monthly", "day1": 31, "day": "2026-02-15", "start": "2026-01-31", "end": "2026-02-27" },
+    { "frequency": "monthly", "day1": 31, "day": "2026-02-28", "start": "2026-02-28", "end": "2026-03-30" },
+    { "frequency": "monthly", "day1": 31, "day": "2026-04-30", "start": "2026-04-30", "end": "2026-05-30" },
+    { "frequency": "monthly", "day1": 31, "day": "2026-12-31", "start": "2026-12-31", "end": "2027-01-30" },
+    { "frequency": "monthly", "day1": 30, "day": "2028-02-29", "start": "2028-02-29", "end": "2028-03-29" },
+    { "frequency": "monthly", "day1": 30, "day": "2026-03-01", "start": "2026-02-28", "end": "2026-03-29" },
+    { "frequency": "monthly", "day1": 29, "day": "2026-02-28", "start": "2026-02-28", "end": "2026-03-28" },
+    { "frequency": "monthly", "day1": 29, "day": "2026-03-28", "start": "2026-02-28", "end": "2026-03-28" },
+    { "frequency": "monthly", "day1": 29, "day": "2028-02-29", "start": "2028-02-29", "end": "2028-03-28" },
+    { "frequency": "monthly", "day1": 28, "day": "2026-02-27", "start": "2026-01-28", "end": "2026-02-27" },
+    { "frequency": "twice_monthly", "day1": 1, "day2": 15, "day": "2026-03-20", "start": "2026-03-15", "end": "2026-03-31" },
+    { "frequency": "twice_monthly", "day1": 15, "day2": 31, "day": "2026-02-20", "start": "2026-02-15", "end": "2026-02-27" },
+    { "frequency": "twice_monthly", "day1": 15, "day2": 31, "day": "2026-03-05", "start": "2026-02-28", "end": "2026-03-14" },
+    { "frequency": "weekly", "day1": 1, "anchor": "2026-11-06", "day": "2026-11-25", "start": "2026-11-20", "end": "2026-11-26" },
+    { "frequency": "weekly", "day1": 1, "anchor": "2026-11-06", "day": "2026-11-01", "start": "2026-10-30", "end": "2026-11-05" },
+    { "frequency": "biweekly", "day1": 1, "anchor": "2026-01-02", "day": "2026-03-01", "start": "2026-02-27", "end": "2026-03-12" },
+    { "frequency": "yearly", "day1": 1, "anchor": "2024-02-29", "day": "2026-03-10", "start": "2026-02-28", "end": "2027-02-27" },
+    { "frequency": "yearly", "day1": 1, "anchor": "2024-02-29", "day": "2028-03-01", "start": "2028-02-29", "end": "2029-02-27" }
+  ]
+}
