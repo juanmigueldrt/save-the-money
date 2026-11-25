@@ -217,6 +217,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
             else { .usernameTaken }
         case "28000", "PGRST301": .notSignedIn
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
+        // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
+        case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

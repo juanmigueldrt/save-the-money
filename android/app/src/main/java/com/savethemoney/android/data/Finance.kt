@@ -168,6 +168,43 @@ data class MovementDraft(
     }
 }
 
+/**
+ * Una transferencia entre dos cuentas, antes de guardarla: sale [amountMinor] (siempre positivo) de una y entra en la otra.
+ * Por ejemplo el pago de una tarjeta. [id] lo genera la app una vez por formulario: reintentar tras un fallo de red no duplica.
+ */
+data class TransferDraft(
+    val id: String,
+    val fromAccountId: String,
+    val toAccountId: String,
+    val categoryId: String? = null,
+    val bookedOn: LocalDate,
+    val amountMinor: Long,
+    val fromDescription: String,
+    val toDescription: String,
+    val notes: String? = null,
+    val excluded: Boolean = false,
+    val payee: String? = null,
+    val tags: List<String> = emptyList(),
+) {
+    /** Las dos patas: la salida de una cuenta y la entrada en la otra. */
+    val legs: List<MovementDraft> get() = listOf(
+        MovementDraft(fromAccountId, categoryId, bookedOn, -amountMinor, fromDescription, notes, excluded = excluded, payee = payee, tags = tags),
+        MovementDraft(toAccountId, categoryId, bookedOn, amountMinor, toDescription, notes, excluded = excluded, payee = payee, tags = tags),
+    )
+
+    /** Problema que impide guardarla, en español, o nulo si es válida. */
+    val issue: String? get() = when {
+        fromAccountId == toAccountId -> "Elige dos cuentas distintas."
+        amountMinor <= 0L -> "El importe tiene que ser mayor que cero."
+        else -> legs.firstNotNullOfOrNull { it.issue }
+    }
+
+    companion object {
+        /** Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día. */
+        const val STORED_WITH_OTHER_DATA = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+    }
+}
+
 data class AccountDraft(
     val name: String,
     val kind: AccountKind = AccountKind.Checking,
@@ -233,6 +270,13 @@ interface FinanceService {
     /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
     suspend fun movements(householdId: String, ids: List<String>): List<Movement>
     suspend fun addMovement(draft: MovementDraft, householdId: String): Movement
+
+    /**
+     * Guarda las dos patas de una transferencia (primero la salida), o ninguna si algo falla (RPC `create_transfer`).
+     * Repetir la llamada con el mismo id devuelve las ya guardadas y no apunta nada nuevo; si se repite con otra cuenta,
+     * otro importe u otro día falla con [TransferDraft.STORED_WITH_OTHER_DATA].
+     */
+    suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement>
     suspend fun updateMovement(movement: Movement): Movement
     suspend fun deleteMovement(movementId: String)
 
@@ -321,6 +365,9 @@ class InMemoryFinance : FinanceService {
     private val categories = mutableListOf<BudgetCategory>()
     private val seeded = mutableSetOf<String>()
     private val movements = mutableListOf<Movement>()
+
+    /** Las patas de cada transferencia guardada, por su id: repetirla no la duplica. */
+    private val transferLegs = mutableMapOf<String, List<String>>()
 
     private fun id() = UUID.randomUUID().toString()
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
@@ -415,6 +462,24 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun addMovement(draft: MovementDraft, householdId: String) =
         build(draft, householdId).also { movements += it }
+
+    override suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement> {
+        draft.issue?.let(::fail)
+        transferLegs[draft.id]?.let { ids ->
+            val stored = movements.filter { it.id in ids }
+            // Como el servidor: repetirla solo vale con las mismas cuentas, importe y día.
+            val same = stored.map { it.accountId } == listOf(draft.fromAccountId, draft.toAccountId) &&
+                stored.map { it.amountMinor } == listOf(-draft.amountMinor, draft.amountMinor) &&
+                stored.all { it.bookedOn == draft.bookedOn.toString() }
+            if (!same) fail(TransferDraft.STORED_WITH_OTHER_DATA)
+            return stored
+        }
+        // Se validan las dos patas antes de guardar ninguna.
+        val legs = draft.legs.map { build(it, householdId) }
+        movements += legs
+        transferLegs[draft.id] = legs.map { it.id }
+        return legs
+    }
 
     override suspend fun updateMovement(movement: Movement): Movement {
         movement.toDraft().issue?.let(::fail)
