@@ -234,7 +234,7 @@ fun Pantalla26(nav: Nav) {
     var eligeFecha by remember { mutableStateOf(false) }
     var borrando by remember { mutableStateOf<InvestmentTrade?>(null) }
     val action = rememberAction()
-    val tasa = if (fee.isBlank()) BigDecimal.ZERO else parseDecimal(fee)
+    val tasa = if (fee.isBlank()) BigDecimal.ZERO else parseDecimal(fee, maxFractionDigits = 3)
     val quote = tasa?.let { t ->
         if (mode == 0) Money.parse(amount)?.let { BuyQuote.byAmount(it, h.price, t) } else parseDecimal(amount)?.let { BuyQuote.byQuantity(it, h.price, t) }
     }
@@ -355,6 +355,9 @@ fun Pantalla26(nav: Nav) {
                     Spacer(Modifier.height(12.dp))
                     val cifra = if (mode == 0) "≈ ${InvestmentText.quantity(quote.quantity)} participaciones" else Money.format(quote.amount)
                     Aviso("$cifra · comisión ${Money.format(quote.fee)}")
+                } else if (mode == 1 && amount.isNotBlank() && parseDecimal(amount) == null) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Escribe las participaciones con coma para los decimales, p. ej. 0,125.", style = StmType.bodySmall, color = c.error)
                 }
                 Spacer(Modifier.height(12.dp))
                 FilledField("Desde", finance.account(cuenta)?.name ?: SIN_CUENTA, trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
@@ -519,8 +522,8 @@ fun Pantalla39(nav: Nav) {
     val action = rememberAction()
 
     fun guardar() = action.run {
-        val valor = if (precio.isBlank()) BigDecimal.ZERO else parseDecimal(precio) ?: throw AppError.InvalidInput("Escribe el precio con números, p. ej. 12,50.")
-        val tasa = if (comision.isBlank()) BigDecimal.ZERO else parseDecimal(comision) ?: throw AppError.InvalidInput("Escribe la comisión con números, p. ej. 0,2.")
+        val valor = if (precio.isBlank()) BigDecimal.ZERO else parseDecimal(precio, maxFractionDigits = 6) ?: throw AppError.InvalidInput("Escribe el precio con coma para los decimales, p. ej. 12,50.")
+        val tasa = if (comision.isBlank()) BigDecimal.ZERO else parseDecimal(comision, maxFractionDigits = 3) ?: throw AppError.InvalidInput("Escribe la comisión con números, p. ej. 0,2.")
         val hoy = finance.today()
         val cambiaPrecio = editando?.let { it.price.compareTo(valor) != 0 } ?: (valor.signum() > 0)
         val base = editando ?: Holding(
@@ -621,7 +624,7 @@ fun Pantalla40(nav: Nav) {
     val action = rememberAction()
 
     fun guardar() = action.run {
-        val valor = parseDecimal(precio)?.takeIf { it.signum() > 0 } ?: throw AppError.InvalidInput("Escribe el precio con números, p. ej. 12,50.")
+        val valor = parseDecimal(precio, maxFractionDigits = 6)?.takeIf { it.signum() > 0 } ?: throw AppError.InvalidInput("Escribe el precio con coma para los decimales, p. ej. 12,50.")
         inv.recordPrice(valor, fecha, h)
         nav.back()
     }
@@ -660,8 +663,8 @@ fun Pantalla41(nav: Nav) {
 
     fun guardar() = action.run {
         val unidades = parseDecimal(cantidad)
-        val valor = parseDecimal(precio)
-        if (unidades == null || valor == null) throw AppError.InvalidInput("Escribe las participaciones y el precio con números.")
+        val valor = parseDecimal(precio, maxFractionDigits = 6)
+        if (unidades == null || valor == null) throw AppError.InvalidInput("Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125.")
         val fee = if (comision.isBlank()) 0L else Money.parse(comision)?.takeIf { it >= 0 } ?: throw AppError.InvalidInput("Escribe la comisión con números.")
         val trade = InvestmentTrade("", h.householdId, h.id, fecha.toString(), TradeSide.Sell, unidades, valor, fee)
         inv.add(trade)
@@ -720,7 +723,7 @@ fun Pantalla42(nav: Nav) {
     val borrador = run {
         val id = activo
         val money = Money.entered(importe)
-        val rate = parseDecimal(rentabilidad)
+        val rate = parseDecimal(rentabilidad, maxFractionDigits = 2)
         if (id == null || money == null || rate == null) null
         else (editando ?: InvestmentPlan("", inv.householdId, id, amountMinor = money, startsOn = inicio.toString())).copy(
             amountMinor = money, every = recurrencia.every, unit = recurrencia.unit, accountId = cuenta, startsOn = inicio.toString(),

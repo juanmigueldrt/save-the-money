@@ -41,6 +41,16 @@ class SharedVectorsTest {
     }
 
     @Test
+    fun decimalParsing() {
+        for (v in load("decimal_parse.json")) {
+            val expected = v["value"]?.jsonPrimitive?.content?.toBigDecimal()
+            val got = parseDecimal(v.str("input"), v.int("maxFractionDigits"))
+            // Sin ceros finales: para BigDecimal 1250 y 1250.0 no son iguales.
+            assertEquals("«${v.str("input")}» con ${v.str("maxFractionDigits")} decimales", expected?.stripTrailingZeros(), got?.stripTrailingZeros())
+        }
+    }
+
+    @Test
     fun cardInstallmentsAndStatementDates() {
         for (v in load("card_installments.json", "installments")) {
             val got = CardInstallment.payment(v["principal"]!!.jsonPrimitive.long, v.int("months"), v["rate"]!!.jsonPrimitive.double)

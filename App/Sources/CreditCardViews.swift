@@ -494,8 +494,8 @@ struct CardTermsFormView: View {
 
     private func save() async {
         guard let limitMoney = Money(entered: limit), limitMoney.minor > 0 else { error = "El límite no es un importe válido."; return }
-        guard let revolving = Decimal(parsing: revolvingRate), let installment = Decimal(parsing: installmentRate),
-              let percent = Decimal(parsing: minPercent) else { error = "Revisa los intereses y el pago mínimo."; return }
+        guard let revolving = Decimal(parsing: revolvingRate, maxFractionDigits: 2), let installment = Decimal(parsing: installmentRate, maxFractionDigits: 2),
+              let percent = Decimal(parsing: minPercent, maxFractionDigits: 2) else { error = "Revisa los intereses y el pago mínimo."; return }
         guard let minimum = Money(entered: minAmount.isEmpty ? "0" : minAmount) else { error = "El pago mínimo no es un importe válido."; return }
         var fixedMoney: Money?
         if mode == .fixed {
