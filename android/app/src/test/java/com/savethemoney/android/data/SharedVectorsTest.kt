@@ -79,8 +79,12 @@ class SharedVectorsTest {
                 statementDay = v.int("statementDay"), paymentDay = v.int("paymentDay"), paymentDelayMonths = v.int("paymentDelayMonths"),
             )
             val movements = v["movements"]!!.jsonArray.map {
-                val payment = it["payment"]?.jsonPrimitive?.content == "true"
-                Movement(it.str("key"), "home", "card", if (payment) "transfer" else null, it.str("day"), it["amount"]!!.jsonPrimitive.long, it.str("key"))
+                val category = when {
+                    it["payment"]?.jsonPrimitive?.content == "true" -> "transfer"
+                    it["refund"]?.jsonPrimitive?.content == "true" -> "shopping"
+                    else -> null
+                }
+                Movement(it.str("key"), "home", "card", category, it.str("day"), it["amount"]!!.jsonPrimitive.long, it.str("key"))
             }
             // Un aplazado cuya compra no está en la lista apunta a un movimiento que no se ha cargado.
             val plans = v["installments"]!!.jsonArray.mapIndexed { i, it ->
@@ -90,6 +94,7 @@ class SharedVectorsTest {
             assertEquals(name, v["used"]!!.jsonPrimitive.long, s.used)
             assertEquals(name, v["revolvingBalance"]!!.jsonPrimitive.long, s.revolvingBalance)
             assertEquals(name, v.int("unresolved"), s.unresolvedInstallments.size)
+            assertEquals(name, v.int("uncategorized"), s.uncategorizedCredits.size)
             val got = s.payments.map { "${it.due} ${it.amount} ${it.purchases} ${it.installments} ${it.interest}" }
             val expected = v["payments"]!!.jsonArray.map {
                 "${it.str("due")} ${it.str("amount")} ${it.str("purchases")} ${it.str("installments")} ${it.str("interest")}"

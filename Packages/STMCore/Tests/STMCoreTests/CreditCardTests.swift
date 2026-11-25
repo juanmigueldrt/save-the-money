@@ -6,11 +6,12 @@ final class CreditCardTests: XCTestCase {
     let home = UUID()
     let card = UUID()
     let transfer = UUID()
+    let shopping = UUID()
 
     private func day(_ y: Int, _ m: Int, _ d: Int) -> CalendarDay { CalendarDay(year: y, month: m, day: d)! }
 
-    private func move(_ amount: Int, on date: CalendarDay, payment: Bool = false) -> Movement {
-        Movement(householdId: home, accountId: card, categoryId: payment ? transfer : nil, bookedOn: date,
+    private func move(_ amount: Int, on date: CalendarDay, payment: Bool = false, refund: Bool = false) -> Movement {
+        Movement(householdId: home, accountId: card, categoryId: payment ? transfer : refund ? shopping : nil, bookedOn: date,
                  amount: Money(minor: amount), description: payment ? "Pago de la tarjeta" : "Compra de prueba")
     }
 
@@ -48,7 +49,7 @@ final class CreditCardTests: XCTestCase {
             move(15_000, on: day(2026, 11, 1), payment: true),   // pago del extracto del 1 de octubre
             move(-20_000, on: day(2026, 10, 10)),
             move(-10_000, on: day(2026, 10, 20)),
-            move(2_000, on: day(2026, 10, 25)),                  // devolución
+            move(2_000, on: day(2026, 10, 25), refund: true),    // devolución
             move(-5_000, on: day(2026, 11, 2)),
         ]
         let s = summary(terms(), movements, today: day(2026, 11, 4))
@@ -68,6 +69,41 @@ final class CreditCardTests: XCTestCase {
         XCTAssertEqual(s.interestInPayments, .zero)
         XCTAssertNil(s.payoff)
         XCTAssertFalse(s.isOverAlert)
+        XCTAssertEqual(s.uncategorizedCredits, [])
+    }
+
+    /// ORC-79: el pago del extracto anterior, importado de un CSV sin categoría, no es una devolución.
+    /// El caso del ticket también está en `summaries` de testdata/vectors/card_installments.json.
+    func testUncategorizedCreditDoesNotReduceCharges() {
+        let credit = move(50_000, on: day(2026, 10, 5))
+        let old = move(1_000, on: day(2026, 9, 20))      // extracto ya cobrado: no cambia ningún cargo
+        let movements = [move(-51_000, on: day(2026, 9, 12)), old, credit, move(-30_000, on: day(2026, 10, 10))]
+        let s = summary(terms(), movements, today: day(2026, 11, 20))
+        XCTAssertEqual(s.used, Money(minor: 30_000))
+        XCTAssertEqual(s.next?.due, day(2026, 12, 1))
+        XCTAssertEqual(s.next?.amount, Money(minor: 30_000))
+        XCTAssertEqual(s.next?.purchases, Money(minor: 30_000))
+        XCTAssertEqual(s.revolvingBalance, Money(minor: 30_000))
+        XCTAssertEqual(s.uncategorizedCredits, [credit.id])
+
+        // En el extracto abierto tampoco baja lo gastado.
+        let open = move(2_000, on: day(2026, 11, 10))
+        let later = summary(terms(), movements + [move(-5_000, on: day(2026, 11, 5)), open], today: day(2026, 11, 20))
+        XCTAssertEqual(later.spentThisCycle, Money(minor: 5_000))
+        XCTAssertEqual(later.payments.map(\.amount.minor), [30_000, 5_000, 0, 0, 0, 0])
+        XCTAssertEqual(later.uncategorizedCredits, [credit.id, open.id])
+
+        // Al clasificarlo deja de avisar: como pago no toca el cargo; como devolución lo baja.
+        var paid = credit
+        paid.categoryId = transfer
+        let asPayment = summary(terms(), [movements[0], old, paid, movements[3]], today: day(2026, 11, 20))
+        XCTAssertEqual(asPayment.next?.amount, Money(minor: 30_000))
+        XCTAssertEqual(asPayment.uncategorizedCredits, [])
+        var refunded = credit
+        refunded.categoryId = shopping
+        let asRefund = summary(terms(), [movements[0], old, refunded, movements[3]], today: day(2026, 11, 20))
+        XCTAssertEqual(asRefund.next?.amount, .zero)
+        XCTAssertEqual(asRefund.uncategorizedCredits, [])
     }
 
     func testInstallmentsAddToEachPayment() {

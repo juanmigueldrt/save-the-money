@@ -18,11 +18,12 @@ class CreditCardTest {
     private val home = "home"
     private val card = "card"
     private val transfer = "transfer"
+    private val shopping = "shopping"
 
     private fun day(y: Int, m: Int, d: Int) = LocalDate.of(y, m, d)
 
-    private fun move(amount: Long, on: LocalDate, payment: Boolean = false) = Movement(
-        UUID.randomUUID().toString(), home, card, if (payment) transfer else null, on.toString(), amount,
+    private fun move(amount: Long, on: LocalDate, payment: Boolean = false, refund: Boolean = false) = Movement(
+        UUID.randomUUID().toString(), home, card, if (payment) transfer else if (refund) shopping else null, on.toString(), amount,
         if (payment) "Pago de la tarjeta" else "Compra de prueba",
     )
 
@@ -50,7 +51,7 @@ class CreditCardTest {
             move(15_000, day(2026, 11, 1), payment = true),
             move(-20_000, day(2026, 10, 10)),
             move(-10_000, day(2026, 10, 20)),
-            move(2_000, day(2026, 10, 25)),
+            move(2_000, day(2026, 10, 25), refund = true),
             move(-5_000, day(2026, 11, 2)),
         )
         val s = summary(terms(), movements, today = day(2026, 11, 4))
@@ -69,6 +70,37 @@ class CreditCardTest {
         assertEquals(0L, s.interestInPayments)
         assertNull(s.payoff)
         assertFalse(s.isOverAlert)
+        assertEquals(emptyList<String>(), s.uncategorizedCredits)
+    }
+
+    /** ORC-79: el pago del extracto anterior, importado de un CSV sin categoría, no es una devolución. */
+    @Test fun uncategorizedCreditDoesNotReduceCharges() {
+        val credit = move(50_000, day(2026, 10, 5))
+        val old = move(1_000, day(2026, 9, 20)) // extracto ya cobrado: no cambia ningún cargo
+        val movements = listOf(move(-51_000, day(2026, 9, 12)), old, credit, move(-30_000, day(2026, 10, 10)))
+        val today = day(2026, 11, 20)
+        val s = summary(terms(), movements, today = today)
+        assertEquals(30_000L, s.used)
+        assertEquals(day(2026, 12, 1), s.next?.due)
+        assertEquals(30_000L, s.next?.amount)
+        assertEquals(30_000L, s.next?.purchases)
+        assertEquals(30_000L, s.revolvingBalance)
+        assertEquals(listOf(credit.id), s.uncategorizedCredits)
+
+        // En el extracto abierto tampoco baja lo gastado.
+        val open = move(2_000, day(2026, 11, 10))
+        val later = summary(terms(), movements + move(-5_000, day(2026, 11, 5)) + open, today = today)
+        assertEquals(5_000L, later.spentThisCycle)
+        assertEquals(listOf(30_000L, 5_000L, 0L, 0L, 0L, 0L), later.payments.map { it.amount })
+        assertEquals(listOf(credit.id, open.id), later.uncategorizedCredits)
+
+        // Al clasificarlo deja de avisar: como pago no toca el cargo; como devolución lo baja.
+        val asPayment = summary(terms(), movements.map { if (it.id == credit.id) it.copy(categoryId = transfer) else it }, today = today)
+        assertEquals(30_000L, asPayment.next?.amount)
+        assertEquals(emptyList<String>(), asPayment.uncategorizedCredits)
+        val asRefund = summary(terms(), movements.map { if (it.id == credit.id) it.copy(categoryId = shopping) else it }, today = today)
+        assertEquals(0L, asRefund.next?.amount)
+        assertEquals(emptyList<String>(), asRefund.uncategorizedCredits)
     }
 
     /**
