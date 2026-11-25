@@ -3,8 +3,8 @@ import Foundation
 /// Cuentas y movimientos en memoria, con las mismas reglas que el RLS del servidor:
 /// sólo se ve y se toca lo de los hogares de los que uno es miembro.
 extension InMemoryBackend: FinanceService {
-    private func requireMember(of householdId: UUID) throws -> UUID {
-        let user = try requireUser()
+    private func requireMember(of householdId: UUID, _ operation: String = #function) throws -> UUID {
+        let user = try requireUser(operation)
         guard isMember(user, of: householdId) else { throw AppError.unknown("no es miembro") }
         return user
     }

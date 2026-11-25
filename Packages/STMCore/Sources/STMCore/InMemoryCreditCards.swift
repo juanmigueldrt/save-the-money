@@ -3,8 +3,8 @@ import Foundation
 /// Tarjetas en memoria, con las mismas reglas que el servidor: sólo miembros del hogar,
 /// sólo cuentas de tipo tarjeta y un aplazado por compra de esa misma tarjeta.
 extension InMemoryBackend: CreditCardService {
-    private func requireCardMember(of householdId: UUID) throws {
-        let user = try requireUser()
+    private func requireCardMember(of householdId: UUID, _ operation: String = #function) throws {
+        let user = try requireUser(operation)
         guard isMember(user, of: householdId) else { throw AppError.unknown("no es miembro") }
     }
 

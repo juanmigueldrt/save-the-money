@@ -3,8 +3,8 @@ import Foundation
 /// Inversiones en memoria, con las mismas reglas que el servidor: sólo los miembros
 /// del hogar, cuentas y dueños del mismo hogar, y borrar un activo borra lo suyo.
 extension InMemoryBackend: InvestmentService {
-    private func requireInvestmentMember(of householdId: UUID) throws {
-        let user = try requireUser()
+    private func requireInvestmentMember(of householdId: UUID, _ operation: String = #function) throws {
+        let user = try requireUser(operation)
         guard isMember(user, of: householdId) else { throw AppError.unknown("no es miembro") }
     }
 
