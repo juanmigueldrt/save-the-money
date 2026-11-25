@@ -390,19 +390,15 @@ fun List<InvestmentPlan>.counts(day: LocalDate): Pair<Int, Int> {
     return live.count { !it.isPaused } to live.count { it.isPaused }
 }
 
-/** Lee un número escrito a mano: "12,5", "12.5", "1.234,56" o "1,234.56". Nulo si no se entiende o es negativo. */
-fun parseDecimal(text: String): BigDecimal? {
-    var s = text.replace("€", "").replace("%", "").filterNot { it.isWhitespace() }
-    if (s.isEmpty()) return null
-    val comma = s.lastIndexOf(',')
-    val dot = s.lastIndexOf('.')
-    s = if (comma >= 0 && dot >= 0) {
-        if (comma > dot) s.replace(".", "").replace(",", ".") else s.replace(",", "")
-    } else {
-        s.replace(",", ".")
-    }
-    if (s.count { it == '.' } > 1 || !s.all { it == '.' || it in '0'..'9' }) return null
-    return s.toBigDecimalOrNull()
+/**
+ * Lee un número escrito a mano con la regla de [parseNumber]: "12,5", "12.5", "1.234,56" o "1,234.56".
+ * Admite un «%». Nulo si no se entiende, es negativo o tiene más de [maxFractionDigits] decimales
+ * (8 por defecto, los de las participaciones; los precios guardan 6, la comisión 3 y los tipos 2).
+ */
+fun parseDecimal(text: String, maxFractionDigits: Int = 8): BigDecimal? {
+    val number = parseNumber(text.replace("%", ""), maxFractionDigits)?.takeUnless { it.negative } ?: return null
+    val integer = number.integer.ifEmpty { "0" }
+    return BigDecimal(if (number.fraction.isEmpty()) integer else "$integer.${number.fraction}")
 }
 
 object InvestmentReminders {

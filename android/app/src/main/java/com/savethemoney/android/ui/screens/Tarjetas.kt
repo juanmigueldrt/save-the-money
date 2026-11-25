@@ -50,6 +50,7 @@ import com.savethemoney.android.data.CreditCardCalculator
 import com.savethemoney.android.data.CreditCardSummary
 import com.savethemoney.android.data.CreditCardTerms
 import com.savethemoney.android.data.Money
+import com.savethemoney.android.data.parseDecimal
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.LocalSession
@@ -86,13 +87,12 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 import java.time.LocalDate
 
-
 private fun euros(minor: Long) = Money.format(minor, decimals = minor % 100 != 0L)
 private fun fechaLarga(d: LocalDate) = "${d.dayOfMonth} de ${Fechas.mes(d)}"
 
 /** "14" o "21,5", para los campos y los textos. */
 private fun tasa(valor: Double) = BigDecimal(valor).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString().replace('.', ',')
-private fun leerTasa(texto: String) = texto.trim().replace(',', '.').toDoubleOrNull()
+private fun leerTasa(texto: String) = parseDecimal(texto, maxFractionDigits = 2)?.toDouble()
 
 /** Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces. */
 private fun desglose(p: CardPayment, modo: CardPaymentMode): String {

@@ -20,52 +20,14 @@ public struct Money: Hashable, Codable, Sendable {
     public var isNegative: Bool { minor < 0 }
 
     /// Convierte texto escrito por el usuario o leído de un CSV ("1.234,56", "-12,5", "12.50 €").
-    /// Devuelve nil si no es un importe válido.
+    /// Devuelve nil si no es un importe válido. La regla completa está en `NumberParser`.
     public init?(parsing text: String, currency: String = "EUR") {
-        var s = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        s = s.replacingOccurrences(of: "€", with: "")
-            .replacingOccurrences(of: "EUR", with: "")
-            .replacingOccurrences(of: "\u{00A0}", with: "")
-            .replacingOccurrences(of: " ", with: "")
-        guard !s.isEmpty else { return nil }
-
-        var negative = false
-        if s.hasPrefix("-") { negative = true; s.removeFirst() }
-        else if s.hasPrefix("+") { s.removeFirst() }
-        if s.hasPrefix("(") && s.hasSuffix(")") { negative = true; s = String(s.dropFirst().dropLast()) }
-        if s.hasSuffix("-") { negative = true; s.removeLast() }
-
-        // El último separador ("," o ".") seguido de 1 o 2 dígitos es el decimal;
-        // el resto son separadores de miles.
-        let lastComma = s.lastIndex(of: ",")
-        let lastDot = s.lastIndex(of: ".")
-        let decimalSep: Character?
-        switch (lastComma, lastDot) {
-        case let (c?, d?): decimalSep = c > d ? "," : "."
-        case let (c?, nil): decimalSep = s.distance(from: c, to: s.endIndex) - 1 <= 2 ? "," : nil
-        case let (nil, d?): decimalSep = s.distance(from: d, to: s.endIndex) - 1 <= 2 ? "." : nil
-        case (nil, nil): decimalSep = nil
-        }
-
-        var integerPart = s
-        var fractionPart = ""
-        if let sep = decimalSep, let idx = s.lastIndex(of: sep) {
-            integerPart = String(s[..<idx])
-            fractionPart = String(s[s.index(after: idx)...])
-        }
-        integerPart.removeAll { $0 == "." || $0 == "," }
-        guard !integerPart.isEmpty || !fractionPart.isEmpty,
-              integerPart.allSatisfy(\.isASCIIDigit),
-              fractionPart.allSatisfy(\.isASCIIDigit),
-              fractionPart.count <= 2 else { return nil }
-
-        let fraction = fractionPart.padding(toLength: 2, withPad: "0", startingAt: 0)
-        guard let whole = Int(integerPart.isEmpty ? "0" : integerPart),
-              let cents = Int(fraction) else { return nil }
-        let (scaled, overflow1) = whole.multipliedReportingOverflow(by: 100)
-        let (total, overflow2) = scaled.addingReportingOverflow(cents)
-        guard !overflow1, !overflow2 else { return nil }
-        self.init(minor: negative ? -total : total, currency: currency)
+        guard let number = NumberParser.parse(text, maxFractionDigits: 2),
+              let whole = Int(number.integer.isEmpty ? "0" : number.integer),
+              let cents = Int(number.fraction.padding(toLength: 2, withPad: "0", startingAt: 0)) else { return nil }
+        // Como mucho 15 cifras enteras: en céntimos cabe de sobra en un Int.
+        let total = whole * 100 + cents
+        self.init(minor: number.isNegative ? -total : total, currency: currency)
     }
 
     /// Texto en formato español: "1.234,56 €". Respeta `Money.display` (modo incógnito y redondeo).
@@ -134,10 +96,6 @@ extension Money {
         }
         return result.map { Money(minor: $0, currency: currency) }
     }
-}
-
-private extension Character {
-    var isASCIIDigit: Bool { ("0"..."9").contains(self) }
 }
 
 /// Cómo se enseñan los importes en la app (Más opciones > Vista).

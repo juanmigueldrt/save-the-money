@@ -29,6 +29,18 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testDecimalParsing() throws {
+        struct File: Decodable { var vectors: [Vector] }
+        struct Vector: Decodable { var input: String; var maxFractionDigits: Int; var value: String? }
+        let file: File = try load("decimal_parse.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        for v in file.vectors {
+            let expected = try v.value.map { try XCTUnwrap(Decimal(string: $0, locale: Locale(identifier: "en_US_POSIX"))) }
+            XCTAssertEqual(Decimal(parsing: v.input, maxFractionDigits: v.maxFractionDigits), expected,
+                           "«\(v.input)» con \(v.maxFractionDigits) decimales")
+        }
+    }
+
     func testCardInstallmentsAndStatementDates() throws {
         struct File: Decodable { var installments: [I]; var statementDates: [S] }
         struct I: Decodable { var principal: Int; var months: Int; var rate: Decimal; var payment: Int }

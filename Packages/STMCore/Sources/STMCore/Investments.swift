@@ -736,20 +736,20 @@ extension Array where Element == InvestmentPlan {
 // MARK: - Texto
 
 extension Decimal {
-    /// Lee un número escrito a mano: "12,5", "12.5", "1.234,56" o "1,234.56". Nil si no se entiende o es negativo.
-    public init?(parsing text: String) {
-        var s = text.replacingOccurrences(of: "€", with: "").replacingOccurrences(of: "%", with: "")
-            .filter { !$0.isWhitespace }
-        guard !s.isEmpty else { return nil }
-        if let comma = s.lastIndex(of: ","), let dot = s.lastIndex(of: ".") {
-            // El último separador es el decimal; el otro, de miles.
-            s = comma > dot ? s.replacingOccurrences(of: ".", with: "").replacingOccurrences(of: ",", with: ".")
-                            : s.replacingOccurrences(of: ",", with: "")
-        } else {
-            s = s.replacingOccurrences(of: ",", with: ".")
+    /// Lee un número escrito a mano con la regla de `NumberParser`: "12,5", "12.5", "1.234,56" o "1,234.56".
+    /// Admite un «%». Nil si no se entiende, es negativo o tiene más de `maxFractionDigits` decimales
+    /// (8 por defecto, los de las participaciones; los precios guardan 6, la comisión 3 y los tipos 2).
+    public init?(parsing text: String, maxFractionDigits: Int = 8) {
+        // El «%» de los tipos se quita aquí: la regla común no lo admite.
+        let plain = text.replacingOccurrences(of: "%", with: "")
+        guard let number = NumberParser.parse(plain, maxFractionDigits: maxFractionDigits), !number.isNegative else {
+            return nil
         }
-        guard s.filter({ $0 == "." }).count <= 1, s.allSatisfy({ $0 == "." || ("0"..."9").contains($0) }),
-              let value = Decimal(string: s, locale: Locale(identifier: "en_US_POSIX")) else { return nil }
+        let integer = number.integer.isEmpty ? "0" : number.integer
+        let fraction = number.fraction.isEmpty ? "0" : number.fraction
+        guard let value = Decimal(string: "\(integer).\(fraction)", locale: Locale(identifier: "en_US_POSIX")) else {
+            return nil
+        }
         self = value
     }
 }
