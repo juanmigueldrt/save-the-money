@@ -289,6 +289,10 @@ public struct CreditCardSummary: Hashable, Sendable {
     /// Con la forma de pago actual y sin compras nuevas: meses hasta pagar la deuda y sus intereses.
     /// nil si no hay deuda con intereses o si la cuota no llega a cubrir los intereses.
     public var payoff: (months: Int, interest: Money)?
+    /// Aplazados cuya compra no está entre los movimientos recibidos. Sin la compra no se sabe ni la
+    /// cuota ni el capital: no salen en `payments` y su deuda queda dentro de `revolvingBalance`.
+    /// Si no está vacío, las cifras de la tarjeta no son de fiar.
+    public var unresolvedInstallments: [UUID] = []
 
     public var next: CardPayment? { payments.first }
     public var isOverAlert: Bool {
@@ -299,6 +303,7 @@ public struct CreditCardSummary: Hashable, Sendable {
     public static func == (lhs: CreditCardSummary, rhs: CreditCardSummary) -> Bool {
         lhs.terms == rhs.terms && lhs.today == rhs.today && lhs.used == rhs.used && lhs.payments == rhs.payments
             && lhs.payoff?.months == rhs.payoff?.months && lhs.payoff?.interest == rhs.payoff?.interest
+            && lhs.unresolvedInstallments == rhs.unresolvedInstallments
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -312,7 +317,8 @@ public struct CreditCardSummary: Hashable, Sendable {
 public enum CreditCardCalculator {
     /// - Parameters:
     ///   - balance: saldo actual de la cuenta de la tarjeta (negativo = se debe).
-    ///   - movements: movimientos de la tarjeta (los de otras cuentas se ignoran).
+    ///   - movements: movimientos de la tarjeta (los de otras cuentas se ignoran). Tienen que estar los de
+    ///     los extractos sin cobrar y la compra de cada aplazado, por antigua que sea.
     ///   - transferCategories: categorías de tipo transferencia: un positivo con una de ellas es un pago de la tarjeta.
     ///   - count: cuántos cargos futuros calcular.
     public static func summary(terms: CreditCardTerms, balance: Money, movements: [Movement],
@@ -321,10 +327,12 @@ public enum CreditCardCalculator {
         let count = max(count, 1)
         let mine = movements.filter { $0.accountId == terms.accountId }
         let byId = Dictionary(mine.map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
-        let plans = installments.filter { $0.accountId == terms.accountId }.compactMap { plan -> (CardInstallment, Movement)? in
+        let own = installments.filter { $0.accountId == terms.accountId }
+        let plans = own.compactMap { plan -> (CardInstallment, Movement)? in
             guard let movement = byId[plan.movementId], movement.amount.isNegative else { return nil }
             return (plan, movement)
         }
+        let unresolved = own.filter { byId[$0.movementId] == nil }.map(\.id)
         let deferred = Set(plans.map { $0.1.id })
         // Compras normales y devoluciones (sin pagos de la tarjeta ni compras aplazadas), en positivo = se debe.
         let charges = mine.filter { !deferred.contains($0.id) && !isCardPayment($0, transferCategories) }
@@ -420,7 +428,8 @@ public enum CreditCardCalculator {
             terms: terms, today: today, used: used, available: terms.creditLimit - used,
             usedFraction: Double(used.minor) / Double(limit), openStatement: openStatement,
             spentThisCycle: spentThisCycle, payments: payments, revolvingBalance: Money(minor: revolvingAtStart),
-            interestInPayments: Money(minor: payments.map(\.interest.minor).reduce(0, +)), payoff: payoff)
+            interestInPayments: Money(minor: payments.map(\.interest.minor).reduce(0, +)), payoff: payoff,
+            unresolvedInstallments: unresolved)
     }
 
     static func isCardPayment(_ movement: Movement, _ transferCategories: Set<UUID>) -> Bool {

@@ -100,9 +100,40 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }.decodeList()
     }
 
+    override suspend fun movements(householdId: String, ids: List<String>): List<Movement> = backend.mapped {
+        if (ids.isEmpty()) return@mapped emptyList()
+        client.from("transactions").select(Columns.raw(MOVEMENT)) {
+            filter {
+                eq("household_id", householdId)
+                isIn("id", ids)
+            }
+        }.decodeList()
+    }
+
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement = backend.mapped {
         draft.issue?.let(::fail)
         client.from("transactions").insert(NewMovementRow.of(draft, householdId)) { select(Columns.raw(MOVEMENT)) }.decodeSingle()
+    }
+
+    /** create_transfer guarda las dos patas en una sola transacción y no repite una ya guardada. */
+    override suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement> = backend.mapped {
+        draft.issue?.let(::fail)
+        val params = buildJsonObject {
+            put("transfer", draft.id)
+            put("household", householdId)
+            put("from_account", draft.fromAccountId)
+            put("to_account", draft.toAccountId)
+            put("booked", draft.bookedOn.toString())
+            put("amount", draft.amountMinor)
+            put("category", draft.categoryId)
+            put("from_label", draft.fromDescription.trim())
+            put("to_label", draft.toDescription.trim())
+            put("note", draft.notes)
+            put("is_excluded", draft.excluded)
+            put("payee_name", Payee.clean(draft.payee))
+            putJsonArray("tag_list") { draft.tags.forEach { add(JsonPrimitive(it)) } }
+        }
+        client.postgrest.rpc("create_transfer", params) { select(Columns.raw(MOVEMENT)) }.decodeList()
     }
 
     override suspend fun updateMovement(movement: Movement): Movement = backend.mapped {

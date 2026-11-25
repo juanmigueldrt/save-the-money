@@ -155,16 +155,11 @@ final class MultiStepFlowTests: XCTestCase {
 
     // MARK: Pago de la tarjeta
 
-    /// Igual que `CardPaymentFormView.save`: salida de la cuenta y entrada en la tarjeta, como transferencia.
-    private func payCard(_ card: Account, from: Account, amount: Money, on date: CalendarDay, finance: FinanceModel) async -> Bool {
-        let transfer = finance.categories(for: .transfer).first?.id
-        let out = MovementDraft(accountId: from.id, categoryId: transfer, bookedOn: date, amount: -amount,
-                                description: "Pago de \(card.name)")
-        let inbound = MovementDraft(accountId: card.id, categoryId: transfer, bookedOn: date, amount: amount,
-                                    description: "Pago de la tarjeta")
-        guard await finance.add(out) else { return false }
-        guard await finance.add(inbound) else { return false }
-        return true
+    /// Igual que `CardPaymentFormView.save`: una transferencia de la cuenta a la tarjeta, con el id del formulario.
+    private func payCard(_ card: Account, from: Account, amount: Money, on date: CalendarDay, finance: FinanceModel,
+                         id: UUID = UUID()) async -> Bool {
+        await finance.transfer(id: id, from: from, to: card, amount: amount, on: date,
+                               description: "Pago de \(card.name)", toDescription: "Pago de la tarjeta")
     }
 
     private func cardSetup() async throws -> (Setup, Account, CreditCardModel) {
@@ -199,19 +194,50 @@ final class MultiStepFlowTests: XCTestCase {
 
     func testCardPaymentWhenTheSecondWriteFails() async throws {
         let (s, card, _) = try await cardSetup()
+        let id = UUID()
         await s.backend.failCalls("addMovement(_:in:)", after: 1)
-        let paid = await payCard(card, from: s.checking, amount: Money(minor: 30_000), on: day(2026, 11, 4), finance: s.finance)
+        let paid = await payCard(card, from: s.checking, amount: Money(minor: 30_000), on: day(2026, 11, 4), finance: s.finance, id: id)
         XCTAssertFalse(paid)
         XCTAssertEqual(s.finance.error, networkMessage)
         // El modelo enseña lo mismo que hay guardado.
-        let stored = try await storedBalances(s)
+        var stored = try await storedBalances(s)
         XCTAssertEqual(s.finance.balances, stored)
         XCTAssertEqual(stored[card.id], Money(minor: -30_000), "la entrada en la tarjeta no se guardó")
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000), "un pago a medias no debe sacar dinero de la cuenta")
+        XCTAssertFalse(s.finance.recent.contains { $0.description == "Pago de Tarjeta" }, "no debe quedar la mitad del pago")
 
-        XCTExpectFailure("ORC-107: el pago no se deshace si falla la segunda escritura; queda sólo la salida de la cuenta") {
-            XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000), "un pago a medias no debe sacar dinero de la cuenta")
-            XCTAssertFalse(s.finance.recent.contains { $0.description == "Pago de Tarjeta" }, "no debe quedar la mitad del pago")
+        // Al reintentar desde el mismo formulario el pago entra entero, una sola vez.
+        await s.backend.clearFailures()
+        let retried = await payCard(card, from: s.checking, amount: Money(minor: 30_000), on: day(2026, 11, 4), finance: s.finance, id: id)
+        XCTAssertTrue(retried)
+        stored = try await storedBalances(s)
+        XCTAssertEqual(s.finance.balances, stored)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 70_000))
+        XCTAssertEqual(stored[card.id], .zero)
+    }
+
+    func testCardPaymentRepeatedDoesNotDuplicate() async throws {
+        let (s, card, _) = try await cardSetup()
+        let id = UUID()
+        for _ in 1...2 {
+            let paid = await payCard(card, from: s.checking, amount: Money(minor: 30_000), on: day(2026, 11, 4), finance: s.finance, id: id)
+            XCTAssertTrue(paid, "repetir la petición no es un error")
         }
+        XCTAssertEqual(s.finance.recent.filter { $0.description == "Pago de Tarjeta" }.count, 1, "una sola salida de la cuenta")
+        XCTAssertEqual(s.finance.recent.filter { $0.description == "Pago de la tarjeta" }.count, 1, "y una sola entrada en la tarjeta")
+        let stored = try await storedBalances(s)
+        XCTAssertEqual(s.finance.balances, stored)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 70_000))
+        XCTAssertEqual(stored[card.id], .zero)
+
+        // Desde el mismo formulario pero con otro importe: no se da por guardado, y se ve el pago que ya estaba.
+        let changed = await payCard(card, from: s.checking, amount: Money(minor: 99_900), on: day(2026, 11, 4), finance: s.finance, id: id)
+        XCTAssertFalse(changed, "el formulario se queda abierto")
+        XCTAssertEqual(s.finance.error, TransferDraft.storedWithOtherData)
+        let after = try await storedBalances(s)
+        XCTAssertEqual(after, stored, "no se apunta nada")
+        XCTAssertEqual(s.finance.balances, after)
+        XCTAssertEqual(s.finance.recent.filter { $0.description == "Pago de Tarjeta" }.map(\.amount), [Money(minor: -30_000)])
     }
 
     // MARK: Compra

@@ -76,13 +76,64 @@ public protocol FinanceService: Sendable {
 
     /// Movimientos más recientes primero. Con `accountId`, sólo los de esa cuenta.
     func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement]
+    /// Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen.
+    func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement]
     /// Todos los movimientos del hogar, para exportarlos. El servidor los da por páginas.
     func allMovements(in householdId: UUID) async throws -> [Movement]
     func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement
+    /// Guarda las dos patas de una transferencia (primero la salida), o ninguna si algo falla.
+    /// Repetir la llamada con el mismo `id` devuelve las ya guardadas y no apunta nada nuevo; si se repite
+    /// con otra cuenta, otro importe u otro día falla con `TransferDraft.storedWithOtherData`.
+    func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement]
     func updateMovement(_ movement: Movement) async throws -> Movement
     func deleteMovement(_ movementId: UUID) async throws
     /// Guarda los movimientos de un CSV. Los que ya estaban (misma huella) se ignoran.
     func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult
+}
+
+/// Una transferencia entre dos cuentas, antes de guardarla: sale `amount` de una y entra en la otra.
+/// Por ejemplo el pago de una tarjeta. `id` lo genera la app una vez por formulario, para que
+/// reintentar tras un fallo de red no apunte el dinero dos veces.
+public struct TransferDraft: Hashable, Sendable {
+    public var id: UUID
+    public var fromAccountId: UUID
+    public var toAccountId: UUID
+    public var categoryId: UUID?
+    public var bookedOn: CalendarDay
+    /// Lo que se mueve, siempre positivo.
+    public var amount: Money
+    public var fromDescription: String
+    public var toDescription: String
+
+    public init(id: UUID = UUID(), fromAccountId: UUID, toAccountId: UUID, categoryId: UUID? = nil,
+                bookedOn: CalendarDay, amount: Money, fromDescription: String, toDescription: String) {
+        self.id = id
+        self.fromAccountId = fromAccountId
+        self.toAccountId = toAccountId
+        self.categoryId = categoryId
+        self.bookedOn = bookedOn
+        self.amount = amount
+        self.fromDescription = fromDescription
+        self.toDescription = toDescription
+    }
+
+    /// Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día.
+    public static let storedWithOtherData = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+
+    /// Las dos patas: la salida de una cuenta y la entrada en la otra.
+    public var legs: [MovementDraft] {
+        [MovementDraft(accountId: fromAccountId, categoryId: categoryId, bookedOn: bookedOn, amount: -amount,
+                       description: fromDescription),
+         MovementDraft(accountId: toAccountId, categoryId: categoryId, bookedOn: bookedOn, amount: amount,
+                       description: toDescription)]
+    }
+
+    /// Problema que impide guardarla, en español, o nil si es válida.
+    public var issue: String? {
+        if fromAccountId == toAccountId { return "Elige dos cuentas distintas." }
+        if amount.minor <= 0 { return "El importe tiene que ser mayor que cero." }
+        return legs.lazy.compactMap(\.issue).first
+    }
 }
 
 /// Presupuesto mensual y los movimientos de un periodo para calcularlo.

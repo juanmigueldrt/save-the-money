@@ -16,6 +16,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var financeAccounts: [Account] = []
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
+    /// Las patas de cada transferencia guardada, por su id: repetirla no la duplica.
+    var transferLegs: [UUID: [UUID]] = [:]
     var budgets: [Budget] = []
     var paySchedules: [UUID: PaySchedule] = [:]
     var extraBudgetList: [ExtraBudget] = []

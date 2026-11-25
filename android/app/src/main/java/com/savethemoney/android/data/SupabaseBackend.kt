@@ -188,6 +188,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             }
             "28000", "PGRST301" -> AppError.NotSignedIn
             "23503", "23514", "22P02" -> AppError.InvalidInput("Algún dato no es válido. Revisa el formulario.")
+            // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
+            "STM01" -> AppError.InvalidInput(TransferDraft.STORED_WITH_OTHER_DATA)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

@@ -169,20 +169,25 @@ final class FinanceModel {
     var archivedAccounts: [Account] { accounts.filter(\.isArchived) }
 
     /// Transferencia entre dos cuentas: dos movimientos con la categoría de transferencia, que no cuentan como gasto.
+    /// Se guardan los dos o ninguno. Con el mismo `id` (uno por formulario) reintentar no duplica.
+    /// `toDescription` es el concepto de la entrada cuando no es el mismo que el de la salida (pago de tarjeta).
     @discardableResult
-    func transfer(from: Account, to: Account, amount: Money, on day: CalendarDay, description: String) async -> Bool {
+    func transfer(id: UUID = UUID(), from: Account, to: Account, amount: Money, on day: CalendarDay,
+                  description: String, toDescription: String? = nil) async -> Bool {
         guard from.id != to.id else { error = "Elige dos cuentas distintas."; return false }
         guard amount.minor > 0 else { error = "El importe tiene que ser mayor que cero."; return false }
         let category = categories(for: .transfer).first?.id
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = text.isEmpty ? "Transferencia" : text
-        return await perform {
-            _ = try await service.addMovement(MovementDraft(accountId: from.id, categoryId: category, bookedOn: day,
-                                                            amount: -amount, description: title), in: household.id)
-            _ = try await service.addMovement(MovementDraft(accountId: to.id, categoryId: category, bookedOn: day,
-                                                            amount: amount, description: title), in: household.id)
+        let saved = await perform {
+            let draft = TransferDraft(id: id, fromAccountId: from.id, toAccountId: to.id, categoryId: category, bookedOn: day,
+                                      amount: amount, fromDescription: title, toDescription: toDescription ?? title)
+            _ = try await service.addTransfer(draft, in: household.id)
             try await reloadAll()
         }
+        // Si falla puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
+        if !saved { try? await reloadAll() }
+        return saved
     }
 
     func importMovements(_ drafts: [MovementDraft]) async -> ImportResult? {

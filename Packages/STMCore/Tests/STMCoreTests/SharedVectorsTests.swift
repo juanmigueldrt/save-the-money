@@ -65,6 +65,50 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testCardSummaries() throws {
+        struct File: Decodable { var summaries: [Case] }
+        struct Case: Decodable {
+            var name: String; var today: String; var statementDay: Int; var paymentDay: Int; var paymentDelayMonths: Int
+            var balance: Int; var movements: [Move]; var installments: [Plan]
+            var used: Int; var revolvingBalance: Int; var unresolved: Int; var payments: [Charge]
+        }
+        struct Move: Decodable { var key: String; var day: String; var amount: Int; var payment: Bool? }
+        struct Plan: Decodable { var movement: String; var months: Int; var rate: Decimal }
+        struct Charge: Decodable, Equatable {
+            var due: String; var amount: Int; var purchases: Int; var installments: Int; var interest: Int
+        }
+        let file: File = try load("card_installments.json")
+        XCTAssertFalse(file.summaries.isEmpty)
+        let home = UUID(), card = UUID(), transfer = UUID()
+        for v in file.summaries {
+            let terms = CreditCardTerms(accountId: card, householdId: home, creditLimit: Money(minor: 300_000),
+                                        statementDay: v.statementDay, paymentDay: v.paymentDay,
+                                        paymentDelayMonths: v.paymentDelayMonths)
+            var ids: [String: UUID] = [:]
+            let movements = v.movements.map { m -> Movement in
+                let movement = Movement(householdId: home, accountId: card, categoryId: m.payment == true ? transfer : nil,
+                                        bookedOn: day(m.day), amount: Money(minor: m.amount), description: m.key)
+                ids[m.key] = movement.id
+                return movement
+            }
+            // Un aplazado cuya compra no está en la lista apunta a un movimiento que no se ha cargado.
+            let plans = v.installments.map {
+                CardInstallment(householdId: home, accountId: card, movementId: ids[$0.movement] ?? UUID(),
+                                months: $0.months, rate: $0.rate)
+            }
+            let s = CreditCardCalculator.summary(terms: terms, balance: Money(minor: v.balance), movements: movements,
+                                                 installments: plans, transferCategories: [transfer], today: day(v.today))
+            XCTAssertEqual(s.used.minor, v.used, v.name)
+            XCTAssertEqual(s.revolvingBalance.minor, v.revolvingBalance, v.name)
+            XCTAssertEqual(s.unresolvedInstallments.count, v.unresolved, v.name)
+            let got = s.payments.map {
+                Charge(due: $0.due.iso, amount: $0.amount.minor, purchases: $0.purchases.minor,
+                       installments: $0.installments.minor, interest: $0.interest.minor)
+            }
+            XCTAssertEqual(got, v.payments, v.name)
+        }
+    }
+
     func testPaymentCalendar() throws {
         struct File: Decodable { var vectors: [V] }
         struct V: Decodable { var name: String; var series: S; var from: String; var through: String; var payments: [P] }
