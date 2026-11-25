@@ -160,7 +160,12 @@ data class CsvMapping(
             }
             val columns = (0 until width).toList()
             val date = columns.firstOrNull { c -> share(c) { DateOrder.DayMonthYear.parse(it) != null } > 0.8 } ?: return null
-            val amount = columns.firstOrNull { c -> c != date && share(c) { Money.parse(it) != null } > 0.8 } ?: return null
+            fun amountColumn(test: (String) -> Boolean) = columns.firstOrNull { c -> c != date && share(c, test) > 0.8 }
+            // Solo si ninguna columna vale con la regla común se prueba el formato inglés ("1,234"),
+            // para que un archivo que ya se detectaba siga eligiendo la misma columna.
+            val amount = amountColumn { Money.parse(it) != null }
+                ?: amountColumn { Money.parse(it) != null || Money.parse(CsvImporter.swapSeparators(it)) != null }
+                ?: return null
             val description = columns.filter { it != date && it != amount }.maxByOrNull { averageLength(sample, it) } ?: return null
             return CsvMapping(null, date, description, AmountColumns.Signed(amount), guessDateOrder(table, date, 0))
         }
@@ -205,6 +210,8 @@ object CsvImporter {
     fun rows(table: CsvTable, mapping: CsvMapping, accountId: String): List<CsvImportRow> {
         val seen = mutableMapOf<String, Int>()
         val result = mutableListOf<CsvImportRow>()
+        val decimalPoint = usesDecimalPoint(table, mapping)
+        fun money(text: String) = Money.parse(if (decimalPoint) swapSeparators(text) else text)
         for (index in mapping.firstDataRow until table.rows.size) {
             val row = table.rows[index]
             fun cell(column: Int) = row.getOrElse(column) { "" }
@@ -219,10 +226,10 @@ object CsvImporter {
             }
 
             val amount = when (val a = mapping.amount) {
-                is AmountColumns.Signed -> Money.parse(cell(a.column))
+                is AmountColumns.Signed -> money(cell(a.column))
                 is AmountColumns.Split -> {
-                    val out = Money.parse(cell(a.debit))?.let { -abs(it) }
-                    val into = Money.parse(cell(a.credit))?.let { abs(it) }
+                    val out = money(cell(a.debit))?.let { -abs(it) }
+                    val into = money(cell(a.credit))?.let { abs(it) }
                     listOfNotNull(out, into).firstOrNull { it != 0L } ?: out ?: into
                 }
             }
@@ -240,6 +247,43 @@ object CsvImporter {
         }
         return result
     }
+
+    /**
+     * Formato numérico del archivo, decidido una vez con las celdas de importe (iOS: `CSVImporter.usesDecimalPoint`).
+     *
+     * Solo cuentan las celdas que dicen por sí solas cuál es su separador decimal: las que tienen
+     * «,» y «.» (decimal el último) y las que tienen un solo separador seguido de una o dos cifras
+     * ("12,50" dice coma; "12.5" dice punto). "1,234" o "1.250" no dicen nada.
+     *
+     * - Si todas las que dicen algo dicen punto, el archivo está en formato inglés y cada celda se
+     *   lee con «,» y «.» intercambiados: "1,234" es 1234,00, "1.5" es 1,50 y "1.250" no vale
+     *   (en inglés serían 3 decimales).
+     * - Si dicen coma, si no coinciden o si ninguna dice nada, no se adivina: se aplica la regla
+     *   común de [Money.parse] y una fila ambigua se lista como no importable, igual que antes.
+     */
+    internal fun usesDecimalPoint(table: CsvTable, mapping: CsvMapping): Boolean {
+        val columns = when (val a = mapping.amount) {
+            is AmountColumns.Signed -> listOf(a.column)
+            is AmountColumns.Split -> listOf(a.debit, a.credit)
+        }
+        val votes = table.rows.drop(mapping.firstDataRow)
+            .flatMap { row -> columns.mapNotNull { row.getOrNull(it)?.let(::decimalSeparatorVote) } }
+            .toSet()
+        return votes == setOf('.')
+    }
+
+    /** «,» o «.» si la celda deja claro cuál es su separador decimal; nulo si no lo deja claro. */
+    internal fun decimalSeparatorVote(text: String): Char? {
+        val separators = text.filter { it == ',' || it == '.' }
+        if (',' in separators && '.' in separators) return separators.last()
+        if (separators.length != 1) return null
+        val digits = text.substring(text.indexOf(separators[0]) + 1).takeWhile { it in '0'..'9' }
+        return if (digits.length in 1..2) separators[0] else null
+    }
+
+    /** Cambia «,» por «.» y al revés: "1,234.56" pasa a "1.234,56". */
+    internal fun swapSeparators(text: String): String =
+        text.map { if (it == ',') '.' else if (it == '.') ',' else it }.joinToString("")
 
     private fun String.split(isSeparator: (Char) -> Boolean): List<String> {
         val parts = mutableListOf<String>()
