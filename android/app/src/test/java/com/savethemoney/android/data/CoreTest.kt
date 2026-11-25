@@ -86,6 +86,8 @@ class CoreTest {
         assertEquals(AppError.InvalidOrExpiredInvite, SupabaseBackend.postgresError("P0002", ""))
         assertEquals(AppError.AlreadyMember, SupabaseBackend.postgresError("23505", "already a member"))
         assertEquals(TransferDraft.STORED_WITH_OTHER_DATA, SupabaseBackend.postgresError("STM01", "").message)
+        assertEquals(InvestmentTrade.NOT_ENOUGH_SHARES, SupabaseBackend.postgresError("STM02", "").message)
+        assertEquals(InvestmentTrade.NEEDED_BY_LATER_SALE, SupabaseBackend.postgresError("STM03", "").message)
         assertEquals(AppError.InvalidCredentials, SupabaseBackend.authError("Invalid login credentials"))
         assertEquals(AppError.UsernameTaken, SupabaseBackend.authError("user_already_exists"))
     }

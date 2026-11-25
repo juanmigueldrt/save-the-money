@@ -149,21 +149,42 @@ data class InvestmentTrade(
         else -> null
     }
 
-    /** Además de [issue]: no se pueden vender más participaciones de las que había ese día. */
+    /**
+     * Además de [issue]: una venta no puede dejar la posición en negativo en ninguna fecha,
+     * tampoco en las posteriores a la suya. Es la misma regla que aplica el servidor.
+     */
     fun issue(others: List<InvestmentTrade>): String? {
         issue?.let { return it }
         if (side != TradeSide.Sell) return null
-        val held = Position.quantity(holdingId, others.filter { it.id != id }, day)
-        return if (quantity > held) "No tienes tantas participaciones para vender." else null
+        return if (Position.isOversold(holdingId, others.filter { it.id != id } + this)) NOT_ENOUGH_SHARES else null
+    }
+
+    /** Por qué no se puede borrar, o nulo: sin una compra, una venta posterior puede quedarse sin participaciones. */
+    fun deletionIssue(others: List<InvestmentTrade>): String? =
+        if (side == TradeSide.Buy && Position.isOversold(holdingId, others.filter { it.id != id })) NEEDED_BY_LATER_SALE else null
+
+    companion object {
+        const val NOT_ENOUGH_SHARES = "No tienes tantas participaciones para vender."
+        const val NEEDED_BY_LATER_SALE = "No se puede borrar esta compra: una venta posterior se quedaría sin participaciones."
     }
 }
+
+/** El movimiento en la cuenta que acompaña a una compra o venta; se guarda el mismo día que la operación. */
+data class TradeCash(
+    val accountId: String,
+    val categoryId: String? = null,
+    /** Lo que entra en la cuenta (venta) o sale (compra, en negativo). */
+    val amountMinor: Long,
+    val description: String,
+)
 
 /** El cálculo de "Comprar activo": por importe o por participaciones. */
 data class BuyQuote(val amount: Long, val quantity: BigDecimal, val fee: Long) {
     val total: Long get() = amount + fee
 
-    fun trade(holding: Holding, price: BigDecimal, day: LocalDate, note: String? = null) =
-        InvestmentTrade("", holding.householdId, holding.id, day.toString(), TradeSide.Buy, quantity, price, fee, note)
+    /** [id] es el del formulario: con el mismo, reintentar no duplica la compra. */
+    fun trade(holding: Holding, price: BigDecimal, day: LocalDate, note: String? = null, id: String = "") =
+        InvestmentTrade(id, holding.householdId, holding.id, day.toString(), TradeSide.Buy, quantity, price, fee, note)
 
     companion object {
         fun byAmount(amount: Long, price: BigDecimal, feeRate: BigDecimal): BuyQuote? {
@@ -231,6 +252,19 @@ class Position(val holding: Holding, trades: List<InvestmentTrade>, through: Loc
             ordered(trades, holdingId, through).fold(BigDecimal.ZERO) { held, trade ->
                 if (trade.side == TradeSide.Buy) held + trade.quantity else (held - trade.quantity).max(BigDecimal.ZERO)
             }
+
+        /**
+         * true si algún día se han vendido más participaciones de las que había hasta entonces
+         * (las compras de un día cuentan antes que sus ventas).
+         */
+        fun isOversold(holdingId: String, trades: List<InvestmentTrade>): Boolean {
+            var held = BigDecimal.ZERO
+            for (trade in ordered(trades, holdingId, null)) {
+                held = if (trade.side == TradeSide.Buy) held + trade.quantity else held - trade.quantity
+                if (held.signum() < 0) return true
+            }
+            return false
+        }
 
         /** Las operaciones del activo por fecha; el mismo día, las compras antes que las ventas. */
         private fun ordered(trades: List<InvestmentTrade>, holdingId: String, through: LocalDate?) =
