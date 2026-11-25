@@ -142,7 +142,7 @@ class SharedVectorsTest {
             val table = CsvTable.parse(v.str("csv"))
             val mapping = CsvMapping.detect(table)!!
             val got = CsvImporter.rows(table, mapping, "account").map { it.draft?.importHash }
-            assertEquals(v.str("name"), v["rows"]!!.jsonArray.map { it.str("importHash") }, got)
+            assertEquals(v.str("name"), v["rows"]!!.jsonArray.map { it["importHash"]?.jsonPrimitive?.content }, got)
         }
     }
 
