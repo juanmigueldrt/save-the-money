@@ -26,6 +26,9 @@ class TrackingModel(private val household: Household, private val service: Finan
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** Qué lectura gana cuando dos se cruzan (ORC-144). */
+    private val turns = ReadTurns()
+
     val latestScore: CreditScore? get() = scores.firstOrNull()
 
     fun history(accounts: List<Account>, months: Int): List<NetWorthPoint> =
@@ -40,35 +43,48 @@ class TrackingModel(private val household: Household, private val service: Finan
     /** Se recalcula sólo cuando cambian los movimientos, no en cada recomposición. */
     private val firstMonth by derivedStateOf { allMovements.minOfOrNull { YearMonth.from(it.day) } }
 
-    private suspend fun guarded(block: suspend () -> Unit) {
+    private suspend fun guarded(block: suspend (turn: Long) -> Unit) {
+        val turn = turns.next()
         try {
-            block()
-            error = null
+            block(turn)
+            turns.store(::error, null, turn)
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
-            error = e.message
+            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            error = AppError.Unknown("app").message
+            turns.store(::error, AppError.Unknown("app").message, turn)
         }
     }
 
-    suspend fun loadMovements() = guarded {
-        allMovements = service.movements(household.id, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31))
+    suspend fun loadMovements() = guarded { turn ->
+        turns.store(::allMovements, service.movements(household.id, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31)), turn)
     }
 
-    suspend fun loadScores() = guarded { scores = service.creditScores() }
+    suspend fun loadScores() = guarded { turn -> turns.store(::scores, service.creditScores(), turn) }
 
-    suspend fun add(score: CreditScore) {
+    // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
+
+    /** Una escritura falló cuando su pantalla ya no estaba: el aviso sale en el error del modelo. */
+    private fun sinPantalla(e: Exception) {
+        turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
+    }
+
+    suspend fun add(score: CreditScore): Unit = escritura(::sinPantalla) {
         score.issue?.let { throw AppError.InvalidInput(it) }
         val saved = service.addCreditScore(score)
         // Se ve ya, aunque falle la recarga: así no se vuelve a apuntar.
-        scores = (scores + saved).sortedByDescending { it.recordedOn }
-        reloadAfterSave { scores = service.creditScores() }?.let { error = it }
+        turns.changed(::scores, (scores + saved).sortedByDescending { it.recordedOn })
+        reloadAfterSave { reloadScores() }?.let { turns.changed(::error, it) }
     }
 
-    suspend fun delete(score: CreditScore) {
+    suspend fun delete(score: CreditScore): Unit = escritura(::sinPantalla) {
         service.deleteCreditScore(score.id)
-        scores = scores.filter { it.id != score.id }
+        turns.changed(::scores, scores.filter { it.id != score.id })
+    }
+
+    private suspend fun reloadScores() {
+        val turn = turns.next()
+        turns.store(::scores, service.creditScores(), turn)
     }
 }

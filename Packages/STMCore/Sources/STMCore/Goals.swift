@@ -20,7 +20,7 @@ public enum GoalKind: String, Codable, CaseIterable, Sendable {
 
 /// Una meta del hogar: juntar una cantidad o terminar de pagar una deuda.
 /// Las dos se llevan igual: lo que había al empezar más las aportaciones, frente al objetivo.
-public struct Goal: Identifiable, Hashable, Codable, Sendable {
+public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -53,9 +53,6 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable {
         self.completedAt = completedAt
         self.archivedAt = archivedAt
     }
-
-    public var isArchived: Bool { archivedAt != nil }
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     public var issue: String? {
         if trimmedName.isEmpty { return "Ponle un nombre a la meta." }

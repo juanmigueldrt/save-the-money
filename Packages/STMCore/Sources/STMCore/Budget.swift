@@ -62,6 +62,10 @@ public struct Budget: Hashable, Sendable {
 
 /// Año y mes, sin día.
 public struct MonthKey: Hashable, Comparable, Sendable, Codable {
+    /// Nombres de los meses en minúscula, para títulos ("5 de noviembre", "Noviembre de 2026").
+    static let nombres = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
+                          "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
+
     public let year: Int
     public let month: Int
 
@@ -84,9 +88,7 @@ public struct MonthKey: Hashable, Comparable, Sendable, Codable {
 
     /// "Noviembre de 2026".
     public var title: String {
-        let names = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-                     "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-        return "\(names[month - 1].capitalized) de \(year)"
+        return "\(MonthKey.nombres[month - 1].capitalized) de \(year)"
     }
 
     /// Días que cuenta como "este mes" un hogar cuyo mes empieza el día `startDay`
@@ -178,24 +180,16 @@ public struct BudgetReport: Hashable, Sendable {
     /// Gastos sin categoría.
     public var uncategorized: Money
     /// De dónde vienen los ingresos: nombre de la categoría (o "Sin categoría") e importe.
-    public var incomeSources: [(title: String, amount: Money)]
+    public var incomeSources: [IncomeSource]
     /// Arrastre del periodo anterior por categoría (vacío si el presupuesto no arrastra).
     public var carried: [UUID: Money] = [:]
     /// % a partir del que avisa.
     public var warnPercent: Int = 80
 
-    public static func == (lhs: BudgetReport, rhs: BudgetReport) -> Bool {
-        lhs.month == rhs.month && lhs.income == rhs.income && lhs.base == rhs.base && lhs.groups == rhs.groups
-            && lhs.lines == rhs.lines && lhs.uncategorized == rhs.uncategorized
-            && lhs.incomeSources.map(\.title) == rhs.incomeSources.map(\.title)
-            && lhs.incomeSources.map(\.amount) == rhs.incomeSources.map(\.amount)
-            && lhs.carried == rhs.carried && lhs.warnPercent == rhs.warnPercent
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(month)
-        hasher.combine(income)
-        hasher.combine(lines)
+    /// Un origen de ingresos del periodo: categoría (o "Sin categoría") e importe.
+    public struct IncomeSource: Hashable, Sendable {
+        public var title: String
+        public var amount: Money
     }
 
     public var totalSpent: Money { groups.reduce(Money.zero) { $0 + $1.spent } + uncategorized }
@@ -260,7 +254,7 @@ public struct BudgetReport: Hashable, Sendable {
         self.income = Money(minor: income)
         incomeSources = incomeByTitle.filter { $0.value > 0 }
             .sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }
-            .map { (title: $0.key, amount: Money(minor: $0.value)) }
+            .map { IncomeSource(title: $0.key, amount: Money(minor: $0.value)) }
         self.uncategorized = Money(minor: uncategorized)
         let template = budget?.template ?? .fiftyThirtyTwenty
         let expected = budget?.expectedIncome ?? .zero
