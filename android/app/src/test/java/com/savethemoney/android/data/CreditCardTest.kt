@@ -1,5 +1,6 @@
 package com.savethemoney.android.data
 
+import com.savethemoney.android.ui.CreditCardModel
 import com.savethemoney.android.ui.FinanceModel
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
@@ -168,6 +169,53 @@ class CreditCardTest {
         assertEquals(listOf(35_762L, 10_762L, 5_762L, 5_762L, 5_762L, 5_762L), s.payments.map { it.amount })
         assertEquals(listOf(749L, 690L, 631L, 571L, 511L, 449L), s.payments.map { it.interest })
         assertTrue(model.cards.movements(account).any { it.id == purchase.id })
+    }
+
+    /**
+     * ORC-132: hoy 2026-11-20 están sin cobrar el extracto del 1-11 (se cobra el 1-12) y el abierto (se cierra el 1-12).
+     * 600 compras de 1 € en el ciclo abierto y una de 300 € del ciclo anterior: con los 500 más recientes faltaban
+     * 100 compras del ciclo abierto y la de 300 €. Mismo caso que CreditCardLoadTests.swift.
+     */
+    @Test fun modelLoadsEveryMovementOfTheUnpaidStatements() = runBlocking {
+        val service = InMemoryFinance()
+        val account = service.createAccount(AccountDraft("Tarjeta", AccountKind.CreditCard), home)
+        suspend fun add(amount: Long, on: LocalDate) = service.addMovement(MovementDraft(account.id, null, on, amount, "Compra de prueba"), home)
+        service.saveCreditCard(CreditCardTerms(account.id, home, 300_000))
+        add(-30_000, day(2026, 10, 10))
+        repeat(600) { add(-100, day(2026, 11, 5)) }
+        // Una compra de un extracto ya cobrado: no hace falta cargarla.
+        val paid = add(-7_000, day(2026, 9, 15))
+
+        val model = FinanceModel(Household(home, "Casa"), service, { day(2026, 11, 20) })
+        model.load()
+        assertNull(model.cards.error)
+        val s = model.cards.summary(account)!!
+        assertEquals(60_000L, s.spentThisCycle)
+        assertEquals(listOf(30_000L, 60_000L, 0L, 0L, 0L, 0L), s.payments.map { it.amount })
+        assertFalse(s.movementsTruncated)
+        assertFalse(model.cards.movements(account).any { it.id == paid.id })
+
+        // Con más movimientos que el tope de una petición, el resumen lo dice.
+        repeat(CreditCardModel.CYCLE_LIMIT) { add(-100, day(2026, 11, 6)) }
+        model.load()
+        assertTrue(model.cards.summary(account)!!.movementsTruncated)
+    }
+
+    /** Un aplazado guardado en otro dispositivo para una compra antigua: al cambiar los aplazados aquí se carga su compra. */
+    @Test fun installmentFromAnotherDeviceLoadsItsPurchase() = runBlocking {
+        val service = InMemoryFinance()
+        val account = service.createAccount(AccountDraft("Tarjeta", AccountKind.CreditCard), home)
+        suspend fun add(amount: Long, on: LocalDate) = service.addMovement(MovementDraft(account.id, null, on, amount, "Compra de prueba"), home)
+        service.saveCreditCard(CreditCardTerms(account.id, home, 300_000))
+        val old = add(-120_000, day(2025, 10, 15))
+        val recent = add(-6_000, day(2026, 11, 2))
+        val model = FinanceModel(Household(home, "Casa"), service, { day(2026, 11, 20) })
+        model.load()
+
+        service.saveInstallment(CardInstallment("", home, account.id, old.id, 24, 14.0))
+        model.cards.deferPurchase(recent, 3, account, 14.0)
+        assertEquals(emptyList<String>(), model.cards.summary(account)!!.unresolvedInstallments)
+        assertTrue(model.cards.movements(account).any { it.id == old.id })
     }
 
     @Test fun installmentsAddToEachPayment() {
