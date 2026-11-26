@@ -10,6 +10,8 @@ struct MoreView: View {
     @Environment(SessionModel.self) private var session
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
+    @Environment(InvestmentModel.self) private var investments
+    @Environment(CreditCardModel.self) private var cards
     @AppStorage(LocalReminders.enabledKey) private var remindersEnabled = true
     @AppStorage(LocalBudgetAlerts.enabledKey) private var budgetAlertsEnabled = true
     @AppStorage(HabitSettings.logReminderKey) private var logReminder: HabitSettings.LogReminder = .off
@@ -95,12 +97,19 @@ struct MoreView: View {
 
             Section {
                 Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
-                    .onChange(of: remindersEnabled) { _, _ in Task { await planning.reschedule() } }
+                    .onChange(of: remindersEnabled) { _, _ in
+                        // Apaga (o vuelve a encender) todos: pagos fijos, tarjetas y aportaciones.
+                        Task {
+                            await planning.reschedule()
+                            await investments.reschedule()
+                            await cards.reschedule()
+                        }
+                    }
                 Toggle("Avisos de límites del presupuesto", isOn: $budgetAlertsEnabled)
             } header: {
                 Text("Avisos")
             } footer: {
-                Text("Los lanza este dispositivo: antes de cada pago fijo y cuando una categoría o grupo del presupuesto llega al 80 % o se pasa.")
+                Text("Los lanza este dispositivo: antes de cada pago fijo, cargo de tarjeta o aportación, y cuando una categoría o grupo del presupuesto llega al 80 % o se pasa.")
             }
 
             Section {

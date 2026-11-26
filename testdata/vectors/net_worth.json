@@ -1,0 +1,64 @@
+{
+  "description": "Patrimonio neto a fin de cada mes (NetWorth.history). Céntimos. Fechas de alta y de archivo a mediodía UTC para que caigan el mismo día en cualquier zona. Totales calculados a mano: el saldo inicial cuenta desde el alta o desde el primer movimiento si es anterior; una cuenta archivada cuenta en los meses que terminan antes del día de archivo; las que no van al patrimonio no suman.",
+  "cases": [
+    {
+      "name": "cuenta creada hoy con 20.000 €: no aparece en los meses anteriores",
+      "through": "2026-11",
+      "months": 3,
+      "accounts": [
+        { "key": "nueva", "opening": 2000000, "createdAt": "2026-11-26T12:00:00Z" }
+      ],
+      "movements": [],
+      "assets": [0, 0, 2000000],
+      "liabilities": [0, 0, 0],
+      "net": [0, 0, 2000000]
+    },
+    {
+      "name": "cuenta archivada el 20 de octubre: cuenta en septiembre y ya no en octubre",
+      "through": "2026-11",
+      "months": 3,
+      "accounts": [
+        { "key": "antigua", "opening": 100000, "createdAt": "2026-01-10T12:00:00Z", "archivedAt": "2026-10-20T12:00:00Z" },
+        { "key": "sin_fecha", "opening": 50000 }
+      ],
+      "movements": [
+        { "account": "antigua", "day": "2026-09-05", "amount": -30000 }
+      ],
+      "assets": [120000, 50000, 50000],
+      "liabilities": [0, 0, 0],
+      "net": [120000, 50000, 50000]
+    },
+    {
+      "name": "movimientos importados de antes del alta: el saldo inicial cuenta desde el primero",
+      "through": "2026-11",
+      "months": 4,
+      "accounts": [
+        { "key": "importada", "opening": 10000, "createdAt": "2026-11-15T12:00:00Z" }
+      ],
+      "movements": [
+        { "account": "importada", "day": "2026-09-10", "amount": 5000 },
+        { "account": "importada", "day": "2026-10-03", "amount": -2000 }
+      ],
+      "assets": [0, 15000, 13000, 13000],
+      "liabilities": [0, 0, 0, 0],
+      "net": [0, 15000, 13000, 13000]
+    },
+    {
+      "name": "deuda, alta el último día del mes, archivo el último día del mes y cuenta fuera del patrimonio",
+      "through": "2026-11",
+      "months": 3,
+      "accounts": [
+        { "key": "tarjeta", "opening": 0, "createdAt": "2026-09-01T12:00:00Z" },
+        { "key": "coche", "opening": 500000, "includeInNetWorth": false },
+        { "key": "fin_de_mes", "opening": 20000, "createdAt": "2026-10-31T12:00:00Z" },
+        { "key": "cerrada", "opening": 7000, "createdAt": "2026-01-01T12:00:00Z", "archivedAt": "2026-09-30T12:00:00Z" }
+      ],
+      "movements": [
+        { "account": "tarjeta", "day": "2026-10-10", "amount": -40000 }
+      ],
+      "assets": [0, 20000, 20000],
+      "liabilities": [0, 40000, 40000],
+      "net": [0, -20000, -20000]
+    }
+  ]
+}

@@ -66,18 +66,28 @@ public struct CSVTable: Hashable, Sendable {
         return CSVTable(rows: rows, delimiter: sep)
     }
 
-    /// El separador que más se repite fuera de comillas en las primeras líneas.
+    /// Separadores que se prueban; en caso de empate gana el primero. La coma va la última
+    /// porque también aparece en conceptos e importes ("PAGO BIZUM, CENA", "-12,50").
+    public static let delimiters: [Character] = [";", "\t", ","]
+
+    /// El separador que da el mismo número de columnas (dos o más) en más líneas de las 20 primeras.
+    /// Contar cuántas veces aparece no vale: "28/10/2026;PAGO BIZUM, CENA, JUAN;-12,50" tiene más comas.
     static func guessDelimiter(_ text: String) -> Character {
-        let candidates: [Character] = [";", ",", "\t"]
-        var counts: [Character: Int] = [:]
+        var sample = ""
         var inQuotes = false
         var lines = 0
         for ch in text {
+            sample.append(ch)
             if ch == "\"" { inQuotes.toggle() }
-            else if !inQuotes, candidates.contains(ch) { counts[ch, default: 0] += 1 }
             else if !inQuotes, ch == "\n" || ch == "\r\n" { lines += 1; if lines >= 20 { break } }
         }
-        return candidates.max { counts[$0, default: 0] < counts[$1, default: 0] } ?? ";"
+        func score(_ candidate: Character) -> Int {
+            var lines: [Int: Int] = [:]
+            for row in parse(sample, delimiter: candidate).rows where row.count >= 2 { lines[row.count, default: 0] += 1 }
+            return lines.values.max() ?? 0
+        }
+        let scores = delimiters.map(score)
+        return delimiters[scores.firstIndex(of: scores.max() ?? 0) ?? 0]
     }
 }
 
@@ -259,6 +269,11 @@ public enum CSVImporter {
             case .split(let debit, let credit):
                 let out = money(cell(debit)).map { Money(minor: -abs($0.minor)) }
                 let into = money(cell(credit)).map { Money(minor: abs($0.minor)) }
+                // Con cargo y abono a la vez no se sabe cuál vale: se avisa en vez de quedarse con uno.
+                if let out, let into, out.minor != 0, into.minor != 0 {
+                    result.append(CSVImportRow(line: line, draft: nil, issue: "Tiene cargo y abono a la vez"))
+                    continue
+                }
                 amount = [out, into].compactMap { $0 }.first { $0.minor != 0 } ?? out ?? into
             }
             guard let amount, amount.minor != 0 else {
