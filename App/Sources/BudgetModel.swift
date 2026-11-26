@@ -6,7 +6,7 @@ import STMCore
 /// la pantalla de presupuesto, la de flujo y el Resumen, para que todas miren el mismo periodo.
 @Observable
 @MainActor
-final class BudgetModel {
+final class BudgetModel: ServerModel {
     let household: Household
     private let service: any BudgetService
     private let alerts: any BudgetAlerting
@@ -28,6 +28,7 @@ final class BudgetModel {
     private(set) var extraBudgets: [ExtraBudget] = []
     private(set) var isLoading = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
 
     init(household: Household, service: any BudgetService, alerts: any BudgetAlerting = NoBudgetAlerts(),
          today: @escaping () -> CalendarDay = { CalendarDay() }) {
@@ -56,7 +57,7 @@ final class BudgetModel {
 
     /// Avisa de los límites del periodo en curso que se acercan o se pasan.
     func checkAlerts(categories: [BudgetCategory]) async {
-        guard budget != nil, period.contains(today()) else { return }
+        guard budget != nil, period.contains(today()), !Task.isCancelled else { return }
         await alerts.notify(BudgetAlertPlanner.alerts(for: report(categories: categories)))
     }
 
@@ -109,12 +110,12 @@ final class BudgetModel {
     }
 
     func load() async {
-        let service = service, id = household.id
+        let service = service, id = household.id, turn = nextTurn()
         isLoading = true
         defer { isLoading = false }
-        error = nil
-        do {
-            if let saved = try await service.paySchedule(), saved != schedule || !hasOwnSchedule {
+        await perform(turn: turn) {
+            if let saved = try await service.paySchedule(), saved != schedule || !hasOwnSchedule,
+               mayStore(\.schedule, turn: turn) {
                 let wasCurrent = period.contains(today())
                 schedule = saved
                 hasOwnSchedule = true
@@ -130,22 +131,21 @@ final class BudgetModel {
             let (current, latest, list, extraList) = try await (budget, last, movements, extras)
             // Si el usuario ya cambió de periodo mientras cargaba, no se pisa.
             guard period == self.period else { return }
-            self.budget = current
-            proposal = current == nil ? latest : nil
-            previousBudget = latest
-            self.movements = list
-            extraBudgets = extraList
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
+            store(current, in: \.budget, turn: turn)
+            store(current == nil ? latest : nil, in: \.proposal, turn: turn)
+            store(latest, in: \.previousBudget, turn: turn)
+            store(list, in: \.movements, turn: turn)
+            store(extraList, in: \.extraBudgets, turn: turn)
         }
     }
 
     @discardableResult
     func save(_ budget: Budget) async -> Bool {
         await perform {
-            self.budget = try await self.service.saveBudget(budget)
+            let saved = try await self.service.saveBudget(budget)
+            markChanged(\.budget)
+            markChanged(\.proposal)
+            self.budget = saved
             self.proposal = nil
         }
     }
@@ -153,7 +153,9 @@ final class BudgetModel {
     @discardableResult
     func save(_ schedule: PaySchedule) async -> Bool {
         let ok = await perform {
-            self.schedule = try await self.service.savePaySchedule(schedule)
+            let saved = try await self.service.savePaySchedule(schedule)
+            markChanged(\.schedule)
+            self.schedule = saved
             self.hasOwnSchedule = true
             self.period = schedule.period(containing: self.today())
         }
@@ -164,8 +166,16 @@ final class BudgetModel {
     @discardableResult
     func save(_ extra: ExtraBudget) async -> Bool {
         await perform {
-            _ = try await self.service.saveExtraBudget(extra)
-            self.extraBudgets = try await self.service.extraBudgets(in: self.household.id)
+            let saved = try await self.service.saveExtraBudget(extra)
+            // Se ve ya, aunque falle la recarga.
+            markChanged(\.extraBudgets)
+            self.extraBudgets.removeAll { $0.id == saved.id }
+            self.extraBudgets.append(saved)
+            await reloadAfterSave {
+                let turn = nextTurn()
+                let list = try await self.service.extraBudgets(in: self.household.id)
+                store(list, in: \.extraBudgets, turn: turn)
+            }
         }
     }
 
@@ -173,6 +183,7 @@ final class BudgetModel {
     func delete(_ extra: ExtraBudget) async -> Bool {
         await perform {
             try await self.service.deleteExtraBudget(extra.id)
+            markChanged(\.extraBudgets)
             self.extraBudgets.removeAll { $0.id == extra.id }
         }
     }
@@ -185,18 +196,5 @@ final class BudgetModel {
         } catch {
             return []
         }
-    }
-
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
     }
 }

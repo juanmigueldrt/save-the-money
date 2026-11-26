@@ -126,6 +126,7 @@ struct HouseholdView: View {
     @State private var removing: HouseholdMember?
     @State private var renaming = false
     @State private var newName = ""
+    @State private var isWorking = false
 
     private var myRole: MemberRole? {
         members.first { $0.profile.id == profile.id }?.role
@@ -179,6 +180,7 @@ struct HouseholdView: View {
                     }
                     Button("Invitar a tu pareja", action: invite)
                         .buttonStyle(PrimaryButtonStyle())
+                        .disabled(isWorking)
                 }
                 .card()
 
@@ -275,7 +277,10 @@ struct HouseholdView: View {
     }
 
     private func invite() {
+        guard !isWorking else { return }
+        isWorking = true
         Task {
+            defer { isWorking = false }
             do {
                 shownInvite = try await session.services.households.createInvite(for: household.id)
             } catch {

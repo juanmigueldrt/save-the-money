@@ -149,6 +149,7 @@ struct GoalDetailView: View {
     @Environment(PlanningModel.self) private var planning
     @State private var editing = false
     @State private var contributing = false
+    @State private var deletingContribution: GoalContribution?
 
     private var goal: Goal? { planning.goals.first { $0.id == goalId } }
 
@@ -200,10 +201,10 @@ struct GoalDetailView: View {
                             .foregroundStyle(item.amount.isNegative ? Palette.negativeText : Palette.label)
                     }
                     .swipeActions {
-                        Button("Borrar", role: .destructive) { Task { await planning.delete(item) } }
+                        Button("Borrar", role: .destructive) { deletingContribution = item }
                     }
                     .contextMenu {
-                        Button("Borrar", role: .destructive) { Task { await planning.delete(item) } }
+                        Button("Borrar", role: .destructive) { deletingContribution = item }
                     }
                 }
             }
@@ -218,6 +219,13 @@ struct GoalDetailView: View {
         }
         .sheet(isPresented: $editing) { GoalFormView(goal: goal) }
         .sheet(isPresented: $contributing) { ContributionFormView(goal: goal) }
+        .confirmationDialog("¿Borrar esta aportación?",
+                            isPresented: Binding(get: { deletingContribution != nil }, set: { if !$0 { deletingContribution = nil } }),
+                            titleVisibility: .visible, presenting: deletingContribution) { item in
+            Button("Borrar aportación", role: .destructive) { Task { await planning.delete(item) } }
+        } message: { _ in
+            Text("La meta bajará en lo que sumaba esta aportación. No se puede deshacer.")
+        }
     }
 }
 

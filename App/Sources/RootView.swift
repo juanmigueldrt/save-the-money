@@ -132,7 +132,9 @@ struct RootView: View {
         .task { await investments.load() }
         // El presupuesto y el flujo se recalculan cuando cambian los movimientos, las cuentas o sus saldos
         // (la tarjeta guarda su copia de las cuentas) y avisa si algún límite del mes llega al 80 % o se pasa.
+        // Hasta que termina la primera carga de las cuentas no se pide nada: así, al arrancar, cada lista se pide una vez.
         .task(id: CreditCardModel.Inputs(finance: finance)) {
+            guard finance.hasLoaded else { return }
             await budgets.load()
             await budgets.checkAlerts(categories: finance.categories)
             // Las tarjetas: próximo cargo, avisos antes del cargo y del límite.
