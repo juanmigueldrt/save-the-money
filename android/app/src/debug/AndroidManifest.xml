@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Solo depuración: permite el Supabase local del emulador; el resto sigue exigiendo HTTPS. -->
-    <application android:networkSecurityConfig="@xml/network_security_config" />
+    <application android:networkSecurityConfig="@xml/network_security_config">
+        <!-- Solo depuración: capturas con datos de muestra (tools/capturar.sh, extra «pantalla»). Exportada para que adb la abra. -->
+        <activity
+            android:name=".CapturasActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize" />
+    </application>
 </manifest>

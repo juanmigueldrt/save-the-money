@@ -113,8 +113,7 @@ fun Pantalla20(nav: Nav) {
             // En el diseño la fila mide 60 (no 64) y el título va justo debajo, sin subtítulo.
             Box(Modifier.fillMaxWidth().height(60.dp)) {
                 TopBar(null, onNav = nav::back) {
-                    // El calendario no está en el diseño: en las capturas se queda fuera.
-                    if (!session.capture) IconBtn(StmIcons.calendarMonth, { nav.go(43) }, contentDescription = "Calendario de pagos")
+                    IconBtn(StmIcons.calendarMonth, { nav.go(43) }, contentDescription = "Calendario de pagos")
                     IconBtn(if (buscando) StmIcons.close else StmIcons.search, {
                         buscando = !buscando
                         busqueda = ""
@@ -137,7 +136,7 @@ fun Pantalla20(nav: Nav) {
                     Text("Este mes", style = StmType.labelMedium, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text(Money.format(total), style = StmType.titleLarge, color = c.onSurface)
-                    if (!session.capture && anual > 0) {
+                    if (anual > 0) {
                         Text("${Money.format(anual)} en los próximos 12 meses", style = StmType.bodySmall, color = c.onSurfaceVariant)
                     }
                 }
@@ -190,7 +189,7 @@ fun Pantalla21(nav: Nav) {
     val planning = finance.planning
     val c = Stm.colors
     val editando = remember { planning.takeSeries() }
-    val base = remember(planning.series) { editando ?: if (session.capture) planning.series.firstOrNull { it.name == "Streaming" } else null }
+    val base = editando
     val tipos = RecurringKind.entries
     var kind by remember(base) { mutableIntStateOf(tipos.indexOf(base?.kind ?: RecurringKind.Subscription)) }
     var name by remember(base) { mutableStateOf(base?.name ?: "") }
@@ -319,7 +318,7 @@ fun Pantalla21(nav: Nav) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FilledField(
                             "Precio de oferta", offerPrice, { offerPrice = it }, Modifier.weight(1f),
-                            suffix = "€", keyboard = KeyboardType.Decimal, autoFocus = session.capture, calculator = true,
+                            suffix = "€", keyboard = KeyboardType.Decimal, calculator = true,
                         )
                         Stepper(if (charges == 1) "1 cargo" else "$charges cargos", { charges = (charges - 1).coerceAtLeast(1) }, { charges = (charges + 1).coerceAtMost(36) })
                     }
@@ -396,8 +395,7 @@ fun Pantalla22(nav: Nav) {
     }
     StmScreen(
         topBar = {
-            // En el diseño hay un «más» sin menú; fuera de las capturas no se enseña.
-            TopBar(null, navIcon = null) { if (LocalSession.current.capture) IconBtn(StmIcons.moreVert, null, contentDescription = "Más opciones") }
+            TopBar(null, navIcon = null)
             LargeTitle("Metas", "Fija metas (y cúmplelas)")
         },
         bottomBar = { NavBar(Tab.Metas, nav::tab) },
@@ -448,7 +446,7 @@ fun Pantalla23(nav: Nav) {
     val finance = session.finance ?: return
     val planning = finance.planning
     val c = Stm.colors
-    val goal = planning.selectedGoal ?: planning.goals.firstOrNull().takeIf { session.capture } ?: return
+    val goal = planning.selectedGoal ?: return
     val p = planning.progress(goal)
     val aportes = planning.contributions(goal)
     val miembros by produceState(emptyList<HouseholdMember>(), planning.household.id) {
@@ -572,12 +570,11 @@ fun Pantalla24(nav: Nav) {
     val planning = finance.planning
     val c = Stm.colors
     val editando = remember { planning.takeGoal() }
-    val base = remember(planning.goals) { editando ?: if (session.capture) planning.goals.firstOrNull { it.name == "Viaje a Lisboa" } else null }
+    val base = editando
     val hoy = planning.today()
     var kind by remember(base) { mutableIntStateOf(if (base?.kind == GoalKind.Debt) 1 else 0) }
     var name by remember(base) { mutableStateOf(base?.name ?: "") }
-    // La captura enseña el estado de error del diseño.
-    var target by remember(base) { mutableStateOf(if (session.capture) "abc" else base?.let { Money.format(it.targetMinor, symbol = false) } ?: "") }
+    var target by remember(base) { mutableStateOf(base?.let { Money.format(it.targetMinor, symbol = false) } ?: "") }
     var fecha by remember(base) { mutableStateOf(base?.targetDay) }
     var starting by remember(base) { mutableStateOf(base?.startingMinor?.takeIf { it != 0L }?.let { Money.format(it, symbol = false) } ?: "") }
     var plan by remember(base) { mutableStateOf(base?.monthlyPlanMinor?.let { Money.format(it, symbol = false) } ?: "") }

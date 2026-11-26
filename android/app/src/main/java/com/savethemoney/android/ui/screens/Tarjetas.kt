@@ -131,11 +131,6 @@ private class Vista10(
 
 private class Otra(val nombre: String, val detalle: String, val onClick: () -> Unit)
 
-private val MAQUETA_10 = Vista10(
-    "Visa compartida", "1.140 €", "•••• 4821", "1.140 de 3.000 €", 0.38f, false, "1.860 €", "Próximo cargo · 1 de diciembre", "312,40 €",
-    "Pago total del extracto + 2 cuotas de aplazados (incluye 4,10 € de intereses). Sale de Cuenta principal.",
-)
-
 private fun vista10(cuenta: Account, s: CreditCardSummary, finance: FinanceModel): Vista10 {
     val prox = s.next
     val origen = finance.account(s.terms.payFromAccountId)?.name?.let { " Sale de $it." }.orEmpty()
@@ -166,17 +161,13 @@ fun Pantalla10(nav: Nav) {
         finance.newAccountKind = AccountKind.CreditCard
         nav.go(9)
     }
-    val vista = if (session.capture) MAQUETA_10 else principal?.let { vista10(it, cards.summary(it)!!, finance) }
-    val otras = if (session.capture) {
-        listOf(Otra("Mastercard", "Usado 240 de 1.500 € · cuota fija") { nav.go(11) })
-    } else {
-        cuentas.filter { it.id != principal?.id }.map { cuenta ->
-            val s = cards.summary(cuenta)
-            if (s == null) {
-                Otra(cuenta.name, "Falta poner el límite y cómo la pagas") { abrir(cuenta, 12) }
-            } else {
-                Otra(cuenta.name, "Usado ${Money.format(s.used, decimals = false, symbol = false)} de ${Money.format(s.terms.creditLimit, decimals = false)} · ${s.terms.paymentMode.title.lowercase()}") { abrir(cuenta, 11) }
-            }
+    val vista = principal?.let { vista10(it, cards.summary(it)!!, finance) }
+    val otras = cuentas.filter { it.id != principal?.id }.map { cuenta ->
+        val s = cards.summary(cuenta)
+        if (s == null) {
+            Otra(cuenta.name, "Falta poner el límite y cómo la pagas") { abrir(cuenta, 12) }
+        } else {
+            Otra(cuenta.name, "Usado ${Money.format(s.used, decimals = false, symbol = false)} de ${Money.format(s.terms.creditLimit, decimals = false)} · ${s.terms.paymentMode.title.lowercase()}") { abrir(cuenta, 11) }
         }
     }
     StmScreen(
@@ -193,7 +184,7 @@ fun Pantalla10(nav: Nav) {
         bottomBar = { NavBar(Tab.Inicio, nav::tab) },
         snackbar = cards.error?.let { e -> { Snackbar(e) } },
     ) {
-        if (!session.capture && cuentas.isEmpty()) {
+        if (cuentas.isEmpty()) {
             StmCard {
                 Text("Aún no hay tarjetas", style = StmType.titleMedium, color = c.onSurface)
                 Spacer(Modifier.height(8.dp))
@@ -205,7 +196,7 @@ fun Pantalla10(nav: Nav) {
                 Btn("Añadir tarjeta", ::nueva)
             }
         }
-        if (!session.capture && cuentas.size > 1 && cards.nextPaymentsTotal > 0) {
+        if (cuentas.size > 1 && cards.nextPaymentsTotal > 0) {
             StmCard {
                 Text("Próximos cargos de todas las tarjetas", style = StmType.labelMedium, color = c.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
@@ -345,19 +336,6 @@ fun Pantalla11(nav: Nav) {
     val finance = session.finance ?: return
     val cards = finance.cards
     val c = Stm.colors
-    if (session.capture) {
-        Detalle11(
-            nav, "Visa compartida", "del 1 al 30 nov", "828,40 €", 0.38f, false,
-            listOf(
-                Cargo11("1 de diciembre", "Extracto de noviembre + cuotas", "312,40 €"),
-                Cargo11("1 de enero", "Cuotas de aplazados", "38,42 €"),
-                Cargo11("1 de febrero", "Última cuota del restaurante", "19,21 €"),
-            ),
-            listOf(Plazo11(StmIcons.restaurant, "Restaurante Sol", "3 meses · TIN 14 %", "Quedan 2 cuotas", "56,00 €", "19,21 €/mes") { nav.go(13) }),
-            onAplazar = { nav.go(13) },
-        )
-        return
-    }
     val cuenta = cards.selected ?: return
     val s = cards.summary(cuenta)
     if (s == null) {
@@ -481,10 +459,9 @@ fun Pantalla12(nav: Nav) {
     val finance = session.finance ?: return
     val cards = finance.cards
     val c = Stm.colors
-    val demo = session.capture
     val cuenta = cards.selected
     val base = cuenta?.let { cards.terms[it.id] }
-    var limite by remember(base) { mutableStateOf(if (demo) "3.000,00" else base?.creditLimit?.let(Money::input).orEmpty()) }
+    var limite by remember(base) { mutableStateOf(base?.creditLimit?.let(Money::input).orEmpty()) }
     var diaExtracto by remember(base) { mutableStateOf("${base?.statementDay ?: 1}") }
     var diaCargo by remember(base) { mutableStateOf("${base?.paymentDay ?: 1}") }
     var retraso by remember(base) { mutableIntStateOf(base?.paymentDelayMonths ?: 1) }
@@ -492,8 +469,8 @@ fun Pantalla12(nav: Nav) {
     var cuota by remember(base) { mutableStateOf(base?.fixedPayment?.let(Money::input).orEmpty()) }
     var minimoPct by remember(base) { mutableStateOf(tasa(base?.minPaymentPercent ?: 3.0)) }
     var minimo by remember(base) { mutableStateOf(Money.input(base?.minPayment ?: 1_500)) }
-    var tinAplazado by remember(base) { mutableStateOf(if (demo) "20,00" else tasa(base?.revolvingRate ?: 20.0)) }
-    var tinPlazos by remember(base) { mutableStateOf(if (demo) "14,00" else tasa(base?.installmentRate ?: 14.0)) }
+    var tinAplazado by remember(base) { mutableStateOf(tasa(base?.revolvingRate ?: 20.0)) }
+    var tinPlazos by remember(base) { mutableStateOf(tasa(base?.installmentRate ?: 14.0)) }
     var pagaDesde by remember(base) { mutableStateOf(base?.payFromAccountId) }
     var recordar by remember(base) { mutableStateOf(base == null || base.remindDaysBefore != null) }
     var dias by remember(base) { mutableIntStateOf(base?.remindDaysBefore ?: 2) }
@@ -578,7 +555,7 @@ fun Pantalla12(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         FilledField(
-            "Paga desde", if (demo) "Cuenta principal" else finance.account(pagaDesde)?.name ?: "Sin elegir",
+            "Paga desde", finance.account(pagaDesde)?.name ?: "Sin elegir",
             trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true },
         )
         Spacer(Modifier.height(16.dp))
@@ -588,26 +565,24 @@ fun Pantalla12(nav: Nav) {
             ListItem("Avisar al $aviso % del límite", trailing = { SwitchSlot(avisar) { avisar = it } })
         }
         // Lo que el diseño no dibuja y iOS sí permite va debajo, para no mover lo anterior.
-        if (!demo) {
-            Spacer(Modifier.height(16.dp))
-            if (recordar) {
-                FilaStepper("Cuándo recordar", textoAviso(dias), { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
-                Spacer(Modifier.height(12.dp))
-            }
-            if (avisar) {
-                FilaStepper("Avisar al pasar del", "$aviso %", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
-                Spacer(Modifier.height(16.dp))
-            }
-            Text("Se cobra", style = StmType.labelLarge, color = c.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
-            Segmented(listOf("Mismo mes", "Mes siguiente", "2 meses"), retraso, { retraso = it })
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Míralo en tu contrato. Por ejemplo: extracto el día 1 y cargo el día 1 del mes siguiente quiere decir que lo gastado en enero se cobra el 1 de marzo.",
-                style = StmType.bodySmall, color = c.onSurfaceVariant,
-            )
+        Spacer(Modifier.height(16.dp))
+        if (recordar) {
+            FilaStepper("Cuándo recordar", textoAviso(dias), { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
+            Spacer(Modifier.height(12.dp))
+        }
+        if (avisar) {
+            FilaStepper("Avisar al pasar del", "$aviso %", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
             Spacer(Modifier.height(16.dp))
         }
+        Text("Se cobra", style = StmType.labelLarge, color = c.onSurfaceVariant)
+        Spacer(Modifier.height(8.dp))
+        Segmented(listOf("Mismo mes", "Mes siguiente", "2 meses"), retraso, { retraso = it })
+        Spacer(Modifier.height(8.dp))
+        Text(
+            "Míralo en tu contrato. Por ejemplo: extracto el día 1 y cargo el día 1 del mes siguiente quiere decir que lo gastado en enero se cobra el 1 de marzo.",
+            style = StmType.bodySmall, color = c.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -634,15 +609,14 @@ fun Pantalla13(nav: Nav) {
     val candidatas = cuenta?.let(cards::deferrable).orEmpty()
     val meses = CardInstallment.commonMonths
     var plazo by remember(compraId) { mutableIntStateOf(plan?.let { meses.indexOf(it.months).coerceAtLeast(0) } ?: 0) }
-    var tin by remember(compraId) { mutableStateOf(if (session.capture) "14,00" else tasa(plan?.rate ?: resumen?.terms?.installmentRate ?: 14.0)) }
+    var tin by remember(compraId) { mutableStateOf(tasa(plan?.rate ?: resumen?.terms?.installmentRate ?: 14.0)) }
     val action = rememberAction()
     val valida = compra != null && (plan != null || candidatas.any { it.id == compra.id })
     StmScreen(
-        topBar = { DetalleBar(nav, if (session.capture) "Visa compartida" else cuenta?.name ?: "Tarjeta") },
+        topBar = { DetalleBar(nav, cuenta?.name ?: "Tarjeta") },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = {
             when {
-                session.capture -> HojaAplazar("Aplazar Restaurante Sol", "56,00 € · 3 nov", plazo, { plazo = it }, tin, { tin = it }, "19,21 €/mes", "1,63 €", nav::back, nav::back, null)
                 valida -> {
                     val total = -compra!!.amountMinor
                     val rate = leerTasa(tin)
@@ -679,7 +653,7 @@ fun Pantalla13(nav: Nav) {
         StmCard {
             Text("Próximo cargo", style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(3.5.dp))
-            Text(if (session.capture) "312,40 €" else Money.format(resumen?.next?.amount ?: 0), style = StmType.displaySmall, color = c.onSurface)
+            Text(Money.format(resumen?.next?.amount ?: 0), style = StmType.displaySmall, color = c.onSurface)
             Spacer(Modifier.height(0.5.dp))
         }
     }
@@ -733,7 +707,7 @@ private fun DetalleBar(nav: Nav, nombre: String) {
     TopBar(nombre, onNav = nav::back) {
         IconBtn(StmIcons.edit, { nav.go(12) }, contentDescription = "Editar condiciones")
         Box {
-            IconBtn(StmIcons.moreVert, if (session.capture || cuenta == null) null else ({ menu = true }), contentDescription = "Más opciones")
+            IconBtn(StmIcons.moreVert, if (cuenta == null) null else ({ menu = true }), contentDescription = "Más opciones")
             // Bloqueada, el menú (otra ventana) no se pinta; vuelve al desbloquear.
             DropdownMenu(menu && !Bloqueo.app.bloqueada, { menu = false }, containerColor = c.surfaceContainer) {
                 DropdownMenuItem({ Text("Editar condiciones", color = c.onSurface) }, {

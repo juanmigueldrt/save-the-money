@@ -68,12 +68,10 @@ fun Pantalla04(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = StmIcons.menu, onNav = { nav.tab(Tab.Mas) }) {
-                if (!session.capture) {
-                    IconBtn(
-                        if (Vista.incognito) StmIcons.visibilityOff else StmIcons.visibility, { Vista.setIncognito(!Vista.incognito) },
-                        contentDescription = if (Vista.incognito) "Mostrar importes" else "Ocultar importes",
-                    )
-                }
+                IconBtn(
+                    if (Vista.incognito) StmIcons.visibilityOff else StmIcons.visibility, { Vista.setIncognito(!Vista.incognito) },
+                    contentDescription = if (Vista.incognito) "Mostrar importes" else "Ocultar importes",
+                )
                 IconBtn(StmIcons.search, { nav.go(5) }, contentDescription = "Buscar")
                 Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(28) }, contentAlignment = Alignment.Center) {
                     Avatar(name.take(1).uppercase(), c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
@@ -100,47 +98,33 @@ fun Pantalla04(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Presupuesto (paso 4) y tarjetas (paso 6) aún no calculan: en la app real no se inventan cifras.
+            Stat("Gastado", Money.format(finance.spentThisMonth, decimals = false), "este mes", Modifier.weight(1f)) { nav.tab(Tab.Presupuesto) }
             Stat(
-                "Gastado", Money.format(finance.spentThisMonth, decimals = false),
-                if (session.capture) "de 2.400 € previstos" else "este mes", Modifier.weight(1f),
-            ) { nav.tab(Tab.Presupuesto) }
-            Stat(
-                "Próximo cargo", when {
-                    session.capture -> "312 €"
-                    proximo != null -> Money.format(proximo.amount, decimals = false)
-                    else -> "—"
-                },
-                when {
-                    session.capture -> "Visa · 1 dic"
-                    proximo != null -> "${proximo.series.trimmedName} · ${Fechas.corto(proximo.due)}"
-                    else -> "Sin cargos a la vista"
-                },
+                "Próximo cargo", proximo?.let { Money.format(it.amount, decimals = false) } ?: "—",
+                proximo?.let { "${it.series.trimmedName} · ${Fechas.corto(it.due)}" } ?: "Sin cargos a la vista",
                 Modifier.weight(1f),
-            ) { nav.go(if (session.capture) 11 else 20) }
+            ) { nav.go(20) }
         }
-        // «Puedes gastar hoy», el presupuesto extra favorito y el calendario no están en el diseño: en las capturas se quedan fuera.
-        if (!session.capture) {
-            if (finance.planning.pending.isNotEmpty()) {
-                Spacer(Modifier.height(16.dp))
-                PendientesCard(finance, nav)
-            }
+        if (finance.planning.pending.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
-            GastarHoyCard(finance.budgets, finance) { nav.tab(Tab.Presupuesto) }
-            if (finance.budgets.extraBudgets.any { it.isFavorite }) {
-                Spacer(Modifier.height(16.dp))
-                FavoritoExtraCard(finance.budgets, finance, nav)
-            }
+            PendientesCard(finance, nav)
+        }
+        Spacer(Modifier.height(16.dp))
+        GastarHoyCard(finance.budgets, finance) { nav.tab(Tab.Presupuesto) }
+        if (finance.budgets.extraBudgets.any { it.isFavorite }) {
             Spacer(Modifier.height(16.dp))
-            SemanaCard(finance, nav)
-            Spacer(Modifier.height(16.dp))
-            ListCard {
-                ListItem(
-                    "Calendario de pagos", "Lo que se cobra cada día",
-                    leading = { LeadIcon(StmIcons.calendarMonth, c.secondaryContainer, c.onSecondaryContainer) },
-                    trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) },
-                    onClick = { nav.go(43) },
-                )
-            }
+            FavoritoExtraCard(finance.budgets, finance, nav)
+        }
+        Spacer(Modifier.height(16.dp))
+        SemanaCard(finance, nav)
+        Spacer(Modifier.height(16.dp))
+        ListCard {
+            ListItem(
+                "Calendario de pagos", "Lo que se cobra cada día",
+                leading = { LeadIcon(StmIcons.calendarMonth, c.secondaryContainer, c.onSecondaryContainer) },
+                trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) },
+                onClick = { nav.go(43) },
+            )
         }
         Spacer(Modifier.height(16.dp))
         SectionHeader("Últimos movimientos", "Ver todo") { nav.go(5) }
@@ -174,7 +158,7 @@ fun Pantalla04(nav: Nav) {
             }
         }
         val archivadas = finance.archivedAccounts
-        if (archivadas.isNotEmpty() && !session.capture) {
+        if (archivadas.isNotEmpty()) {
             var abiertas by remember { mutableStateOf(false) }
             Spacer(Modifier.height(16.dp))
             ListCard {

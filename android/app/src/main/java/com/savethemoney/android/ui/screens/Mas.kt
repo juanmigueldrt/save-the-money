@@ -35,7 +35,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -91,24 +90,18 @@ import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Chip
 import com.savethemoney.android.ui.components.ChipRow
 import com.savethemoney.android.ui.components.Divider
-import com.savethemoney.android.ui.components.Donut
 import com.savethemoney.android.ui.components.FilledField
 import com.savethemoney.android.ui.components.IconBtn
 import com.savethemoney.android.ui.components.LeadIcon
-import com.savethemoney.android.ui.components.LineChart
 import com.savethemoney.android.ui.components.ListCard
 import com.savethemoney.android.ui.components.ListHeader
 import com.savethemoney.android.ui.components.ListItem
 import com.savethemoney.android.ui.components.NavBar
 import com.savethemoney.android.ui.components.OutlinedField
-import com.savethemoney.android.ui.components.Pill
-import com.savethemoney.android.ui.components.Segmented
-import com.savethemoney.android.ui.components.Slice
 import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.SelectorSheet
 import com.savethemoney.android.ui.components.SheetItem
 import com.savethemoney.android.ui.components.BottomSheet
-import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmDialog
 import com.savethemoney.android.ui.components.StmIcon
 import com.savethemoney.android.ui.components.StmScreen
@@ -124,176 +117,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
-
-/** 25 Inversiones: cartera con evolución, reparto y posiciones. */
-@Composable
-internal fun Diseno25(nav: Nav) {
-    val c = Stm.colors
-    var range by remember { mutableIntStateOf(2) }
-    StmScreen(
-        topBar = {
-            MediumTopBar("Cartera", onBack = nav::back) {
-                IconBtn(StmIcons.eventRepeat, { nav.go(27) }, contentDescription = "Inversiones recurrentes")
-                IconBtn(StmIcons.add, { nav.go(26) }, contentDescription = "Comprar")
-            }
-        },
-        bottomBar = { NavBar(Tab.Mas, nav::tab) },
-    ) {
-        Spacer(Modifier.height(7.5.dp))
-        Text("31.950 €", style = StmType.displaySmall, color = c.onSurface)
-        Spacer(Modifier.height(4.5.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Pill("+3.420 € (+12,0 %)")
-            Spacer(Modifier.width(8.dp))
-            Text("desde el inicio", style = StmType.bodySmall, color = c.onSurfaceVariant)
-        }
-        Spacer(Modifier.height(20.dp))
-        HugSegmented(listOf("1S", "1M", "1A", "Todo"), range) { range = it }
-        Spacer(Modifier.height(16.dp))
-        StmCard {
-            LineChart(listOf(116f, 100.4f, 108.2f, 73.1f, 45.8f, 55.6f, 22.4f, 0f).map { 1f - it / 120f })
-        }
-        Spacer(Modifier.height(16.dp))
-        StmCard {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Donut(listOf(Slice(0.62f, c.primary), Slice(0.24f, c.tertiary), Slice(0.14f, c.secondaryContainer)), 112.dp, 16.dp)
-                Spacer(Modifier.width(16.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Legend(c.primary, "Fondos indexados 62 %")
-                    Legend(c.tertiary, "Acciones 24 %")
-                    Legend(c.secondaryContainer, "Efectivo 14 %")
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        ListCard {
-            ListItem(
-                "Fondo indexado mundial", "112,4 participaciones",
-                leading = { LeadIcon(StmIcons.public, c.tertiaryContainer, c.onTertiaryContainer) },
-                trailing = {
-                    Column(horizontalAlignment = Alignment.End) {
-                        Text("19.810 €", style = StmType.labelLarge, color = c.onSurface)
-                        Text("+14,2 %", style = StmType.bodySmall, color = c.onSurfaceVariant)
-                    }
-                },
-                onClick = { nav.go(26) },
-            )
-        }
-    }
-}
-
-/** 26 Comprar activo: precio, evolución, posición y compra por importe o participaciones. */
-@Composable
-internal fun Diseno26(nav: Nav) {
-    val c = Stm.colors
-    var mode by remember { mutableIntStateOf(0) }
-    var amount by remember { mutableStateOf("300,00") }
-    var fee by remember { mutableStateOf("0,10") }
-    StmScreen(
-        topBar = {
-            TopBar("Fondo indexado mundial", onNav = nav::back) {
-                IconBtn(StmIcons.edit, null, contentDescription = "Editar")
-            }
-        },
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text("Precio · apuntado hoy", style = StmType.labelMedium, color = c.onSurfaceVariant)
-        Spacer(Modifier.height(3.5.dp))
-        Text("176,25 €", style = StmType.displaySmall, color = c.onSurface)
-        Spacer(Modifier.height(4.5.dp))
-        Pill("+0,8 % hoy")
-        Spacer(Modifier.height(20.dp))
-        StmCard {
-            LineChart(listOf(96f, 80.2f, 85.5f, 53.9f, 32.9f, 43.4f, 17.1f, 0f).map { 1f - it / 100f }, plotHeight = 100.dp)
-        }
-        Spacer(Modifier.height(16.dp))
-        StmCard {
-            Text("Tu posición", style = StmType.titleMedium, color = c.onSurface)
-            Spacer(Modifier.height(8.dp))
-            DataRow("Participaciones", "112,40")
-            Spacer(Modifier.height(8.dp))
-            DataRow("Valor", "19.810 €")
-            Spacer(Modifier.height(8.dp))
-            DataRow("Rentabilidad", "+2.462 € (+14,2 %)", c.success)
-        }
-        Spacer(Modifier.height(16.dp))
-        StmCard {
-            Text("Comprar", style = StmType.titleMedium, color = c.onSurface)
-            Spacer(Modifier.height(12.dp))
-            Segmented(listOf("Por importe", "Por participaciones"), mode, { mode = it })
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SuffixField("Importe", amount, { amount = it }, "€", Modifier.weight(1f))
-                SuffixField("Comisión", fee, { fee = it }, "%", Modifier.weight(1f))
-            }
-            Spacer(Modifier.height(12.dp))
-            Text("≈ 1,70 participaciones · comisión 0,30 €", style = StmType.bodySmall, color = c.onSurfaceVariant)
-            Spacer(Modifier.height(12.dp))
-            Btn("Comprar", nav::back, Modifier.fillMaxWidth())
-        }
-    }
-}
-
-/** 27 Inversiones recurrentes: calendario del mes con los días de aportación y planes activos. */
-@Composable
-internal fun Diseno27(nav: Nav) {
-    val c = Stm.colors
-    var world by remember { mutableStateOf(true) }
-    var bonds by remember { mutableStateOf(false) }
-    StmScreen(
-        topBar = {
-            TopBar("Inversiones recurrentes", onNav = nav::back) {
-                IconBtn(StmIcons.add, null, contentDescription = "Añadir")
-            }
-        },
-    ) {
-        StmCard {
-            Text("Noviembre", style = StmType.titleMedium, color = c.onSurface)
-            Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("L", "M", "X", "J", "V", "S", "D").forEach {
-                    Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
-                        Text(it, style = StmType.labelMedium, color = c.onSurfaceVariant)
-                    }
-                }
-            }
-            Spacer(Modifier.height(12.dp))
-            // Noviembre de 2026 empieza en domingo en el calendario real; el diseño lo pinta en sábado.
-            val days = List(5) { null } + (1..30).toList()
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                days.chunked(7).forEach { week ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        week.forEach { day ->
-                            val (bg, fg) = when (day) {
-                                5 -> c.primary to c.onPrimary
-                                1, 20 -> c.secondaryContainer to c.onSecondaryContainer
-                                else -> Color.Transparent to c.onSurface
-                            }
-                            Box(Modifier.size(40.dp).clip(CircleShape).background(bg), contentAlignment = Alignment.Center) {
-                                if (day != null) Text("$day", style = StmType.bodyMedium, color = fg)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        ListCard {
-            ListItem(
-                "Fondo indexado mundial", "300 € el día 1 de cada mes",
-                leading = { LeadIcon(StmIcons.public, c.tertiaryContainer, c.onTertiaryContainer) },
-                trailing = { StmSwitch(world) { world = it } },
-                onClick = { nav.go(26) },
-            )
-            Divider()
-            ListItem(
-                "Fondo de bonos", "100 € el día 20 · en pausa",
-                leading = { LeadIcon(StmIcons.accountBalance, c.surfaceContainerHighest, c.onSurfaceVariant) },
-                trailing = { StmSwitch(bonds) { bonds = it } },
-            )
-        }
-    }
-}
 
 /** 30 Más opciones: menú de secciones, datos y preferencias. */
 @Composable
@@ -400,14 +223,14 @@ fun Pantalla30(nav: Nav) {
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
         }
         // Sin permiso, Android descarta los avisos sin decir nada: que se vea aquí.
-        if (!session.capture && !LocalNotifier(context).canShow) {
+        if (!LocalNotifier(context).canShow) {
             Text(
                 "Android no deja mostrar notificaciones de Save the Money: los avisos no se verán hasta que las actives en Ajustes.",
                 Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.error,
             )
         }
         // Fase D, como en iOS: recordatorio para apuntar gastos y resumen semanal. Sólo en este dispositivo.
-        if (!session.capture && finance != null) {
+        if (finance != null) {
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListHeader("Recordatorios")
@@ -435,25 +258,21 @@ fun Pantalla30(nav: Nav) {
             }
         }
         // No está en el diseño; va al final para no mover lo anterior. Sólo en este dispositivo.
-        if (!session.capture) {
-            Spacer(Modifier.height(16.dp))
-            ListCard {
-                ListHeader("Vista")
-                InterruptorVista(StmIcons.visibilityOff, "Modo incógnito", "Oculta los importes; también con el ojo del Resumen", Vista.incognito, Vista::setIncognito)
-                InterruptorVista(StmIcons.savings, "Sin céntimos", "1.235 € en vez de 1.234,56 €", Vista.sinCentimos, Vista::setSinCentimos)
-                InterruptorVista(StmIcons.add, "Mostrar + en los ingresos", "+1.200,00 €", Vista.signoMas, Vista::setSignoMas)
-                InterruptorVista(StmIcons.trendingUp, "Ingresos en verde", "En las listas de movimientos", Vista.ingresosEnVerde, Vista::setIngresosEnVerde)
-            }
-            Text(
-                "Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.",
-                Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
-            )
+        Spacer(Modifier.height(16.dp))
+        ListCard {
+            ListHeader("Vista")
+            InterruptorVista(StmIcons.visibilityOff, "Modo incógnito", "Oculta los importes; también con el ojo del Resumen", Vista.incognito, Vista::setIncognito)
+            InterruptorVista(StmIcons.savings, "Sin céntimos", "1.235 € en vez de 1.234,56 €", Vista.sinCentimos, Vista::setSinCentimos)
+            InterruptorVista(StmIcons.add, "Mostrar + en los ingresos", "+1.200,00 €", Vista.signoMas, Vista::setSignoMas)
+            InterruptorVista(StmIcons.trendingUp, "Ingresos en verde", "En las listas de movimientos", Vista.ingresosEnVerde, Vista::setIngresosEnVerde)
         }
+        Text(
+            "Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.",
+            Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
+        )
         // Bloqueo con huella, cara o código (ORC-111). Sólo en este dispositivo.
-        if (!session.capture) {
-            Spacer(Modifier.height(16.dp))
-            AjusteBloqueo()
-        }
+        Spacer(Modifier.height(16.dp))
+        AjusteBloqueo()
         Spacer(Modifier.height(16.dp))
         ListCard {
             MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
@@ -609,7 +428,7 @@ fun Pantalla32(nav: Nav) {
     val action = rememberAction()
 
     fun cargar(texto: String, archivo: String) {
-        val guardado = if (session.capture) null else CsvSavedFormat.match(texto, FormatosCsv.load(context))
+        val guardado = CsvSavedFormat.match(texto, FormatosCsv.load(context))
         val formato = guardado?.first
         val t = guardado?.second ?: CsvTable.parse(texto)
         textoCsv = texto
@@ -639,7 +458,6 @@ fun Pantalla32(nav: Nav) {
         marcas = emptyMap()
         creados = null
     }
-    LaunchedEffect(Unit) { if (session.capture) cargar(CSV_MUESTRA, "movimientos-octubre.csv") }
     val elegir = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             val leido = withContext(Dispatchers.IO) { leerCsv(context, uri) }
@@ -686,7 +504,7 @@ fun Pantalla32(nav: Nav) {
                             aviso = null
                             creados = null
                             resultado = finance.importMovements(ImportMarks.drafts(revisadas, marcas, tarjeta))
-                            if (t != null && m != null && !session.capture) FormatosCsv.remember(context, CsvSavedFormat.of(t, m, cuenta))
+                            if (t != null && m != null) FormatosCsv.remember(context, CsvSavedFormat.of(t, m, cuenta))
                             val fijos = ImportMark.Recurring in marcas.values || ImportMark.Subscription in marcas.values
                             if (fijos) {
                                 val nuevos = ImportMarks.series(revisadas, marcas, finance.planning.series, finance.planning.household.id)
@@ -866,10 +684,8 @@ fun Pantalla32(nav: Nav) {
                 Spacer(Modifier.height(16.dp))
                 FilledField("Tarjeta de las compras", finance.account(tarjeta)?.name ?: "Elige una tarjeta", trailing = StmIcons.arrowDropDown, onClick = { selector = "tarjeta" })
             }
-            if (!session.capture) {
-                Spacer(Modifier.height(8.dp))
-                Text("Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
-            }
+            Spacer(Modifier.height(8.dp))
+            Text("Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         if (problemas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
@@ -952,16 +768,13 @@ private fun etiquetaSeparador(c: Char) = when (c) {
     else -> "Coma (,)"
 }
 
-private const val CSV_MUESTRA = "Fecha;Concepto;Cuenta;Importe\n03/10/2026;Supermercado Día;;-64,20\n01/10/2026;Nómina;;2150,00\n"
-
 /** 33 Borrar datos: diálogo de confirmación sobre Más opciones. */
 @Composable
 fun Pantalla33(nav: Nav) {
     val c = Stm.colors
     val session = LocalSession.current
     val finance = session.finance
-    // Vacío de verdad: solo la captura del diseño lo trae escrito.
-    var confirm by remember { mutableStateOf(if (session.capture) "borrar" else "") }
+    var confirm by remember { mutableStateOf("") }
     val action = rememberAction()
     StmScreen(
         topBar = { MasHeader() },

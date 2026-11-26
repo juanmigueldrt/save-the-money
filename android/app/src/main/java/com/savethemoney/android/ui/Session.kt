@@ -23,8 +23,6 @@ class Session(
     val backend: Backend,
     val financeService: FinanceService,
     val isDemo: Boolean,
-    /** Modo captura: datos de muestra y fecha fija para comparar con el diseño. */
-    val capture: Boolean = false,
     private val today: () -> LocalDate = LocalDate::now,
     private val notifier: Notifier = NoNotifier,
     /** Borra lo que queda en el dispositivo de la cuenta: exportados y avisos mostrados. */
