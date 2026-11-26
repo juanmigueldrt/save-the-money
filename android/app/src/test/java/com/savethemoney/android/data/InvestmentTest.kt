@@ -62,6 +62,15 @@ class InvestmentTest {
         assertNull(trade(h, TradeSide.Sell, "2.5", "11", day(2026, 6, 1)).issue(bought))
         assertNotNull(trade(h, TradeSide.Sell, "3", "11", day(2026, 6, 1)).issue(bought))
         assertNotNull(trade(h, TradeSide.Sell, "1", "11", day(2026, 4, 1)).issue(bought))
+
+        // Con una venta ya apuntada el 1 de junio, otra con fecha anterior no puede dejarla sin participaciones.
+        val sold = trade(h, TradeSide.Sell, "2", "11", day(2026, 6, 1))
+        assertEquals(InvestmentTrade.NOT_ENOUGH_SHARES, trade(h, TradeSide.Sell, "1", "11", day(2026, 5, 15)).issue(bought + sold))
+        assertNull(trade(h, TradeSide.Sell, "0.5", "11", day(2026, 5, 15)).issue(bought + sold))
+        // Ni se borra la compra de la que depende; la venta sí.
+        assertEquals(InvestmentTrade.NEEDED_BY_LATER_SALE, bought[0].deletionIssue(bought + sold))
+        assertNull(sold.deletionIssue(bought + sold))
+        assertNull(bought[0].deletionIssue(bought))
         assertNotNull(trade(h, TradeSide.Buy, "0", "11", day(2026, 6, 1)).issue)
         assertNotNull(trade(h, TradeSide.Buy, "0.123456789", "11", day(2026, 6, 1)).issue)
     }
@@ -196,6 +205,53 @@ class InvestmentTest {
         service.resetHousehold(home)
         assertTrue(service.holdings(home).isEmpty())
         assertTrue(service.trades(home).isEmpty())
+    }
+
+    @Test fun tradeWithCashIsAtomicAndNotRepeated() = runBlocking {
+        val service = InMemoryFinance()
+        val account = service.createAccount(AccountDraft("Corriente", openingMinor = 100_000), home)
+        val holding = service.createHolding(Holding("", home, "Fondo global", price = BigDecimal.TEN))
+        val model = com.savethemoney.android.ui.FinanceModel(Household(home, "Casa"), service, { day(2026, 11, 4) })
+        model.load()
+        model.investments.load()
+        val buy = InvestmentTrade("b1", home, holding.id, "2026-11-02", quantity = BigDecimal.TEN, price = BigDecimal.TEN)
+        val cash = TradeCash(account.id, null, -10_000, "Compra de Fondo global")
+        fun rejected(message: String, block: suspend () -> Unit) {
+            val error = assertThrows(AppError::class.java) { runBlocking { block() } }
+            assertEquals(message, error.message)
+        }
+
+        // Si el movimiento no vale, tampoco queda la operación.
+        rejected("Escribe un concepto.") { model.addTrade(buy, cash.copy(description = "  ")) }
+        assertTrue(service.trades(home).isEmpty())
+        assertEquals(100_000L, service.balances(home)[account.id])
+
+        // Repetirla con el mismo id no duplica; con otros datos, avisa.
+        repeat(2) { model.addTrade(buy, cash) }
+        assertEquals(listOf("b1"), model.investments.trades.map { it.id })
+        assertEquals(1, service.trades(home).size)
+        assertEquals(90_000L, model.balances[account.id])
+        rejected(TransferDraft.STORED_WITH_OTHER_DATA) { model.addTrade(buy.copy(quantity = BigDecimal(11)), cash) }
+        rejected(TransferDraft.STORED_WITH_OTHER_DATA) { model.addTrade(buy, null) }
+        rejected(TransferDraft.STORED_WITH_OTHER_DATA) { model.addTrade(buy, cash.copy(amountMinor = -9_000)) }
+
+        // La venta ingresa en la cuenta: 4 × 12 = 48 €. La compra de la que depende no se puede borrar.
+        val sell = InvestmentTrade("s1", home, holding.id, "2026-11-04", TradeSide.Sell, BigDecimal(4), BigDecimal(12))
+        model.addTrade(sell, TradeCash(account.id, null, sell.cashImpact, "Venta de Fondo global"))
+        assertEquals(94_800L, model.balances[account.id])
+        rejected(InvestmentTrade.NEEDED_BY_LATER_SALE) { model.investments.delete(buy) }
+        rejected(InvestmentTrade.NEEDED_BY_LATER_SALE) { service.deleteTrade("b1") }
+        // Vender 7 el día 3 dejaría el día 4 en 10 − 7 − 4 = −1.
+        val earlier = InvestmentTrade("s2", home, holding.id, "2026-11-03", TradeSide.Sell, BigDecimal(7), BigDecimal(12))
+        rejected(InvestmentTrade.NOT_ENOUGH_SHARES) { model.addTrade(earlier, null) }
+        rejected(InvestmentTrade.NOT_ENOUGH_SHARES) { service.addTrade(earlier) }
+        assertEquals(2, service.trades(home).size)
+        assertEquals(94_800L, service.balances(home)[account.id])
+
+        model.investments.delete(sell)
+        model.investments.delete(buy)
+        assertTrue(service.trades(home).isEmpty())
+        assertEquals("borrar la operación no borra su movimiento", 94_800L, service.balances(home)[account.id])
     }
 
     @Test fun parsingTypedNumbers() {

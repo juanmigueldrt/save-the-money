@@ -196,6 +196,23 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testTradeTimeline() throws {
+        struct File: Decodable { var vectors: [Vector] }
+        struct Vector: Decodable { var name: String; var trades: [Entry]; var oversold: Bool }
+        struct Entry: Decodable { var day: String; var side: TradeSide; var quantity: String }
+        let file: File = try load("trade_timeline.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        let holding = UUID()
+        for v in file.vectors {
+            let trades = try v.trades.map {
+                InvestmentTrade(householdId: UUID(), holdingId: holding, tradedOn: day($0.day), side: $0.side,
+                                quantity: try XCTUnwrap(Decimal(string: $0.quantity, locale: Locale(identifier: "en_US_POSIX"))),
+                                price: 10)
+            }
+            XCTAssertEqual(Position.isOversold(holding, in: trades), v.oversold, v.name)
+        }
+    }
+
     func testSHA256() throws {
         struct File: Decodable { var vectors: [V] }
         struct V: Decodable { var text: String; var `repeat`: Int; var utf8Bytes: Int; var sha256: String }

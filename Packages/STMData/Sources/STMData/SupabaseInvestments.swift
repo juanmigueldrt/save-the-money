@@ -61,42 +61,17 @@ extension SupabaseBackend: InvestmentService {
         try await allRows(of: "holding_prices", columns: Self.priceColumns, householdId: householdId, orderedBy: "priced_on")
     }
 
+    /// `record_holding_price` apunta el precio del día y el precio actual del activo en una sola transacción.
     public func recordPrice(_ price: Decimal, on day: CalendarDay, for holdingId: UUID) async throws -> Holding {
         if price < 0 { throw AppError.invalidInput("El precio no puede ser negativo.") }
-        let holding: Holding = try await mapped {
-            try await client.from("holdings")
+        let rows: [Holding] = try await mapped {
+            try await client.rpc("record_holding_price", params: PriceParams(holding: holdingId, priced: day, newPrice: price))
                 .select(Self.holdingColumns)
-                .eq("id", value: holdingId.uuidString)
-                .single()
                 .execute()
                 .value
         }
-        // No se usa upsert: haría UPDATE de columnas que no se pueden cambiar (hogar, activo, día).
-        let updated: [HoldingPrice] = try await mapped {
-            try await client.from("holding_prices")
-                .update(PriceUpdate(price: price))
-                .eq("holding_id", value: holdingId.uuidString)
-                .eq("priced_on", value: day.iso)
-                .select(Self.priceColumns)
-                .execute()
-                .value
-        }
-        if updated.isEmpty {
-            let row = HoldingPrice(householdId: holding.householdId, holdingId: holdingId, pricedOn: day, price: price)
-            try await mapped {
-                try await client.from("holding_prices").insert(row).execute()
-            }
-        }
-        guard holding.priceOn.map({ day >= $0 }) ?? true else { return holding }
-        return try await mapped {
-            try await client.from("holdings")
-                .update(CurrentPrice(price: price, priceOn: day))
-                .eq("id", value: holdingId.uuidString)
-                .select(Self.holdingColumns)
-                .single()
-                .execute()
-                .value
-        }
+        guard let saved = rows.first else { throw AppError.unknown("record_holding_price") }
+        return saved
     }
 
     // MARK: Operaciones
@@ -105,27 +80,22 @@ extension SupabaseBackend: InvestmentService {
         try await allRows(of: "investment_trades", columns: Self.tradeColumns, householdId: householdId, orderedBy: "traded_on")
     }
 
-    public func addTrade(_ trade: InvestmentTrade) async throws -> InvestmentTrade {
-        if trade.side == .sell {
-            let others: [InvestmentTrade] = try await mapped {
-                try await client.from("investment_trades")
-                    .select(Self.tradeColumns)
-                    .eq("holding_id", value: trade.holdingId.uuidString)
-                    .execute()
-                    .value
-            }
-            if let issue = trade.issue(given: others) { throw AppError.invalidInput(issue) }
-        } else if let issue = trade.issue {
+    /// `create_trade` guarda la operación y su movimiento en una sola transacción y no repite una ya guardada.
+    /// Que haya participaciones para vender lo comprueba el servidor, con todas las operaciones del activo.
+    public func addTrade(_ trade: InvestmentTrade, cash: TradeCash?) async throws -> InvestmentTrade {
+        if let issue = trade.issue { throw AppError.invalidInput(issue) }
+        if let cash, let issue = MovementDraft(accountId: cash.accountId, bookedOn: trade.tradedOn, amount: cash.amount,
+                                               description: cash.description).issue {
             throw AppError.invalidInput(issue)
         }
-        return try await mapped {
-            try await client.from("investment_trades")
-                .insert(trade)
+        let rows: [InvestmentTrade] = try await mapped {
+            try await client.rpc("create_trade", params: TradeParams(trade: trade, cash: cash))
                 .select(Self.tradeColumns)
-                .single()
                 .execute()
                 .value
         }
+        guard let saved = rows.first else { throw AppError.unknown("create_trade") }
+        return saved
     }
 
     public func deleteTrade(_ tradeId: UUID) async throws {
@@ -204,17 +174,45 @@ extension SupabaseBackend: InvestmentService {
     }
 }
 
-private struct PriceUpdate: Encodable, Sendable {
-    var price: Decimal
-}
-
-private struct CurrentPrice: Encodable, Sendable {
-    var price: Decimal
-    var priceOn: CalendarDay
+/// Parámetros de `record_holding_price`.
+private struct PriceParams: Encodable, Sendable {
+    var holding: UUID
+    var priced: CalendarDay
+    var newPrice: Decimal
 
     private enum CodingKeys: String, CodingKey {
-        case price
-        case priceOn = "price_on"
+        case holding, priced
+        case newPrice = "new_price"
+    }
+}
+
+/// Parámetros de `create_trade`. Sin `cash` van nulos los cuatro del movimiento.
+private struct TradeParams: Encodable, Sendable {
+    var trade: InvestmentTrade
+    var cash: TradeCash?
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(trade.id, forKey: .trade)
+        try c.encode(trade.householdId, forKey: .household)
+        try c.encode(trade.holdingId, forKey: .holding)
+        try c.encode(trade.tradedOn, forKey: .traded)
+        try c.encode(trade.side, forKey: .tradeSide)
+        try c.encode(trade.quantity, forKey: .shares)
+        try c.encode(trade.price, forKey: .unitPrice)
+        try c.encode(trade.fee.minor, forKey: .fee)
+        try c.encode(trade.note, forKey: .tradeNote)
+        try c.encode(cash?.accountId, forKey: .account)
+        try c.encode(cash?.categoryId, forKey: .category)
+        try c.encode(cash?.amount.minor, forKey: .cash)
+        try c.encode(cash?.description.trimmingCharacters(in: .whitespacesAndNewlines), forKey: .label)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case trade, household, holding, traded, shares, fee, account, category, cash, label
+        case tradeSide = "trade_side"
+        case unitPrice = "unit_price"
+        case tradeNote = "trade_note"
     }
 }
 

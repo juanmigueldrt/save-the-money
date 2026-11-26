@@ -295,12 +295,20 @@ public struct InvestmentTrade: Identifiable, Hashable, Codable, Sendable {
         return nil
     }
 
-    /// Además de `issue`: no se pueden vender más participaciones de las que había ese día.
+    public static let notEnoughShares = "No tienes tantas participaciones para vender."
+    public static let neededByLaterSale = "No se puede borrar esta compra: una venta posterior se quedaría sin participaciones."
+
+    /// Además de `issue`: una venta no puede dejar la posición en negativo en ninguna fecha,
+    /// tampoco en las posteriores a la suya. Es la misma regla que aplica el servidor.
     public func issue(given others: [InvestmentTrade]) -> String? {
         if let issue { return issue }
         guard side == .sell else { return nil }
-        let held = Position.quantity(of: holdingId, in: others.filter { $0.id != id }, through: tradedOn)
-        return quantity > held ? "No tienes tantas participaciones para vender." : nil
+        return Position.isOversold(holdingId, in: others.filter { $0.id != id } + [self]) ? Self.notEnoughShares : nil
+    }
+
+    /// Por qué no se puede borrar, o nil: sin una compra, una venta posterior puede quedarse sin participaciones.
+    public func deletionIssue(given others: [InvestmentTrade]) -> String? {
+        side == .buy && Position.isOversold(holdingId, in: others.filter { $0.id != id }) ? Self.neededByLaterSale : nil
     }
 
     enum CodingKeys: String, CodingKey {
@@ -370,8 +378,10 @@ public struct BuyQuote: Hashable, Sendable {
     }
 
     /// La operación que se guarda al confirmar.
-    public func trade(for holding: Holding, price: Decimal, on day: CalendarDay, note: String? = nil) -> InvestmentTrade {
-        InvestmentTrade(householdId: holding.householdId, holdingId: holding.id, tradedOn: day, side: .buy,
+    /// `id` es el del formulario: con el mismo, reintentar no duplica la compra.
+    public func trade(for holding: Holding, price: Decimal, on day: CalendarDay, note: String? = nil,
+                      id: UUID = UUID()) -> InvestmentTrade {
+        InvestmentTrade(id: id, householdId: holding.householdId, holdingId: holding.id, tradedOn: day, side: .buy,
                         quantity: quantity, price: price, fee: fee, note: note)
     }
 }
@@ -431,6 +441,17 @@ public struct Position: Hashable, Sendable, Identifiable {
         ordered(trades, of: holdingId, through: day).reduce(Decimal(0)) { held, trade in
             trade.side == .buy ? held + trade.quantity : max(0, held - trade.quantity)
         }
+    }
+
+    /// true si algún día se han vendido más participaciones de las que había hasta entonces
+    /// (las compras de un día cuentan antes que sus ventas).
+    public static func isOversold(_ holdingId: UUID, in trades: [InvestmentTrade]) -> Bool {
+        var held: Decimal = 0
+        for trade in ordered(trades, of: holdingId, through: nil) {
+            held += trade.side == .buy ? trade.quantity : -trade.quantity
+            if held < 0 { return true }
+        }
+        return false
     }
 
     /// Las operaciones del activo por fecha; el mismo día, las compras antes que las ventas.
