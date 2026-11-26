@@ -163,8 +163,9 @@ class BudgetModel(val household: Household, private val service: FinanceService,
     }
 
     suspend fun save(extra: ExtraBudget) {
-        service.saveExtraBudget(extra)
-        extraBudgets = service.extraBudgets(household.id)
+        val saved = service.saveExtraBudget(extra)
+        extraBudgets = extraBudgets.filter { it.id != saved.id } + saved
+        reloadAfterSave { extraBudgets = service.extraBudgets(household.id) }?.let { error = it }
     }
 
     suspend fun delete(extra: ExtraBudget) {
