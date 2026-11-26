@@ -209,7 +209,7 @@ class SessionTest {
         assertEquals(Session.State.Offline(AppError.Network.message), session.state)
 
         backend.offline = false
-        session.resume()
+        session.resume(now = 0)
 
         assertTrue("al volver la red debería entrar, no ${session.state}", session.state is Session.State.Ready)
     }

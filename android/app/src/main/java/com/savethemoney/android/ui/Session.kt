@@ -65,9 +65,24 @@ class Session(
         }
     }
 
-    /** Al volver a primer plano: si se quedó «sin conexión» se reintenta; si no, se recargan las finanzas. */
-    suspend fun resume() {
-        if (state is State.Offline) start() else finance?.load()
+    /** Cuándo recargó por última vez [resume] (reloj monótono, en ms); nulo si aún no. */
+    private var lastResumeLoad: Long? = null
+
+    /**
+     * Al volver a primer plano: si se quedó «sin conexión» se reintenta; si no, se recargan las finanzas, como mucho una
+     * vez cada [RESUME_INTERVAL_MS] y nunca con otra carga en marcha. [now] es el reloj monótono en ms.
+     */
+    suspend fun resume(now: Long) {
+        if (state is State.Offline) return start()
+        val model = finance ?: return
+        if (model.isLoading || lastResumeLoad?.let { now - it < RESUME_INTERVAL_MS } == true) return
+        lastResumeLoad = now
+        model.load()
+    }
+
+    companion object {
+        /** Lo mínimo entre dos recargas al volver a primer plano. */
+        const val RESUME_INTERVAL_MS = 30_000L
     }
 
     /** Mientras la app está abierta: si la sesión se pierde (el servidor rechaza el refresco), vuelve al login. */
