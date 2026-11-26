@@ -141,9 +141,11 @@ class CreditCardModel(
         val saved = service.saveCreditCard(item)
         terms = terms + (saved.accountId to saved)
         // Con otro día de extracto cambian los ciclos sin cobrar: se vuelven a cargar sus movimientos.
-        val (list, cut) = cardMovements(saved.accountId, saved)
-        movements = movements + (saved.accountId to list)
-        truncatedAccounts = if (cut) truncatedAccounts + saved.accountId else truncatedAccounts - saved.accountId
+        reloadAfterSave {
+            val (list, cut) = cardMovements(saved.accountId, saved)
+            movements = movements + (saved.accountId to list)
+            truncatedAccounts = if (cut) truncatedAccounts + saved.accountId else truncatedAccounts - saved.accountId
+        }?.let { error = it }
         recompute()
     }
 
@@ -151,16 +153,23 @@ class CreditCardModel(
         val plan = installment(movement)?.copy(months = months, rate = rate)
             ?: CardInstallment("", household.id, account.id, movement.id, months, rate)
         plan.issue?.let { throw AppError.InvalidInput(it) }
-        service.saveInstallment(plan)
-        installments = service.cardInstallments(household.id)
-        loadMissingPurchases()
+        val saved = service.saveInstallment(plan)
+        // Se ve ya, aunque falle la recarga.
+        installments = installments.filter { it.movementId != saved.movementId } + saved
+        reloadAfterSave {
+            installments = service.cardInstallments(household.id)
+            loadMissingPurchases()
+        }?.let { error = it }
         recompute()
     }
 
     suspend fun remove(plan: CardInstallment) {
         service.deleteInstallment(plan.id)
-        installments = service.cardInstallments(household.id)
-        loadMissingPurchases()
+        installments = installments.filter { it.id != plan.id }
+        reloadAfterSave {
+            installments = service.cardInstallments(household.id)
+            loadMissingPurchases()
+        }?.let { error = it }
         recompute()
     }
 

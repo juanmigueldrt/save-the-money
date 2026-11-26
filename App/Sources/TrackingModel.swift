@@ -14,6 +14,10 @@ final class TrackingModel: ServerModel {
 
     /// Todos los movimientos, para rehacer el patrimonio mes a mes.
     private(set) var allMovements: [Movement] = []
+    /// Día del movimiento más antiguo, calculado al cargar (lo usa el tramo «Todo»).
+    private var firstMovement: CalendarDay?
+    /// Patrimonio ya calculado, para no rehacerlo en cada pintado. Se vacía al cargar otros movimientos.
+    @ObservationIgnored private var historyCache: [HistoryKey: [NetWorthPoint]] = [:]
     private(set) var creditScores: [CreditScore] = []
     private(set) var reportMovements: [Movement] = []
     private(set) var isLoading = false
@@ -35,20 +39,39 @@ final class TrackingModel: ServerModel {
 
     // MARK: Patrimonio
 
+    private struct HistoryKey: Hashable {
+        var accounts: [Account]
+        var months: Int
+        var through: MonthKey
+    }
+
     func history(accounts: [Account], months: Int = 12) -> [NetWorthPoint] {
-        NetWorth.history(accounts: accounts, movements: allMovements, months: months, through: MonthKey(today()))
+        let key = HistoryKey(accounts: accounts, months: months, through: MonthKey(today()))
+        if let cached = historyCache[key] { return cached }
+        let points = NetWorth.history(accounts: accounts, movements: allMovements, months: months, through: key.through)
+        // Cambiar cuentas sin cambiar movimientos deja claves viejas: con esto no crece sin límite.
+        if historyCache.count >= 16 { historyCache.removeAll() }
+        historyCache[key] = points
+        return points
     }
 
     /// Patrimonio del tramo elegido (1M, 6M, 1A o Todo), como en Android.
     func history(accounts: [Account], range: NetWorthRange) -> [NetWorthPoint] {
         let through = MonthKey(today())
-        let first = allMovements.map(\.bookedOn).min()
-        return history(accounts: accounts, months: range.months(firstMovement: first, through: through))
+        return history(accounts: accounts, months: range.months(firstMovement: firstMovement, through: through))
     }
 
+    /// Se recarga con cada cambio (también los del otro miembro), pero si llega lo mismo no se recalcula nada.
     func loadHistory() async {
         let finance = finance, id = household.id, turn = nextTurn()
-        await perform(turn: turn) { store(try await finance.allMovements(in: id), in: \.allMovements, turn: turn) }
+        await perform(turn: turn) {
+            let list = try await finance.allMovements(in: id)
+            // Una respuesta antigua no pisa una más nueva; y si llega lo mismo no se recalcula nada.
+            guard mayStore(\.allMovements, turn: turn), list != self.allMovements else { return }
+            self.allMovements = list
+            self.firstMovement = list.map(\.bookedOn).min()
+            self.historyCache = [:]
+        }
     }
 
     // MARK: Score
