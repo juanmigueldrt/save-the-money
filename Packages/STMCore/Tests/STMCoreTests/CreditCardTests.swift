@@ -204,6 +204,14 @@ final class CreditCardTests: XCTestCase {
         XCTAssertEqual(tooLow.next?.amount, Money(minor: 4_667))
     }
 
+    func testIgualdadTambienMiraLoGastadoEnElCiclo() {
+        let s = summary(terms(), [move(-10_000, on: day(2026, 11, 4))], today: day(2026, 11, 4))
+        var otro = s
+        otro.spentThisCycle = Money(minor: s.spentThisCycle.minor + 1)
+        XCTAssertNotEqual(s, otro)
+        XCTAssertEqual(s, s)
+    }
+
     func testLimitAlertAndReminders() throws {
         let movements = [move(-250_000, on: day(2026, 10, 10))]
         let s = summary(terms(), movements, today: day(2026, 11, 4))

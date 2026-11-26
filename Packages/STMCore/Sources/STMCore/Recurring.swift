@@ -40,9 +40,7 @@ extension CalendarDay {
 
     /// "5 de noviembre".
     public var longTitle: String {
-        let names = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio",
-                     "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-        return "\(day) de \(names[month - 1])"
+        return "\(day) de \(MonthKey.nombres[month - 1])"
     }
 }
 
@@ -136,8 +134,8 @@ public struct Recurrence: Hashable, Codable, Sendable {
 }
 
 /// Un pago o ingreso que se repite: una suscripción, el alquiler, la nómina...
-/// Se comparte con todo el hogar.
-public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
+/// Es de quien la crea (`created_by`): el resto del hogar no la ve (RLS, migración 20261115000000).
+public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable, Named, Archivable {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -184,7 +182,6 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
         self.pendingFrom = pendingFrom
     }
 
-    public var isArchived: Bool { archivedAt != nil }
     public var hasIntro: Bool { introAmount != nil && (introCharges ?? 0) > 0 }
 
     /// Lo que se cobra en el cargo número `n` (0 es el primero): la oferta o el precio normal.
@@ -218,8 +215,6 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
         guard hasIntro, let next = nextDue(onOrAfter: day), isIntro(on: next), let introAmount else { return monthlyAmount }
         return Money(minor: recurrence.monthly(introAmount.minor), currency: amount.currency)
     }
-
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// Negativo para gastos, positivo para ingresos.
     public var signedAmount: Money { kind == .income ? amount : -amount }

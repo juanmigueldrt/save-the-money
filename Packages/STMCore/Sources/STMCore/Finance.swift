@@ -32,7 +32,7 @@ public enum AccountKind: String, Codable, CaseIterable, Sendable {
 }
 
 /// Cuenta de un hogar. `ownerId` nil significa compartida.
-public struct Account: Identifiable, Hashable, Codable, Sendable {
+public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archivable {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -66,7 +66,6 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         self.includeInNetWorth = includeInNetWorth
     }
 
-    public var isArchived: Bool { archivedAt != nil }
     public var isShared: Bool { ownerId == nil }
 
     enum CodingKeys: String, CodingKey {
@@ -123,7 +122,7 @@ public enum CategoryKind: String, Codable, CaseIterable, Sendable {
     }
 }
 
-public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable {
+public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable, Named {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -148,8 +147,6 @@ public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable {
     }
 
     public static let maxNameLength = 40
-
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     /// Qué falla antes de guardarla, mirando también las demás categorías del hogar.
     public func issue(among others: [BudgetCategory]) -> String? {
@@ -341,7 +338,7 @@ public struct MovementDraft: Hashable, Sendable {
     }
 }
 
-public struct AccountDraft: Hashable, Sendable {
+public struct AccountDraft: Hashable, Sendable, Named {
     public var name: String
     public var kind: AccountKind
     public var openingBalance: Money
@@ -353,8 +350,6 @@ public struct AccountDraft: Hashable, Sendable {
         self.openingBalance = openingBalance
         self.ownerId = ownerId
     }
-
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     public var issue: String? {
         if trimmedName.isEmpty { return "Ponle un nombre a la cuenta." }
