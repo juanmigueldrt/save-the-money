@@ -20,6 +20,10 @@ extension SupabaseBackend: CreditCardService {
 
     public func saveCreditCard(_ terms: CreditCardTerms) async throws -> CreditCardTerms {
         if let issue = terms.issue { throw AppError.invalidInput(issue) }
+        return try await saved(Self.saveCreditCardCall(terms), columns: Self.cardColumns)
+    }
+
+    static func saveCreditCardCall(_ terms: CreditCardTerms) -> RpcCall {
         var params: [String: AnyJSON] = [
             "card": .uuid(terms.accountId), "credit_limit": .integer(terms.creditLimit.minor),
             "statement": .integer(terms.statementDay), "payment": .integer(terms.paymentDay),
@@ -32,11 +36,11 @@ extension SupabaseBackend: CreditCardService {
         // Sin versión son condiciones nuevas: `create_credit_card` no las repite si ya estaban guardadas.
         guard let seen = terms.updatedAt else {
             params["household"] = .uuid(terms.householdId)
-            return try await saved("create_credit_card", columns: Self.cardColumns, params)
+            return RpcCall(function: "create_credit_card", params: params)
         }
         // `update_credit_card` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
         params["seen"] = .string(seen)
-        return try await saved("update_credit_card", columns: Self.cardColumns, params)
+        return RpcCall(function: "update_credit_card", params: params)
     }
 
     public func cardInstallments(in householdId: UUID) async throws -> [CardInstallment] {
@@ -50,15 +54,19 @@ extension SupabaseBackend: CreditCardService {
 
     public func saveInstallment(_ installment: CardInstallment) async throws -> CardInstallment {
         if let issue = installment.issue { throw AppError.invalidInput(issue) }
+        return try await saved(Self.saveInstallmentCall(installment), columns: Self.installmentColumns)
+    }
+
+    static func saveInstallmentCall(_ installment: CardInstallment) -> RpcCall {
         // Sin versión es un aplazado nuevo: `create_card_installment` no lo repite si ya estaba guardado.
         guard let seen = installment.updatedAt else {
-            return try await saved("create_card_installment", columns: Self.installmentColumns, [
+            return RpcCall(function: "create_card_installment", params: [
                 "installment": .uuid(installment.id), "household": .uuid(installment.householdId),
                 "card": .uuid(installment.accountId), "movement": .uuid(installment.movementId),
                 "plan_months": .integer(installment.months), "plan_rate": .decimal(installment.rate)
             ])
         }
-        return try await saved("update_card_installment", columns: Self.installmentColumns, [
+        return RpcCall(function: "update_card_installment", params: [
             "installment": .uuid(installment.id), "seen": .string(seen),
             "plan_months": .integer(installment.months), "plan_rate": .decimal(installment.rate)
         ])

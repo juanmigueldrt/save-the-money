@@ -27,6 +27,13 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
 
+    /**
+     * Llama a una función `create_…` o `update_…` (ORC-142) y pide la fila guardada. Un alta repetida devuelve la que
+     * había; un cambio sobre una versión que ya no es la del servidor falla con STM05. Qué se manda: [RpcEscrituras].
+     */
+    private suspend fun io.github.jan.supabase.SupabaseClient.saved(call: RpcCall, columns: String) =
+        postgrest.rpc(call.function, call.params) { select(Columns.raw(columns)) }
+
     override suspend fun accounts(householdId: String): List<Account> = backend.mapped {
         allPages { from, to ->
             client.from("accounts").select(Columns.raw(ACCOUNT)) {
@@ -50,32 +57,11 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createAccount(draft: AccountDraft, householdId: String): Account = backend.mapped {
         draft.issue?.let(::fail)
-        // create_account no repite una cuenta ya guardada con ese id: devuelve la que había.
-        val params = buildJsonObject {
-            put("account", draft.id)
-            put("household", householdId)
-            put("label", draft.trimmedName)
-            put("account_kind", Json.encodeToJsonElement(draft.kind))
-            put("opening", draft.openingMinor)
-            put("owner", draft.ownerId)
-        }
-        client.postgrest.rpc("create_account", params) { select(Columns.raw(ACCOUNT)) }.decodeSingle()
+        client.saved(RpcEscrituras.createAccount(draft, householdId), ACCOUNT).decodeSingle()
     }
 
     override suspend fun updateAccount(account: Account): Account = backend.mapped {
-        // update_account compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        val params = buildJsonObject {
-            put("account", account.id)
-            put("seen", account.updatedAt)
-            put("label", account.name.trim())
-            put("account_kind", Json.encodeToJsonElement(account.kind))
-            put("opening", account.openingMinor)
-            put("owner", account.ownerId)
-            put("archived", account.archivedAt)
-            put("make_default", account.isDefault && !account.isArchived)
-            put("in_net_worth", account.includeInNetWorth)
-        }
-        client.postgrest.rpc("update_account", params) { select(Columns.raw(ACCOUNT)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateAccount(account), ACCOUNT).decodeSingle()
     }
 
     override suspend fun deleteAccount(accountId: String) = backend.mapped {
@@ -94,34 +80,15 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    private fun CategoryKind.groupOf(category: BudgetCategory) = if (this == CategoryKind.Expense) category.budgetGroup else null
-
     override suspend fun createCategory(category: BudgetCategory): BudgetCategory = backend.mapped {
         category.issue(emptyList())?.let(::fail)
-        // create_category no repite una categoría ya guardada con ese id: devuelve la que había.
-        val params = buildJsonObject {
-            put("category", category.id.ifEmpty(::newId))
-            put("household", category.householdId)
-            put("label", category.trimmedName)
-            put("category_kind", Json.encodeToJsonElement(category.kind))
-            put("budget", Json.encodeToJsonElement(category.kind.groupOf(category)))
-            put("icon_name", category.icon)
-        }
-        client.postgrest.rpc("create_category", params) { select(Columns.raw(CATEGORY)) }.decodeSingle()
+        client.saved(RpcEscrituras.createCategory(category), CATEGORY).decodeSingle()
     }
 
     /** Solo nombre, grupo e icono: el tipo de una categoría no se cambia. */
     override suspend fun updateCategory(category: BudgetCategory): BudgetCategory = backend.mapped {
         category.issue(emptyList())?.let(::fail)
-        // update_category compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        val params = buildJsonObject {
-            put("category", category.id)
-            put("seen", category.updatedAt)
-            put("label", category.trimmedName)
-            put("budget", Json.encodeToJsonElement(category.kind.groupOf(category)))
-            put("icon_name", category.icon)
-        }
-        client.postgrest.rpc("update_category", params) { select(Columns.raw(CATEGORY)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateCategory(category), CATEGORY).decodeSingle()
     }
 
     override suspend fun deleteCategory(categoryId: String) = backend.mapped {
@@ -343,21 +310,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     /** Se actualiza por id; si no había fila, se crea. */
     override suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget = backend.mapped {
         budget.issue?.let(::fail)
-        val params = buildJsonObject {
-            put("budget", budget.id)
-            put("label", budget.trimmedName)
-            put("cap", budget.limit)
-            put("starts", budget.startsOn.toString())
-            put("ends", budget.endsOn?.toString())
-            putJsonArray("category_list") { budget.categoryIds.forEach { add(JsonPrimitive(it)) } }
-            putJsonArray("account_list") { budget.accountIds.forEach { add(JsonPrimitive(it)) } }
-            put("favorite", budget.isFavorite)
-            if (budget.updatedAt == null) put("household", budget.householdId) else put("seen", budget.updatedAt)
-        }
-        // Sin versión es uno nuevo (create_extra_budget no lo repite si ya estaba); con versión, un cambio
-        // (update_extra_budget falla con STM05 si ya no es la que se leyó).
-        val function = if (budget.updatedAt == null) "create_extra_budget" else "update_extra_budget"
-        client.postgrest.rpc(function, params) { select(Columns.raw(EXTRA)) }.decodeSingle<ExtraRow>().extra
+        client.saved(RpcEscrituras.saveExtraBudget(budget), EXTRA).decodeSingle<ExtraRow>().extra
     }
 
     override suspend fun deleteExtraBudget(id: String) = backend.mapped {
@@ -399,15 +352,12 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
         series.issue?.let(::fail)
-        // create_recurring_series no repite un pago fijo ya guardado con ese id: devuelve el que había.
-        val params = series.copy(id = series.id.ifEmpty(::newId)).params().with("household", series.householdId)
-        client.postgrest.rpc("create_recurring_series", params) { select(Columns.raw(SERIES)) }.decodeSingle()
+        client.saved(RpcEscrituras.createRecurring(series), SERIES).decodeSingle()
     }
 
     override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
         series.issue?.let(::fail)
-        // update_recurring_series compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        client.postgrest.rpc("update_recurring_series", series.params().with("seen", series.updatedAt)) { select(Columns.raw(SERIES)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateRecurring(series), SERIES).decodeSingle()
     }
 
     override suspend fun deleteRecurring(seriesId: String) = backend.mapped {
@@ -455,14 +405,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun updateCharge(charge: RecurringCharge, status: ChargeStatus, transactionId: String?): RecurringCharge = backend.mapped {
-        // update_recurring_charge compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        val params = buildJsonObject {
-            put("charge", charge.id)
-            put("seen", charge.updatedAt)
-            put("new_status", status.name.lowercase())
-            put("movement", if (status == ChargeStatus.Pending) null else transactionId)
-        }
-        client.postgrest.rpc("update_recurring_charge", params) { select(Columns.raw(CHARGE)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateCharge(charge, status, transactionId), CHARGE).decodeSingle()
     }
 
     override suspend fun goals(householdId: String): List<Goal> = backend.mapped {
@@ -478,15 +421,12 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createGoal(goal: Goal): Goal = backend.mapped {
         goal.issue?.let(::fail)
-        // create_goal no repite una meta ya guardada con ese id: devuelve la que había.
-        val params = goal.copy(id = goal.id.ifEmpty(::newId)).params().with("household", goal.householdId)
-        client.postgrest.rpc("create_goal", params) { select(Columns.raw(GOAL)) }.decodeSingle()
+        client.saved(RpcEscrituras.createGoal(goal), GOAL).decodeSingle()
     }
 
     override suspend fun updateGoal(goal: Goal): Goal = backend.mapped {
         goal.issue?.let(::fail)
-        // update_goal compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        client.postgrest.rpc("update_goal", goal.params().with("seen", goal.updatedAt)) { select(Columns.raw(GOAL)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateGoal(goal), GOAL).decodeSingle()
     }
 
     override suspend fun deleteGoal(goalId: String) = backend.mapped {
@@ -507,15 +447,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun addContribution(contribution: GoalContribution): GoalContribution = backend.mapped {
         contribution.issue?.let(::fail)
-        val params = buildJsonObject {
-            put("contribution", contribution.id.ifEmpty(::newId))
-            put("household", contribution.householdId)
-            put("goal", contribution.goalId)
-            put("amount", contribution.amountMinor)
-            put("made", contribution.madeOn)
-            put("remark", contribution.note)
-        }
-        client.postgrest.rpc("create_goal_contribution", params) { select(Columns.raw(CONTRIBUTION)) }.decodeSingle()
+        client.saved(RpcEscrituras.addContribution(contribution), CONTRIBUTION).decodeSingle()
     }
 
     override suspend fun creditCards(householdId: String): List<CreditCardTerms> = backend.mapped {
@@ -531,13 +463,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     // No se usa upsert: haría UPDATE de la cuenta y el hogar, que no se pueden cambiar.
     override suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms = backend.mapped {
         terms.issue?.let(::fail)
-        if (terms.updatedAt == null) {
-            // Sin versión son condiciones nuevas: create_credit_card no las repite si ya estaban guardadas.
-            client.postgrest.rpc("create_credit_card", terms.params().with("household", terms.householdId)) { select(Columns.raw(CARD)) }.decodeSingle()
-        } else {
-            // update_credit_card compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-            client.postgrest.rpc("update_credit_card", terms.params().with("seen", terms.updatedAt)) { select(Columns.raw(CARD)) }.decodeSingle()
-        }
+        client.saved(RpcEscrituras.saveCreditCard(terms), CARD).decodeSingle()
     }
 
     override suspend fun cardInstallments(householdId: String): List<CardInstallment> = backend.mapped {
@@ -552,22 +478,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun saveInstallment(installment: CardInstallment): CardInstallment = backend.mapped {
         installment.issue?.let(::fail)
-        val params = buildJsonObject {
-            put("installment", installment.id.ifEmpty(::newId))
-            put("plan_months", installment.months)
-            put("plan_rate", installment.rate)
-            if (installment.updatedAt == null) {
-                put("household", installment.householdId)
-                put("card", installment.accountId)
-                put("movement", installment.movementId)
-            } else {
-                put("seen", installment.updatedAt)
-            }
-        }
-        // Sin versión es un aplazado nuevo (create_card_installment no lo repite si ya estaba); con versión, un cambio
-        // (update_card_installment falla con STM05 si ya no es la que se leyó).
-        val function = if (installment.updatedAt == null) "create_card_installment" else "update_card_installment"
-        client.postgrest.rpc(function, params) { select(Columns.raw(INSTALLMENT)) }.decodeSingle()
+        client.saved(RpcEscrituras.saveInstallment(installment), INSTALLMENT).decodeSingle()
     }
 
     override suspend fun creditScores(): List<CreditScore> = backend.mapped {
@@ -619,33 +530,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    /** Lo que comparten create_holding y update_holding. La moneda no va: la pone el servidor al crear. */
-    private fun Holding.params() = buildJsonObject {
-        put("holding", id)
-        put("label", trimmedName)
-        put("ticker", trimmedSymbol)
-        put("holding_kind", Json.encodeToJsonElement(kind))
-        put("asset", Json.encodeToJsonElement(assetClass))
-        put("account", accountId)
-        put("owner", ownerId)
-        put("unit_price", price.toPlainString())
-        put("priced", priceOn)
-        put("fee", feeRate.toPlainString())
-        put("remark", note)
-        put("archived", archivedAt)
-    }
-
     override suspend fun createHolding(holding: Holding): Holding = backend.mapped {
         holding.issue?.let(::fail)
-        // create_holding no repite un activo ya guardado con ese id: devuelve el que había.
-        val params = holding.copy(id = holding.id.ifEmpty(::newId)).params().with("household", holding.householdId)
-        client.postgrest.rpc("create_holding", params) { select(Columns.raw(HOLDING)) }.decodeSingle()
+        client.saved(RpcEscrituras.createHolding(holding), HOLDING).decodeSingle()
     }
 
     override suspend fun updateHolding(holding: Holding): Holding = backend.mapped {
         holding.issue?.let(::fail)
-        // update_holding compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        client.postgrest.rpc("update_holding", holding.params().with("seen", holding.updatedAt)) { select(Columns.raw(HOLDING)) }.decodeSingle()
+        client.saved(RpcEscrituras.updateHolding(holding), HOLDING).decodeSingle()
     }
 
     override suspend fun deleteHolding(holdingId: String) = backend.mapped<Unit> {
@@ -709,32 +601,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    /** Lo que comparten create_investment_plan y update_investment_plan. El activo de un plan no se cambia. */
-    private fun InvestmentPlan.params() = buildJsonObject {
-        put("plan", id)
-        put("account", accountId)
-        put("amount", amountMinor)
-        put("step", every)
-        put("step_unit", Json.encodeToJsonElement(unit))
-        put("starts", startsOn)
-        put("ends", endsOn)
-        put("annual_return", expectedAnnualReturn.toPlainString())
-        put("remind_days", remindDaysBefore)
-        put("paused", pausedAt)
-        put("archived", archivedAt)
-    }
-
     override suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
         plan.issue?.let(::fail)
-        // create_investment_plan no repite un plan ya guardado con ese id: devuelve el que había.
-        val params = plan.copy(id = plan.id.ifEmpty(::newId)).params().with("household", plan.householdId).with("holding", plan.holdingId)
-        client.postgrest.rpc("create_investment_plan", params) { select(Columns.raw(PLAN)) }.decodeSingle()
+        client.saved(RpcEscrituras.createPlan(plan), PLAN).decodeSingle()
     }
 
     override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
         plan.issue?.let(::fail)
-        // update_investment_plan compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        client.postgrest.rpc("update_investment_plan", plan.params().with("seen", plan.updatedAt)) { select(Columns.raw(PLAN)) }.decodeSingle()
+        client.saved(RpcEscrituras.updatePlan(plan), PLAN).decodeSingle()
     }
 
     override suspend fun deletePlan(planId: String) = backend.mapped<Unit> {
@@ -778,69 +652,7 @@ private const val PLAN = "id,household_id,holding_id,account_id,amount_minor,eve
 private const val SCORE = "id,score,max_score,provider,recorded_on,note"
 private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate,updated_at"
 
-/** Lo que comparten create_credit_card y update_credit_card. */
-private fun CreditCardTerms.params() = buildJsonObject {
-    put("card", accountId)
-    put("credit_limit", creditLimit)
-    put("statement", statementDay)
-    put("payment", paymentDay)
-    put("delay_months", paymentDelayMonths)
-    put("mode", paymentMode.name.lowercase())
-    put("fixed_payment", fixedPayment)
-    put("min_percent", minPaymentPercent)
-    put("min_payment", minPayment)
-    put("revolving", revolvingRate)
-    put("installments", installmentRate)
-    put("pay_from", payFromAccountId)
-    put("remind_days", remindDaysBefore)
-    put("alert", alertPercent)
-}
-
-/**
- * Columnas editables, con los nulos explícitos para poder borrar un valor: lo que comparten create_recurring_series y
- * update_recurring_series. Sin `pendingFrom`, el servidor pone hoy al crear y deja el que había al cambiar.
- */
-private fun RecurringSeries.params() = buildJsonObject {
-    put("series", id)
-    put("label", trimmedName)
-    put("series_kind", RECURRING_KIND.getValue(kind))
-    put("amount", amountMinor)
-    put("account", accountId)
-    put("category", categoryId)
-    put("step", every)
-    put("step_unit", unit.name.lowercase())
-    put("starts", startsOn)
-    put("ends", endsOn)
-    put("remind_days", remindDaysBefore)
-    put("archived", archivedAt)
-    put("intro_amount", introMinor)
-    put("intro_count", introCharges)
-    put("pending", createsPending)
-    put("pending_start", pendingFrom)
-}
-
-private val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
-
-/** Un id para una fila nueva que llega sin él: quien llama no es un formulario que vaya a reintentar. */
-private fun newId() = java.util.UUID.randomUUID().toString()
-
-/** Los parámetros de una función del servidor más uno: el hogar al dar de alta, la versión leída al cambiar. */
-private fun JsonObject.with(key: String, value: String?) = JsonObject(this + (key to JsonPrimitive(value)))
-
-/** Lo que comparten create_goal y update_goal. */
-private fun Goal.params() = buildJsonObject {
-    put("goal", id)
-    put("label", trimmedName)
-    put("goal_kind", kind.name.lowercase())
-    put("target", targetMinor)
-    put("starting", startingMinor)
-    put("monthly_plan", monthlyPlanMinor)
-    put("due", targetOn)
-    put("account", accountId)
-    put("icon_name", icon)
-    put("completed", completedAt)
-    put("archived", archivedAt)
-}
+internal val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
 
 // Filas que se envían. Nunca llevan id ni created_by: el servidor no deja escribirlos.
 // Los opcionales van como null explícito: todas las filas de un lote deben llevar las mismas claves.

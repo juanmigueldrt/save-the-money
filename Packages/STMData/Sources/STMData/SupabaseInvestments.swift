@@ -24,16 +24,24 @@ extension SupabaseBackend: InvestmentService {
 
     public func createHolding(_ holding: Holding) async throws -> Holding {
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
-        var params = Self.holdingParams(holding)
-        params["household"] = .uuid(holding.householdId)
-        return try await saved("create_holding", columns: Self.holdingColumns, params)
+        return try await saved(Self.createHoldingCall(holding), columns: Self.holdingColumns)
     }
 
     public func updateHolding(_ holding: Holding) async throws -> Holding {
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
-        var params = Self.holdingParams(holding)
+        return try await saved(Self.updateHoldingCall(holding), columns: Self.holdingColumns)
+    }
+
+    static func createHoldingCall(_ holding: Holding) -> RpcCall {
+        var params = holdingParams(holding)
+        params["household"] = .uuid(holding.householdId)
+        return RpcCall(function: "create_holding", params: params)
+    }
+
+    static func updateHoldingCall(_ holding: Holding) -> RpcCall {
+        var params = holdingParams(holding)
         params["seen"] = .text(holding.updatedAt)
-        return try await saved("update_holding", columns: Self.holdingColumns, params)
+        return RpcCall(function: "update_holding", params: params)
     }
 
     /// Lo que comparten `create_holding` y `update_holding`. La moneda no va: la pone el servidor al crear.
@@ -126,17 +134,25 @@ extension SupabaseBackend: InvestmentService {
 
     public func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
         if let issue = plan.issue { throw AppError.invalidInput(issue) }
-        var params = Self.planParams(plan)
-        params["household"] = .uuid(plan.householdId)
-        params["holding"] = .uuid(plan.holdingId)
-        return try await saved("create_investment_plan", columns: Self.planColumns, params)
+        return try await saved(Self.createPlanCall(plan), columns: Self.planColumns)
     }
 
     public func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
         if let issue = plan.issue { throw AppError.invalidInput(issue) }
-        var params = Self.planParams(plan)
+        return try await saved(Self.updatePlanCall(plan), columns: Self.planColumns)
+    }
+
+    static func createPlanCall(_ plan: InvestmentPlan) -> RpcCall {
+        var params = planParams(plan)
+        params["household"] = .uuid(plan.householdId)
+        params["holding"] = .uuid(plan.holdingId)
+        return RpcCall(function: "create_investment_plan", params: params)
+    }
+
+    static func updatePlanCall(_ plan: InvestmentPlan) -> RpcCall {
+        var params = planParams(plan)
         params["seen"] = .text(plan.updatedAt)
-        return try await saved("update_investment_plan", columns: Self.planColumns, params)
+        return RpcCall(function: "update_investment_plan", params: params)
     }
 
     /// Lo que comparten `create_investment_plan` y `update_investment_plan`. El activo de un plan no se cambia.

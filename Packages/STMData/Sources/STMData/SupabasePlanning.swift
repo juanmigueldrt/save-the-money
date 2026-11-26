@@ -24,16 +24,24 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
         if let issue = series.issue { throw AppError.invalidInput(issue) }
-        var params = Self.seriesParams(series)
-        params["household"] = .uuid(series.householdId)
-        return try await saved("create_recurring_series", columns: Self.seriesColumns, params)
+        return try await saved(Self.createRecurringCall(series), columns: Self.seriesColumns)
     }
 
     public func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
         if let issue = series.issue { throw AppError.invalidInput(issue) }
-        var params = Self.seriesParams(series)
+        return try await saved(Self.updateRecurringCall(series), columns: Self.seriesColumns)
+    }
+
+    static func createRecurringCall(_ series: RecurringSeries) -> RpcCall {
+        var params = seriesParams(series)
+        params["household"] = .uuid(series.householdId)
+        return RpcCall(function: "create_recurring_series", params: params)
+    }
+
+    static func updateRecurringCall(_ series: RecurringSeries) -> RpcCall {
+        var params = seriesParams(series)
         params["seen"] = .text(series.updatedAt)
-        return try await saved("update_recurring_series", columns: Self.seriesColumns, params)
+        return RpcCall(function: "update_recurring_series", params: params)
     }
 
     /// Lo que comparten `create_recurring_series` y `update_recurring_series`. Sin `pendingFrom`, el servidor pone
@@ -97,7 +105,11 @@ extension SupabaseBackend: RecurringService, GoalService {
     public func updateCharge(_ charge: RecurringCharge, status: ChargeStatus,
                              transactionId: UUID?) async throws -> RecurringCharge {
         // `update_recurring_charge` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        try await saved("update_recurring_charge", columns: Self.chargeColumns, [
+        try await saved(Self.updateChargeCall(charge, status: status, transactionId: transactionId), columns: Self.chargeColumns)
+    }
+
+    static func updateChargeCall(_ charge: RecurringCharge, status: ChargeStatus, transactionId: UUID?) -> RpcCall {
+        RpcCall(function: "update_recurring_charge", params: [
             "charge": .uuid(charge.id), "seen": .text(charge.updatedAt), "new_status": .string(status.rawValue),
             "movement": .uuid(status == .pending ? nil : transactionId)
         ])
@@ -123,16 +135,24 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func createGoal(_ goal: Goal) async throws -> Goal {
         if let issue = goal.issue { throw AppError.invalidInput(issue) }
-        var params = Self.goalParams(goal)
-        params["household"] = .uuid(goal.householdId)
-        return try await saved("create_goal", columns: Self.goalColumns, params)
+        return try await saved(Self.createGoalCall(goal), columns: Self.goalColumns)
     }
 
     public func updateGoal(_ goal: Goal) async throws -> Goal {
         if let issue = goal.issue { throw AppError.invalidInput(issue) }
-        var params = Self.goalParams(goal)
+        return try await saved(Self.updateGoalCall(goal), columns: Self.goalColumns)
+    }
+
+    static func createGoalCall(_ goal: Goal) -> RpcCall {
+        var params = goalParams(goal)
+        params["household"] = .uuid(goal.householdId)
+        return RpcCall(function: "create_goal", params: params)
+    }
+
+    static func updateGoalCall(_ goal: Goal) -> RpcCall {
+        var params = goalParams(goal)
         params["seen"] = .text(goal.updatedAt)
-        return try await saved("update_goal", columns: Self.goalColumns, params)
+        return RpcCall(function: "update_goal", params: params)
     }
 
     /// Lo que comparten `create_goal` y `update_goal`.
@@ -161,7 +181,11 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution {
         if let issue = contribution.issue { throw AppError.invalidInput(issue) }
-        return try await saved("create_goal_contribution", columns: Self.contributionColumns, [
+        return try await saved(Self.addContributionCall(contribution), columns: Self.contributionColumns)
+    }
+
+    static func addContributionCall(_ contribution: GoalContribution) -> RpcCall {
+        RpcCall(function: "create_goal_contribution", params: [
             "contribution": .uuid(contribution.id), "household": .uuid(contribution.householdId),
             "goal": .uuid(contribution.goalId), "amount": .integer(contribution.amount.minor),
             "made": .day(contribution.madeOn), "remark": .text(contribution.note)

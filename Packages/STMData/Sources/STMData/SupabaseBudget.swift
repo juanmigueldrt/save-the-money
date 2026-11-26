@@ -81,6 +81,10 @@ extension SupabaseBackend: BudgetService {
 
     public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
         if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        return try await saved(Self.saveExtraBudgetCall(budget), columns: Self.extraColumns)
+    }
+
+    static func saveExtraBudgetCall(_ budget: ExtraBudget) -> RpcCall {
         var params: [String: AnyJSON] = [
             "budget": .uuid(budget.id), "label": .string(budget.trimmedName), "cap": .integer(budget.limit.minor),
             "starts": .day(budget.startsOn), "ends": .day(budget.endsOn),
@@ -91,11 +95,11 @@ extension SupabaseBackend: BudgetService {
         // Sin versión es uno nuevo: `create_extra_budget` no lo repite si ya estaba guardado.
         guard let seen = budget.updatedAt else {
             params["household"] = .uuid(budget.householdId)
-            return try await saved("create_extra_budget", columns: Self.extraColumns, params)
+            return RpcCall(function: "create_extra_budget", params: params)
         }
         // `update_extra_budget` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
         params["seen"] = .string(seen)
-        return try await saved("update_extra_budget", columns: Self.extraColumns, params)
+        return RpcCall(function: "update_extra_budget", params: params)
     }
 
     public func deleteExtraBudget(_ id: UUID) async throws {

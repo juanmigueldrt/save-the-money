@@ -34,7 +34,11 @@ extension SupabaseBackend: FinanceService {
     public func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account {
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
         // `create_account` no repite una cuenta ya guardada con ese id: devuelve la que había.
-        return try await saved("create_account", columns: Self.accountColumns, [
+        return try await saved(Self.createAccountCall(draft, in: householdId), columns: Self.accountColumns)
+    }
+
+    static func createAccountCall(_ draft: AccountDraft, in householdId: UUID) -> RpcCall {
+        RpcCall(function: "create_account", params: [
             "account": .uuid(draft.id), "household": .uuid(householdId), "label": .string(draft.trimmedName),
             "account_kind": .string(draft.kind.rawValue), "opening": .integer(draft.openingBalance.minor),
             "owner": .uuid(draft.ownerId)
@@ -43,7 +47,11 @@ extension SupabaseBackend: FinanceService {
 
     public func updateAccount(_ account: Account) async throws -> Account {
         // `update_account` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
-        try await saved("update_account", columns: Self.accountColumns, [
+        try await saved(Self.updateAccountCall(account), columns: Self.accountColumns)
+    }
+
+    static func updateAccountCall(_ account: Account) -> RpcCall {
+        RpcCall(function: "update_account", params: [
             "account": .uuid(account.id), "seen": .text(account.updatedAt),
             "label": .string(account.name.trimmingCharacters(in: .whitespacesAndNewlines)),
             "account_kind": .string(account.kind.rawValue), "opening": .integer(account.openingBalance.minor),
@@ -74,7 +82,11 @@ extension SupabaseBackend: FinanceService {
     public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
         if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
         // `create_category` no repite una categoría ya guardada con ese id: devuelve la que había.
-        return try await saved("create_category", columns: Self.categoryColumns, [
+        return try await saved(Self.createCategoryCall(category), columns: Self.categoryColumns)
+    }
+
+    static func createCategoryCall(_ category: BudgetCategory) -> RpcCall {
+        RpcCall(function: "create_category", params: [
             "category": .uuid(category.id), "household": .uuid(category.householdId), "label": .string(category.trimmedName),
             "category_kind": .string(category.kind.rawValue),
             "budget": .text(category.kind == .expense ? category.budgetGroup?.rawValue : nil), "icon_name": .text(category.icon)
@@ -85,7 +97,11 @@ extension SupabaseBackend: FinanceService {
         if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
         // `update_category` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
         // Solo nombre, grupo e icono: el tipo de una categoría no se cambia.
-        return try await saved("update_category", columns: Self.categoryColumns, [
+        return try await saved(Self.updateCategoryCall(category), columns: Self.categoryColumns)
+    }
+
+    static func updateCategoryCall(_ category: BudgetCategory) -> RpcCall {
+        RpcCall(function: "update_category", params: [
             "category": .uuid(category.id), "seen": .text(category.updatedAt), "label": .string(category.trimmedName),
             "budget": .text(category.kind == .expense ? category.budgetGroup?.rawValue : nil), "icon_name": .text(category.icon)
         ])

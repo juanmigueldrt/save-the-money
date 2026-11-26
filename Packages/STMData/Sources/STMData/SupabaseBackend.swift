@@ -234,11 +234,11 @@ public struct SupabaseBackend: AuthService, HouseholdService {
 
     /// Llama a una función `create_…` o `update_…` y devuelve la fila guardada. Los parámetros van todos, también
     /// los nulos: las funciones de cambio no tienen valores por defecto.
-    func saved<Row: Decodable & Sendable>(_ function: String, columns: String, _ params: [String: AnyJSON]) async throws -> Row {
+    func saved<Row: Decodable & Sendable>(_ call: RpcCall, columns: String) async throws -> Row {
         let rows: [Row] = try await mapped {
-            try await client.rpc(function, params: params).select(columns).execute().value
+            try await client.rpc(call.function, params: call.params).select(columns).execute().value
         }
-        guard let row = rows.first else { throw AppError.unknown(function) }
+        guard let row = rows.first else { throw AppError.unknown(call.function) }
         return row
     }
 
@@ -335,6 +335,15 @@ private struct ProfileChanges: Encodable, Sendable {
         try container.encode(displayName, forKey: .displayName)
         try container.encode(theme, forKey: .theme)
     }
+}
+
+/// Una llamada a una función `create_…` o `update_…` del servidor: su nombre y sus parámetros. Las claves tienen que
+/// ser exactamente los nombres de los parámetros de la función: PostgREST no encuentra la función si sobra o falta
+/// alguno sin valor por defecto. `RpcEscriturasTests` las compara con `testdata/vectors/rpc_escrituras.json`, el
+/// mismo fichero que usa `supabase/tests/api/escrituras_idempotentes.py` contra el PostgREST local.
+struct RpcCall: Sendable {
+    let function: String
+    let params: [String: AnyJSON]
 }
 
 /// Valores para los parámetros de las funciones del servidor, con los nulos explícitos.
