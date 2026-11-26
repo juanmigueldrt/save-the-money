@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 o anterior: allowBackup="false" ya lo desactiva todo; esto deja la sesión fuera aunque cambie. -->
+<full-backup-content>
+    <exclude domain="sharedpref" path="com.savethemoney.android_preferences.xml" />
+</full-backup-content>

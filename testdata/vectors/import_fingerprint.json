@@ -116,6 +116,42 @@
           "importHash": "2210b5fcc3737f1364539cee75f62132dd88998456aadee0dbbb21f5f0059366"
         }
       ]
+    },
+    {
+      "name": "Separador ; aunque los conceptos tengan más comas que puntos y coma",
+      "csv": "Fecha;Concepto;Importe\n28/10/2026;PAGO BIZUM, CENA, JUAN, ANA;-12,50\n29/10/2026;COMPRA TARJETA, MADRID, ES;-3,10\n",
+      "rows": [
+        {
+          "hashInput": "2026-10-28|-1250|pago bizum, cena, juan, ana|0",
+          "importHash": "27e360c62eb61d4608c66f5f3eb9f6c91d0c5a75c1ebf1410eb34f9e60df1cbd"
+        },
+        {
+          "hashInput": "2026-10-29|-310|compra tarjeta, madrid, es|0",
+          "importHash": "cf4f62a93671b15902f7ed95a07f0de5f426b727ceb68d7d8bbd820da7129242"
+        }
+      ]
+    },
+    {
+      "name": "Cargo y abono: una fila con los dos distintos de cero no se importa; un cargo 0,00 no cuenta",
+      "csv": "Fecha;Concepto;Cargo;Abono\n05/03/2026;Uno;12,50;\n06/03/2026;Dos;;3,10\n07/03/2026;Tres;5,00;5,00\n08/03/2026;Cuatro;0,00;7,00\n",
+      "rows": [
+        {
+          "hashInput": "2026-03-05|-1250|uno|0",
+          "importHash": "87587915c66bbcac023f9766aeb63bb7f344d77f6ce27226cef7a4f35cca7081"
+        },
+        {
+          "hashInput": "2026-03-06|310|dos|0",
+          "importHash": "ec0c80276c4a5a83f0a672c00f4bcf349fdce1eef5c9ef83a69428b849216828"
+        },
+        {
+          "hashInput": null,
+          "importHash": null
+        },
+        {
+          "hashInput": "2026-03-08|700|cuatro|0",
+          "importHash": "9e315a9ed542ab9ac400b7609dc7e2e5ed16c3ce3f5223b72a584832e6ba6385"
+        }
+      ]
     }
   ]
 }
