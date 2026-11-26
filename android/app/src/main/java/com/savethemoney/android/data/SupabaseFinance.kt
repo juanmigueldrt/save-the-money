@@ -123,9 +123,23 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }.decodeList()
     }
 
+    /** create_movement no repite un movimiento ya guardado con ese id: devuelve el que había. */
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement = backend.mapped {
         draft.issue?.let(::fail)
-        client.from("transactions").insert(NewMovementRow.of(draft, householdId)) { select(Columns.raw(MOVEMENT)) }.decodeSingle()
+        val params = buildJsonObject {
+            put("movement", draft.id)
+            put("household", householdId)
+            put("account", draft.accountId)
+            put("category", draft.categoryId)
+            put("booked", draft.bookedOn.toString())
+            put("amount", draft.amountMinor)
+            put("label", draft.description.trim())
+            put("note", draft.notes)
+            put("is_excluded", draft.excluded)
+            put("payee_name", Payee.clean(draft.payee))
+            putJsonArray("tag_list") { draft.tags.forEach { add(JsonPrimitive(it)) } }
+        }
+        client.postgrest.rpc("create_movement", params) { select(Columns.raw(MOVEMENT)) }.decodeSingle()
     }
 
     /** create_transfer guarda las dos patas en una sola transacción y no repite una ya guardada. */
@@ -151,14 +165,23 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun updateMovement(movement: Movement): Movement = backend.mapped {
         movement.toDraft().issue?.let(::fail)
-        val changes = MovementChanges(
-            movement.accountId, movement.categoryId, movement.bookedOn, movement.amountMinor, movement.description.trim(), movement.notes,
-            movement.excluded, movement.reviewedAt, Payee.clean(movement.payee), movement.tags,
-        )
-        client.from("transactions").update(changes) {
-            select(Columns.raw(MOVEMENT))
-            filter { eq("id", movement.id) }
-        }.decodeSingle()
+        // update_movement compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        val params = buildJsonObject {
+            put("movement", movement.id)
+            // El `updated_at` tal cual llegó del servidor: es la versión que se leyó.
+            put("seen", movement.updatedAt)
+            put("account", movement.accountId)
+            put("category", movement.categoryId)
+            put("booked", movement.bookedOn)
+            put("amount", movement.amountMinor)
+            put("label", movement.description.trim())
+            put("note", movement.notes)
+            put("is_excluded", movement.excluded)
+            put("reviewed", movement.reviewedAt)
+            put("payee_name", Payee.clean(movement.payee))
+            putJsonArray("tag_list") { movement.tags.forEach { add(JsonPrimitive(it)) } }
+        }
+        client.postgrest.rpc("update_movement", params) { select(Columns.raw(MOVEMENT)) }.decodeSingle()
     }
 
     override suspend fun deleteMovement(movementId: String) = backend.mapped {
@@ -645,7 +668,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
-        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
+        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at"
 
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500
@@ -839,18 +862,4 @@ private data class NewChargeRow(
     @SerialName("series_id") val seriesId: String,
     @SerialName("due_on") val dueOn: String,
     @SerialName("amount_minor") val amountMinor: Long,
-)
-
-@Serializable
-private data class MovementChanges(
-    @SerialName("account_id") val accountId: String,
-    @SerialName("category_id") val categoryId: String?,
-    @SerialName("booked_on") val bookedOn: String,
-    @SerialName("amount_minor") val amountMinor: Long,
-    val description: String,
-    val notes: String?,
-    val excluded: Boolean,
-    @SerialName("reviewed_at") val reviewedAt: String?,
-    val payee: String?,
-    val tags: List<String>,
 )

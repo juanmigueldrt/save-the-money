@@ -102,20 +102,20 @@ final class FinanceModel {
 
     @discardableResult
     func update(_ movement: Movement) async -> Bool {
-        await perform {
-            _ = try await service.updateMovement(movement)
-            try await reloadAll()
-        }
+        await update([movement])
     }
 
     /// Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final.
     @discardableResult
     func update(_ movements: [Movement]) async -> Bool {
         guard !movements.isEmpty else { return true }
-        return await perform {
+        let saved = await perform {
             for movement in movements { _ = try await service.updateMovement(movement) }
             try await reloadAll()
         }
+        // Si otro dispositivo cambió alguno antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !saved { try? await reloadAll() }
+        return saved
     }
 
     /// Borra varios a la vez (sin «Deshacer»: la vista pide confirmación antes).
