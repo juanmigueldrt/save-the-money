@@ -74,7 +74,7 @@ final class InvestmentModel {
         isLoading = true
         defer { isLoading = false }
         let service = service, households = households, id = household.id
-        _ = await perform {
+        let loaded = await perform {
             async let holdings = service.holdings(in: id)
             async let prices = service.holdingPrices(in: id)
             async let trades = service.trades(in: id)
@@ -82,7 +82,8 @@ final class InvestmentModel {
             (self.holdings, self.prices, self.trades, self.plans) = try await (holdings, prices, trades, plans)
         }
         members = (try? await households.members(of: id)) ?? members
-        await reschedule()
+        // Si la carga falla, los avisos ya programados se quedan como estaban.
+        if loaded { await reschedule() }
     }
 
     func reschedule() async {
