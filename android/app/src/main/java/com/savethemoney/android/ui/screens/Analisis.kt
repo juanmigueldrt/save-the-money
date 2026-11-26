@@ -549,13 +549,14 @@ fun Pantalla18(nav: Nav) {
     var selector by remember { mutableStateOf<String?>(null) }
     LaunchedEffect(finance.recent) { if (!session.capture) tracking.loadMovements() }
     val hoy = finance.today()
-    val seis = ReportPeriod.Last6Months.range(hoy)
+    val inicioMes = finance.household.monthStartDay
+    val seis = ReportPeriod.Last6Months.range(hoy, inicioMes)
     val movimientos = tracking.allMovements
-    val ingresos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Income)
-    val gastos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Expense)
+    val ingresos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Income, monthStartDay = inicioMes)
+    val gastos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Expense, monthStartDay = inicioMes)
     val tope = (ingresos.byMonth.map { it.amount } + gastos.byMonth.map { it.amount }).max().coerceAtLeast(1)
-    val informe = SpendingReport(movimientos, finance.categories, period.range(hoy), kind, setOfNotNull(categoria))
-    val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy), kind, setOfNotNull(categoria))
+    val informe = SpendingReport(movimientos, finance.categories, period.range(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
+    val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
     val sube = biggestRise(movimientos, finance.categories, YearMonth.from(hoy))
     val agrupacion = when (filter) {
         2 -> GroupedSpending.Grouping.Tag

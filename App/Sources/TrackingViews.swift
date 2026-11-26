@@ -390,10 +390,13 @@ struct ReportsView: View {
 
     @ViewBuilder
     private var incomeAndExpenses: some View {
-        let range = ReportPeriod.last6Months.range()
+        let startDay = tracking.household.monthStartDay
+        let range = ReportPeriod.last6Months.range(monthStartDay: startDay)
         let movements = tracking.allMovements
-        let income = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .income)
-        let spending = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .expense)
+        let income = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .income,
+                                    monthStartDay: startDay)
+        let spending = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .expense,
+                                      monthStartDay: startDay)
         let bars = income.byMonth.map { MonthBar(month: $0.month, kind: "Ingresos", amount: $0.amount) }
             + spending.byMonth.map { MonthBar(month: $0.month, kind: "Gastos", amount: $0.amount) }
         let saving = income.averagePerMonth - spending.averagePerMonth

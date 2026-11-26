@@ -1,0 +1,105 @@
+{
+  "_source": "Worked out by hand from the rule: a household month with start day S runs from day S of the previous month to day S-1 of this month, and is named after the month it ends in. A report range is the household periods of each preset (current month from its start day until today). The previous range keeps the same position in the period (same day of the period, capped at the last day of the previous period); a full previous month maps to the full previous period. Expense movements have negative amounts and no category. Movements after today are never in any range. Totals and months are summed by hand.",
+  "monthStartDay": 25,
+  "today": "2026-11-10",
+  "movements": [
+    { "day": "2026-10-24", "minor": -1000 },
+    { "day": "2026-10-25", "minor": -2000 },
+    { "day": "2026-11-10", "minor": -3000 },
+    { "day": "2026-09-25", "minor": -4000 },
+    { "day": "2026-09-24", "minor": -5000 },
+    { "day": "2026-08-25", "minor": -6000 },
+    { "day": "2026-08-24", "minor": -7000 },
+    { "day": "2026-11-11", "minor": -8000 },
+    { "day": "2025-12-25", "minor": -9000 },
+    { "day": "2025-12-24", "minor": -10000 },
+    { "day": "2025-11-10", "minor": -500 },
+    { "day": "2025-11-11", "minor": -700 }
+  ],
+  "vectors": [
+    {
+      "preset": "thisMonth",
+      "range": ["2026-10-25", "2026-11-10"],
+      "total": 5000,
+      "months": [{ "month": "2026-11", "minor": 5000 }],
+      "previousRange": ["2026-09-25", "2026-10-11"],
+      "previousTotal": 4000
+    },
+    {
+      "preset": "lastMonth",
+      "range": ["2026-09-25", "2026-10-24"],
+      "total": 5000,
+      "months": [{ "month": "2026-10", "minor": 5000 }],
+      "previousRange": ["2026-08-25", "2026-09-24"],
+      "previousTotal": 11000
+    },
+    {
+      "preset": "last3Months",
+      "range": ["2026-08-25", "2026-11-10"],
+      "total": 21000,
+      "months": [
+        { "month": "2026-09", "minor": 11000 },
+        { "month": "2026-10", "minor": 5000 },
+        { "month": "2026-11", "minor": 5000 }
+      ],
+      "previousRange": ["2026-05-25", "2026-08-10"],
+      "previousTotal": 0
+    },
+    {
+      "preset": "last6Months",
+      "range": ["2026-05-25", "2026-11-10"],
+      "total": 28000,
+      "months": [
+        { "month": "2026-06", "minor": 0 },
+        { "month": "2026-07", "minor": 0 },
+        { "month": "2026-08", "minor": 7000 },
+        { "month": "2026-09", "minor": 11000 },
+        { "month": "2026-10", "minor": 5000 },
+        { "month": "2026-11", "minor": 5000 }
+      ],
+      "previousRange": ["2025-11-25", "2026-05-11"],
+      "previousTotal": 19000
+    },
+    {
+      "preset": "thisYear",
+      "range": ["2025-12-25", "2026-11-10"],
+      "total": 37000,
+      "months": [
+        { "month": "2026-01", "minor": 9000 },
+        { "month": "2026-02", "minor": 0 },
+        { "month": "2026-03", "minor": 0 },
+        { "month": "2026-04", "minor": 0 },
+        { "month": "2026-05", "minor": 0 },
+        { "month": "2026-06", "minor": 0 },
+        { "month": "2026-07", "minor": 0 },
+        { "month": "2026-08", "minor": 7000 },
+        { "month": "2026-09", "minor": 11000 },
+        { "month": "2026-10", "minor": 5000 },
+        { "month": "2026-11", "minor": 5000 }
+      ],
+      "previousRange": ["2024-12-25", "2025-11-10"],
+      "previousTotal": 500
+    },
+    {
+      "preset": "last12Months",
+      "range": ["2025-11-25", "2026-11-10"],
+      "total": 47000,
+      "months": [
+        { "month": "2025-12", "minor": 10000 },
+        { "month": "2026-01", "minor": 9000 },
+        { "month": "2026-02", "minor": 0 },
+        { "month": "2026-03", "minor": 0 },
+        { "month": "2026-04", "minor": 0 },
+        { "month": "2026-05", "minor": 0 },
+        { "month": "2026-06", "minor": 0 },
+        { "month": "2026-07", "minor": 0 },
+        { "month": "2026-08", "minor": 7000 },
+        { "month": "2026-09", "minor": 11000 },
+        { "month": "2026-10", "minor": 5000 },
+        { "month": "2026-11", "minor": 5000 }
+      ],
+      "previousRange": ["2024-11-25", "2025-11-10"],
+      "previousTotal": 500
+    }
+  ]
+}
