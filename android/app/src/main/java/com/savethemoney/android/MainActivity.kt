@@ -126,7 +126,7 @@ class MainActivity : ComponentActivity() {
     /** Al volver a la app, lo que haya apuntado la pareja; si estaba «sin conexión», se reintenta. */
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch { session.resume() }
+        lifecycleScope.launch { session.resume(SystemClock.elapsedRealtime()) }
     }
 
     override fun onStart() {

@@ -71,6 +71,13 @@ class FinanceModel(
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** Qué lectura gana cuando dos se cruzan (ORC-122). */
+    private val turns = ReadTurns()
+    private var loads = 0
+
+    /** Hay una carga completa en marcha. */
+    val isLoading: Boolean get() = loads > 0
+
     /** Lo que se acaba de borrar en la lista, para poder deshacerlo. */
     var lastDeleted by mutableStateOf<Movement?>(null)
 
@@ -131,6 +138,8 @@ class FinanceModel(
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {
+        val turn = turns.next()
+        loads++
         try {
             val id = household.id
             coroutineScope {
@@ -138,12 +147,17 @@ class FinanceModel(
                 val b = async { service.balances(id) }
                 val c = async { service.categories(id) }
                 val r = async { service.movements(id, null, RECENT_LIMIT) }
-                accounts = a.await()
-                balances = b.await()
-                categories = c.await()
-                recent = r.await()
+                // Todo o nada: se espera a las cuatro antes de guardar ninguna.
+                val newAccounts = a.await()
+                val newBalances = b.await()
+                val newCategories = c.await()
+                val newRecent = r.await()
+                turns.store(::accounts, newAccounts, turn)
+                turns.store(::balances, newBalances, turn)
+                turns.store(::categories, newCategories, turn)
+                turns.store(::recent, newRecent, turn)
             }
-            error = null
+            turns.store(::error, null, turn)
             planning.load()
             planning.syncCharges(recent)
             budgets.load()
@@ -153,27 +167,36 @@ class FinanceModel(
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
-            error = e.message
+            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            error = AppError.Unknown("app").message
+            turns.store(::error, AppError.Unknown("app").message, turn)
+        } finally {
+            loads--
         }
     }
 
     suspend fun movements(account: Account): List<Movement> = service.movements(household.id, account.id, RECENT_LIMIT)
 
-    suspend fun createAccount(draft: AccountDraft): Account = service.createAccount(draft, household.id).also { reloadAccounts() }
-    suspend fun updateAccount(account: Account) { service.updateAccount(account); reloadAccounts() }
-    suspend fun deleteAccount(account: Account) { service.deleteAccount(account.id); reloadAll() }
+    // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
+
+    /** Una escritura falló cuando su pantalla ya no estaba: el aviso sale en el error del modelo. */
+    private fun sinPantalla(e: Exception) {
+        turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
+    }
+
+    suspend fun createAccount(draft: AccountDraft): Account = escritura(::sinPantalla) { service.createAccount(draft, household.id).also { reloadAccounts() } }
+    suspend fun updateAccount(account: Account): Unit = escritura(::sinPantalla) { service.updateAccount(account); reloadAccounts() }
+    suspend fun deleteAccount(account: Account): Unit = escritura(::sinPantalla) { service.deleteAccount(account.id); reloadAll() }
 
     /** «Actualizar saldo»: apunta hoy un ajuste para que el saldo de la cuenta sea [actual]. */
     suspend fun adjustBalance(account: Account, actual: Long) {
         BalanceAdjustment.draft(account, balance(account), actual, today(), categories)?.let { add(it) }
     }
 
-    suspend fun add(draft: MovementDraft) { service.addMovement(draft, household.id); reloadAll() }
+    suspend fun add(draft: MovementDraft): Unit = escritura(::sinPantalla) { service.addMovement(draft, household.id); reloadAll() }
 
     /** Las dos patas de una transferencia (o el pago de una tarjeta): se guardan las dos o ninguna, y repetirla no duplica. */
-    suspend fun transfer(draft: com.savethemoney.android.data.TransferDraft) {
+    suspend fun transfer(draft: com.savethemoney.android.data.TransferDraft): Unit = escritura(::sinPantalla) {
         try {
             service.addTransfer(draft, household.id)
         } catch (e: AppError) {
@@ -185,7 +208,7 @@ class FinanceModel(
     }
 
     /** Una compra o venta y, con [cash], su movimiento en la cuenta: los dos o ninguno, y repetirla no duplica. */
-    suspend fun addTrade(trade: com.savethemoney.android.data.InvestmentTrade, cash: com.savethemoney.android.data.TradeCash?) {
+    suspend fun addTrade(trade: com.savethemoney.android.data.InvestmentTrade, cash: com.savethemoney.android.data.TradeCash?): Unit = escritura(::sinPantalla) {
         try {
             investments.add(trade, cash)
         } finally {
@@ -196,8 +219,8 @@ class FinanceModel(
     suspend fun update(movement: Movement) { update(listOf(movement)) }
 
     /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
-    suspend fun update(movements: List<Movement>) {
-        if (movements.isEmpty()) return
+    suspend fun update(movements: List<Movement>): Unit = escritura(::sinPantalla) {
+        if (movements.isEmpty()) return@escritura
         try {
             movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
         } catch (e: AppError.MovementChanged) {
@@ -213,7 +236,7 @@ class FinanceModel(
     }
 
     /** Borra varios a la vez (sin «Deshacer»: la pantalla pide confirmación antes). */
-    suspend fun delete(movements: List<Movement>) {
+    suspend fun delete(movements: List<Movement>): Unit = escritura(::sinPantalla) {
         movements.forEach { service.deleteMovement(it.id) }
         if (movements.any { it.id == tappedMovement?.id }) tappedMovement = null
         reloadAll()
@@ -226,35 +249,35 @@ class FinanceModel(
     val knownTags: List<String> get() = MovementTags.all(recent)
     val knownPayees: List<String> get() = Payee.all(recent)
 
-    suspend fun delete(movement: Movement) {
+    suspend fun delete(movement: Movement): Unit = escritura(::sinPantalla) {
         service.deleteMovement(movement.id)
         if (movement.id == tappedMovement?.id) tappedMovement = null
         reloadAll()
         lastDeleted = movement
     }
 
-    suspend fun undoDelete() {
-        val movement = lastDeleted ?: return
+    suspend fun undoDelete(): Unit = escritura(::sinPantalla) {
+        val movement = lastDeleted ?: return@escritura
         add(movement.toDraft())
         lastDeleted = null
     }
 
     /** Varios movimientos de golpe (CSV). Las transferencias van por [transfer]. */
     suspend fun importMovements(drafts: List<MovementDraft>): ImportResult =
-        service.importMovements(drafts, household.id).also { reloadAll() }
+        escritura(::sinPantalla) { service.importMovements(drafts, household.id).also { reloadAll() } }
 
-    suspend fun save(category: BudgetCategory) {
+    suspend fun save(category: BudgetCategory): Unit = escritura(::sinPantalla) {
         category.issue(categories)?.let { throw AppError.InvalidInput(it) }
         val saved = if (categories.any { it.id == category.id }) service.updateCategory(category) else service.createCategory(category)
         // Se ve ya, aunque falle la recarga: así guardarla otra vez la actualiza en vez de crear otra.
-        categories = categories.filter { it.id != category.id && it.id != saved.id } + saved
-        reloadAfterSave { categories = service.categories(household.id) }?.let { error = it }
+        turns.changed(::categories, categories.filter { it.id != category.id && it.id != saved.id } + saved)
+        reloadAfterSave { reloadCategories() }?.let { turns.changed(::error, it) }
     }
 
-    suspend fun delete(category: BudgetCategory) {
+    suspend fun delete(category: BudgetCategory): Unit = escritura(::sinPantalla) {
         service.deleteCategory(category.id)
-        categories = categories.filter { it.id != category.id }
-        reloadAfterSave { categories = service.categories(household.id) }?.let { error = it }
+        turns.changed(::categories, categories.filter { it.id != category.id })
+        reloadAfterSave { reloadCategories() }?.let { turns.changed(::error, it) }
         reloadAll()
     }
 
@@ -263,37 +286,46 @@ class FinanceModel(
         MovementsCsv.bytes(service.movements(household.id, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31)), accounts, categories)
 
     /** Borra todo lo apuntado en el hogar y vuelve a cargar. */
-    suspend fun resetHousehold() {
+    suspend fun resetHousehold(): Unit = escritura(::sinPantalla) {
         service.resetHousehold(household.id)
         load()
     }
 
     /** Tras guardar. Nunca lanza: lo guardado sigue guardado y, si falla, [error] lo dice como problema de carga. */
     private suspend fun reloadAccounts() {
-        reloadAfterSave { fetchAccounts() }?.let { error = it }
+        reloadAfterSave { fetchAccounts() }?.let { turns.changed(::error, it) }
     }
 
     /** Como [reloadAccounts], con los movimientos. */
     private suspend fun reloadAll() {
         reloadAfterSave {
             fetchAccounts()
-            recent = service.movements(household.id, null, RECENT_LIMIT)
+            val turn = turns.next()
+            turns.store(::recent, service.movements(household.id, null, RECENT_LIMIT), turn)
             // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
             planning.syncCharges(recent)
-        }?.let { error = it }
+        }?.let { turns.changed(::error, it) }
     }
 
     private suspend fun fetchAccounts() {
-        accounts = service.accounts(household.id)
-        balances = service.balances(household.id)
+        val turn = turns.next()
+        val newAccounts = service.accounts(household.id)
+        val newBalances = service.balances(household.id)
+        turns.store(::accounts, newAccounts, turn)
+        turns.store(::balances, newBalances, turn)
         cards.load(accounts, balances, categories)
+    }
+
+    private suspend fun reloadCategories() {
+        val turn = turns.next()
+        turns.store(::categories, service.categories(household.id), turn)
     }
 
     /**
      * Gasto nuevo en una tarjeta: lo apunta y, según [purchase], lo aplaza con el TIN de la tarjeta
      * o crea su pago fijo. Se valida todo antes de guardar nada.
      */
-    suspend fun addCardPurchase(draft: MovementDraft, purchase: CardPurchase) {
+    suspend fun addCardPurchase(draft: MovementDraft, purchase: CardPurchase): Unit = escritura(::sinPantalla) {
         draft.issue?.let { throw AppError.InvalidInput(it) }
         val rate = cards.terms[draft.accountId]?.installmentRate ?: 14.0
         val check = Movement("", household.id, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor, draft.description)
@@ -312,7 +344,7 @@ class FinanceModel(
     }
 
     /** Confirma un pago fijo pendiente: crea su movimiento y recarga saldos y movimientos. */
-    suspend fun confirm(item: PendingCharge, draft: MovementDraft) {
+    suspend fun confirm(item: PendingCharge, draft: MovementDraft): Unit = escritura(::sinPantalla) {
         planning.confirm(item, draft)
         reloadAll()
     }
