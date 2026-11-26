@@ -46,6 +46,17 @@ final class HouseholdFlowTests: XCTestCase {
         }
     }
 
+    func testDemasiadosCodigosDiceCuantoEsperar() {
+        XCTAssertEqual(
+            AppError.tooManyInviteAttempts(minutes: 15).errorDescription,
+            "Has probado demasiados códigos. Vuelve a intentarlo dentro de 15 minutos."
+        )
+        XCTAssertEqual(
+            AppError.tooManyInviteAttempts(minutes: 1).errorDescription,
+            "Has probado demasiados códigos. Vuelve a intentarlo dentro de 1 minuto."
+        )
+    }
+
     func testOwnerRemovesMember() async throws {
         let backend = InMemoryBackend()
         let password = "contrasena-de-prueba"

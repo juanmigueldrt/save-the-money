@@ -341,7 +341,8 @@ data class PlannedReminder(val id: String, val fireOn: String, val hour: Int, va
 object ReminderPlanner {
     const val PREFIX = "stm.recurring."
 
-    fun plan(series: List<RecurringSeries>, today: LocalDate, horizonDays: Long = 45, limit: Int = 50, hour: Int = 9): List<PlannedReminder> {
+    /** Como en iOS, que guarda 64 avisos: 20 de pagos fijos, 10 de tarjetas, 10 de aportaciones y hasta 24 de hábito. */
+    fun plan(series: List<RecurringSeries>, today: LocalDate, horizonDays: Long = 45, limit: Int = 20, hour: Int = 9): List<PlannedReminder> {
         val end = today.plusDays(horizonDays)
         val result = mutableListOf<PlannedReminder>()
         for (item in series) {

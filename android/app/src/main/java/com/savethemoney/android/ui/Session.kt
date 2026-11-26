@@ -16,6 +16,7 @@ import com.savethemoney.android.data.Profile
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
 import java.time.LocalDate
+import kotlinx.coroutines.CancellationException
 
 /** Estado de la sesión: quién ha entrado y en qué hogar está (SessionModel de iOS). */
 class Session(
@@ -69,6 +70,7 @@ class Session(
      * había un hogar abierto, se pasa a «sin conexión» con reintento.
      */
     suspend fun refresh() {
+        signOutNotice = null
         if (backend.currentUserId() == null) {
             finance = null
             state = State.SignedOut
@@ -119,8 +121,19 @@ class Session(
         }
     }
 
+    /** Si el cierre no llegó al servidor. Este dispositivo ya está desconectado; el aviso se ve en la pantalla de entrar. */
+    var signOutNotice by mutableStateOf<String?>(null)
+        private set
+
     suspend fun signOut() {
-        runCatching { backend.signOut() }
+        signOutNotice = null
+        try {
+            backend.signOut()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            signOutNotice = "No se ha podido cerrar la sesión en el servidor. " + ((e as? AppError)?.message ?: AppError.Unknown("app").message)
+        }
         notifier.replaceReminders(emptyList())
         finance = null
         state = State.SignedOut

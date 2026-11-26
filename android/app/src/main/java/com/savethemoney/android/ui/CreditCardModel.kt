@@ -69,6 +69,7 @@ class CreditCardModel(
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load(accounts: List<Account>, balances: Map<String, Long>, categories: List<BudgetCategory>) {
+        var loaded = false
         this.accounts = accounts
         this.balances = balances
         transferCategories = categories.filter { it.kind == CategoryKind.Transfer }.map { it.id }.toSet()
@@ -83,6 +84,7 @@ class CreditCardModel(
                 account.id to if (missing.isEmpty()) recent else recent + service.movements(household.id, missing)
             }
             error = null
+            loaded = true
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
@@ -90,16 +92,18 @@ class CreditCardModel(
         } catch (e: Exception) {
             error = AppError.Unknown("app").message
         }
-        recompute()
+        // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
+        recompute(rescheduling = loaded)
     }
 
-    private fun recompute() {
+    private fun recompute(rescheduling: Boolean = true) {
         summaries = cardAccounts.mapNotNull { account ->
             val t = terms[account.id] ?: return@mapNotNull null
             account.id to CreditCardCalculator.summary(
                 t, balances[account.id] ?: account.openingMinor, movements(account), installments, transferCategories, today(),
             )
         }.toMap()
+        if (!rescheduling) return
         val cards = cardAccounts.mapNotNull { account ->
             summaries[account.id]?.let { CardReminder(it, account.name, it.terms.payFromAccountId?.let(balances::get)) }
         }

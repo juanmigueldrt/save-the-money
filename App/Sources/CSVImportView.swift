@@ -11,6 +11,8 @@ struct CSVImportView: View {
     @State private var choosingFile = false
     @State private var fileName: String?
     @State private var table: CSVTable?
+    /// Texto del archivo, para volver a leerlo si el usuario cambia el separador.
+    @State private var fileText: String?
     @State private var mapping: CSVMapping?
     @State private var accountId: UUID?
     @State private var error: String?
@@ -73,6 +75,17 @@ struct CSVImportView: View {
                     Label("Columnas como la última vez con este banco.", systemImage: "clock.arrow.circlepath")
                         .font(Typography.footnote)
                         .foregroundStyle(Palette.labelSecondary)
+                }
+            }
+            if let table {
+                Section {
+                    Picker("Separador", selection: Binding { table.delimiter } set: { changeDelimiter($0) }) {
+                        Text("Punto y coma (;)").tag(Character(";"))
+                        Text("Tabulador").tag(Character("\t"))
+                        Text("Coma (,)").tag(Character(","))
+                    }
+                } footer: {
+                    Text("Si las columnas salen mal, prueba con otro separador.")
                 }
             }
             if let table, mapping != nil {
@@ -160,6 +173,7 @@ struct CSVImportView: View {
                 return
             }
             let parsed = CSVTable.parse(text)
+            fileText = text
             fileName = url.lastPathComponent
             marks = [:]
             review = CSVRowReview()
@@ -178,6 +192,19 @@ struct CSVImportView: View {
         } catch {
             self.error = "No he podido abrir el archivo."
         }
+    }
+
+    /// Vuelve a leer el archivo con el separador elegido y a detectar las columnas.
+    private func changeDelimiter(_ delimiter: Character) {
+        guard let fileText, delimiter != table?.delimiter else { return }
+        let parsed = CSVTable.parse(fileText, delimiter: delimiter)
+        result = nil
+        marks = [:]
+        review = CSVRowReview()
+        table = parsed
+        mapping = CSVMapping.detect(in: parsed)
+        usedSavedFormat = false
+        recompute()
     }
 
     private func runImport() async {
