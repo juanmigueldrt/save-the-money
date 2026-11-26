@@ -73,7 +73,7 @@ final class CreditCardModel: ServerModel {
         guard let summary = summaries[account.id], let terms = terms[account.id] else { return [] }
         let start = terms.cycleStart(forStatement: summary.openStatement)
         return movements(of: account).filter {
-            $0.amount.minor <= -5_000 && $0.bookedOn >= start && installment(for: $0) == nil
+            $0.amount.minor <= -CardInstallment.usualMinimum.minor && $0.bookedOn >= start && installment(for: $0) == nil
                 && !(transferCategories.contains($0.categoryId ?? UUID()))
         }
     }
@@ -207,7 +207,7 @@ final class CreditCardModel: ServerModel {
     /// Un aplazado nuevo lleva el id de su movimiento (hay uno por compra): repetirlo no crea otro.
     @discardableResult
     func deferPurchase(_ movement: Movement, months: Int, in account: Account) async -> Bool {
-        let rate = terms[account.id]?.installmentRate ?? 14
+        let rate = terms[account.id]?.installmentRate ?? CreditCardTerms.defaultInstallmentRate
         let plan = installment(for: movement).map { existing -> CardInstallment in
             var changed = existing
             changed.months = months

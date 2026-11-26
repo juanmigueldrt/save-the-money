@@ -291,12 +291,7 @@ struct GoalFormView: View {
             .formStyle(.grouped)
             .brandBackground()
             .navigationTitle(goal == nil ? "Nueva meta" : "Editar meta")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
-                }
-            }
+            .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
             .confirmationDialog("¿Borrar esta meta?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Borrar meta", role: .destructive) { Task { await delete() } }
             } message: {
@@ -395,12 +390,7 @@ struct ContributionFormView: View {
             .formStyle(.grouped)
             .brandBackground()
             .navigationTitle(goal.kind == .savings ? "Aportación" : "Pago de la deuda")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
-                }
-            }
+            .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
         }
         .frame(minWidth: 340, minHeight: 300)
     }

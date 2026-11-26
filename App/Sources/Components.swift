@@ -118,6 +118,16 @@ extension View {
     func formWidth() -> some View {
         frame(maxWidth: 420)
     }
+
+    /// Barra común de los formularios: «Cancelar» y «Guardar», que se desactiva mientras se guarda.
+    func formToolbar(isWorking: Bool, cancel: @escaping () -> Void, save: @escaping @MainActor () async -> Void) -> some View {
+        toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { cancel() } }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Guardar") { Task { await save() } }.disabled(isWorking)
+            }
+        }
+    }
 }
 
 /// Dos columnas cuando caben (Mac, iPad en horizontal) y una sola en iPhone.
