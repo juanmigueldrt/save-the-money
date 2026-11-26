@@ -1,0 +1,41 @@
+{
+  "_source": "Calculado a mano con la regla del mes del hogar: un mes con inicio el día S va del día S del mes anterior al día S-1 de este y lleva el nombre del mes en que acaba. Con inicio 25 y hoy 2026-11-10: mes 2026-11 = 25/10 a 24/11 (hasta hoy); mes 2026-10 = 25/09 a 24/10; mes 2026-09 = 25/08 a 24/09. Con inicio 1 es el mes natural. Gasto = categorías de gasto, sin traspasos ni ingresos, hasta hoy. Subida: suma por categoría del mes y del mes anterior con el periodo completo; el porcentaje es nulo si el mes anterior no hubo gasto en esa categoría. Importes en céntimos; sumas hechas a mano.",
+  "today": "2026-11-10",
+  "categories": [
+    { "id": "comida", "name": "Comida", "kind": "expense" },
+    { "id": "ocio", "name": "Ocio", "kind": "expense" },
+    { "id": "regalos", "name": "Regalos", "kind": "expense" },
+    { "id": "nomina", "name": "Nómina", "kind": "income" },
+    { "id": "traspaso", "name": "Traspaso", "kind": "transfer" }
+  ],
+  "movements": [
+    { "id": "m1", "day": "2025-12-24", "category": "comida", "minor": -100 },
+    { "id": "m2", "day": "2025-12-25", "category": "comida", "minor": -200 },
+    { "id": "m3", "day": "2026-09-24", "category": "comida", "minor": -500 },
+    { "id": "m4", "day": "2026-09-25", "category": "comida", "minor": -700 },
+    { "id": "m5", "day": "2026-10-01", "category": "ocio", "minor": -1000 },
+    { "id": "m6", "day": "2026-10-24", "category": "comida", "minor": -1500 },
+    { "id": "m7", "day": "2026-10-25", "category": "comida", "minor": -2000 },
+    { "id": "m8", "day": "2026-10-30", "category": "ocio", "minor": -3000 },
+    { "id": "m9", "day": "2026-11-01", "category": "nomina", "minor": 50000 },
+    { "id": "m10", "day": "2026-10-30", "category": "regalos", "minor": -2500 },
+    { "id": "m11", "day": "2026-11-05", "category": "traspaso", "minor": -4000 },
+    { "id": "m12", "day": "2026-11-10", "category": "comida", "minor": -500 }
+  ],
+  "spent": [
+    { "monthStartDay": 25, "minor": 8000 },
+    { "monthStartDay": 1, "minor": 500 }
+  ],
+  "rise": [
+    { "monthStartDay": 25, "title": "Regalos", "percent": null, "previous": "2026-10" },
+    { "monthStartDay": 1, "title": null, "percent": null, "previous": null }
+  ],
+  "filters": [
+    { "dates": "thisMonth", "monthStartDay": 25, "ids": ["m7", "m8", "m9", "m10", "m11", "m12"] },
+    { "dates": "lastMonth", "monthStartDay": 25, "ids": ["m4", "m5", "m6"] },
+    { "dates": "thisYear", "monthStartDay": 25, "ids": ["m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12"] },
+    { "dates": "thisMonth", "monthStartDay": 1, "ids": ["m9", "m11", "m12"] },
+    { "dates": "lastMonth", "monthStartDay": 1, "ids": ["m5", "m6", "m7", "m8", "m10"] },
+    { "dates": "thisYear", "monthStartDay": 1, "ids": ["m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12"] }
+  ]
+}

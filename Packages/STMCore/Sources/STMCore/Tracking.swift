@@ -528,11 +528,12 @@ public enum NetWorthRange: String, CaseIterable, Sendable, Identifiable {
 // MARK: - Resumen del mes (igual que en Android)
 
 public enum MonthSummary {
-    /// Lo gastado en el mes de `today` hasta hoy. Los traspasos no cuentan; una devolución resta.
+    /// Lo gastado en el mes del hogar de `today` hasta hoy. Los traspasos no cuentan; una devolución resta.
     public static func spent(movements: [Movement], categories: [BudgetCategory],
-                             today: CalendarDay = CalendarDay()) -> Money {
-        SpendingReport(movements: movements, categories: categories, range: MonthKey(today).firstDay...today,
-                       kind: .expense).total
+                             today: CalendarDay = CalendarDay(), monthStartDay: Int = 1) -> Money {
+        SpendingReport(movements: movements, categories: categories,
+                       range: ReportPeriod.thisMonth.range(today: today, monthStartDay: monthStartDay),
+                       kind: .expense, monthStartDay: monthStartDay).total
     }
 
     /// Cuánto ha cambiado el patrimonio este mes: la suma de los movimientos del mes en cuentas no archivadas.
@@ -557,10 +558,12 @@ public struct BiggestRise: Hashable, Sendable {
     public var percent: Int?
     public var previous: MonthKey
 
-    public static func find(movements: [Movement], categories: [BudgetCategory], month: MonthKey) -> BiggestRise? {
+    /// - Parameter month: mes del hogar (con `MonthKey.containing`); cada mes abarca su `MonthKey.period`.
+    public static func find(movements: [Movement], categories: [BudgetCategory], month: MonthKey,
+                            monthStartDay: Int = 1) -> BiggestRise? {
         func rows(_ m: MonthKey) -> [String: SpendingReport.Row] {
-            let range = m.firstDay...m.adding(months: 1).firstDay.adding(days: -1)
-            let report = SpendingReport(movements: movements, categories: categories, range: range, kind: .expense)
+            let report = SpendingReport(movements: movements, categories: categories, range: m.period(startDay: monthStartDay),
+                                        kind: .expense)
             return Dictionary(report.byCategory.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         }
         let previous = month.adding(months: -1)
