@@ -141,7 +141,7 @@ fun Pantalla05(nav: Nav) {
     }
     val categorias = finance.recent.mapNotNull { it.categoryId }.groupingBy { it }.eachCount().entries
         .sortedByDescending { it.value }.mapNotNull { finance.category(it.key) }
-    val visibles = filtro.apply(finance.recent, finance.categories, finance.today())
+    val visibles = filtro.apply(finance.recent, finance.categories, finance.today(), finance.household.monthStartDay)
     val filtrando = filtro.activeCount > 0 || filtro.search.isNotBlank()
     val marcados = visibles.filter { it.id in elegidos }
     fun terminaSeleccion() {

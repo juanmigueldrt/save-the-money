@@ -278,6 +278,9 @@ interface FinanceService {
     /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
     suspend fun movements(householdId: String, ids: List<String>): List<Movement>
 
+    /** Movimientos de la cuenta desde ese día (incluido), más recientes primero, como mucho [limit]. */
+    suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int): List<Movement>
+
     /**
      * Repetir la llamada con el mismo [MovementDraft.id] devuelve el movimiento ya guardado y no apunta nada nuevo (RPC
      * `create_movement`); si se repite con otra cuenta, otro importe u otro día falla con [TransferDraft.STORED_WITH_OTHER_DATA].
@@ -492,6 +495,12 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun movements(householdId: String, ids: List<String>) =
         movements.filter { it.householdId == householdId && it.id in ids }
+
+    override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int) = movements
+        .filter { it.householdId == householdId && it.accountId == accountId && !it.day.isBefore(since) }
+        .asReversed()
+        .sortedByDescending { it.bookedOn }
+        .take(limit)
 
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement {
         val movement = build(draft, householdId)

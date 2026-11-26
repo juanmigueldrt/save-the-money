@@ -150,6 +150,21 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    public func movements(in householdId: UUID, accountId: UUID, since: CalendarDay, limit: Int) async throws -> [Movement] {
+        try await mapped {
+            try await client.from("transactions")
+                .select(Self.movementColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .eq("account_id", value: accountId.uuidString)
+                .gte("booked_on", value: since.iso)
+                .order("booked_on", ascending: false)
+                .order("created_at", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+        }
+    }
+
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
         // El servidor devuelve como mucho 1000 filas por petición (max_rows).
         let pageSize = 1000

@@ -110,6 +110,19 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }.decodeList()
     }
 
+    override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int): List<Movement> = backend.mapped {
+        client.from("transactions").select(Columns.raw(MOVEMENT)) {
+            filter {
+                eq("household_id", householdId)
+                eq("account_id", accountId)
+                gte("booked_on", since.toString())
+            }
+            order("booked_on", Order.DESCENDING)
+            order("created_at", Order.DESCENDING)
+            limit(limit.toLong())
+        }.decodeList()
+    }
+
     /** create_movement no repite un movimiento ya guardado con ese id: devuelve el que había. */
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement = backend.mapped {
         draft.issue?.let(::fail)

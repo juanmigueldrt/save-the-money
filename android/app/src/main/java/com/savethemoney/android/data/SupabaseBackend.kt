@@ -6,6 +6,7 @@ import io.github.jan.supabase.auth.Auth
 import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.createSupabaseClient
 import io.github.jan.supabase.exceptions.HttpRequestException
 import io.github.jan.supabase.exceptions.RestException
@@ -15,10 +16,18 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.io.IOException
 import java.time.Instant
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Servicios sobre Supabase. Toda la seguridad la pone el servidor (RLS y funciones);
@@ -34,10 +43,10 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         install(Postgrest)
     }
 
-    override suspend fun currentUserId(): String? {
-        client.auth.awaitInitialization()
-        return client.auth.currentUserOrNull()?.id
-    }
+    override suspend fun currentUserId(): String? = client.auth.usuarioConSesion()
+
+    // supabase-kt borra la sesión si el servidor rechaza el refresco (y al cerrar sesión): la app vuelve al login.
+    override val sessionEnded: Flow<Unit> = client.auth.sessionStatus.filterIsInstance<SessionStatus.NotAuthenticated>().map { }
 
     override suspend fun signUp(username: Username, password: String, displayName: String?): String = mapped {
         client.auth.signUpWith(Email) {
@@ -181,6 +190,11 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         throw AppError.Network
     } catch (e: IOException) {
         throw AppError.Network
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: Exception) {
+        // Respuesta inesperada (un valor de enumerado nuevo, una fila que falta…): se avisa en vez de cerrar la app.
+        throw AppError.Unknown("app")
     }
 
     companion object {
@@ -193,7 +207,9 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "23505" -> when {
                 "already a member" in message -> AppError.AlreadyMember
                 "categories_household_name_idx" in message -> AppError.InvalidInput("Ya hay una categoría con ese nombre.")
-                else -> AppError.UsernameTaken
+                // profiles.username es único: Postgres nombra la restricción en el mensaje.
+                "profiles_username_key" in message -> AppError.UsernameTaken
+                else -> AppError.InvalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
             }
             "28000", "PGRST301" -> AppError.NotSignedIn
             "23503", "23514", "22P02" -> AppError.InvalidInput("Algún dato no es válido. Revisa el formulario.")
@@ -219,5 +235,26 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
                 else -> AppError.Unknown("auth")
             }
         }
+    }
+}
+
+/**
+ * Usuario de la sesión guardada; nulo si no hay o el servidor la rechazó.
+ * Lo comprobado en supabase-kt 3.2.6 (AuthImpl): con el token caducado y sin red, la sesión sigue guardada
+ * pero el estado queda en RefreshFailure (o en Initializing mientras aún no ha caducado) y se reintenta cada
+ * 10 s; si el servidor rechaza el refresco (4xx) borra la sesión y pasa a NotAuthenticated.
+ * Sin red se lanza AppError.Network para enseñar «sin conexión» sin perder la sesión.
+ */
+internal suspend fun Auth.usuarioConSesion(espera: Duration = 10.seconds): String? {
+    val antes = sessionStatus.value
+    // Al pulsar «Reintentar» no se espera al siguiente reintento de la librería: se vuelve a refrescar ya.
+    if (antes is SessionStatus.RefreshFailure) loadFromStorage()
+    val estado = withTimeoutOrNull(espera) {
+        sessionStatus.first { it !is SessionStatus.Initializing && !(antes is SessionStatus.RefreshFailure && it === antes) }
+    }
+    return when (estado) {
+        is SessionStatus.Authenticated -> estado.session.user?.id
+        is SessionStatus.NotAuthenticated -> null
+        else -> throw AppError.Network
     }
 }
