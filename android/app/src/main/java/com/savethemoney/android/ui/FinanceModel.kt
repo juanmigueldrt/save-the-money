@@ -104,12 +104,17 @@ class FinanceModel(
         return categories.filter { it.kind == kind }.sortedWith(compareBy(collator) { it.name })
     }
 
-    private fun thisMonth(m: Movement): Boolean = m.day.withDayOfMonth(1) == today().withDayOfMonth(1)
-
-    /** Cambio del patrimonio este mes: lo que ha entrado menos lo que ha salido en las cuentas que cuentan; las transferencias se compensan. */
+    /**
+     * Cambio del patrimonio en el mes del hogar: lo que ha entrado menos lo que ha salido en las cuentas que cuentan;
+     * las transferencias se compensan. Una cuenta archivada cuenta hasta el día en que se archivó (como en iOS).
+     */
     val netThisMonth: Long get() {
-        val ids = activeAccounts.filter { it.includeInNetWorth }.map { it.id }.toSet()
-        return recent.filter { thisMonth(it) && it.accountId in ids }.sumOf { it.amountMinor }
+        val period = ReportPeriod.ThisMonth.range(today(), household.monthStartDay)
+        val counted = accounts.filter { it.includeInNetWorth }.associateBy { it.id }
+        return recent.filter { m ->
+            val account = counted[m.accountId] ?: return@filter false
+            m.day in period && (account.archivedAt?.let { m.day < LocalDate.parse(it.take(10)) } ?: true)
+        }.sumOf { it.amountMinor }
     }
 
     /** Gasto del mes del hogar sin contar transferencias entre cuentas. */

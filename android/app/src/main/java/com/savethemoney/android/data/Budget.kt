@@ -213,11 +213,13 @@ class CashFlow(report: BudgetReport) {
         val edges = mutableListOf<Link>()
         val middle = mutableListOf<Node>()
         for (progress in report.groups) {
-            if (progress.spent <= 0) continue
+            // El grupo suma solo sus categorías con gasto neto positivo: un reembolso no puede dejar bandas fuera del nodo.
+            val spending = report.lines(progress.group).filter { it.spent > 0 }
+            val groupTotal = spending.sumOf { it.spent }
+            if (groupTotal <= 0) continue
             val groupId = "grupo:${progress.group.name}"
-            middle += Node(groupId, progress.group.title, 1, progress.spent.toDouble(), Role.Group(progress.group))
-            for (line in report.lines(progress.group)) {
-                if (line.spent <= 0) continue
+            middle += Node(groupId, progress.group.title, 1, groupTotal.toDouble(), Role.Group(progress.group))
+            for (line in spending) {
                 val id = "categoria:${line.category.id}"
                 leaves += Node(id, line.category.name, 2, line.spent.toDouble(), Role.Group(progress.group))
                 edges += Link(groupId, id, line.spent.toDouble())

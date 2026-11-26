@@ -108,6 +108,7 @@ data class Holding(
         trimmedName.length > 60 -> "El nombre es demasiado largo."
         (trimmedSymbol?.length ?: 0) > 20 -> "El código es demasiado largo."
         price.signum() < 0 -> "El precio no puede ser negativo."
+        price.setScale(6, RoundingMode.HALF_UP).compareTo(price) != 0 -> "Como mucho 6 decimales en el precio."
         feeRate.signum() < 0 || feeRate > BigDecimal.TEN -> "La comisión tiene que estar entre 0 y 10 %."
         (note?.length ?: 0) > 200 -> "La nota es demasiado larga."
         else -> null
@@ -149,6 +150,7 @@ data class InvestmentTrade(
         quantity.signum() <= 0 -> "Indica cuántas participaciones."
         quantity.setScale(8, RoundingMode.HALF_UP).compareTo(quantity) != 0 -> "Como mucho 8 decimales en las participaciones."
         price.signum() < 0 -> "El precio no puede ser negativo."
+        price.setScale(6, RoundingMode.HALF_UP).compareTo(price) != 0 -> "Como mucho 6 decimales en el precio."
         feeMinor < 0 -> "La comisión no puede ser negativa."
         (note?.length ?: 0) > 200 -> "La nota es demasiado larga."
         else -> null
