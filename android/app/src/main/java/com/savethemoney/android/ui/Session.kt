@@ -27,6 +27,8 @@ class Session(
     val capture: Boolean = false,
     private val today: () -> LocalDate = LocalDate::now,
     private val notifier: Notifier = NoNotifier,
+    /** Borra lo que queda en el dispositivo de la cuenta: exportados y avisos mostrados. */
+    private val borrarLocal: () -> Unit = {},
 ) {
     sealed interface State {
         data object Loading : State
@@ -74,6 +76,7 @@ class Session(
         backend.sessionEnded.collect {
             if (state == State.Loading || state == State.SignedOut) return@collect
             notifier.replaceReminders(emptyList())
+            borrarLocal()
             finance = null
             state = State.SignedOut
             signOutNotice = AppError.NotSignedIn.message
@@ -153,7 +156,9 @@ class Session(
         } catch (e: Exception) {
             signOutNotice = "No se ha podido cerrar la sesión en el servidor. " + ((e as? AppError)?.message ?: AppError.Unknown("app").message)
         }
+        // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
         notifier.replaceReminders(emptyList())
+        borrarLocal()
         finance = null
         state = State.SignedOut
     }

@@ -43,6 +43,28 @@ class SessionTest {
     }
 
     @Test
+    fun signOutBorraLosDatosLocalesAunqueFalleElServidor() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        val offline = object : Backend by memory {
+            override suspend fun signOut() {
+                try {
+                    throw AppError.Network
+                } finally {
+                    memory.signOut()
+                }
+            }
+        }
+        var borrados = 0
+        val session = Session(offline, InMemoryFinance(), isDemo = true, borrarLocal = { borrados++ })
+        session.refresh()
+
+        session.signOut()
+
+        assertEquals(1, borrados)
+    }
+
+    @Test
     fun signOutSinRedAvisaEnLaPantallaDeEntrar() = runBlocking {
         val memory = InMemoryBackend()
         memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)

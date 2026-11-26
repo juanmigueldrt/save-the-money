@@ -112,6 +112,13 @@ class LocalNotifier(private val context: Context) : Notifier {
         return true
     }
 
+    /** Al cerrar sesión: cancela lo pendiente, quita lo mostrado y borra todas las preferencias de avisos (este archivo es solo de avisos). */
+    fun borrarTodo() {
+        pending().forEach { alarms.cancel(alarm(it)) }
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+        prefs.edit { clear() }
+    }
+
     private fun shown(): Set<String> = prefs.getStringSet(KEY_SHOWN, emptySet()).orEmpty()
 
     private fun pending(): List<PlannedReminder> =

@@ -170,21 +170,19 @@ enum BillsPDF {
 
     @MainActor
     static func render(_ bills: MonthlyBills, householdName: String, today: CalendarDay) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("exportar", isDirectory: true)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        let url = folder.appendingPathComponent(bills.fileName)
-        try? FileManager.default.removeItem(at: url)
-
         // El PDF lleva siempre los importes reales, aunque la app esté en modo incógnito o sin céntimos.
         let shown = Money.display
         Money.display = .standard
         defer { Money.display = shown }
         let renderer = ImageRenderer(content: BillsPDFPage(bills: bills, householdName: householdName, today: today))
         renderer.proposedSize = ProposedViewSize(width: BillsPDFPage.width, height: nil)
+        // Se dibuja en memoria y se escribe con ExportFiles, que pone la protección completa del fichero.
+        let pdf = NSMutableData()
         var written = false
         renderer.render { size, draw in
             var box = CGRect(x: 0, y: 0, width: BillsPDFPage.width, height: max(BillsPDFPage.minHeight, size.height))
-            guard let context = CGContext(url as CFURL, mediaBox: &box, nil) else { return }
+            guard let consumer = CGDataConsumer(data: pdf as CFMutableData),
+                  let context = CGContext(consumer: consumer, mediaBox: &box, nil) else { return }
             context.beginPDFPage(nil)
             context.translateBy(x: 0, y: box.height - size.height)
             draw(context)
@@ -193,6 +191,6 @@ enum BillsPDF {
             written = true
         }
         guard written else { throw Failure.render }
-        return url
+        return try ExportFiles.write(pdf as Data, named: bills.fileName)
     }
 }
