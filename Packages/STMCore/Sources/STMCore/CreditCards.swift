@@ -62,10 +62,13 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
 
     public var id: UUID { accountId }
 
+    /// TIN anual en % de las compras a plazos cuando la tarjeta no tiene condiciones guardadas (Android usa el mismo).
+    public static let defaultInstallmentRate: Decimal = 14
+
     public init(accountId: UUID, householdId: UUID, creditLimit: Money, statementDay: Int = 1, paymentDay: Int = 1,
                 paymentDelayMonths: Int = 1, paymentMode: CardPaymentMode = .full, fixedPayment: Money? = nil,
                 minPaymentPercent: Decimal = 3, minPayment: Money = Money(minor: 1500), revolvingRate: Decimal = 20,
-                installmentRate: Decimal = 14, payFromAccountId: UUID? = nil, remindDaysBefore: Int? = 2,
+                installmentRate: Decimal = CreditCardTerms.defaultInstallmentRate, payFromAccountId: UUID? = nil, remindDaysBefore: Int? = 2,
                 alertPercent: Int? = 80, updatedAt: String? = nil) {
         self.updatedAt = updatedAt
         self.accountId = accountId
