@@ -201,7 +201,17 @@ class FinanceModel(
     /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
     suspend fun update(movements: List<Movement>) {
         if (movements.isEmpty()) return
-        movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
+        try {
+            movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
+        } catch (e: AppError.MovementChanged) {
+            // Otro dispositivo lo cambió antes: se recarga (también el que está abierto) para que se vea lo nuevo detrás del aviso.
+            try {
+                reloadAll()
+                tappedMovement = tappedMovement?.let { service.movements(household.id, listOf(it.id)).firstOrNull() }
+            } catch (_: AppError) {
+            }
+            throw e
+        }
         reloadAll()
     }
 
