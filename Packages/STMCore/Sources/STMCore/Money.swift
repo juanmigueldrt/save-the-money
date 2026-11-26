@@ -37,21 +37,43 @@ public struct Money: Hashable, Codable, Sendable {
 
     /// Igual, con unas opciones concretas (p. ej. `.standard` para un PDF o un archivo).
     public func formatted(locale: Locale = Locale(identifier: "es_ES"), options: MoneyDisplayOptions) -> String {
+        if isMixed { return Money.mixedText }
+        return Money.withFormatter(locale: locale, currency: currency, roundsToUnits: options.roundsToUnits) { formatter in
+            if options.hidesAmounts { return "•••• " + (formatter.currencySymbol ?? currency) }
+            let text = formatter.string(from: decimal as NSDecimalNumber) ?? "\(decimal) \(currency)"
+            // Signo menos tipográfico (U+2212), como pide el manual, en vez del guion.
+            return text.replacingOccurrences(of: "-", with: "\u{2212}")
+        }
+    }
+
+    private struct FormatterKey: Hashable {
+        var locale: Locale
+        var currency: String
+        var roundsToUnits: Bool
+    }
+
+    private static let formattersLock = NSLock()
+    /// Un formateador por configuración regional, moneda y redondeo: crearlo era lo caro de cada importe.
+    /// `NumberFormatter` no es `Sendable`: solo se toca con el candado cogido (crearlo, configurarlo y
+    /// usarlo), así que nunca lo usan dos hilos a la vez y nadie lo cambia después de guardarlo.
+    nonisolated(unsafe) private static var formatters: [FormatterKey: NumberFormatter] = [:]
+
+    private static func withFormatter(locale: Locale, currency: String, roundsToUnits: Bool,
+                                      _ body: (NumberFormatter) -> String) -> String {
+        formattersLock.lock()
+        defer { formattersLock.unlock() }
+        let key = FormatterKey(locale: locale, currency: currency, roundsToUnits: roundsToUnits)
+        if let formatter = formatters[key] { return body(formatter) }
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = locale
-        if isMixed { return Money.mixedText }
         formatter.currencyCode = currency
-        if options.hidesAmounts {
-            return "•••• " + (formatter.currencySymbol ?? currency)
-        }
-        if options.roundsToUnits {
+        if roundsToUnits {
             formatter.maximumFractionDigits = 0
             formatter.minimumFractionDigits = 0
         }
-        let text = formatter.string(from: decimal as NSDecimalNumber) ?? "\(decimal) \(currency)"
-        // Signo menos tipográfico (U+2212), como pide el manual, en vez del guion.
-        return text.replacingOccurrences(of: "-", with: "\u{2212}")
+        formatters[key] = formatter
+        return body(formatter)
     }
 }
 
