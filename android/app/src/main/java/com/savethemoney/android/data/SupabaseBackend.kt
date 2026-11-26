@@ -22,7 +22,9 @@ import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.put
 import java.io.IOException
 import java.time.Instant
@@ -110,7 +112,7 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         client.from("profiles").update(buildJsonObject {
             // null explícito para poder borrar el nombre visible
             put("display_name", displayName)
-            put("theme", theme.name.lowercase())
+            put("theme", Json.encodeToJsonElement(theme))
         }) {
             select(Columns.raw(PROFILE))
             filter { eq("id", userId()) }

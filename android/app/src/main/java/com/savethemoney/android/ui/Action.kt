@@ -139,6 +139,15 @@ class ReadTurns {
     }
 }
 
+/**
+ * Lo que deja en [error] una carga que falla: el mensaje del [AppError] o el genérico. La cancelación se relanza antes que
+ * nada: parar una lectura no es un fallo.
+ */
+suspend fun ReadTurns.fallaCarga(error: KMutableProperty0<String?>, turn: Long, e: Exception) {
+    if (e is CancellationException) throw e
+    store(error, (e as? AppError)?.message ?: AppError.Unknown("app").message, turn)
+}
+
 @Composable
 fun rememberAction(): Action {
     val scope = rememberCoroutineScope()

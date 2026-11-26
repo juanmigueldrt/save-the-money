@@ -184,12 +184,8 @@ class FinanceModel(
             budgets.checkAlerts(categories)
             cards.load(accounts, balances, categories)
             investments.load()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         } finally {
             loads--
         }

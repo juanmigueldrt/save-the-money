@@ -18,7 +18,6 @@ import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.Notifier
-import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 
 /** Tarjetas del hogar: condiciones, aplazados, cargos y sus avisos (CreditCardModel de iOS). */
@@ -94,12 +93,8 @@ class CreditCardModel(
             turns.store(::truncatedAccounts, fetched.filter { (_, result) -> result.second }.map { it.first }.toSet(), turn)
             turns.store(::error, null, turn)
             loaded = true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         }
         // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
         recompute(rescheduling = loaded)
