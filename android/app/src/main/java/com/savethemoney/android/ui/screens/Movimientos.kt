@@ -397,8 +397,15 @@ fun Pantalla06(nav: Nav) {
     var confirmar by remember { mutableStateOf(false) }
     var ajustando by remember { mutableStateOf(false) }
     val action = rememberAction()
+    var fallo by remember(account.id) { mutableStateOf<String?>(null) }
     LaunchedEffect(account.id, finance.recent) {
-        try { lista = finance.movements(account) } catch (_: AppError) { /* se queda la lista que había */ }
+        try {
+            lista = finance.movements(account)
+            fallo = null
+        } catch (e: AppError) {
+            // Se queda la lista que había, con el aviso: no es lo mismo que una cuenta sin movimientos.
+            fallo = "No se han podido cargar los movimientos. ${e.message}"
+        }
     }
     val hoy = finance.today()
     val serie = monthEndBalances(finance.balance(account), lista, hoy)
@@ -480,7 +487,8 @@ fun Pantalla06(nav: Nav) {
             LineChart(serie.map { if (alto == bajo) 0.5f else (it - bajo).toFloat() / (alto - bajo) })
         }
         Spacer(Modifier.height(16.dp))
-        if (lista.isEmpty()) Vacio("Todavía no hay movimientos en esta cuenta.")
+        fallo?.let { Text(it, Modifier.padding(vertical = 8.dp), style = StmType.bodyMedium, color = Stm.colors.error) }
+        if (lista.isEmpty() && fallo == null) Vacio("Todavía no hay movimientos en esta cuenta.")
         lista.take(MAX_FILAS).groupBy { it.day.withDayOfMonth(1) }.forEach { (mes, items) ->
             ListCard {
                 ListHeader(Fechas.mesTitulo(mes) + if (mes.year != hoy.year) " ${mes.year}" else "")
