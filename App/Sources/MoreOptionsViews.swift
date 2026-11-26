@@ -227,14 +227,26 @@ struct MoreView: View {
     }
 }
 
-/// Ficheros exportados: van a la carpeta temporal de la app; cada exportación sustituye a la anterior.
+/// Ficheros exportados: van a la carpeta temporal de la app. La carpeta se vacía al arrancar, al cerrar
+/// sesión y antes de cada exportación, así no quedan datos de una exportación anterior.
 enum ExportFiles {
+    static var folder: URL { FileManager.default.temporaryDirectory.appendingPathComponent("exportar", isDirectory: true) }
+
+    static func clear() {
+        try? FileManager.default.removeItem(at: folder)
+    }
+
     static func write(_ data: Data, named name: String) throws -> URL {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent("exportar", isDirectory: true)
+        clear()
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         let url = folder.appendingPathComponent(name)
-        try? FileManager.default.removeItem(at: url)
-        try data.write(to: url, options: [.atomic, .completeFileProtection])
+        // En macOS escribir con protección completa falla (EPERM); allí sólo queda el borrado de la carpeta.
+        #if os(iOS)
+        let options: Data.WritingOptions = [.atomic, .completeFileProtection]
+        #else
+        let options: Data.WritingOptions = [.atomic]
+        #endif
+        try data.write(to: url, options: options)
         return url
     }
 }

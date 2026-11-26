@@ -15,11 +15,15 @@ import com.savethemoney.android.data.RecurringKind
 import java.io.File
 import java.time.LocalDate
 
+/** Borra lo exportado (caché de exportar): al arrancar, al cerrar sesión y antes de cada exportación. */
+fun borrarExportados(context: Context) {
+    File(context.cacheDir, "exportar").deleteRecursively()
+}
+
 /** Fichero nuevo en la caché de exportar; cada exportación borra la anterior para no dejar datos atrás. */
 fun ficheroExportar(context: Context, nombre: String): File {
-    val carpeta = File(context.cacheDir, "exportar")
-    carpeta.deleteRecursively()
-    carpeta.mkdirs()
+    borrarExportados(context)
+    val carpeta = File(context.cacheDir, "exportar").apply { mkdirs() }
     return File(carpeta, nombre)
 }
 

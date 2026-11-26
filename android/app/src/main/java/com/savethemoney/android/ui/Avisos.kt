@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.edit
 import com.savethemoney.android.MainActivity
 import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetAlert
@@ -91,6 +92,13 @@ class LocalNotifier(private val context: Context) : Notifier {
             Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle(title)
                 .setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(open).setAutoCancel(true).build(),
         )
+    }
+
+    /** Al cerrar sesión: cancela lo pendiente, quita lo mostrado y borra todas las preferencias de avisos (este archivo es solo de avisos). */
+    fun borrarTodo() {
+        pending().forEach { alarms.cancel(alarm(it)) }
+        context.getSystemService(NotificationManager::class.java).cancelAll()
+        prefs.edit { clear() }
     }
 
     private fun pending(): List<PlannedReminder> =
