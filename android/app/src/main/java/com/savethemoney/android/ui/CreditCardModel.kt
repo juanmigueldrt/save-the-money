@@ -37,6 +37,9 @@ class CreditCardModel(
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** Qué lectura gana cuando dos se cruzan (ORC-144). */
+    private val turns = ReadTurns()
+
     // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
     var selectedId by mutableStateOf<String?>(null)
     var purchaseId: String? = null
@@ -76,21 +79,27 @@ class CreditCardModel(
         this.accounts = accounts
         this.balances = balances
         transferCategories = categories.filter { it.kind == CategoryKind.Transfer }.map { it.id }.toSet()
+        val turn = turns.next()
         try {
-            terms = service.creditCards(household.id).associateBy { it.accountId }
-            installments = service.cardInstallments(household.id)
+            // Todo o nada: se lee todo antes de guardar nada.
+            val newTerms = service.creditCards(household.id).associateBy { it.accountId }
+            val newInstallments = service.cardInstallments(household.id)
             // Sin condiciones no hay cálculo: no hace falta ningún movimiento (se cargan al guardarlas).
-            val fetched = cardAccounts.mapNotNull { account -> terms[account.id]?.let { account.id to cardMovements(account.id, it) } }
-            movements = fetched.associate { (id, result) -> id to result.first }
-            truncatedAccounts = fetched.filter { (_, result) -> result.second }.map { it.first }.toSet()
-            error = null
+            val fetched = cardAccounts.mapNotNull { account ->
+                newTerms[account.id]?.let { account.id to cardMovements(account.id, it, newInstallments) }
+            }
+            turns.store(::terms, newTerms, turn)
+            turns.store(::installments, newInstallments, turn)
+            turns.store(::movements, fetched.associate { (id, result) -> id to result.first }, turn)
+            turns.store(::truncatedAccounts, fetched.filter { (_, result) -> result.second }.map { it.first }.toSet(), turn)
+            turns.store(::error, null, turn)
             loaded = true
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
-            error = e.message
+            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            error = AppError.Unknown("app").message
+            turns.store(::error, AppError.Unknown("app").message, turn)
         }
         // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
         recompute(rescheduling = loaded)
@@ -100,22 +109,30 @@ class CreditCardModel(
      * Lo que necesita el cálculo de la tarjeta: todos los movimientos de los extractos sin cobrar (por fecha, no los N más
      * recientes) y la compra de cada aplazado. El segundo valor dice si se ha llegado a [CYCLE_LIMIT].
      */
-    private suspend fun cardMovements(accountId: String, terms: CreditCardTerms): Pair<List<Movement>, Boolean> {
+    private suspend fun cardMovements(
+        accountId: String,
+        terms: CreditCardTerms,
+        plans: List<CardInstallment> = installments,
+    ): Pair<List<Movement>, Boolean> {
         val since = terms.cycleStart(CreditCardCalculator.firstUnpaidStatement(terms, today()))
         val list = service.movements(household.id, accountId, since, CYCLE_LIMIT)
-        return withPurchases(list, accountId) to (list.size >= CYCLE_LIMIT)
+        return withPurchases(list, accountId, plans) to (list.size >= CYCLE_LIMIT)
     }
 
     /** Añade las compras de los aplazados de la tarjeta que falten, por antiguas que sean. */
-    private suspend fun withPurchases(list: List<Movement>, accountId: String): List<Movement> {
+    private suspend fun withPurchases(list: List<Movement>, accountId: String, plans: List<CardInstallment> = installments): List<Movement> {
         val known = list.map { it.id }.toSet()
-        val missing = installments.filter { it.accountId == accountId && it.movementId !in known }.map { it.movementId }
+        val missing = plans.filter { it.accountId == accountId && it.movementId !in known }.map { it.movementId }
         return if (missing.isEmpty()) list else list + service.movements(household.id, missing)
     }
 
-    /** Tras recargar los aplazados: uno creado en otro dispositivo puede ser de una compra que no se había cargado. */
-    private suspend fun loadMissingPurchases() {
-        movements = movements.mapValues { (id, list) -> withPurchases(list, id) }
+    /** Tras guardar o quitar un aplazado: se releen los aplazados y las compras que falten (uno creado en otro dispositivo puede ser de una que no se había cargado). */
+    private suspend fun reloadInstallments() {
+        val turn = turns.next()
+        val plans = service.cardInstallments(household.id)
+        val list = movements.mapValues { (id, list) -> withPurchases(list, id, plans) }
+        turns.store(::installments, plans, turn)
+        turns.store(::movements, list, turn)
     }
 
     private fun recompute(rescheduling: Boolean = true) {
@@ -136,40 +153,42 @@ class CreditCardModel(
     /** Al volver a encender los avisos en Más opciones. */
     fun reschedule() = recompute()
 
-    suspend fun save(item: CreditCardTerms) {
+    // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
+
+    /** Una escritura falló cuando su pantalla ya no estaba: el aviso sale en el error del modelo. */
+    private fun sinPantalla(e: Exception) {
+        turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
+    }
+
+    suspend fun save(item: CreditCardTerms): Unit = escritura(::sinPantalla) {
         item.issue?.let { throw AppError.InvalidInput(it) }
         val saved = service.saveCreditCard(item)
-        terms = terms + (saved.accountId to saved)
+        turns.changed(::terms, terms + (saved.accountId to saved))
         // Con otro día de extracto cambian los ciclos sin cobrar: se vuelven a cargar sus movimientos.
         reloadAfterSave {
+            val turn = turns.next()
             val (list, cut) = cardMovements(saved.accountId, saved)
-            movements = movements + (saved.accountId to list)
-            truncatedAccounts = if (cut) truncatedAccounts + saved.accountId else truncatedAccounts - saved.accountId
-        }?.let { error = it }
+            turns.store(::movements, movements + (saved.accountId to list), turn)
+            turns.store(::truncatedAccounts, if (cut) truncatedAccounts + saved.accountId else truncatedAccounts - saved.accountId, turn)
+        }?.let { turns.changed(::error, it) }
         recompute()
     }
 
-    suspend fun deferPurchase(movement: Movement, months: Int, account: Account, rate: Double) {
+    suspend fun deferPurchase(movement: Movement, months: Int, account: Account, rate: Double): Unit = escritura(::sinPantalla) {
         val plan = installment(movement)?.copy(months = months, rate = rate)
             ?: CardInstallment("", household.id, account.id, movement.id, months, rate)
         plan.issue?.let { throw AppError.InvalidInput(it) }
         val saved = service.saveInstallment(plan)
         // Se ve ya, aunque falle la recarga.
-        installments = installments.filter { it.movementId != saved.movementId } + saved
-        reloadAfterSave {
-            installments = service.cardInstallments(household.id)
-            loadMissingPurchases()
-        }?.let { error = it }
+        turns.changed(::installments, installments.filter { it.movementId != saved.movementId } + saved)
+        reloadAfterSave { reloadInstallments() }?.let { turns.changed(::error, it) }
         recompute()
     }
 
-    suspend fun remove(plan: CardInstallment) {
+    suspend fun remove(plan: CardInstallment): Unit = escritura(::sinPantalla) {
         service.deleteInstallment(plan.id)
-        installments = installments.filter { it.id != plan.id }
-        reloadAfterSave {
-            installments = service.cardInstallments(household.id)
-            loadMissingPurchases()
-        }?.let { error = it }
+        turns.changed(::installments, installments.filter { it.id != plan.id })
+        reloadAfterSave { reloadInstallments() }?.let { turns.changed(::error, it) }
         recompute()
     }
 

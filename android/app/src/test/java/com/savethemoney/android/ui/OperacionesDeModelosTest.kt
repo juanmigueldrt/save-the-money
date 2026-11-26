@@ -2,15 +2,23 @@ package com.savethemoney.android.ui
 
 import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.AccountDraft
+import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.CreditCardTerms
+import com.savethemoney.android.data.CreditScore
+import com.savethemoney.android.data.ExtraBudget
 import com.savethemoney.android.data.FinanceService
+import com.savethemoney.android.data.Goal
+import com.savethemoney.android.data.Holding
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.InMemoryBackend
 import com.savethemoney.android.data.InMemoryFinance
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDraft
+import com.savethemoney.android.data.NoNotifier
 import com.savethemoney.android.data.Username
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.joinAll
 import kotlinx.coroutines.launch
@@ -164,6 +172,119 @@ class OperacionesDeModelosTest {
         service.puerta.abrir(fallando = AppError.Network)
         antigua.join()
         assertNull("lo que hay en pantalla es de la carga nueva, que fue bien", model.error)
+    }
+
+    // Respuestas que se cruzan en los demás modelos (ORC-144): una carga antigua no pisa lo guardado después.
+
+    /** Retiene la primera lectura de cada modelo hasta que la prueba la suelta. */
+    private class LecturasConPuerta(private val base: InMemoryFinance) : FinanceService by base {
+        val puerta = Puerta()
+
+        override suspend fun extraBudgets(householdId: String): List<ExtraBudget> = base.extraBudgets(householdId).also { puerta.pasar() }
+        override suspend fun goals(householdId: String): List<Goal> = base.goals(householdId).also { puerta.pasar() }
+        override suspend fun creditCards(householdId: String): List<CreditCardTerms> = base.creditCards(householdId).also { puerta.pasar() }
+        override suspend fun holdings(householdId: String): List<Holding> = base.holdings(householdId).also { puerta.pasar() }
+        override suspend fun creditScores(): List<CreditScore> = base.creditScores().also { puerta.pasar() }
+    }
+
+    /** Empieza [carga], la retiene en la puerta, hace [escritura] y luego deja llegar la respuesta antigua. */
+    private suspend fun CoroutineScope.cruzar(
+        service: LecturasConPuerta,
+        carga: suspend () -> Unit,
+        escritura: suspend () -> Unit,
+    ) {
+        val antigua = launch { carga() }
+        service.puerta.llegada.await()
+        escritura()
+        service.puerta.abrir()
+        antigua.join()
+    }
+
+    @Test
+    fun presupuestoUnaCargaAntiguaNoPisaUnExtraGuardado() = runBlocking {
+        val service = LecturasConPuerta(InMemoryFinance())
+        val model = BudgetModel(Household("h", "Casa"), service, NoNotifier) { hoy }
+
+        cruzar(service, { model.load() }) { model.save(ExtraBudget("e1", "h", "Viaje de prueba", 30_000, hoy)) }
+
+        assertEquals("el extra guardado no desaparece", listOf("e1"), model.extraBudgets.map { it.id })
+    }
+
+    @Test
+    fun planesUnaCargaAntiguaNoPisaUnaMetaGuardada() = runBlocking {
+        val service = LecturasConPuerta(InMemoryFinance())
+        val model = PlanningModel(Household("h", "Casa"), service, NoNotifier) { hoy }
+
+        cruzar(service, { model.load() }) { model.save(Goal("", "h", "Colchón de prueba", targetMinor = 100_000)) }
+
+        assertEquals("la meta guardada no desaparece", listOf("Colchón de prueba"), model.goals.map { it.name })
+    }
+
+    @Test
+    fun tarjetasUnaCargaAntiguaNoPisaLasCondicionesGuardadas() = runBlocking {
+        val base = InMemoryFinance()
+        val tarjeta = base.createAccount(AccountDraft("Tarjeta de prueba", AccountKind.CreditCard), "h")
+        val service = LecturasConPuerta(base)
+        val model = CreditCardModel(Household("h", "Casa"), service, NoNotifier) { hoy }
+
+        cruzar(service, { model.load(listOf(tarjeta), emptyMap(), emptyList()) }) {
+            model.save(CreditCardTerms(tarjeta.id, "h", creditLimit = 200_000))
+        }
+
+        assertEquals("las condiciones guardadas no desaparecen", setOf(tarjeta.id), model.terms.keys)
+    }
+
+    @Test
+    fun inversionesUnaCargaAntiguaNoPisaUnActivoGuardado() = runBlocking {
+        val service = LecturasConPuerta(InMemoryFinance())
+        val model = InvestmentModel(Household("h", "Casa"), service, NoNotifier) { hoy }
+
+        cruzar(service, { model.load() }) { model.save(Holding("", "h", "Fondo de prueba")) }
+
+        assertEquals("el activo guardado no desaparece", listOf("Fondo de prueba"), model.holdings.map { it.name })
+    }
+
+    @Test
+    fun seguimientoUnaCargaAntiguaNoPisaUnScoreGuardado() = runBlocking {
+        val service = LecturasConPuerta(InMemoryFinance())
+        val model = TrackingModel(Household("h", "Casa"), service) { hoy }
+
+        cruzar(service, { model.loadScores() }) { model.add(CreditScore("", 720, recordedOn = hoy.toString())) }
+
+        assertEquals("el score guardado no desaparece", listOf(720), model.scores.map { it.score })
+    }
+
+    /** El score se guarda en el servidor y la respuesta tarda: la petición ya ha salido. */
+    private class ScoreConPuerta(private val base: InMemoryFinance) : FinanceService by base {
+        val puerta = Puerta(cortable = true)
+
+        override suspend fun addCreditScore(score: CreditScore): CreditScore = base.addCreditScore(score).also { puerta.pasar() }
+    }
+
+    /** Sale de la pantalla con el score ya enviado y deja llegar la respuesta (o [fallo]). */
+    private suspend fun CoroutineScope.scoreSinPantalla(fallo: Throwable? = null): TrackingModel {
+        val service = ScoreConPuerta(InMemoryFinance())
+        val model = TrackingModel(Household("h", "Casa"), service) { hoy }
+        val pantalla = launch { model.add(CreditScore("", 720, recordedOn = hoy.toString())) }
+        service.puerta.llegada.await()
+        pantalla.cancel()
+        service.puerta.abrir(fallando = fallo)
+        pantalla.join()
+        escrituras.children.toList().joinAll()
+        return model
+    }
+
+    @Test
+    fun seguimientoUnaEscrituraTerminaAunqueSeSalgaDeLaPantalla() = runBlocking {
+        val model = scoreSinPantalla()
+        assertEquals("lo guardado se ve aunque se saliera de la pantalla", listOf(720), model.scores.map { it.score })
+        assertNull(model.error)
+    }
+
+    @Test
+    fun seguimientoUnaEscrituraQueFallaSinPantallaAvisaEnElModelo() = runBlocking {
+        val model = scoreSinPantalla(fallo = AppError.Network)
+        assertEquals("el fallo no se pierde: sale en el error del modelo", AppError.Network.message, model.error)
     }
 
     // Escrituras que salen de la pantalla
