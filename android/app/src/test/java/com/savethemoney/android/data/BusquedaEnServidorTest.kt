@@ -3,11 +3,17 @@ package com.savethemoney.android.data
 import io.github.jan.supabase.annotations.SupabaseExperimental
 import io.github.jan.supabase.postgrest.PropertyConversionMethod
 import io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.File
 
 /**
  * ORC-85: la búsqueda de la lista va al servidor como filtro `or=(…)` de PostgREST. El texto del usuario va entre comillas y
@@ -59,6 +65,25 @@ class BusquedaEnServidorTest {
         )
         assertEquals(listOf("(${texto("\"*12,50*\"")},amount_minor.in.(1250,-1250))"), params("12,50")["or"])
         assertEquals(listOf("(${texto("\"*-12,50*\"")},amount_minor.eq.-1250)"), params("-12,50")["or"])
+    }
+
+    /** ORC-146: las mismas cadenas que el CI manda al Supabase local (supabase/tests/api/filtros_postgrest.py). */
+    @Test
+    fun filtrosCompartidosConIosYConElServidor() {
+        // Gradle corre las pruebas desde `android/app`.
+        val file = Json.parseToJsonElement(File("../../testdata/vectors/postgrest_filters.json").readText()).jsonObject
+        val search = file["search"]!!.jsonArray
+        val movements = file["movements"]!!.jsonArray
+        assertFalse(search.isEmpty())
+        assertFalse(movements.isEmpty())
+        fun JsonElement.str(key: String) = jsonObject[key]!!.jsonPrimitive.content
+        for (v in search) {
+            assertEquals(v.str("name"), v.str("filter"), movementSearchFilter(MovementSearch.of(v.str("input"), emptyList())!!))
+        }
+        for (m in movements) {
+            val movement = Movement(m.str("id"), "h1", "a1", null, m.str("bookedOn"), -1, "x")
+            assertEquals(m.str("key"), m.str("cursor"), movementAfterFilter(movement))
+        }
     }
 
     @Test

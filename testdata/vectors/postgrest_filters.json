@@ -1,0 +1,356 @@
+{
+  "description": "ORC-146. Filtros de PostgREST de la lista de movimientos (búsqueda y cursor), compartidos por las pruebas de STMData, de Android y por supabase/tests/api/filtros_postgrest.py, que los manda al Supabase local del CI. `filter` es lo que va dentro de or=(…), escrito a mano a partir de la regla: en LIKE, \\ % _ llevan \\ delante y * pasa a _; entre comillas, \\ pasa a \\\\ y \" a \\\". `matches` son las claves de `movements` que debe devolver el servidor. `cursorOrder` es el orden de la lista (día y id de mayor a menor) y `cursor` lo que va dentro de or=(…) para pedir lo que va detrás de esa fila. Datos inventados.",
+  "search": [
+    {
+      "name": "texto normal, que también vale como etiqueta",
+      "input": "pan",
+      "filter": "description.ilike.\"*pan*\",notes.ilike.\"*pan*\",payee.ilike.\"*pan*\",tags.cs.{pan}",
+      "matches": [
+        "A"
+      ]
+    },
+    {
+      "name": "% es un carácter, no un comodín",
+      "input": "50%",
+      "filter": "description.ilike.\"*50\\\\%*\",notes.ilike.\"*50\\\\%*\",payee.ilike.\"*50\\\\%*\"",
+      "matches": [
+        "B"
+      ]
+    },
+    {
+      "name": "_ es un carácter, no un comodín",
+      "input": "a_b",
+      "filter": "description.ilike.\"*a\\\\_b*\",notes.ilike.\"*a\\\\_b*\",payee.ilike.\"*a\\\\_b*\",tags.cs.{a_b}",
+      "matches": [
+        "D"
+      ]
+    },
+    {
+      "name": "barra invertida",
+      "input": "C:\\temp",
+      "filter": "description.ilike.\"*C:\\\\\\\\temp*\",notes.ilike.\"*C:\\\\\\\\temp*\",payee.ilike.\"*C:\\\\\\\\temp*\"",
+      "matches": [
+        "F"
+      ]
+    },
+    {
+      "name": "comillas dobles",
+      "input": "di \"hola\"",
+      "filter": "description.ilike.\"*di \\\"hola\\\"*\",notes.ilike.\"*di \\\"hola\\\"*\",payee.ilike.\"*di \\\"hola\\\"*\"",
+      "matches": [
+        "G"
+      ]
+    },
+    {
+      "name": "coma",
+      "input": "uno, dos",
+      "filter": "description.ilike.\"*uno, dos*\",notes.ilike.\"*uno, dos*\",payee.ilike.\"*uno, dos*\"",
+      "matches": [
+        "H"
+      ]
+    },
+    {
+      "name": "paréntesis, en la descripción y en las notas",
+      "input": "(nota)",
+      "filter": "description.ilike.\"*(nota)*\",notes.ilike.\"*(nota)*\",payee.ilike.\"*(nota)*\"",
+      "matches": [
+        "I",
+        "J"
+      ]
+    },
+    {
+      "name": "puntos, en el beneficiario",
+      "input": "S.A.",
+      "filter": "description.ilike.\"*S.A.*\",notes.ilike.\"*S.A.*\",payee.ilike.\"*S.A.*\"",
+      "matches": [
+        "K"
+      ]
+    },
+    {
+      "name": "* cuenta como un carácter cualquiera",
+      "input": "a*c",
+      "filter": "description.ilike.\"*a_c*\",notes.ilike.\"*a_c*\",payee.ilike.\"*a_c*\"",
+      "matches": [
+        "L",
+        "M"
+      ]
+    },
+    {
+      "name": "emoji y tilde",
+      "input": "café 😀",
+      "filter": "description.ilike.\"*café 😀*\",notes.ilike.\"*café 😀*\",payee.ilike.\"*café 😀*\"",
+      "matches": [
+        "N"
+      ]
+    },
+    {
+      "name": "importe con signo",
+      "input": "-12,50",
+      "filter": "description.ilike.\"*-12,50*\",notes.ilike.\"*-12,50*\",payee.ilike.\"*-12,50*\",amount_minor.eq.-1250",
+      "matches": [
+        "Q"
+      ]
+    },
+    {
+      "name": "etiqueta con #",
+      "input": "#Viaje",
+      "filter": "description.ilike.\"*#Viaje*\",notes.ilike.\"*#Viaje*\",payee.ilike.\"*#Viaje*\",tags.cs.{viaje}",
+      "matches": [
+        "R",
+        "Q"
+      ]
+    },
+    {
+      "name": "texto que intenta cerrar el filtro",
+      "input": "a),or(id.neq.0",
+      "filter": "description.ilike.\"*a),or(id.neq.0*\",notes.ilike.\"*a),or(id.neq.0*\",payee.ilike.\"*a),or(id.neq.0*\"",
+      "matches": []
+    }
+  ],
+  "movements": [
+    {
+      "key": "A",
+      "id": "5E1D0000-0000-4000-8000-00000000001A",
+      "bookedOn": "2026-01-10",
+      "amountMinor": -250,
+      "description": "Pan de molde",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-10,and(booked_on.eq.2026-01-10,id.lt.5e1d0000-0000-4000-8000-00000000001a)"
+    },
+    {
+      "key": "B",
+      "id": "5E1D0000-0000-4000-8000-00000000000B",
+      "bookedOn": "2026-01-10",
+      "amountMinor": -1000,
+      "description": "Descuento 50% hoy",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-10,and(booked_on.eq.2026-01-10,id.lt.5e1d0000-0000-4000-8000-00000000000b)"
+    },
+    {
+      "key": "C",
+      "id": "5E1D0000-0000-4000-8000-00000000002C",
+      "bookedOn": "2026-01-10",
+      "amountMinor": -1100,
+      "description": "Descuento 500 hoy",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-10,and(booked_on.eq.2026-01-10,id.lt.5e1d0000-0000-4000-8000-00000000002c)"
+    },
+    {
+      "key": "D",
+      "id": "5E1D0000-0000-4000-8000-00000000000D",
+      "bookedOn": "2026-01-10",
+      "amountMinor": -100,
+      "description": "Ref a_b",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-10,and(booked_on.eq.2026-01-10,id.lt.5e1d0000-0000-4000-8000-00000000000d)"
+    },
+    {
+      "key": "E",
+      "id": "5E1D0000-0000-4000-8000-00000000001E",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Ref axb",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000001e)"
+    },
+    {
+      "key": "F",
+      "id": "5E1D0000-0000-4000-8000-00000000000F",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Copia en C:\\temp",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000000f)"
+    },
+    {
+      "key": "G",
+      "id": "5E1D0000-0000-4000-8000-00000000003A",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Le di \"hola\"",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000003a)"
+    },
+    {
+      "key": "H",
+      "id": "5E1D0000-0000-4000-8000-00000000002B",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Uno, dos y tres",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000002b)"
+    },
+    {
+      "key": "I",
+      "id": "5E1D0000-0000-4000-8000-00000000000C",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Gasto (nota) extra",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000000c)"
+    },
+    {
+      "key": "J",
+      "id": "5E1D0000-0000-4000-8000-00000000000A",
+      "bookedOn": "2026-01-09",
+      "amountMinor": -100,
+      "description": "Otro",
+      "notes": "ver (nota)",
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-09,and(booked_on.eq.2026-01-09,id.lt.5e1d0000-0000-4000-8000-00000000000a)"
+    },
+    {
+      "key": "K",
+      "id": "5E1D0000-0000-4000-8000-00000000004F",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "Compra",
+      "notes": null,
+      "payee": "Tienda S.A.",
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000004f)"
+    },
+    {
+      "key": "L",
+      "id": "5E1D0000-0000-4000-8000-00000000003C",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "Precio a*c",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000003c)"
+    },
+    {
+      "key": "M",
+      "id": "5E1D0000-0000-4000-8000-00000000001C",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "Precio abc",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000001c)"
+    },
+    {
+      "key": "N",
+      "id": "5E1D0000-0000-4000-8000-00000000002E",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "café 😀 rico",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000002e)"
+    },
+    {
+      "key": "O",
+      "id": "5E1D0000-0000-4000-8000-00000000000E",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "cafe sin tilde",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000000e)"
+    },
+    {
+      "key": "P",
+      "id": "5E1D0000-0000-4000-8000-00000000005A",
+      "bookedOn": "2026-01-08",
+      "amountMinor": 1250,
+      "description": "Reembolso",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000005a)"
+    },
+    {
+      "key": "Q",
+      "id": "5E1D0000-0000-4000-8000-00000000001F",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -1250,
+      "description": "Cena",
+      "notes": null,
+      "payee": null,
+      "tags": [
+        "viaje"
+      ],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000001f)"
+    },
+    {
+      "key": "R",
+      "id": "5E1D0000-0000-4000-8000-00000000006B",
+      "bookedOn": "2026-01-08",
+      "amountMinor": -100,
+      "description": "Hotel #viaje",
+      "notes": null,
+      "payee": null,
+      "tags": [],
+      "cursor": "booked_on.lt.2026-01-08,and(booked_on.eq.2026-01-08,id.lt.5e1d0000-0000-4000-8000-00000000006b)"
+    }
+  ],
+  "cursorOrder": [
+    "C",
+    "A",
+    "D",
+    "B",
+    "G",
+    "H",
+    "E",
+    "F",
+    "I",
+    "J",
+    "R",
+    "P",
+    "K",
+    "L",
+    "N",
+    "Q",
+    "M",
+    "O"
+  ],
+  "combined": [
+    {
+      "name": "búsqueda y cursor juntos: sólo lo que cumple las dos",
+      "input": "(nota)",
+      "after": "I",
+      "matches": [
+        "J"
+      ]
+    },
+    {
+      "name": "búsqueda y cursor juntos: nada detrás de la última",
+      "input": "(nota)",
+      "after": "J",
+      "matches": []
+    },
+    {
+      "name": "búsqueda y cursor juntos, mismo día",
+      "input": "a*c",
+      "after": "L",
+      "matches": [
+        "M"
+      ]
+    }
+  ]
+}

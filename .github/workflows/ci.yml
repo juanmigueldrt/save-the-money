@@ -55,8 +55,12 @@ jobs:
       - uses: supabase/setup-cli@1dedf2c611547ede7232d26866dd3c56ab903bbb # v1.7.3
         with:
           version: 3.0.0
-      - run: supabase db start
+      # Base de datos, auth, PostgREST y Kong: lo justo para probar la API REST como la usan las apps.
+      - run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
       - run: supabase test db
+      # ORC-146: los filtros de búsqueda, el cursor y las páginas de 1000 contra el PostgREST local.
+      - name: Filtros de PostgREST
+        run: python3 supabase/tests/api/filtros_postgrest.py
 
   apple:
     name: App (iOS y macOS)
