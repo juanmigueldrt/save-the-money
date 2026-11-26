@@ -16,7 +16,7 @@ final class TrackingTests: XCTestCase {
     func testNetWorthNowAndHistory() {
         let checking = Account(householdId: home, name: "Cuenta común", openingBalance: Money(minor: 100_000))
         let card = Account(householdId: home, name: "Tarjeta", kind: .creditCard)
-        let old = Account(householdId: home, name: "Antigua", openingBalance: Money(minor: 9_999), archivedAt: Date())
+        let old = Account(householdId: home, name: "Antigua", openingBalance: Money(minor: 9_999), archivedAt: day(2026, 8, 15).date())
         let movements = [
             move(checking, 50_000, on: day(2026, 9, 28)),
             move(checking, -20_000, on: day(2026, 10, 15)),
@@ -35,6 +35,32 @@ final class TrackingTests: XCTestCase {
                                               MonthKey(year: 2026, month: 11)])
         XCTAssertEqual(history.map(\.net.minor), [150_000, 130_000, 100_000])
         XCTAssertEqual(history.last?.liabilities, Money(minor: 30_000))
+    }
+
+    func testOpeningBalanceCountsFromCreation() {
+        let today = day(2026, 11, 26)
+        let fresh = Account(householdId: home, name: "Nueva", openingBalance: Money(minor: 2_000_000), createdAt: today.date())
+        let history = NetWorth.history(accounts: [fresh], movements: [], months: 12, through: MonthKey(today))
+        XCTAssertEqual(history.count, 12)
+        XCTAssertEqual(history.dropLast().map(\.net.minor), Array(repeating: 0, count: 11),
+                       "una cuenta creada hoy no existía los meses anteriores")
+        XCTAssertEqual(history.last?.net, Money(minor: 2_000_000))
+
+        let imported = Account(householdId: home, name: "Importada", openingBalance: Money(minor: 10_000),
+                               createdAt: today.date())
+        let older = NetWorth.history(accounts: [imported], movements: [move(imported, 5_000, on: day(2026, 9, 10))],
+                                     months: 4, through: MonthKey(today))
+        XCTAssertEqual(older.map(\.net.minor), [0, 15_000, 15_000, 15_000],
+                       "con movimientos de antes del alta, el saldo inicial cuenta desde el primero")
+    }
+
+    func testArchivedAccountStaysUntilArchived() {
+        let closed = Account(householdId: home, name: "Cerrada", openingBalance: Money(minor: 40_000),
+                             archivedAt: day(2026, 10, 20).date())
+        let history = NetWorth.history(accounts: [closed], movements: [], months: 3, through: MonthKey(year: 2026, month: 11))
+        XCTAssertEqual(history.map(\.net.minor), [40_000, 0, 0], "cuenta en septiembre; en octubre ya estaba archivada")
+        XCTAssertEqual(NetWorth.current(accounts: [closed], balances: [closed.id: Money(minor: 40_000)],
+                                        today: day(2026, 11, 26)).net, .zero)
     }
 
     func testCreditScoreRatingAndValidation() {
