@@ -652,8 +652,6 @@ private const val PLAN = "id,household_id,holding_id,account_id,amount_minor,eve
 private const val SCORE = "id,score,max_score,provider,recorded_on,note"
 private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate,updated_at"
 
-internal val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
-
 // Filas que se envían. Nunca llevan id ni created_by: el servidor no deja escribirlos.
 // Los opcionales van como null explícito: todas las filas de un lote deben llevar las mismas claves.
 

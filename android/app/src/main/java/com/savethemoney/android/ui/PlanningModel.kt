@@ -96,12 +96,8 @@ class PlanningModel(
             }
             turns.store(::error, null, turn)
             loaded = true
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         }
         // Aparte: si los cargos fallan, los pagos fijos y las metas se ven igual.
         quietly { turns.store(::charges, service.recurringCharges(household.id), turn) }
