@@ -14,6 +14,12 @@ interface Backend {
     val sessionEnded: Flow<Unit> get() = emptyFlow()
     suspend fun signUp(username: Username, password: String, displayName: String?): String
     suspend fun signIn(username: Username, password: String): String
+
+    /**
+     * Cambia la contraseña de quien tiene la sesión abierta, que sigue abierta en este dispositivo.
+     * Comprueba antes la actual: si no es, lanza [AppError.WrongCurrentPassword] y no cambia nada.
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String)
     suspend fun signOut()
 
     suspend fun myProfile(): Profile
@@ -43,7 +49,7 @@ fun HouseholdInvite.isUsable(now: Instant = Instant.now()): Boolean =
  * shortcut: sin bloqueo entre hilos; la app solo lo llama desde el hilo principal.
  */
 class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
-    private class UserRecord(var profile: Profile, val password: String)
+    private class UserRecord(var profile: Profile, var password: String)
 
     private val users = mutableMapOf<String, UserRecord>()
     private val householdsById = mutableMapOf<String, Household>()
@@ -71,6 +77,15 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
             ?: throw AppError.InvalidCredentials
         currentUser = account.profile.id
         return account.profile.id
+    }
+
+    // Como el servidor: la sesión sigue abierta; una actual que no es no cambia nada.
+    override suspend fun changePassword(currentPassword: String, newPassword: String) {
+        val record = users[requireUser()] ?: throw AppError.NotSignedIn
+        if (record.password != currentPassword) throw AppError.WrongCurrentPassword
+        if (newPassword.length < SignUpForm.MIN_PASSWORD) throw AppError.WeakPassword
+        if (newPassword == currentPassword) throw AppError.InvalidInput(ChangePasswordForm.SAME_PASSWORD)
+        record.password = newPassword
     }
 
     override suspend fun signOut() { currentUser = null }

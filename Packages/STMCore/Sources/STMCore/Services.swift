@@ -3,6 +3,10 @@ import Foundation
 /// Errores que la app enseña al usuario, ya en español.
 public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case invalidCredentials
+    /// Al cambiar la contraseña, la actual que se escribió no es la de la cuenta.
+    case wrongCurrentPassword
+    /// El servidor limita los intentos seguidos (inicio de sesión, cambio de contraseña).
+    case tooManyAttempts
     case usernameTaken
     case weakPassword
     case notSignedIn
@@ -19,6 +23,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidCredentials: "Usuario o contraseña incorrectos."
+        case .wrongCurrentPassword: "La contraseña actual no es correcta."
+        case .tooManyAttempts: "Demasiados intentos seguidos. Inténtalo de nuevo más tarde."
         case .usernameTaken: "Ese nombre de usuario ya existe. Prueba con otro."
         case .weakPassword: "La contraseña es demasiado débil. Usa al menos \(SignUpForm.minimumPasswordLength) caracteres."
         case .notSignedIn: "Tu sesión ha caducado. Vuelve a iniciar sesión."
@@ -41,6 +47,9 @@ public protocol AuthService: Sendable {
     func currentUserId() async -> UUID?
     func signUp(username: Username, password: String, displayName: String?) async throws -> UUID
     func signIn(username: Username, password: String) async throws -> UUID
+    /// Cambia la contraseña de quien tiene la sesión abierta, que sigue abierta en este dispositivo.
+    /// Comprueba antes la actual: si no es, lanza `wrongCurrentPassword` y no cambia nada.
+    func changePassword(currentPassword: String, newPassword: String) async throws
     func signOut() async throws
 }
 

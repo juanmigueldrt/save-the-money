@@ -19,7 +19,7 @@ final class CreditCardModel: ServerModel {
     private(set) var installments: [CardInstallment] = []
     private(set) var movements: [UUID: [Movement]] = [:]
     private(set) var summaries: [UUID: CreditCardSummary] = [:]
-    private(set) var isLoading = false
+    var isLoading = false
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
 
@@ -89,8 +89,8 @@ final class CreditCardModel: ServerModel {
         self.accounts = accounts
         self.balances = balances
         transferCategories = Set(categories.filter { $0.kind == .transfer }.map(\.id))
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         let turn = nextTurn()
         let succeeded = await perform(turn: turn) {
             let service = service, id = household.id

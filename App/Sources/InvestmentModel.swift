@@ -18,7 +18,7 @@ final class InvestmentModel: ServerModel {
     private(set) var trades: [InvestmentTrade] = []
     private(set) var plans: [InvestmentPlan] = []
     private(set) var members: [HouseholdMember] = []
-    private(set) var isLoading = false
+    var isLoading = false
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
     var range: ChartRange = .month
@@ -72,8 +72,8 @@ final class InvestmentModel: ServerModel {
     // MARK: Carga
 
     func load() async {
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         let service = service, households = households, id = household.id, turn = nextTurn()
         let loaded = await perform(turn: turn) {
             async let holdings = service.holdings(in: id)

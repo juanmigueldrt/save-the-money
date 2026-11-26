@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.ChangePasswordForm
 import com.savethemoney.android.data.Backend
 import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
@@ -128,6 +129,12 @@ class Session(
         form.firstIssue?.let { throw AppError.InvalidInput(it) }
         backend.signUp(Username.parse(form.username).getOrThrow(), form.password, form.trimmedDisplayName)
         refresh()
+    }
+
+    /** La sesión de este dispositivo sigue abierta; el servidor cierra las de los demás. */
+    suspend fun changePassword(form: ChangePasswordForm) {
+        form.firstIssue?.let { throw AppError.InvalidInput(it) }
+        backend.changePassword(form.currentPassword, form.newPassword)
     }
 
     /** Se guarda en el perfil, así sigue a la persona en sus otros dispositivos. */

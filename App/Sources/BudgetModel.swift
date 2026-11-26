@@ -26,7 +26,7 @@ final class BudgetModel: ServerModel {
     /// Movimientos de este periodo y de los 3 anteriores (para arrastre y presupuesto inteligente).
     private(set) var movements: [Movement] = []
     private(set) var extraBudgets: [ExtraBudget] = []
-    private(set) var isLoading = false
+    var isLoading = false
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
 
@@ -111,8 +111,8 @@ final class BudgetModel: ServerModel {
 
     func load() async {
         let service = service, id = household.id, turn = nextTurn()
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         await perform(turn: turn) {
             if let saved = try await service.paySchedule(), saved != schedule || !hasOwnSchedule,
                mayStore(\.schedule, turn: turn) {

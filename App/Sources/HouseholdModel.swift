@@ -14,6 +14,7 @@ final class HouseholdModel: ServerModel {
     /// Mientras se crea una invitación: «Invitar» queda desactivado para no crear dos.
     private(set) var isInviting = false
     var error: String?
+    var isLoading = false
     @ObservationIgnored var turns = ReadTurns()
 
     init(householdId: UUID, service: any HouseholdService) {

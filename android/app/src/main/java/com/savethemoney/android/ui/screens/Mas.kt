@@ -66,6 +66,8 @@ import com.savethemoney.android.data.ImportMark
 import com.savethemoney.android.data.ImportMarks
 import androidx.compose.foundation.isSystemInDarkTheme
 import com.savethemoney.android.data.AppTheme
+import com.savethemoney.android.data.ChangePasswordForm
+import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.CsvMapping
 import com.savethemoney.android.data.MovementsCsv
 import com.savethemoney.android.ui.compartir
@@ -137,6 +139,8 @@ fun Pantalla30(nav: Nav) {
     var limites by remember(finance) { mutableStateOf(finance?.planning?.budgetAlertsEnabled ?: true) }
     var habitos by remember(finance) { mutableStateOf(finance?.planning?.habits ?: HabitSettings()) }
     var eligeHabito by remember { mutableStateOf(false) }
+    var cambiaClave by remember { mutableStateOf(false) }
+    var claveCambiada by remember { mutableStateOf(false) }
     val cambiaHabitos = { nuevos: HabitSettings ->
         habitos = nuevos
         finance?.planning?.habits = nuevos
@@ -159,6 +163,8 @@ fun Pantalla30(nav: Nav) {
                     { eligeHabito = false },
                 )
             }
+        } else if (cambiaClave) {
+            { DialogoContrasena({ claveCambiada = true }) { cambiaClave = false } }
         } else {
             null
         },
@@ -274,6 +280,16 @@ fun Pantalla30(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         AjusteBloqueo()
         Spacer(Modifier.height(16.dp))
+        // Cambiar la contraseña con la sesión abierta (ORC-57).
+        ListCard {
+            MenuRow(StmIcons.lock, "Cambiar la contraseña") { cambiaClave = true }
+        }
+        Text(
+            if (claveCambiada) "Contraseña cambiada. Esta sesión sigue abierta; en tus otros dispositivos tendrás que volver a entrar."
+            else "Pide la contraseña actual. Al cambiarla se cierra la sesión en tus otros dispositivos.",
+            Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
         ListCard {
             MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
         }
@@ -289,6 +305,49 @@ private fun InterruptorVista(icon: androidx.compose.ui.graphics.vector.ImageVect
         trailing = { StmSwitch(activo, cambia) },
         onClick = { cambia(!activo) },
     )
+}
+
+/** Cambiar la contraseña (ORC-57): la actual y la nueva dos veces, con la misma regla que al crear la cuenta. */
+@Composable
+private fun BoxScope.DialogoContrasena(onChanged: () -> Unit, onDismiss: () -> Unit) {
+    val c = Stm.colors
+    val session = LocalSession.current
+    val action = rememberAction()
+    var actual by remember { mutableStateOf("") }
+    var nueva by remember { mutableStateOf("") }
+    var repite by remember { mutableStateOf("") }
+    val form = ChangePasswordForm(actual, nueva, repite)
+    // Los avisos salen en cuanto se escribe en el campo, como al crear la cuenta.
+    val tooShort = nueva.isNotEmpty() && nueva.length < SignUpForm.MIN_PASSWORD
+    val mismatch = repite.isNotEmpty() && repite != nueva
+    StmDialog(
+        "Cambiar la contraseña",
+        onDismiss = onDismiss,
+        actions = {
+            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
+            Btn("Cambiar", {
+                action.run {
+                    session.changePassword(form)
+                    onChanged()
+                    onDismiss()
+                }
+            }, kind = BtnKind.Text, enabled = form.firstIssue == null && !action.busy)
+        },
+    ) {
+        Spacer(Modifier.height(16.dp))
+        OutlinedField("Contraseña actual", actual, { actual = it }, password = true, labelBackground = c.surfaceContainerHigh, autoFocus = true)
+        Spacer(Modifier.height(12.dp))
+        OutlinedField(
+            "Nueva contraseña", nueva, { nueva = it }, password = true, labelBackground = c.surfaceContainerHigh, error = tooShort,
+            supporting = if (tooShort) "Usa al menos ${SignUpForm.MIN_PASSWORD} caracteres" else null,
+        )
+        Spacer(Modifier.height(12.dp))
+        OutlinedField(
+            "Repite la nueva contraseña", repite, { repite = it }, password = true, labelBackground = c.surfaceContainerHigh,
+            error = mismatch || action.error != null,
+            supporting = action.error ?: if (mismatch) "Las contraseñas no coinciden." else if (nueva.isNotEmpty() && nueva == actual) ChangePasswordForm.SAME_PASSWORD else null,
+        )
+    }
 }
 
 /** 31 Categorías: gastos o ingresos agrupados; tocar una para editarla. */
