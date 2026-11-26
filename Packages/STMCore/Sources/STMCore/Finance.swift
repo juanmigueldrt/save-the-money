@@ -41,6 +41,9 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
     public var openingBalance: Money
     public var ownerId: UUID?
     public var archivedAt: Date?
+    /// Cuándo se dio de alta (`created_at`): el saldo inicial es el que tenía ese día.
+    /// Nil si no se sabe (cuentas en memoria): entonces el saldo inicial cuenta desde siempre.
+    public var createdAt: Date?
     /// La que sale elegida al apuntar un movimiento.
     public var isDefault: Bool
     /// Si suma en el patrimonio neto.
@@ -48,7 +51,8 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: AccountKind = .checking,
                 currency: String = "EUR", openingBalance: Money = .zero, ownerId: UUID? = nil,
-                archivedAt: Date? = nil, isDefault: Bool = false, includeInNetWorth: Bool = true) {
+                archivedAt: Date? = nil, isDefault: Bool = false, includeInNetWorth: Bool = true,
+                createdAt: Date? = nil) {
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -57,6 +61,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         self.openingBalance = openingBalance
         self.ownerId = ownerId
         self.archivedAt = archivedAt
+        self.createdAt = createdAt
         self.isDefault = isDefault
         self.includeInNetWorth = includeInNetWorth
     }
@@ -70,6 +75,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         case openingBalanceMinor = "opening_balance_minor"
         case ownerId = "owner_id"
         case archivedAt = "archived_at"
+        case createdAt = "created_at"
         case isDefault = "is_default"
         case includeInNetWorth = "include_in_net_worth"
     }
@@ -84,6 +90,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         openingBalance = Money(minor: try c.decode(Int.self, forKey: .openingBalanceMinor), currency: currency)
         ownerId = try c.decodeIfPresent(UUID.self, forKey: .ownerId)
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        createdAt = try c.decodeIfPresent(ServerDate.self, forKey: .createdAt)?.date
         isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
         includeInNetWorth = try c.decodeIfPresent(Bool.self, forKey: .includeInNetWorth) ?? true
     }
@@ -98,6 +105,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable {
         try c.encode(openingBalance.minor, forKey: .openingBalanceMinor)
         try c.encode(ownerId, forKey: .ownerId)
         try c.encodeIfPresent(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encodeIfPresent(createdAt.map(ServerDate.init), forKey: .createdAt)
         try c.encode(isDefault, forKey: .isDefault)
         try c.encode(includeInNetWorth, forKey: .includeInNetWorth)
     }
