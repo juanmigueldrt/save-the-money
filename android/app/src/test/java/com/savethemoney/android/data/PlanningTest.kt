@@ -14,6 +14,19 @@ class PlanningTest {
         RecurringSeries("s", "h", "Pago", amountMinor = amount, every = every, unit = unit, startsOn = start, endsOn = end)
 
     @Test
+    fun seriesStartingAfterThePeriodDoesNotCount() {
+        // Alquiler de 900 € desde el 1 de febrero de 2027, apuntado en noviembre de 2026. Datos inventados.
+        val rent = serie("2027-02-01", amount = 90_000L)
+        assertEquals(0L, listOf(rent).monthlyTotal(RecurringKind.Subscription, d("2026-11-01")))
+        assertEquals(0L, listOf(rent).monthlyTotal(RecurringKind.Subscription, d("2026-12-01")))
+        assertEquals(0L, listOf(rent).monthlyTotal(RecurringKind.Subscription, d("2027-01-01")))
+        assertEquals(90_000L, listOf(rent).monthlyTotal(RecurringKind.Subscription, d("2027-02-01")))
+        // Una serie que terminó antes del periodo tampoco cuenta.
+        val ended = serie("2026-01-01", amount = 3_000L, end = "2026-10-31")
+        assertEquals(0L, listOf(ended).monthlyTotal(RecurringKind.Subscription, d("2026-11-01")))
+    }
+
+    @Test
     fun monthlySeriesKeepsDay31() {
         val s = serie("2026-01-31")
         assertEquals(listOf(d("2026-02-28"), d("2026-03-31")), s.occurrences(d("2026-02-01"), d("2026-03-31")))

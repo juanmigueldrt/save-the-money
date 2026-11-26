@@ -139,6 +139,22 @@ final class InvestmentTests: XCTestCase {
         XCTAssertEqual(saved.cashImpact, Money(minor: -50_100))
     }
 
+    func testPlanCuentaSegunSuMesDeInicio() {
+        // Aportación de 300 €. Datos inventados. Hoy es el 2 de noviembre de 2026.
+        let today = day(2026, 11, 2)
+        let holdingId = fund().id
+        func plan(startsOn: CalendarDay, endsOn: CalendarDay? = nil) -> [InvestmentPlan] {
+            [InvestmentPlan(householdId: home, holdingId: holdingId, amount: Money(minor: 30_000), startsOn: startsOn, endsOn: endsOn)]
+        }
+        XCTAssertEqual(plan(startsOn: day(2026, 12, 5)).monthlyTotal(on: today), Money.zero, "empieza el mes que viene")
+        XCTAssertEqual(plan(startsOn: day(2026, 11, 5)).monthlyTotal(on: today), Money(minor: 30_000), "empieza más tarde este mes")
+        XCTAssertEqual(plan(startsOn: day(2026, 11, 30)).monthlyTotal(on: today), Money(minor: 30_000), "empieza el último día de este mes")
+        XCTAssertEqual(plan(startsOn: day(2026, 12, 1)).monthlyTotal(on: day(2026, 11, 30)), Money.zero, "empieza el día 1 del mes siguiente")
+        XCTAssertEqual(plan(startsOn: day(2026, 1, 5), endsOn: day(2026, 11, 1)).monthlyTotal(on: today), Money.zero, "terminó ayer")
+        XCTAssertEqual(plan(startsOn: day(2026, 11, 5)).counts(on: today).active, 1)
+        XCTAssertEqual(plan(startsOn: day(2026, 12, 5)).counts(on: today).active, 0)
+    }
+
     func testPlansCalendarTotalsAndProjection() {
         let holding = fund()
         let monthly = InvestmentPlan(householdId: home, holdingId: holding.id, amount: Money(minor: 30_000),

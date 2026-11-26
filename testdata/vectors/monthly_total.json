@@ -1,0 +1,63 @@
+{
+  "_source": "Worked out by hand from the rule: a monthly series counts on day D when it started in the calendar month of D or earlier (it may start later that month, or on its last day), and it did not end before D. Its monthly amount is its amount, since it repeats every month. Amounts are integer cents.",
+  "vectors": [
+    {
+      "name": "Empieza el mes que viene: no cuenta",
+      "day": "2026-11-02",
+      "series": [{ "amount": 90000, "startsOn": "2026-12-01" }],
+      "expected": 0
+    },
+    {
+      "name": "Empieza más tarde este mes: cuenta",
+      "day": "2026-11-02",
+      "series": [{ "amount": 999, "startsOn": "2026-11-05" }],
+      "expected": 999
+    },
+    {
+      "name": "Empieza el último día de este mes: cuenta",
+      "day": "2026-11-02",
+      "series": [{ "amount": 999, "startsOn": "2026-11-30" }],
+      "expected": 999
+    },
+    {
+      "name": "Empieza el día 1 del mes siguiente, visto el último día de este mes: no cuenta",
+      "day": "2026-11-30",
+      "series": [{ "amount": 999, "startsOn": "2026-12-01" }],
+      "expected": 0
+    },
+    {
+      "name": "Terminó ayer: no cuenta",
+      "day": "2026-11-02",
+      "series": [{ "amount": 999, "startsOn": "2026-01-01", "endsOn": "2026-11-01" }],
+      "expected": 0
+    },
+    {
+      "name": "Termina hoy: cuenta",
+      "day": "2026-11-02",
+      "series": [{ "amount": 999, "startsOn": "2026-01-01", "endsOn": "2026-11-02" }],
+      "expected": 999
+    },
+    {
+      "name": "Alquiler de 900 € desde el 1 de febrero de 2027, visto en noviembre: no cuenta",
+      "day": "2026-11-01",
+      "series": [{ "amount": 90000, "startsOn": "2027-02-01" }],
+      "expected": 0
+    },
+    {
+      "name": "Alquiler de 900 € desde el 1 de febrero de 2027, visto en febrero: cuenta",
+      "day": "2027-02-01",
+      "series": [{ "amount": 90000, "startsOn": "2027-02-01" }],
+      "expected": 90000
+    },
+    {
+      "name": "Suma sólo las series que ya cuentan: 999 + 300, no 90000 del mes que viene",
+      "day": "2026-11-02",
+      "series": [
+        { "amount": 999, "startsOn": "2026-11-05" },
+        { "amount": 90000, "startsOn": "2026-12-01" },
+        { "amount": 300, "startsOn": "2026-10-01" }
+      ],
+      "expected": 1299
+    }
+  ]
+}

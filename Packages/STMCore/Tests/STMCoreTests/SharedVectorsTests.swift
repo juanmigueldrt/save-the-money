@@ -19,6 +19,21 @@ final class SharedVectorsTests: XCTestCase {
         return CalendarDay(year: p[0], month: p[1], day: p[2])!
     }
 
+    func testMonthlyTotalStartsAndEnds() throws {
+        struct File: Decodable { var vectors: [Vector] }
+        struct Vector: Decodable { var name: String; var day: String; var series: [Serie]; var expected: Int }
+        struct Serie: Decodable { var amount: Int; var startsOn: String; var endsOn: String? }
+        let file: File = try load("monthly_total.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        for v in file.vectors {
+            let series = v.series.map { s in
+                RecurringSeries(householdId: UUID(), name: "Serie", kind: .subscription, amount: Money(minor: s.amount),
+                                startsOn: day(s.startsOn), endsOn: s.endsOn.map { day($0) })
+            }
+            XCTAssertEqual(series.monthlyTotal(of: .subscription, on: day(v.day)).minor, v.expected, v.name)
+        }
+    }
+
     func testMoneyParsing() throws {
         struct File: Decodable { var vectors: [V] }
         struct V: Decodable { var input: String; var minor: Int? }

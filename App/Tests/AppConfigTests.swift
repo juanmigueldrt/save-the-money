@@ -222,6 +222,7 @@ final class PlanningModelTests: XCTestCase {
         let saved = await planning.save(music)
         XCTAssertTrue(saved)
         XCTAssertEqual(planning.upcoming.count, 1)
+        // Empieza el 5 de este mes y hoy es el 2: ya cuenta en el total mensual.
         XCTAssertEqual(planning.monthlyTotal(of: .subscription).minor, 999)
         let planned = await reminders.last
         XCTAssertEqual(planned.first?.fireOn, CalendarDay(year: 2026, month: 11, day: 3))

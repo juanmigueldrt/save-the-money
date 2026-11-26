@@ -417,10 +417,16 @@ fun List<InvestmentPlan>.charges(month: YearMonth): List<PlanCharge> =
         .flatMap { plan -> plan.occurrences(month.atDay(1), month.atEndOfMonth()).map { PlanCharge(plan, it) } }
         .sortedWith(compareBy({ it.due }, { -it.plan.amountMinor }))
 
-fun List<InvestmentPlan>.monthlyTotal(day: LocalDate): Long = filter { it.isActive(day) }.sumOf { it.monthlyAmount }
+/** Lo que suman al mes los planes activos. Cuenta un plan si empezó en el mes de [day] o antes y no terminó antes de [day]. */
+fun List<InvestmentPlan>.monthlyTotal(day: LocalDate): Long {
+    val monthEnd = day.withDayOfMonth(day.lengthOfMonth())
+    return filter { it.isActive(day) && !it.startDay.isAfter(monthEnd) }.sumOf { it.monthlyAmount }
+}
 
+/** Planes activos y en pausa de ese día. Misma regla de inicio que [monthlyTotal]. */
 fun List<InvestmentPlan>.counts(day: LocalDate): Pair<Int, Int> {
-    val live = filter { !it.isArchived && it.endDay?.isBefore(day) != true }
+    val monthEnd = day.withDayOfMonth(day.lengthOfMonth())
+    val live = filter { !it.isArchived && !it.startDay.isAfter(monthEnd) && it.endDay?.isBefore(day) != true }
     return live.count { !it.isPaused } to live.count { it.isPaused }
 }
 
