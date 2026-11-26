@@ -112,7 +112,7 @@ struct HouseholdOnboardingView: View {
     }
 }
 
-/// Sección Hogar: miembros, invitaciones y salir.
+/// Sección Hogar: elegir hogar, ajustes del hogar y del perfil, miembros, invitaciones y salir.
 struct HouseholdView: View {
     let profile: Profile
     let household: Household
@@ -124,6 +124,9 @@ struct HouseholdView: View {
     @State private var removing: HouseholdMember?
     @State private var renaming = false
     @State private var newName = ""
+    @State private var startDay = 1
+    @State private var displayName = ""
+    @State private var isSaving = false
 
     private var myRole: MemberRole? { model.role(of: profile.id) }
 
@@ -145,6 +148,12 @@ struct HouseholdView: View {
                         .help("Cambiar el nombre del hogar")
                     }
                 }
+
+                if session.households.count > 1 { householdPicker }
+
+                monthStartCard
+
+                displayNameCard
 
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     Text("Miembros")
@@ -220,6 +229,10 @@ struct HouseholdView: View {
         }
         .background(Palette.bgGrouped)
         .task(id: household.id) { await model.load() }
+        .onAppear {
+            startDay = household.monthStartDay
+            displayName = profile.displayName ?? ""
+        }
         .sheet(item: $shownInvite, onDismiss: { Task { await model.load() } }, content: { invite in
             InviteSheet(invite: invite, householdName: household.name)
         })
@@ -250,6 +263,137 @@ struct HouseholdView: View {
             }
         } message: { _ in
             Text("Dejará de tener acceso a este hogar. Puedes volver a invitarle cuando quieras.")
+        }
+    }
+}
+
+extension HouseholdView {
+    /// Con más de un hogar: cuál está abierto. Al cambiar se cargan los datos del otro desde cero.
+    private var householdPicker: some View {
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Text("Tus hogares")
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
+            Picker("Hogar abierto", selection: Binding(get: { household.id }, set: { id in
+                if let other = session.households.first(where: { $0.id == id }) { session.open(other) }
+            })) {
+                ForEach(session.households) { Text($0.name).tag($0.id) }
+            }
+            Text("Cada hogar tiene sus propias cuentas y presupuestos. Este dispositivo recuerda cuál abriste.")
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
+        }
+        .card()
+    }
+
+    /// Día de inicio del mes: lo cambia solo el dueño; los demás lo ven.
+    private var monthStartCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Text("Inicio del mes")
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
+            if myRole == .owner {
+                Picker("Día de inicio del mes", selection: $startDay) {
+                    ForEach(Household.monthStartDays, id: \.self) { Text("Día \($0)").tag($0) }
+                }
+                Button("Guardar día de inicio") { saveStartDay() }
+                    .buttonStyle(SecondaryButtonStyle())
+                    .disabled(isSaving || startDay == household.monthStartDay)
+            } else {
+                Text(myRole == .member
+                     ? "El mes del hogar empieza el día \(household.monthStartDay). Solo quien creó el hogar puede cambiarlo."
+                     : "El mes del hogar empieza el día \(household.monthStartDay).")
+                    .font(Typography.body)
+                    .foregroundStyle(Palette.label)
+            }
+            Text("Presupuestos, informes y «este mes» cuentan desde este día. No se cambia ni se borra ningún movimiento.")
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
+        }
+        .card()
+    }
+
+    /// Nombre visible de quien ha entrado, el que ven los demás miembros.
+    private var displayNameCard: some View {
+        VStack(alignment: .leading, spacing: Spacing.s16) {
+            Text("Tu nombre")
+                .titleFont(.title2)
+                .foregroundStyle(Palette.label)
+            LabeledField(label: "Nombre visible") {
+                TextField(profile.username, text: $displayName)
+                    .accessibilityLabel("Nombre visible")
+                    .onSubmit(saveDisplayName)
+            }
+            Button("Guardar nombre", action: saveDisplayName)
+                .buttonStyle(SecondaryButtonStyle())
+                .disabled(isSaving || SignUpForm(displayName: displayName).trimmedDisplayName == profile.displayName)
+            Text("Es como te ven los demás miembros. Vacío, se usa tu usuario (\(profile.username)); como mucho 60 caracteres.")
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.labelSecondary)
+        }
+        .card()
+    }
+
+    private func saveStartDay() {
+        save { try await session.setMonthStartDay(startDay) }
+    }
+
+    private func saveDisplayName() {
+        save {
+            try await session.setDisplayName(displayName)
+            // La lista de miembros lleva el nombre: se vuelve a pedir.
+            await model.load()
+        }
+    }
+
+    /// Si el servidor lo rechaza (p. ej. quien no es dueño), su aviso se ve en la pantalla.
+    private func save(_ action: @escaping () async throws -> Void) {
+        guard !isSaving else { return }
+        isSaving = true
+        model.error = nil
+        Task {
+            defer { isSaving = false }
+            do {
+                try await action()
+            } catch {
+                model.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+            }
+        }
+    }
+}
+
+/// Un enlace de invitación con un hogar ya abierto: nunca se une solo, pregunta antes.
+struct JoinFromLinkModifier: ViewModifier {
+    let household: Household
+
+    @Environment(SessionModel.self) private var session
+    @State private var error: String?
+
+    func body(content: Content) -> some View {
+        content
+            .confirmationDialog("¿Unirte a otro hogar?",
+                                isPresented: Binding(get: { session.pendingInvite != nil },
+                                                     set: { if !$0 { session.pendingInvite = nil } }),
+                                titleVisibility: .visible, presenting: session.pendingInvite) { code in
+                Button("Unirme con el código \(code.display)") { join(code) }
+                Button("Ahora no", role: .cancel) {}
+            } message: { _ in
+                Text("Seguirás en \(household.name): pertenecerás a los dos hogares y podrás cambiar de uno a otro en Hogar.")
+            }
+            .alert("No te has podido unir", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+                Button("Aceptar", role: .cancel) {}
+            } message: {
+                Text(error ?? "")
+            }
+    }
+
+    private func join(_ code: InviteCode) {
+        Task {
+            do {
+                try await session.join(code)
+            } catch {
+                self.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+            }
         }
     }
 }

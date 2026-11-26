@@ -34,11 +34,21 @@ interface Backend {
     suspend fun leave(householdId: String)
     /** Cambia el nombre del hogar. Sólo puede quien lo creó. */
     suspend fun renameHousehold(householdId: String, name: String): Household
+    /**
+     * Cambia el día en que empieza el mes del hogar ([MONTH_START_DAYS]). Sólo puede quien lo creó.
+     * No toca ningún dato guardado: solo cambia qué días cuentan en cada mes de presupuestos e informes.
+     */
+    suspend fun setMonthStartDay(householdId: String, day: Int): Household
     /** Solo el dueño del hogar puede quitar a otro miembro. */
     suspend fun removeMember(householdId: String, userId: String)
 }
 
 const val HOUSEHOLD_NAME_ISSUE = "El nombre del hogar tiene que tener entre 1 y 80 letras."
+
+/** Días en que puede empezar el mes del hogar: del 1 al 28, que existen en todos los meses (igual que el servidor). */
+val MONTH_START_DAYS = 1..28
+const val MONTH_START_DAY_ISSUE = "El mes del hogar puede empezar entre el día 1 y el 28."
+const val MONTH_START_DAY_OWNER_ONLY = "Solo quien creó el hogar puede cambiar el día en que empieza el mes."
 
 // OffsetDateTime y no Instant.parse: el servidor manda «+00:00», que Instant.parse solo entiende desde Android 14.
 // Si la fecha no se entiende, la invitación no vale.
@@ -123,6 +133,17 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         }
         val valid = validHouseholdName(name) ?: throw AppError.InvalidInput(HOUSEHOLD_NAME_ISSUE)
         val household = householdsById[householdId]?.copy(name = valid) ?: throw AppError.Unknown("hogar")
+        householdsById[householdId] = household
+        return household
+    }
+
+    override suspend fun setMonthStartDay(householdId: String, day: Int): Household {
+        val user = requireUser()
+        if (memberships.none { it.userId == user && it.householdId == householdId && it.role == MemberRole.Owner }) {
+            throw AppError.InvalidInput(MONTH_START_DAY_OWNER_ONLY)
+        }
+        if (day !in MONTH_START_DAYS) throw AppError.InvalidInput(MONTH_START_DAY_ISSUE)
+        val household = householdsById[householdId]?.copy(monthStartDay = day) ?: throw AppError.Unknown("hogar")
         householdsById[householdId] = household
         return household
     }

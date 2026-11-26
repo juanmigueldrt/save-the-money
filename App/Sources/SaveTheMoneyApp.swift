@@ -71,7 +71,10 @@ struct AppRootView: View {
                              finance: models.finance, budgets: models.budgets, planning: models.planning,
                              tracking: models.tracking, investments: models.investments, cards: models.cards)
                         .environment(models.household)
-                        .id(household.id)
+                        // Otro hogar u otro día de inicio del mes: modelos nuevos, así que todo se vuelve a cargar.
+                        .id("\(household.id)-\(household.monthStartDay)")
+                        // Fuera del .id: un enlace de invitación con un hogar abierto pide confirmación.
+                        .modifier(JoinFromLinkModifier(household: household))
                 }
             }
         }
@@ -84,6 +87,8 @@ struct AppRootView: View {
 @MainActor
 struct HouseholdModels {
     let householdId: UUID
+    /// Con el que se crearon: si cambia, `SessionModel` los rehace.
+    let monthStartDay: Int
     let finance: FinanceModel
     let budgets: BudgetModel
     let planning: PlanningModel
@@ -94,6 +99,7 @@ struct HouseholdModels {
 
     init(household: Household, services: AppServices) {
         householdId = household.id
+        monthStartDay = household.monthStartDay
         finance = FinanceModel(household: household, service: services.finance)
         budgets = BudgetModel(household: household, service: services.budgets,
                               alerts: services.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts())
