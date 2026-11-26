@@ -209,6 +209,7 @@ struct CreditCardDetailView: View {
     @State private var editingTerms = false
     @State private var deferring = false
     @State private var recordingPayment = false
+    @State private var removingPlan: CardInstallment?
 
     var body: some View {
         ScrollView {
@@ -268,6 +269,13 @@ struct CreditCardDetailView: View {
         .sheet(isPresented: $editingTerms) { CardTermsFormView(account: account) }
         .sheet(isPresented: $deferring) { DeferPurchaseView(account: account) }
         .sheet(isPresented: $recordingPayment) { CardPaymentFormView(account: account) }
+        .confirmationDialog("¿Quitar este aplazado?",
+                            isPresented: Binding(get: { removingPlan != nil }, set: { if !$0 { removingPlan = nil } }),
+                            titleVisibility: .visible, presenting: removingPlan) { plan in
+            Button("Quitar el aplazado", role: .destructive) { Task { await cards.removeInstallment(plan) } }
+        } message: { _ in
+            Text("La compra se queda en el extracto como un cargo normal. Puedes volver a aplazarla cuando quieras.")
+        }
     }
 
     private func calendar(_ summary: CreditCardSummary) -> some View {
@@ -364,7 +372,7 @@ struct CreditCardDetailView: View {
                             .foregroundStyle(Palette.label)
                     }
                     .contextMenu {
-                        Button("Quitar el aplazado", role: .destructive) { Task { await cards.removeInstallment(plan) } }
+                        Button("Quitar el aplazado", role: .destructive) { removingPlan = plan }
                     }
                 }
             }
@@ -567,6 +575,7 @@ struct DeferPurchaseView: View {
     @State private var movementId: UUID?
     @State private var months = 3
     @State private var error: String?
+    @State private var isWorking = false
 
     private var candidates: [Movement] { cards.deferrable(in: account) }
     private var rate: Decimal { cards.terms[account.id]?.installmentRate ?? 14 }
@@ -607,7 +616,7 @@ struct DeferPurchaseView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Aplazar") { Task { await save() } }.disabled(movementId == nil)
+                    Button("Aplazar") { Task { await save() } }.disabled(movementId == nil || isWorking)
                 }
             }
         }
@@ -615,7 +624,9 @@ struct DeferPurchaseView: View {
     }
 
     private func save() async {
-        guard let movement = candidates.first(where: { $0.id == movementId }) else { return }
+        guard !isWorking, let movement = candidates.first(where: { $0.id == movementId }) else { return }
+        isWorking = true
+        defer { isWorking = false }
         if await cards.deferPurchase(movement, months: months, in: account) { dismiss() } else { error = cards.error }
     }
 }

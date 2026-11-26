@@ -75,6 +75,14 @@ class InvestmentTest {
         assertNotNull(trade(h, TradeSide.Buy, "0.123456789", "11", day(2026, 6, 1)).issue)
     }
 
+    @Test fun precioConMasDeSeisDecimalesNoSeAcepta() {
+        val h = fund()
+        assertNull(fund(price = "1.123456").issue)
+        assertNotNull(fund(price = "1.1234567").issue)
+        assertNotNull(trade(h, TradeSide.Buy, "1", "1.1234567", day(2026, 6, 1)).issue)
+        assertNull(trade(h, TradeSide.Buy, "1", "1.123456", day(2026, 6, 1)).issue)
+    }
+
     @Test fun portfolioTotalsAndAllocation() {
         val world = fund(price = "20")
         val bonds = fund("Fondo de bonos", "5", InvestmentKind.Bond)

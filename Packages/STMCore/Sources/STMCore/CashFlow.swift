@@ -38,11 +38,15 @@ public struct CashFlow: Hashable, Sendable {
 
         // Columna 2: categorías con gasto, colgando de su grupo.
         var middle: [Node] = []
-        for progress in report.groups where progress.spent.minor > 0 {
+        for progress in report.groups {
+            // El grupo suma solo sus categorías con gasto neto positivo: un reembolso no puede dejar bandas fuera del nodo.
+            let spending = report.lines(in: progress.group).filter { $0.spent.minor > 0 }
+            let groupTotal = spending.reduce(0) { $0 + $1.spent.minor }
+            guard groupTotal > 0 else { continue }
             let groupId = "grupo:\(progress.group.rawValue)"
             middle.append(Node(id: groupId, title: progress.group.title, column: 1,
-                               value: Double(progress.spent.minor), role: .group(progress.group)))
-            for line in report.lines(in: progress.group) where line.spent.minor > 0 {
+                               value: Double(groupTotal), role: .group(progress.group)))
+            for line in spending {
                 let id = "categoria:\(line.category.id.uuidString)"
                 nodes.append(Node(id: id, title: line.category.name, column: 2,
                                   value: Double(line.spent.minor), role: .category(progress.group)))

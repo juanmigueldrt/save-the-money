@@ -1,7 +1,7 @@
 import Foundation
 
 /// Cuentas y movimientos en memoria, con las mismas reglas que el RLS del servidor:
-/// sólo se ve y se toca lo de los hogares de los que uno es miembro.
+/// cada miembro ve y toca solo lo que ha creado, en los hogares de los que es miembro.
 extension InMemoryBackend: FinanceService {
     private func requireMember(of householdId: UUID, _ operation: String = #function) throws -> UUID {
         let user = try requireUser(operation)
@@ -10,8 +10,8 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func accounts(in householdId: UUID) async throws -> [Account] {
-        _ = try requireMember(of: householdId)
-        return financeAccounts.filter { $0.householdId == householdId }
+        let user = try requireMember(of: householdId)
+        return financeAccounts.filter { $0.householdId == householdId && isMine($0.id, in: householdId, user: user) }
     }
 
     public func balances(in householdId: UUID) async throws -> [UUID: Money] {
@@ -23,7 +23,7 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account {
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
         if let owner = draft.ownerId, !isMember(owner, of: householdId) {
             throw AppError.invalidInput("Esa persona no es del hogar.")
@@ -31,18 +31,21 @@ extension InMemoryBackend: FinanceService {
         let account = Account(householdId: householdId, name: draft.trimmedName, kind: draft.kind,
                               openingBalance: draft.openingBalance, ownerId: draft.ownerId)
         financeAccounts.append(account)
+        creators[account.id] = user
         return account
     }
 
     public func updateAccount(_ account: Account) async throws -> Account {
         guard let index = financeAccounts.firstIndex(where: { $0.id == account.id }) else { throw AppError.unknown("cuenta") }
         let householdId = financeAccounts[index].householdId
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
+        guard isMine(account.id, in: householdId, user: user) else { throw AppError.unknown("cuenta") }
         var updated = account
         updated.householdId = householdId
         if updated.isDefault && !updated.isArchived {
             // Como en la base de datos: sólo una predeterminada por persona.
-            for other in financeAccounts.indices where financeAccounts[other].id != account.id {
+            for other in financeAccounts.indices
+            where financeAccounts[other].id != account.id && creators[financeAccounts[other].id] == user {
                 financeAccounts[other].isDefault = false
             }
         }
@@ -52,7 +55,8 @@ extension InMemoryBackend: FinanceService {
 
     public func deleteAccount(_ accountId: UUID) async throws {
         guard let account = financeAccounts.first(where: { $0.id == accountId }) else { return }
-        _ = try requireMember(of: account.householdId)
+        let user = try requireMember(of: account.householdId)
+        guard isMine(accountId, in: account.householdId, user: user) else { return }
         financeAccounts.removeAll { $0.id == accountId }
         let gone = Set(financeMovements.filter { $0.accountId == accountId }.map(\.id))
         financeMovements.removeAll { $0.accountId == accountId }
@@ -64,36 +68,41 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func categories(in householdId: UUID) async throws -> [BudgetCategory] {
-        _ = try requireMember(of: householdId)
-        return financeCategories.filter { $0.householdId == householdId }
+        let user = try requireMember(of: householdId)
+        return financeCategories.filter { $0.householdId == householdId && isMine($0.id, in: householdId, user: user) }
     }
 
     public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
-        _ = try requireMember(of: category.householdId)
-        if let issue = category.issue(among: financeCategories) { throw AppError.invalidInput(issue) }
+        let user = try requireMember(of: category.householdId)
+        // Como el índice único del servidor: el nombre no se repite entre las categorías propias.
+        let own = financeCategories.filter { creators[$0.id] == user }
+        if let issue = category.issue(among: own) { throw AppError.invalidInput(issue) }
         var created = BudgetCategory(householdId: category.householdId, name: category.trimmedName, kind: category.kind,
                                      budgetGroup: category.budgetGroup, icon: category.icon)
         if created.kind != .expense { created.budgetGroup = nil }
         financeCategories.append(created)
+        creators[created.id] = user
         return created
     }
 
     public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
         guard let index = financeCategories.firstIndex(where: { $0.id == category.id }) else { throw AppError.unknown("categoría") }
         let current = financeCategories[index]
-        _ = try requireMember(of: current.householdId)
+        let user = try requireMember(of: current.householdId)
+        guard isMine(current.id, in: current.householdId, user: user) else { throw AppError.unknown("categoría") }
         var updated = current
         updated.name = category.trimmedName
         updated.budgetGroup = current.kind == .expense ? category.budgetGroup : nil
         updated.icon = category.icon
-        if let issue = updated.issue(among: financeCategories) { throw AppError.invalidInput(issue) }
+        if let issue = updated.issue(among: financeCategories.filter({ creators[$0.id] == user })) { throw AppError.invalidInput(issue) }
         financeCategories[index] = updated
         return updated
     }
 
     public func deleteCategory(_ categoryId: UUID) async throws {
         guard let category = financeCategories.first(where: { $0.id == categoryId }) else { return }
-        _ = try requireMember(of: category.householdId)
+        let user = try requireMember(of: category.householdId)
+        guard isMine(categoryId, in: category.householdId, user: user) else { return }
         financeCategories.removeAll { $0.id == categoryId }
         for index in financeMovements.indices where financeMovements[index].categoryId == categoryId {
             financeMovements[index].categoryId = nil
@@ -101,68 +110,76 @@ extension InMemoryBackend: FinanceService {
         for index in recurring.indices where recurring[index].categoryId == categoryId {
             recurring[index].categoryId = nil
         }
-        for index in budgets.indices {
-            budgets[index].limits[categoryId] = nil
+        for owner in budgets.keys {
+            for index in budgets[owner, default: []].indices {
+                budgets[owner]?[index].limits[categoryId] = nil
+            }
         }
     }
 
+    /// Como el servidor: borra solo lo tuyo de ese hogar y te repone tus categorías de partida.
     public func resetHousehold(_ householdId: UUID) async throws {
-        _ = try requireMember(of: householdId)
-        let holdingIds = Set(holdingList.filter { $0.householdId == householdId }.map(\.id))
+        let user = try requireMember(of: householdId)
+        let mine = { (id: UUID) in self.creators[id] == user }
+        let holdingIds = Set(holdingList.filter { $0.householdId == householdId && mine($0.id) }.map(\.id))
         holdingPriceList.removeAll { holdingIds.contains($0.holdingId) }
         tradeList.removeAll { holdingIds.contains($0.holdingId) }
         planList.removeAll { holdingIds.contains($0.holdingId) }
-        holdingList.removeAll { $0.householdId == householdId }
-        creditCardList.removeAll { $0.householdId == householdId }
-        installmentList.removeAll { $0.householdId == householdId }
-        let goalIds = Set(goalList.filter { $0.householdId == householdId }.map(\.id))
+        holdingList.removeAll { holdingIds.contains($0.id) }
+        // Las condiciones de una tarjeta son de quien creó su cuenta.
+        creditCardList.removeAll { $0.householdId == householdId && mine($0.accountId) }
+        installmentList.removeAll { $0.householdId == householdId && mine($0.id) }
+        let goalIds = Set(goalList.filter { $0.householdId == householdId && mine($0.id) }.map(\.id))
         goalContributions.removeAll { goalIds.contains($0.goalId) }
-        goalList.removeAll { $0.householdId == householdId }
-        recurring.removeAll { $0.householdId == householdId }
-        chargeList.removeAll { $0.householdId == householdId }
-        budgets.removeAll { $0.householdId == householdId }
-        extraBudgetList.removeAll { $0.householdId == householdId }
-        financeMovements.removeAll { $0.householdId == householdId }
-        financeAccounts.removeAll { $0.householdId == householdId }
-        financeCategories.removeAll { $0.householdId == householdId }
-        financeCategories += BudgetCategory.defaults(for: householdId)
+        goalList.removeAll { goalIds.contains($0.id) }
+        recurring.removeAll { $0.householdId == householdId && mine($0.id) }
+        chargeList.removeAll { $0.householdId == householdId && mine($0.id) }
+        budgets[user]?.removeAll { $0.householdId == householdId }
+        extraBudgetList.removeAll { $0.householdId == householdId && mine($0.id) }
+        financeMovements.removeAll { $0.householdId == householdId && mine($0.id) }
+        financeAccounts.removeAll { $0.householdId == householdId && mine($0.id) }
+        financeCategories.removeAll { $0.householdId == householdId && mine($0.id) }
+        seedCategories(in: householdId, for: user)
     }
 
     public func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement] {
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
         return financeMovements
-            .filter { $0.householdId == householdId && (accountId == nil || $0.accountId == accountId) }
+            .filter { $0.householdId == householdId && (accountId == nil || $0.accountId == accountId) && creators[$0.id] == user }
             .sorted { $0.bookedOn > $1.bookedOn }
             .prefix(limit)
             .map { $0 }
     }
 
     public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
-        _ = try requireMember(of: householdId)
-        return financeMovements.filter { $0.householdId == householdId && ids.contains($0.id) }
+        let user = try requireMember(of: householdId)
+        return financeMovements.filter { $0.householdId == householdId && ids.contains($0.id) && creators[$0.id] == user }
     }
 
     public func movements(in householdId: UUID, accountId: UUID, since: CalendarDay, limit: Int) async throws -> [Movement] {
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
         return financeMovements
-            .filter { $0.householdId == householdId && $0.accountId == accountId && $0.bookedOn >= since }
+            .filter { $0.householdId == householdId && $0.accountId == accountId && $0.bookedOn >= since && creators[$0.id] == user }
             .sorted { $0.bookedOn > $1.bookedOn }
             .prefix(limit)
             .map { $0 }
     }
 
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
-        _ = try requireMember(of: householdId)
-        return financeMovements.filter { $0.householdId == householdId }
+        let user = try requireMember(of: householdId)
+        return financeMovements.filter { $0.householdId == householdId && creators[$0.id] == user }
     }
 
-    func validated(_ draft: MovementDraft, in householdId: UUID) throws -> Movement {
+    /// La cuenta y la categoría tienen que ser de `user` y de ese hogar, como pide el RLS al apuntar.
+    func validated(_ draft: MovementDraft, in householdId: UUID, by user: UUID) throws -> Movement {
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
-        guard financeAccounts.contains(where: { $0.id == draft.accountId && $0.householdId == householdId }) else {
+        guard financeAccounts.contains(where: { $0.id == draft.accountId && $0.householdId == householdId }),
+              isMine(draft.accountId, in: householdId, user: user) else {
             throw AppError.unknown("cuenta de otro hogar")
         }
         if let category = draft.categoryId,
-           !financeCategories.contains(where: { $0.id == category && $0.householdId == householdId }) {
+           !financeCategories.contains(where: { $0.id == category && $0.householdId == householdId })
+            || !isMine(category, in: householdId, user: user) {
             throw AppError.unknown("categoría de otro hogar")
         }
         movementVersion += 1
@@ -174,10 +191,12 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement {
-        _ = try requireMember(of: householdId)
-        let movement = try validated(draft, in: householdId)
+        let user = try requireMember(of: householdId)
+        let movement = try validated(draft, in: householdId, by: user)
         if let stored = financeMovements.first(where: { $0.id == draft.id }) {
-            // Como el servidor: repetirlo solo vale con la misma cuenta, importe y día.
+            // Como el servidor: un id que ya usó otra persona no se ve, así que no vale.
+            guard creators[stored.id] == user else { throw AppError.idUsedBySomeoneElse }
+            // Repetirlo solo vale con la misma cuenta, importe y día.
             guard stored.householdId == householdId, stored.accountId == movement.accountId,
                   stored.amount == movement.amount, stored.bookedOn == movement.bookedOn else {
                 throw AppError.invalidInput(TransferDraft.storedWithOtherData)
@@ -185,15 +204,18 @@ extension InMemoryBackend: FinanceService {
             return stored
         }
         financeMovements.append(movement)
+        creators[movement.id] = user
         return movement
     }
 
     public func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement] {
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
         if let issue = transfer.issue { throw AppError.invalidInput(issue) }
         if let stored = transferLegs[transfer.id] {
+            // Como el servidor: si las patas son de otra persona, ese id ya está usado.
+            guard stored.allSatisfy({ creators[$0] == user }) else { throw AppError.idUsedBySomeoneElse }
             let legs = financeMovements.filter { stored.contains($0.id) }
-            // Como el servidor: repetirla solo vale con las mismas cuentas, importe y día.
+            // Repetirla solo vale con las mismas cuentas, importe y día.
             guard legs.map(\.accountId) == [transfer.fromAccountId, transfer.toAccountId],
                   legs.map(\.amount) == [-transfer.amount, transfer.amount],
                   legs.allSatisfy({ $0.bookedOn == transfer.bookedOn }) else {
@@ -201,7 +223,7 @@ extension InMemoryBackend: FinanceService {
             }
             return legs
         }
-        let legs = try transfer.legs.map { try validated($0, in: householdId) }
+        let legs = try transfer.legs.map { try validated($0, in: householdId, by: user) }
         // Cada pata pasa por el mismo punto de fallo que `addMovement`: si falla la segunda,
         // se deshace la primera, como la transacción del servidor.
         let before = financeMovements
@@ -214,20 +236,22 @@ extension InMemoryBackend: FinanceService {
             financeMovements = before
             throw error
         }
+        for leg in legs { creators[leg.id] = user }
         transferLegs[transfer.id] = legs.map(\.id)
         return legs
     }
 
     public func updateMovement(_ movement: Movement) async throws -> Movement {
-        // Como el servidor: un movimiento borrado o en otra versión que la leída no se cambia.
+        // Como el servidor: un movimiento borrado, ajeno o en otra versión que la leída no se cambia.
         guard let index = financeMovements.firstIndex(where: { $0.id == movement.id }) else { throw AppError.movementChanged }
         let householdId = financeMovements[index].householdId
-        _ = try requireMember(of: householdId)
-        guard movement.updatedAt == financeMovements[index].updatedAt else { throw AppError.movementChanged }
+        let user = try requireMember(of: householdId)
+        guard isMine(movement.id, in: householdId, user: user),
+              movement.updatedAt == financeMovements[index].updatedAt else { throw AppError.movementChanged }
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
                                   amount: movement.amount, description: movement.description, notes: movement.notes,
                                   excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
-        var updated = try validated(draft, in: householdId)
+        var updated = try validated(draft, in: householdId, by: user)
         updated = Movement(id: movement.id, householdId: householdId, accountId: updated.accountId,
                            categoryId: updated.categoryId, bookedOn: updated.bookedOn, amount: updated.amount,
                            description: updated.description, notes: updated.notes,
@@ -240,7 +264,8 @@ extension InMemoryBackend: FinanceService {
 
     public func deleteMovement(_ movementId: UUID) async throws {
         guard let movement = financeMovements.first(where: { $0.id == movementId }) else { return }
-        _ = try requireMember(of: movement.householdId)
+        let user = try requireMember(of: movement.householdId)
+        guard isMine(movementId, in: movement.householdId, user: user) else { return }
         financeMovements.removeAll { $0.id == movementId }
         installmentList.removeAll { $0.movementId == movementId }
         for index in chargeList.indices where chargeList[index].transactionId == movementId {
@@ -249,19 +274,25 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult {
-        _ = try requireMember(of: householdId)
+        let user = try requireMember(of: householdId)
         var inserted = 0
         var duplicates = 0
         for draft in drafts {
-            let movement = try validated(draft, in: householdId)
+            let movement = try validated(draft, in: householdId, by: user)
             if let hash = movement.importHash,
                financeMovements.contains(where: { $0.accountId == movement.accountId && $0.importHash == hash }) {
                 duplicates += 1
                 continue
             }
             financeMovements.append(movement)
+            creators[movement.id] = user
             inserted += 1
         }
         return ImportResult(inserted: inserted, duplicates: duplicates)
     }
+}
+
+extension AppError {
+    /// Lo que devuelve la app ante el 23505 del servidor: ese id ya lo usó otra persona.
+    static let idUsedBySomeoneElse = AppError.invalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
 }

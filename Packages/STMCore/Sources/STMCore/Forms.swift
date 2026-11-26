@@ -26,6 +26,7 @@ public struct SignUpForm: Equatable, Sendable {
             case .username(.tooShort): "El usuario necesita al menos 3 caracteres."
             case .username(.tooLong): "El usuario puede tener como mucho 30 caracteres."
             case .username(.invalidCharacters): "Usa solo letras sin tilde, números, punto, guion o guion bajo."
+            case .username(.invalidEdges): "El usuario empieza y termina con una letra o un número."
             case .passwordTooShort: "La contraseña necesita al menos \(SignUpForm.minimumPasswordLength) caracteres."
             case .passwordsDoNotMatch: "Las contraseñas no coinciden."
             }

@@ -164,7 +164,8 @@ final class TrackingTests: XCTestCase {
     func testParityWithAndroidSummaryAndReports() {
         let checking = Account(householdId: home, name: "Cuenta común", openingBalance: Money(minor: 100_000))
         let savings = Account(householdId: home, name: "Ahorro")
-        let old = Account(householdId: home, name: "Antigua", archivedAt: Date())
+        let archivedOn = Calendar.current.date(from: DateComponents(year: 2026, month: 11, day: 5))!
+        let old = Account(householdId: home, name: "Antigua", archivedAt: archivedOn)
         let food = BudgetCategory(householdId: home, name: "Supermercado", kind: .expense, budgetGroup: .needs, icon: "cart")
         let fun = BudgetCategory(householdId: home, name: "Ocio", kind: .expense, budgetGroup: .wants)
         let transfer = BudgetCategory(householdId: home, name: "Transferencia", kind: .transfer)
@@ -184,7 +185,14 @@ final class TrackingTests: XCTestCase {
         XCTAssertEqual(MonthSummary.spent(movements: open, categories: categories, today: today), Money(minor: 9_000),
                        "sin traspasos ni lo de después de hoy")
         XCTAssertEqual(MonthSummary.netWorthChange(accounts: [checking, savings, old], movements: movements, today: today),
-                       Money(minor: -9_000), "el traspaso se anula y la cuenta archivada no cuenta")
+                       Money(minor: -108_000), "el traspaso se anula; la cuenta archivada el 5 cuenta lo del 4")
+        XCTAssertEqual(MonthSummary.netWorthChange(accounts: [checking, savings, old],
+                                                   movements: [move(checking, -7_000, on: day(2026, 10, 26), food)],
+                                                   today: today), Money(minor: 0), "inicio 1: octubre no cuenta")
+        XCTAssertEqual(MonthSummary.netWorthChange(accounts: [checking, savings, old],
+                                                   movements: [move(checking, -7_000, on: day(2026, 10, 26), food)],
+                                                   today: today, monthStartDay: 25), Money(minor: -7_000),
+                       "con inicio 25 el mes va del 25 de octubre")
 
         let rise = BiggestRise.find(movements: open, categories: categories, month: MonthKey(today))
         XCTAssertEqual(rise?.title, "Ocio")
@@ -233,6 +241,18 @@ final class TrackingTests: XCTestCase {
         XCTAssertEqual(flex.remaining, Money(minor: 52_000))
         XCTAssertEqual(flex.daysLeft, 10)
         XCTAssertEqual(flex.perDay, Money(minor: 5_200))
+    }
+
+    func testBudgetAlertAtExactLimitDoesNotSayPasado() {
+        let account = Account(householdId: home, name: "Cuenta común")
+        let fun = BudgetCategory(householdId: home, name: "Ocio", kind: .expense, budgetGroup: .wants)
+        let month = MonthKey(year: 2026, month: 11)
+        let budget = Budget(householdId: home, month: month, expectedIncome: Money(minor: 100_000),
+                            limits: [fun.id: Money(minor: 10_000)])
+        let movements = [move(account, -10_000, on: day(2026, 11, 5), fun)]
+        let report = BudgetReport(budget: budget, month: month, categories: [fun], movements: movements)
+        let alerts = BudgetAlertPlanner.alerts(for: report)
+        XCTAssertEqual(alerts.map(\.title), ["Has llegado al límite en Ocio"])
     }
 
     func testBudgetAlerts() {
