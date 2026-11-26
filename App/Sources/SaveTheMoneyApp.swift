@@ -65,27 +65,49 @@ struct AppRootView: View {
             case .needsHousehold(let profile):
                 HouseholdOnboardingView(profile: profile)
             case .ready(let profile, let household):
-                RootView(profile: profile, household: household,
-                         finance: FinanceModel(household: household, service: session.services.finance),
-                         budgets: BudgetModel(household: household, service: session.services.budgets,
-                                              alerts: session.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts()),
-                         planning: PlanningModel(household: household, recurring: session.services.recurring,
-                                                 goals: session.services.goals,
-                                                 reminders: session.isDemo ? NoReminders() : LocalReminders()),
-                         tracking: TrackingModel(household: household, finance: session.services.finance,
-                                                 budgets: session.services.budgets, scores: session.services.creditScores),
-                         investments: InvestmentModel(household: household, service: session.services.investments,
-                                                      households: session.services.households,
-                                                      reminders: session.isDemo ? NoReminders() : LocalReminders()),
-                         cards: CreditCardModel(household: household, service: session.services.creditCards,
-                                                finance: session.services.finance,
-                                                reminders: session.isDemo ? NoReminders() : LocalReminders(),
-                                                alerts: session.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts()))
-                    .id(household.id)
+                // `models` existe siempre en `.ready` (lo crea la sesión al entrar en el hogar).
+                if let models = session.models {
+                    RootView(profile: profile, household: household,
+                             finance: models.finance, budgets: models.budgets, planning: models.planning,
+                             tracking: models.tracking, investments: models.investments, cards: models.cards)
+                        .environment(models.household)
+                        .id(household.id)
+                }
             }
         }
         .animation(.default, value: session.state)
         .preferredColorScheme(session.theme.colorScheme)
+    }
+}
+
+/// Los modelos de un hogar abierto. Los crea `SessionModel` una sola vez al entrar en el hogar.
+@MainActor
+struct HouseholdModels {
+    let householdId: UUID
+    let finance: FinanceModel
+    let budgets: BudgetModel
+    let planning: PlanningModel
+    let tracking: TrackingModel
+    let investments: InvestmentModel
+    let cards: CreditCardModel
+    let household: HouseholdModel
+
+    init(household: Household, services: AppServices) {
+        householdId = household.id
+        finance = FinanceModel(household: household, service: services.finance)
+        budgets = BudgetModel(household: household, service: services.budgets,
+                              alerts: services.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts())
+        planning = PlanningModel(household: household, recurring: services.recurring, goals: services.goals,
+                                 reminders: services.isDemo ? NoReminders() : LocalReminders())
+        tracking = TrackingModel(household: household, finance: services.finance,
+                                 budgets: services.budgets, scores: services.creditScores)
+        investments = InvestmentModel(household: household, service: services.investments,
+                                      households: services.households,
+                                      reminders: services.isDemo ? NoReminders() : LocalReminders())
+        cards = CreditCardModel(household: household, service: services.creditCards, finance: services.finance,
+                                reminders: services.isDemo ? NoReminders() : LocalReminders(),
+                                alerts: services.isDemo ? NoBudgetAlerts() : LocalBudgetAlerts())
+        self.household = HouseholdModel(householdId: household.id, service: services.households)
     }
 }
 
