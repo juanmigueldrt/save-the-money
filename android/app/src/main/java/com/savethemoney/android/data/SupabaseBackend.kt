@@ -1,7 +1,9 @@
 package com.savethemoney.android.data
 
+import com.russhwolf.settings.Settings
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.auth.SettingsSessionManager
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.createSupabaseClient
@@ -20,11 +22,15 @@ import java.time.Instant
 
 /**
  * Servicios sobre Supabase. Toda la seguridad la pone el servidor (RLS y funciones);
- * aquí solo se llama a la API y se traducen los errores. La sesión la guarda supabase-kt.
+ * aquí solo se llama a la API y se traducen los errores. La sesión la guarda [SesionCifrada].
  */
 class SupabaseBackend(url: String, anonKey: String) : Backend {
     val client: SupabaseClient = createSupabaseClient(url, anonKey) {
-        install(Auth)
+        install(Auth) {
+            // Mismo archivo de preferencias que usaba supabase-kt; la sesión en claro de antes se migra al arrancar.
+            val ajustes = Settings()
+            sessionManager = SesionCifrada(ajustes, SettingsSessionManager(ajustes, SesionCifrada.claveAntigua(url)))
+        }
         install(Postgrest)
     }
 

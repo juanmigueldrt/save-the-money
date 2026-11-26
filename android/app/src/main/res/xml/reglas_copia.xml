@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: allowBackup="false" no impide la transferencia entre dispositivos.
+     La sesión (preferencias por defecto, donde la guarda supabase-kt) no sale nunca del móvil. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="sharedpref" path="com.savethemoney.android_preferences.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="com.savethemoney.android_preferences.xml" />
+    </device-transfer>
+</data-extraction-rules>
