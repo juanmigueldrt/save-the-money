@@ -163,22 +163,25 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (sin cuenta ni hogar, que se fijan al crear).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(accountId, forKey: .accountId)
+        try c.encode(householdId, forKey: .householdId)
         try c.encode(creditLimit.minor, forKey: .creditLimitMinor)
         try c.encode(statementDay, forKey: .statementDay)
         try c.encode(paymentDay, forKey: .paymentDay)
         try c.encode(paymentDelayMonths, forKey: .paymentDelayMonths)
         try c.encode(paymentMode, forKey: .paymentMode)
         try c.encode(fixedPayment?.minor, forKey: .fixedPaymentMinor)
-        try c.encode(minPaymentPercent, forKey: .minPaymentPercent)
+        try encodeNumeric(minPaymentPercent, &c, .minPaymentPercent)
         try c.encode(minPayment.minor, forKey: .minPaymentMinor)
-        try c.encode(revolvingRate, forKey: .revolvingRate)
-        try c.encode(installmentRate, forKey: .installmentRate)
+        try encodeNumeric(revolvingRate, &c, .revolvingRate)
+        try encodeNumeric(installmentRate, &c, .installmentRate)
         try c.encode(payFromAccountId, forKey: .payFromAccountId)
         try c.encode(remindDaysBefore, forKey: .remindDaysBefore)
         try c.encode(alertPercent, forKey: .alertPercent)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -250,11 +253,16 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (plazo e interés); el resto se fija al crear.
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(accountId, forKey: .accountId)
+        try c.encode(movementId, forKey: .movementId)
         try c.encode(months, forKey: .months)
-        try c.encode(rate, forKey: .rate)
+        try encodeNumeric(rate, &c, .rate)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 

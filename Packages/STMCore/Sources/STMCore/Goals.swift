@@ -97,10 +97,12 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(trimmedName, forKey: .name)
+        try c.encode(id, forKey: .id)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(name, forKey: .name)
         try c.encode(kind, forKey: .kind)
         try c.encode(target.minor, forKey: .targetMinor)
         try c.encode(starting.minor, forKey: .startingMinor)
@@ -110,6 +112,7 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
         try c.encode(icon, forKey: .icon)
         try c.encode(completedAt.map(ServerDate.init), forKey: .completedAt)
         try c.encode(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -157,6 +160,7 @@ public struct GoalContribution: Identifiable, Hashable, Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(householdId, forKey: .householdId)
         try c.encode(goalId, forKey: .goalId)
         try c.encode(amount.minor, forKey: .amountMinor)

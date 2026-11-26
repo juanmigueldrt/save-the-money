@@ -58,13 +58,17 @@ public struct RecurringCharge: Identifiable, Hashable, Codable, Sendable {
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Las columnas que se insertan (el id lo pone el servidor).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(householdId, forKey: .householdId)
         try c.encode(seriesId, forKey: .seriesId)
         try c.encode(dueOn, forKey: .dueOn)
         try c.encode(amount.minor, forKey: .amountMinor)
+        try c.encode(status, forKey: .status)
+        try c.encode(transactionId, forKey: .transactionId)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 

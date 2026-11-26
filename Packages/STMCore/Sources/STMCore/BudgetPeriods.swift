@@ -381,12 +381,13 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(id, forKey: .id)
         try c.encode(householdId, forKey: .householdId)
-        try c.encode(trimmedName, forKey: .name)
+        try c.encode(name, forKey: .name)
         try c.encode(limit.minor, forKey: .limitMinor)
         try c.encode(startsOn, forKey: .startsOn)
         try c.encode(endsOn, forKey: .endsOn)
         try c.encode(categoryIds, forKey: .categoryIds)
         try c.encode(accountIds, forKey: .accountIds)
         try c.encode(isFavorite, forKey: .isFavorite)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
