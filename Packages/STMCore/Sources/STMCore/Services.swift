@@ -3,6 +3,10 @@ import Foundation
 /// Errores que la app enseña al usuario, ya en español.
 public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case invalidCredentials
+    /// Al cambiar la contraseña, la actual que se escribió no es la de la cuenta.
+    case wrongCurrentPassword
+    /// El servidor limita los intentos seguidos (inicio de sesión, cambio de contraseña).
+    case tooManyAttempts
     case usernameTaken
     case weakPassword
     case notSignedIn
@@ -19,6 +23,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     public var errorDescription: String? {
         switch self {
         case .invalidCredentials: "Usuario o contraseña incorrectos."
+        case .wrongCurrentPassword: "La contraseña actual no es correcta."
+        case .tooManyAttempts: "Demasiados intentos seguidos. Inténtalo de nuevo más tarde."
         case .usernameTaken: "Ese nombre de usuario ya existe. Prueba con otro."
         case .weakPassword: "La contraseña es demasiado débil. Usa al menos \(SignUpForm.minimumPasswordLength) caracteres."
         case .notSignedIn: "Tu sesión ha caducado. Vuelve a iniciar sesión."
@@ -41,6 +47,9 @@ public protocol AuthService: Sendable {
     func currentUserId() async -> UUID?
     func signUp(username: Username, password: String, displayName: String?) async throws -> UUID
     func signIn(username: Username, password: String) async throws -> UUID
+    /// Cambia la contraseña de quien tiene la sesión abierta, que sigue abierta en este dispositivo.
+    /// Comprueba antes la actual: si no es, lanza `wrongCurrentPassword` y no cambia nada.
+    func changePassword(currentPassword: String, newPassword: String) async throws
     func signOut() async throws
 }
 
@@ -99,8 +108,13 @@ public protocol FinanceService: Sendable {
     func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement]
     /// Solo cambia el movimiento si sigue en la versión leída (`movement.updatedAt`). Si otro dispositivo lo cambió
     /// o lo borró antes, no guarda nada y falla con `AppError.movementChanged`. Devuelve la versión nueva.
+    /// En una pata de transferencia, el importe y el día cambian también en la otra pata (en el servidor, en la
+    /// misma transacción); la salida tiene que seguir siendo negativa y la entrada positiva.
     func updateMovement(_ movement: Movement) async throws -> Movement
     func deleteMovement(_ movementId: UUID) async throws
+    /// Borra las dos patas de una transferencia (`Movement.transferId`) en una sola llamada, o ninguna.
+    /// Si la otra pata ya no existe borra la que queda; si ya no queda ninguna no hace nada.
+    func deleteTransfer(_ transferId: UUID) async throws
     /// Guarda los movimientos de un CSV. Los que ya estaban (misma huella) se ignoran.
     func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult
 }
@@ -133,6 +147,12 @@ public struct TransferDraft: Hashable, Sendable {
 
     /// Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día.
     public static let storedWithOtherData = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+    /// Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella.
+    public static let otherLegLocked = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
+    /// Lo que se avisa antes de borrar una pata: se borran las dos.
+    public static let deleteWarning = "Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer."
+    /// Lo que se avisa al editar una pata.
+    public static let editNote = "Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta."
 
     /// Las dos patas: la salida de una cuenta y la entrada en la otra.
     public var legs: [MovementDraft] {

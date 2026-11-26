@@ -9,12 +9,16 @@ protocol ServerModel: AnyObject {
     var error: String? { get set }
     /// Turnos de las lecturas: ver `store(_:in:turn:)`.
     var turns: ReadTurns { get set }
+    /// true mientras hay una carga en curso: ver `beginLoad()`.
+    var isLoading: Bool { get set }
 }
 
 /// Cada lectura toma un turno al empezar. Lo que trae solo se guarda si nada que empezó después lo ha guardado ya.
 struct ReadTurns {
     private var issued = 0
     private var stored: [AnyKeyPath: Int] = [:]
+    /// Cargas que todavía no han terminado.
+    fileprivate(set) var running = 0
 
     mutating func next() -> Int {
         issued += 1
@@ -67,6 +71,18 @@ extension ServerModel {
 
     /// El turno de una lectura que empieza.
     func nextTurn() -> Int { turns.next() }
+
+    /// Marca una carga en curso. `isLoading` sigue en true hasta que termina la última que se solapa con las demás.
+    func beginLoad() {
+        turns.running += 1
+        isLoading = true
+    }
+
+    /// Cierra la carga que empezó con `beginLoad()`.
+    func endLoad() {
+        turns.running -= 1
+        isLoading = turns.running > 0
+    }
 
     /// true si lo que ha traído la lectura del turno `turn` puede guardarse en `slice`: la tarea no se ha cancelado
     /// y ninguna lectura que empezó después ha guardado ahí lo suyo. Una respuesta antigua no pisa una más nueva.

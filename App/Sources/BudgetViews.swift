@@ -342,7 +342,7 @@ struct CashFlowView: View {
                         SummaryLine(title: "Sale", amount: report.totalSpent)
                     }
                     if flow.isEmpty {
-                        EmptyHint(text: "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
+                        EmptyHint(text: budgets.isLoading ? "Cargando…" : "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
                     } else {
                         SankeyDiagram(flow: flow)
                             .chartHeight(max(320, CGFloat(flow.nodes.filter { $0.column == 2 }.count) * 34))

@@ -156,18 +156,18 @@ struct RootView: View {
         }
     }
 
+    private var householdReload: HouseholdReload {
+        HouseholdReload(finance: finance, budgets: budgets, planning: planning, investments: investments,
+                        cards: cards, tracking: tracking)
+    }
+
     private var actions: AppActions {
         AppActions(
             newMovement: { addingMovement = true },
             newAccount: { addingAccount = true },
             importCSV: { importingCSV = true },
             refresh: {
-                Task {
-                    await finance.load()
-                    await planning.load()
-                    await budgets.load()
-                    await investments.load()
-                }
+                Task { await householdReload.reload() }
             },
             show: { section in
                 #if os(iOS)
@@ -259,6 +259,34 @@ struct RootView: View {
         case .more:
             MoreView(profile: profile, household: household)
         }
+    }
+}
+
+/// Los modelos del hogar abierto que se recargan juntos.
+struct HouseholdReload {
+    let finance: FinanceModel
+    let budgets: BudgetModel
+    let planning: PlanningModel
+    let investments: InvestmentModel
+    let cards: CreditCardModel
+    let tracking: TrackingModel
+
+    /// Recarga todo lo del hogar: lo que usan ⌘R («Actualizar») y «Empezar de cero». Sigue el orden de la carga
+    /// de arranque: primero las cuentas y los movimientos, y después lo que depende de ellos.
+    /// No se puede confiar en el cambio de `CreditCardModel.Inputs`: si la recarga no cambia nada, no se dispara.
+    @MainActor
+    func reload() async {
+        await finance.load()
+        await budgets.load()
+        await budgets.checkAlerts(categories: finance.categories)
+        await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+        await planning.load()
+        await planning.syncCharges(movements: finance.recent)
+        await investments.load()
+        // El seguimiento (patrimonio, informes e historial de crédito) lo cargan las vistas al cambiar sus datos.
+        await tracking.loadHistory()
+        await tracking.loadScores()
+        await tracking.loadReport()
     }
 }
 

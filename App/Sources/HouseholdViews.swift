@@ -118,19 +118,14 @@ struct HouseholdView: View {
     let household: Household
 
     @Environment(SessionModel.self) private var session
-    @State private var members: [HouseholdMember] = []
-    @State private var invites: [HouseholdInvite] = []
+    @Environment(HouseholdModel.self) private var model
     @State private var shownInvite: HouseholdInvite?
-    @State private var error: String?
     @State private var confirmingLeave = false
     @State private var removing: HouseholdMember?
     @State private var renaming = false
     @State private var newName = ""
-    @State private var isWorking = false
 
-    private var myRole: MemberRole? {
-        members.first { $0.profile.id == profile.id }?.role
-    }
+    private var myRole: MemberRole? { model.role(of: profile.id) }
 
     var body: some View {
         ScrollView {
@@ -155,7 +150,7 @@ struct HouseholdView: View {
                     Text("Miembros")
                         .titleFont(.title2)
                         .foregroundStyle(Palette.label)
-                    ForEach(members) { member in
+                    ForEach(model.members) { member in
                         HStack {
                             Text(member.profile.name)
                                 .font(Typography.headline)
@@ -178,18 +173,18 @@ struct HouseholdView: View {
                             }
                         }
                     }
-                    Button("Invitar a tu pareja", action: invite)
+                    Button("Invitar a tu pareja") { Task { shownInvite = await model.invite() } }
                         .buttonStyle(PrimaryButtonStyle())
-                        .disabled(isWorking)
+                        .disabled(model.isInviting)
                 }
                 .card()
 
-                if !invites.isEmpty {
+                if !model.invites.isEmpty {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Text("Invitaciones pendientes")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        ForEach(invites) { pending in
+                        ForEach(model.invites) { pending in
                             HStack {
                                 Text(pending.inviteCode?.display ?? pending.code)
                                     .font(Typography.headline.monospaced())
@@ -198,7 +193,7 @@ struct HouseholdView: View {
                                 Text("Caduca \(pending.expiresAt.formatted(.relative(presentation: .named)))")
                                     .font(Typography.footnote)
                                     .foregroundStyle(Palette.labelSecondary)
-                                Button("Anular") { revoke(pending) }
+                                Button("Anular") { Task { await model.revoke(pending) } }
                                     .font(Typography.subheadlineEmphasis)
                                     .foregroundStyle(Palette.negativeText)
                                     .buttonStyle(.plain)
@@ -208,7 +203,7 @@ struct HouseholdView: View {
                     .card()
                 }
 
-                ErrorText(message: error)
+                ErrorText(message: model.error)
 
                 VStack(spacing: Spacing.s16) {
                     if myRole == .member {
@@ -224,17 +219,17 @@ struct HouseholdView: View {
             .frame(maxWidth: .infinity)
         }
         .background(Palette.bgGrouped)
-        .task(id: household.id) { await load() }
-        .sheet(item: $shownInvite, onDismiss: { Task { await load() } }) { invite in
+        .task(id: household.id) { await model.load() }
+        .sheet(item: $shownInvite, onDismiss: { Task { await model.load() } }, content: { invite in
             InviteSheet(invite: invite, householdName: household.name)
-        }
+        })
         .alert("Nombre del hogar", isPresented: $renaming) {
             TextField("Nombre del hogar", text: $newName)
             Button("Cancelar", role: .cancel) {}
             Button("Guardar") {
                 Task {
                     do { try await session.renameHousehold(household, to: newName) }
-                    catch { self.error = (error as? AppError)?.errorDescription ?? "No se ha podido cambiar el nombre." }
+                    catch { model.error = (error as? AppError)?.errorDescription ?? "No se ha podido cambiar el nombre." }
                 }
             }
         } message: {
@@ -242,10 +237,7 @@ struct HouseholdView: View {
         }
         .confirmationDialog("¿Salir de \(household.name)?", isPresented: $confirmingLeave, titleVisibility: .visible) {
             Button("Salir del hogar", role: .destructive) {
-                Task {
-                    do { try await session.leaveHousehold(household) }
-                    catch { self.error = (error as? AppError)?.errorDescription }
-                }
+                Task { await model.leave(then: session.refresh) }
             }
         } message: {
             Text("Dejarás de ver lo que te hayan compartido en este hogar.")
@@ -254,52 +246,10 @@ struct HouseholdView: View {
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
                             titleVisibility: .visible, presenting: removing) { member in
             Button("Quitar del hogar", role: .destructive) {
-                Task {
-                    do {
-                        try await session.services.households.removeMember(member.profile.id, from: household.id)
-                        await load()
-                    } catch { self.error = (error as? AppError)?.errorDescription }
-                }
+                Task { await model.remove(member) }
             }
         } message: { _ in
             Text("Dejará de tener acceso a este hogar. Puedes volver a invitarle cuando quieras.")
-        }
-    }
-
-    private func load() async {
-        do {
-            members = try await session.services.households.members(of: household.id)
-            invites = try await session.services.households.pendingInvites(for: household.id)
-            error = nil
-        } catch {
-            self.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
-        }
-    }
-
-    private func invite() {
-        guard !isWorking else { return }
-        isWorking = true
-        Task {
-            defer { isWorking = false }
-            do {
-                shownInvite = try await session.services.households.createInvite(for: household.id)
-            } catch {
-                self.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
-            }
-        }
-    }
-
-    private func revoke(_ invite: HouseholdInvite) {
-        Task {
-            var failure: String?
-            do {
-                try await session.services.households.revokeInvite(invite.id)
-            } catch {
-                failure = "No se ha podido anular la invitación. " + ((error as? AppError)?.errorDescription ?? "")
-            }
-            await load()
-            // Después de cargar: load() borra el aviso anterior.
-            if let failure { self.error = failure }
         }
     }
 }

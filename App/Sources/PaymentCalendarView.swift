@@ -126,7 +126,7 @@ struct PaymentCalendarView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if payments.isEmpty {
-                EmptyHint(text: "No hay más pagos previstos. Añade tus pagos fijos y suscripciones para verlos aquí.")
+                EmptyHint(text: planning.isLoading ? "Cargando…" : "No hay más pagos previstos. Añade tus pagos fijos y suscripciones para verlos aquí.")
             }
             ForEach(payments) { payment in
                 Button { jump(to: payment.day) } label: { PaymentRow(payment: payment, showsDay: true) }
@@ -270,7 +270,7 @@ struct NextPaymentsCard: View {
                         .foregroundStyle(Palette.labelSecondary)
                 }
                 if next.isEmpty {
-                    EmptyHint(text: "Cuando añadas pagos fijos o suscripciones verás aquí los próximos.")
+                    EmptyHint(text: planning.isLoading ? "Cargando…" : "Cuando añadas pagos fijos o suscripciones verás aquí los próximos.")
                 }
                 ForEach(next) { PaymentRow(payment: $0, showsDay: true) }
             }

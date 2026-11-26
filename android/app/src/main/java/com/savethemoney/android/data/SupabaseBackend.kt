@@ -68,6 +68,28 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         userId()
     }
 
+    /*
+     * supabase-kt 3.2.6 no envía current_password y el proyecto puede pedir un inicio de sesión reciente
+     * («secure password change»). Por eso se vuelve a iniciar sesión con la actual: la comprueba (con el
+     * límite de intentos del servidor) y deja una sesión nueva con la que el cambio vale con ese ajuste
+     * encendido o apagado. Si la actual no es, supabase-kt no toca la sesión guardada (solo la borra con
+     * session_not_found). Tras el cambio, el servidor cierra todas las demás sesiones de la cuenta.
+     */
+    override suspend fun changePassword(currentPassword: String, newPassword: String) = mapped {
+        val email = client.auth.currentUserOrNull()?.email ?: throw AppError.NotSignedIn
+        try {
+            client.auth.signInWith(Email) {
+                this.email = email
+                password = currentPassword
+            }
+        } catch (e: RestException) {
+            val error = authError(listOfNotNull(e.error, e.description, e.message).joinToString(" "))
+            throw if (error == AppError.InvalidCredentials) AppError.WrongCurrentPassword else error
+        }
+        client.auth.updateUser { password = newPassword }
+        Unit
+    }
+
     // supabase-kt 3.2.6 solo borra la sesión local si la llamada al servidor sale bien:
     // sin red quedaría guardada y la app volvería a entrar sola.
     override suspend fun signOut() = mapped {
@@ -224,6 +246,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
             // El trigger de households: no se cambia base_currency con importes guardados.
             "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)
+            // Transferencias: la otra pata no se pudo cambiar o borrar a la vez.
+            "STM07" -> AppError.InvalidInput(TransferDraft.OTHER_LEG_LOCKED)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 
@@ -232,7 +256,11 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             return when {
                 "invalid login credentials" in text || "invalid_credentials" in text -> AppError.InvalidCredentials
                 "already registered" in text || "user_already_exists" in text || "duplicate key" in text -> AppError.UsernameTaken
+                // Antes que «password should be»: el mensaje de same_password también lo contiene.
+                "same_password" in text || "should be different from the old" in text ->
+                    AppError.InvalidInput(ChangePasswordForm.SAME_PASSWORD)
                 "weak_password" in text || "password should be" in text -> AppError.WeakPassword
+                "over_request_rate_limit" in text || "rate limit" in text -> AppError.TooManyAttempts
                 "session" in text && ("missing" in text || "not found" in text) -> AppError.NotSignedIn
                 else -> AppError.Unknown("auth")
             }

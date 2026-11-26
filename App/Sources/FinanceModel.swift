@@ -14,7 +14,7 @@ final class FinanceModel: ServerModel {
     private(set) var balances: [UUID: Money] = [:]
     private(set) var categories: [BudgetCategory] = []
     private(set) var recent: [Movement] = []
-    private(set) var isLoading = false
+    var isLoading = false
     /// La primera carga ya ha terminado (bien o mal). Antes, RootView no carga lo que depende de ella.
     private(set) var hasLoaded = false
     var error: String?
@@ -47,8 +47,8 @@ final class FinanceModel: ServerModel {
     }
 
     func load() async {
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         let service = service, id = household.id, turn = nextTurn()
         await perform(turn: turn) {
             async let accounts = service.accounts(in: id)
@@ -118,7 +118,19 @@ final class FinanceModel: ServerModel {
     func update(_ movements: [Movement]) async -> Bool {
         guard !movements.isEmpty else { return true }
         let saved = await perform {
-            for movement in movements { _ = try await service.updateMovement(movement) }
+            // Guardar una pata de transferencia cambia también la otra (importe y día): si la otra también está en la
+            // lista, se guarda sobre su versión nueva, que ya trae lo mismo, en vez de fallar como si la hubiera
+            // cambiado otro dispositivo.
+            var versions: [UUID: String?] = [:]
+            for var movement in movements {
+                if let version = versions[movement.id] { movement.updatedAt = version }
+                let saved = try await service.updateMovement(movement)
+                let pairs = movements.filter { $0.transferId != nil && $0.transferId == saved.transferId && $0.id != saved.id }
+                guard !pairs.isEmpty else { continue }
+                for pair in try await service.movements(in: household.id, ids: pairs.map(\.id)) {
+                    versions[pair.id] = pair.updatedAt
+                }
+            }
             await reloadAfterSave { try await reloadAll() }
         }
         // Si otro dispositivo cambió alguno antes, se recarga para que se vea lo nuevo detrás del aviso.
@@ -127,10 +139,18 @@ final class FinanceModel: ServerModel {
     }
 
     /// Borra varios a la vez (sin «Deshacer»: la vista pide confirmación antes).
+    /// Una pata de transferencia se lleva la otra, aunque no esté en la lista.
     @discardableResult
     func delete(_ movements: [Movement]) async -> Bool {
         await perform {
-            for movement in movements { try await service.deleteMovement(movement.id) }
+            var transfers = Set<UUID>()
+            for movement in movements {
+                if let transferId = movement.transferId {
+                    if transfers.insert(transferId).inserted { try await service.deleteTransfer(transferId) }
+                } else {
+                    try await service.deleteMovement(movement.id)
+                }
+            }
             await reloadAfterSave { try await reloadAll() }
         }
     }
@@ -145,13 +165,18 @@ final class FinanceModel: ServerModel {
     /// El último movimiento borrado, para «Deshacer» (como en Android).
     var lastDeleted: Movement?
 
+    /// Una pata de transferencia se borra con la otra y sin «Deshacer», que solo volvería a apuntar una.
     @discardableResult
     func delete(_ movement: Movement) async -> Bool {
         let done = await perform {
-            try await service.deleteMovement(movement.id)
+            if let transferId = movement.transferId {
+                try await service.deleteTransfer(transferId)
+            } else {
+                try await service.deleteMovement(movement.id)
+            }
             await reloadAfterSave { try await reloadAll() }
         }
-        if done { lastDeleted = movement }
+        if done { lastDeleted = movement.transferId == nil ? movement : nil }
         return done
     }
 

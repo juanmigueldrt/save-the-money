@@ -85,7 +85,7 @@ struct RecurringView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if planning.upcoming.isEmpty {
-                EmptyHint(text: "No hay cargos en los próximos 30 días.")
+                EmptyHint(text: planning.isLoading ? "Cargando…" : "No hay cargos en los próximos 30 días.")
             }
             ForEach(planning.upcoming.prefix(12)) { charge in
                 HStack {
