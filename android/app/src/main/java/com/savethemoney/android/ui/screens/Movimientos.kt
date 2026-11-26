@@ -1003,9 +1003,9 @@ fun Pantalla34(nav: Nav) {
                             menu = false
                             confirmaTransferencia = true
                         } else {
+                            // Sin borrar lastDeleted: la lista muestra «Deshacer» como con el resto de borrados.
                             action.run {
                                 finance.delete(m)
-                                finance.lastDeleted = null
                                 nav.back()
                             }
                         }

@@ -94,7 +94,7 @@ private fun fechaLarga(d: LocalDate) = "${d.dayOfMonth} de ${Fechas.mes(d)}"
 
 /** "14" o "21,5", para los campos y los textos. */
 private fun tasa(valor: Double) = BigDecimal(valor).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString().replace('.', ',')
-private fun leerTasa(texto: String) = parseDecimal(texto, maxFractionDigits = 2)?.toDouble()
+internal fun leerTasa(texto: String) = parseDecimal(texto, maxFractionDigits = 2)?.toDouble()
 
 /** Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces. */
 private fun desglose(p: CardPayment, modo: CardPaymentMode): String {
