@@ -12,6 +12,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case alreadyMember
     case network
     case invalidInput(String)
+    /// El movimiento que se quería cambiar ya no es el que se leyó: otro dispositivo lo cambió o lo borró antes.
+    case movementChanged
     case unknown(String)
 
     public var errorDescription: String? {
@@ -26,6 +28,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
         case .alreadyMember: "Ya formas parte de ese hogar."
         case .network: "No hay conexión. Inténtalo de nuevo en un momento."
         case .invalidInput(let message): message
+        case .movementChanged:
+            "Este movimiento ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta."
         case .unknown: "Algo ha fallado. Inténtalo de nuevo."
         }
     }
@@ -86,11 +90,15 @@ public protocol FinanceService: Sendable {
     func movements(in householdId: UUID, accountId: UUID, since: CalendarDay, limit: Int) async throws -> [Movement]
     /// Todos los movimientos del hogar, para exportarlos. El servidor los da por páginas.
     func allMovements(in householdId: UUID) async throws -> [Movement]
+    /// Repetir la llamada con el mismo `draft.id` devuelve el movimiento ya guardado y no apunta nada nuevo; si se
+    /// repite con otra cuenta, otro importe u otro día falla con `TransferDraft.storedWithOtherData`.
     func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement
     /// Guarda las dos patas de una transferencia (primero la salida), o ninguna si algo falla.
     /// Repetir la llamada con el mismo `id` devuelve las ya guardadas y no apunta nada nuevo; si se repite
     /// con otra cuenta, otro importe u otro día falla con `TransferDraft.storedWithOtherData`.
     func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement]
+    /// Solo cambia el movimiento si sigue en la versión leída (`movement.updatedAt`). Si otro dispositivo lo cambió
+    /// o lo borró antes, no guarda nada y falla con `AppError.movementChanged`. Devuelve la versión nueva.
     func updateMovement(_ movement: Movement) async throws -> Movement
     func deleteMovement(_ movementId: UUID) async throws
     /// Guarda los movimientos de un CSV. Los que ya estaban (misma huella) se ignoran.
