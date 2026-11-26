@@ -6,7 +6,7 @@ import STMCore
 /// reprograman los avisos del dispositivo.
 @Observable
 @MainActor
-final class PlanningModel {
+final class PlanningModel: ServerModel {
     let household: Household
     private let recurringService: any RecurringService
     private let goalService: any GoalService
@@ -22,6 +22,7 @@ final class PlanningModel {
     private var knownMovements: [Movement] = []
     private(set) var isLoading = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
 
     init(household: Household, recurring: any RecurringService, goals: any GoalService,
          reminders: any ReminderScheduling = NoReminders(), today: @escaping () -> CalendarDay = { CalendarDay() }) {
@@ -64,14 +65,20 @@ final class PlanningModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let recurringService = recurringService, goalService = goalService, id = household.id
-        let loaded = await perform {
+        let recurringService = recurringService, goalService = goalService, id = household.id, turn = nextTurn()
+        let loaded = await perform(turn: turn) {
             async let series = recurringService.recurringSeries(in: id)
             async let goals = goalService.goals(in: id)
             async let contributions = goalService.contributions(in: id)
             async let charges = recurringService.recurringCharges(in: id)
-            (self.series, self.goals, self.contributions, self.charges) = try await (series, goals, contributions, charges)
+            let list = try await (series, goals, contributions, charges)
+            store(list.0, in: \.series, turn: turn)
+            store(list.1, in: \.goals, turn: turn)
+            store(list.2, in: \.contributions, turn: turn)
+            store(list.3, in: \.charges, turn: turn)
         }
+        // Cancelada, no sigue: ni apunta cargos ni toca los avisos.
+        guard !Task.isCancelled else { return }
         await syncCharges(movements: knownMovements)
         // Si la carga falla, los avisos ya programados se quedan como estaban.
         if loaded { await reschedule() }
@@ -83,18 +90,21 @@ final class PlanningModel {
     /// (del CSV o a mano), para que no se dupliquen.
     func syncCharges(movements: [Movement]) async {
         knownMovements = movements
-        guard !series.isEmpty else { return }
+        guard !series.isEmpty, !Task.isCancelled else { return }
         let missing = PendingCharges.missing(series: series, existing: charges, today: today())
         if !missing.isEmpty, let created = try? await recurringService.createCharges(missing) {
+            markChanged(\.charges)
             charges.append(contentsOf: created)
             // Si otro dispositivo los creó a la vez, se vuelven a leer.
+            let turn = nextTurn()
             if created.count < missing.count, let all = try? await recurringService.recurringCharges(in: household.id) {
-                charges = all
+                store(all, in: \.charges, turn: turn)
             }
         }
         for match in PendingCharges.matches(charges: charges, series: series, movements: movements) {
             guard (try? await recurringService.updateCharge(match.charge, status: .confirmed, transactionId: match.movement)) != nil,
                   let index = charges.firstIndex(where: { $0.id == match.charge }) else { continue }
+            markChanged(\.charges)
             charges[index].status = .confirmed
             charges[index].transactionId = match.movement
         }
@@ -105,6 +115,7 @@ final class PlanningModel {
     func confirm(_ item: PendingCharge, with draft: MovementDraft) async -> Bool {
         await perform {
             let movement = try await recurringService.confirmCharge(item.charge.id, with: draft)
+            markChanged(\.charges)
             if let index = charges.firstIndex(where: { $0.id == item.charge.id }) {
                 charges[index].status = .confirmed
                 charges[index].transactionId = movement.id
@@ -118,6 +129,7 @@ final class PlanningModel {
     func skip(_ item: PendingCharge) async -> Bool {
         await perform {
             try await recurringService.updateCharge(item.charge.id, status: .skipped, transactionId: nil)
+            markChanged(\.charges)
             if let index = charges.firstIndex(where: { $0.id == item.charge.id }) { charges[index].status = .skipped }
         }
     }
@@ -130,6 +142,7 @@ final class PlanningModel {
         let isNew = !series.contains { $0.id == item.id }
         let ok = await perform {
             let saved = isNew ? try await recurringService.createRecurring(item) : try await recurringService.updateRecurring(item)
+            markChanged(\.series)
             series.removeAll { $0.id == item.id || $0.id == saved.id }
             series.append(saved)
             series.sort { $0.trimmedName.localizedStandardCompare($1.trimmedName) == .orderedAscending }
@@ -142,6 +155,8 @@ final class PlanningModel {
     func delete(_ item: RecurringSeries) async -> Bool {
         let ok = await perform {
             try await recurringService.deleteRecurring(item.id)
+            markChanged(\.series)
+            markChanged(\.charges)
             series.removeAll { $0.id == item.id }
             charges.removeAll { $0.seriesId == item.id }
         }
@@ -176,6 +191,7 @@ final class PlanningModel {
         let isNew = !goals.contains { $0.id == goal.id }
         return await perform {
             let saved = isNew ? try await goalService.createGoal(goal) : try await goalService.updateGoal(goal)
+            markChanged(\.goals)
             if let index = goals.firstIndex(where: { $0.id == goal.id || $0.id == saved.id }) {
                 goals[index] = saved
             } else {
@@ -188,6 +204,8 @@ final class PlanningModel {
     func delete(_ goal: Goal) async -> Bool {
         await perform {
             try await goalService.deleteGoal(goal.id)
+            markChanged(\.goals)
+            markChanged(\.contributions)
             goals.removeAll { $0.id == goal.id }
             contributions.removeAll { $0.goalId == goal.id }
         }
@@ -201,6 +219,7 @@ final class PlanningModel {
         if let issue = item.issue { error = issue; return false }
         let ok = await perform {
             let saved = try await goalService.addContribution(item)
+            markChanged(\.contributions)
             contributions.insert(saved, at: 0)
             contributions.sort { $0.madeOn > $1.madeOn }
         }
@@ -217,20 +236,8 @@ final class PlanningModel {
     func delete(_ contribution: GoalContribution) async -> Bool {
         await perform {
             try await goalService.deleteContribution(contribution.id)
+            markChanged(\.contributions)
             contributions.removeAll { $0.id == contribution.id }
         }
-    }
-
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
     }
 }

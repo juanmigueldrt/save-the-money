@@ -6,7 +6,7 @@ import STMCore
 /// Al cambiar los planes se reprograman sus avisos en el dispositivo.
 @Observable
 @MainActor
-final class InvestmentModel {
+final class InvestmentModel: ServerModel {
     let household: Household
     private let service: any InvestmentService
     private let households: any HouseholdService
@@ -20,6 +20,7 @@ final class InvestmentModel {
     private(set) var members: [HouseholdMember] = []
     private(set) var isLoading = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
     var range: ChartRange = .month
 
     init(household: Household, service: any InvestmentService, households: any HouseholdService,
@@ -73,17 +74,21 @@ final class InvestmentModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let service = service, households = households, id = household.id
-        let loaded = await perform {
+        let service = service, households = households, id = household.id, turn = nextTurn()
+        let loaded = await perform(turn: turn) {
             async let holdings = service.holdings(in: id)
             async let prices = service.holdingPrices(in: id)
             async let trades = service.trades(in: id)
             async let plans = service.investmentPlans(in: id)
-            (self.holdings, self.prices, self.trades, self.plans) = try await (holdings, prices, trades, plans)
+            let list = try await (holdings, prices, trades, plans)
+            store(list.0, in: \.holdings, turn: turn)
+            store(list.1, in: \.prices, turn: turn)
+            store(list.2, in: \.trades, turn: turn)
+            store(list.3, in: \.plans, turn: turn)
         }
-        members = (try? await households.members(of: id)) ?? members
-        // Si la carga falla, los avisos ya programados se quedan como estaban.
-        if loaded { await reschedule() }
+        if let list = try? await households.members(of: id) { store(list, in: \.members, turn: turn) }
+        // Si la carga falla (o se cancela), los avisos ya programados se quedan como estaban.
+        if loaded, !Task.isCancelled { await reschedule() }
     }
 
     func reschedule() async {
@@ -100,6 +105,7 @@ final class InvestmentModel {
         var result: Holding?
         _ = await perform {
             let saved = isNew ? try await service.createHolding(holding) : try await service.updateHolding(holding)
+            markChanged(\.holdings)
             holdings.removeAll { $0.id == holding.id || $0.id == saved.id }
             holdings.append(saved)
             holdings.sort { $0.trimmedName.localizedStandardCompare($1.trimmedName) == .orderedAscending }
@@ -112,6 +118,10 @@ final class InvestmentModel {
     func delete(_ holding: Holding) async -> Bool {
         let ok = await perform {
             try await service.deleteHolding(holding.id)
+            markChanged(\.holdings)
+            markChanged(\.prices)
+            markChanged(\.trades)
+            markChanged(\.plans)
             holdings.removeAll { $0.id == holding.id }
             prices.removeAll { $0.holdingId == holding.id }
             trades.removeAll { $0.holdingId == holding.id }
@@ -125,8 +135,13 @@ final class InvestmentModel {
     func recordPrice(_ price: Decimal, on day: CalendarDay, for holding: Holding) async -> Bool {
         await perform {
             let saved = try await service.recordPrice(price, on: day, for: holding.id)
+            markChanged(\.holdings)
             if let index = holdings.firstIndex(where: { $0.id == saved.id }) { holdings[index] = saved }
-            prices = try await service.holdingPrices(in: household.id)
+            await reloadAfterSave {
+                let turn = nextTurn()
+                let list = try await service.holdingPrices(in: household.id)
+                store(list, in: \.prices, turn: turn)
+            }
         }
     }
 
@@ -139,11 +154,18 @@ final class InvestmentModel {
         if let issue = trade.issue(given: trades) { error = issue; return false }
         let saved = await perform {
             let stored = try await service.addTrade(trade, cash: cash)
+            markChanged(\.trades)
             trades.removeAll { $0.id == stored.id }
             trades.append(stored)
         }
         // Si falla puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
-        if !saved, let stored = try? await service.trades(in: household.id) { trades = stored }
+        if !saved {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                let list = try await service.trades(in: household.id)
+                store(list, in: \.trades, turn: turn)
+            }
+        }
         return saved
     }
 
@@ -179,6 +201,7 @@ final class InvestmentModel {
         if let issue = trade.deletionIssue(given: trades) { error = issue; return false }
         return await perform {
             try await service.deleteTrade(trade.id)
+            markChanged(\.trades)
             trades.removeAll { $0.id == trade.id }
         }
     }
@@ -191,6 +214,7 @@ final class InvestmentModel {
         let isNew = !plans.contains { $0.id == plan.id }
         let ok = await perform {
             let saved = isNew ? try await service.createPlan(plan) : try await service.updatePlan(plan)
+            markChanged(\.plans)
             plans.removeAll { $0.id == plan.id || $0.id == saved.id }
             plans.append(saved)
             plans.sort { $0.startsOn < $1.startsOn }
@@ -210,22 +234,10 @@ final class InvestmentModel {
     func delete(_ plan: InvestmentPlan) async -> Bool {
         let ok = await perform {
             try await service.deletePlan(plan.id)
+            markChanged(\.plans)
             plans.removeAll { $0.id == plan.id }
         }
         if ok { await reschedule() }
         return ok
-    }
-
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
     }
 }

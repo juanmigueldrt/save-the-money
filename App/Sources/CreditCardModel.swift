@@ -7,7 +7,7 @@ import STMCore
 /// y avisa si una tarjeta pasa del % del límite.
 @Observable
 @MainActor
-final class CreditCardModel {
+final class CreditCardModel: ServerModel {
     let household: Household
     private let service: any CreditCardService
     private let finance: any FinanceService
@@ -21,6 +21,7 @@ final class CreditCardModel {
     private(set) var summaries: [UUID: CreditCardSummary] = [:]
     private(set) var isLoading = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
 
     /// Lo último que se supo de las cuentas, para recalcular sin esperar a FinanceModel.
     private var accounts: [Account] = []
@@ -50,12 +51,15 @@ final class CreditCardModel {
         let accounts: [Account]
         let balances: [UUID: Money]
         let recent: [Movement]
+        /// Cambia al terminar la primera carga de FinanceModel, aunque el hogar esté vacío.
+        let financeLoaded: Bool
 
         @MainActor
         init(finance: FinanceModel) {
             accounts = finance.accounts
             balances = finance.balances
             recent = finance.recent
+            financeLoaded = finance.hasLoaded
         }
     }
 
@@ -87,13 +91,14 @@ final class CreditCardModel {
         transferCategories = Set(categories.filter { $0.kind == .transfer }.map(\.id))
         isLoading = true
         defer { isLoading = false }
-        let succeeded = await perform {
+        let turn = nextTurn()
+        let succeeded = await perform(turn: turn) {
             let service = service, id = household.id
             async let terms = service.creditCards(in: id)
             async let installments = service.cardInstallments(in: id)
             let (loadedTerms, loadedInstallments) = try await (terms, installments)
-            self.terms = Dictionary(loadedTerms.map { ($0.accountId, $0) }, uniquingKeysWith: { a, _ in a })
-            self.installments = loadedInstallments
+            store(Dictionary(loadedTerms.map { ($0.accountId, $0) }, uniquingKeysWith: { a, _ in a }), in: \.terms, turn: turn)
+            store(loadedInstallments, in: \.installments, turn: turn)
             var loaded: [UUID: [Movement]] = [:]
             var truncated: Set<UUID> = []
             // Sin condiciones no hay cálculo: no hace falta ningún movimiento (se cargan al guardarlas).
@@ -103,9 +108,11 @@ final class CreditCardModel {
                 loaded[account.id] = list
                 if cut { truncated.insert(account.id) }
             }
-            movements = loaded
-            truncatedAccounts = truncated
+            store(loaded, in: \.movements, turn: turn)
+            store(truncated, in: \.truncatedAccounts, turn: turn)
         }
+        // Cancelada, no cambia nada: ni el resumen ni los avisos.
+        guard !Task.isCancelled else { return }
         // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
         await recompute(rescheduling: succeeded)
     }
@@ -133,8 +140,11 @@ final class CreditCardModel {
 
     /// Tras recargar los aplazados: uno creado en otro dispositivo puede ser de una compra que no se había cargado.
     private func loadMissingPurchases() async throws {
+        let turn = nextTurn()
         for account in cardAccounts where movements[account.id] != nil {
-            movements[account.id] = try await addingPurchases(to: movements(of: account), of: account.id)
+            let list = try await addingPurchases(to: movements(of: account), of: account.id)
+            guard mayStore(\.movements, turn: turn) else { return }
+            movements[account.id] = list
         }
     }
 
@@ -171,17 +181,18 @@ final class CreditCardModel {
         }
         let ok = await perform {
             let saved = try await service.saveCreditCard(terms)
+            markChanged(\.terms)
             self.terms[saved.accountId] = saved
-        }
-        if ok, let saved = self.terms[terms.accountId] {
             // Con otro día de extracto cambian los ciclos sin cobrar: se vuelven a cargar sus movimientos.
-            await perform {
+            await reloadAfterSave {
+                let turn = nextTurn()
                 let (list, cut) = try await cardMovements(of: saved.accountId, terms: saved)
+                guard mayStore(\.movements, turn: turn), mayStore(\.truncatedAccounts, turn: turn) else { return }
                 movements[saved.accountId] = list
                 if cut { truncatedAccounts.insert(saved.accountId) } else { truncatedAccounts.remove(saved.accountId) }
             }
-            await recompute()
         }
+        if ok { await recompute() }
         return ok
     }
 
@@ -195,9 +206,12 @@ final class CreditCardModel {
         } ?? CardInstallment(householdId: household.id, accountId: account.id, movementId: movement.id,
                              months: months, rate: rate)
         let ok = await perform {
-            _ = try await service.saveInstallment(plan)
-            installments = try await service.cardInstallments(in: household.id)
-            try await loadMissingPurchases()
+            let saved = try await service.saveInstallment(plan)
+            // Se ve ya, aunque falle la recarga.
+            markChanged(\.installments)
+            installments.removeAll { $0.movementId == saved.movementId }
+            installments.append(saved)
+            await reloadAfterSave { try await reloadInstallments() }
         }
         if ok { await recompute() }
         return ok
@@ -207,24 +221,18 @@ final class CreditCardModel {
     func removeInstallment(_ installment: CardInstallment) async -> Bool {
         let ok = await perform {
             try await service.deleteInstallment(installment.id)
-            installments = try await service.cardInstallments(in: household.id)
-            try await loadMissingPurchases()
+            markChanged(\.installments)
+            installments.removeAll { $0.id == installment.id }
+            await reloadAfterSave { try await reloadInstallments() }
         }
         if ok { await recompute() }
         return ok
     }
 
-    @discardableResult
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
+    private func reloadInstallments() async throws {
+        let turn = nextTurn()
+        let list = try await service.cardInstallments(in: household.id)
+        store(list, in: \.installments, turn: turn)
+        try await loadMissingPurchases()
     }
 }
