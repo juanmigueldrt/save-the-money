@@ -271,6 +271,9 @@ interface FinanceService {
 
     /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
     suspend fun movements(householdId: String, ids: List<String>): List<Movement>
+
+    /** Movimientos de la cuenta desde ese día (incluido), más recientes primero, como mucho [limit]. */
+    suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int): List<Movement>
     suspend fun addMovement(draft: MovementDraft, householdId: String): Movement
 
     /**
@@ -470,6 +473,12 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun movements(householdId: String, ids: List<String>) =
         movements.filter { it.householdId == householdId && it.id in ids }
+
+    override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int) = movements
+        .filter { it.householdId == householdId && it.accountId == accountId && !it.day.isBefore(since) }
+        .asReversed()
+        .sortedByDescending { it.bookedOn }
+        .take(limit)
 
     override suspend fun addMovement(draft: MovementDraft, householdId: String) =
         build(draft, householdId).also { movements += it }

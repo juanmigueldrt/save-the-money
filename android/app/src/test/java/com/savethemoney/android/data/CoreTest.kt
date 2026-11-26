@@ -97,4 +97,17 @@ class CoreTest {
         assertEquals(AppError.InvalidCredentials, SupabaseBackend.authError("Invalid login credentials"))
         assertEquals(AppError.UsernameTaken, SupabaseBackend.authError("user_already_exists"))
     }
+
+    @Test
+    fun soloElDuplicadoDelNombreDeUsuarioDiceNombreEnUso() {
+        val generico = "Ya hay un registro igual guardado. Revisa el formulario."
+        fun duplicado(restriccion: String) =
+            SupabaseBackend.postgresError("23505", "duplicate key value violates unique constraint \"$restriccion\"")
+        assertEquals(AppError.UsernameTaken, duplicado("profiles_username_key"))
+        assertEquals("Ya hay una categoría con ese nombre.", duplicado("categories_household_name_idx").message)
+        assertEquals(generico, duplicado("card_installments_transaction_id_key").message)
+        assertEquals(generico, duplicado("holding_prices_holding_id_priced_on_key").message)
+        assertEquals(generico, duplicado("budgets_household_creator_month_key").message)
+        assertEquals(generico, SupabaseBackend.postgresError("23505", "duplicate key value violates unique constraint").message)
+    }
 }

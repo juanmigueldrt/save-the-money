@@ -26,6 +26,8 @@ final class CreditCardModel {
     private var accounts: [Account] = []
     private var balances: [UUID: Money] = [:]
     private var transferCategories: Set<UUID> = []
+    /// Tarjetas cuyos extractos sin cobrar tienen más movimientos que `cycleLimit`.
+    private var truncatedAccounts: Set<UUID> = []
 
     init(household: Household, service: any CreditCardService, finance: any FinanceService,
          reminders: any ReminderScheduling = NoReminders(), alerts: any BudgetAlerting = NoBudgetAlerts(),
@@ -78,18 +80,47 @@ final class CreditCardModel {
             self.terms = Dictionary(loadedTerms.map { ($0.accountId, $0) }, uniquingKeysWith: { a, _ in a })
             self.installments = loadedInstallments
             var loaded: [UUID: [Movement]] = [:]
+            var truncated: Set<UUID> = []
+            // Sin condiciones no hay cálculo: no hace falta ningún movimiento (se cargan al guardarlas).
             for account in cardAccounts {
-                var list = try await finance.movements(in: id, accountId: account.id, limit: FinanceModel.recentLimit)
-                // La compra de un aplazado cuenta aunque ya no esté entre las recientes.
-                let known = Set(list.map(\.id))
-                let missing = loadedInstallments.filter { $0.accountId == account.id && !known.contains($0.movementId) }
-                if !missing.isEmpty { list += try await finance.movements(in: id, ids: missing.map(\.movementId)) }
+                guard let cardTerms = self.terms[account.id] else { continue }
+                let (list, cut) = try await cardMovements(of: account.id, terms: cardTerms)
                 loaded[account.id] = list
+                if cut { truncated.insert(account.id) }
             }
             movements = loaded
+            truncatedAccounts = truncated
         }
         // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
         await recompute(rescheduling: succeeded)
+    }
+
+    /// Tope de movimientos de los extractos sin cobrar de una tarjeta: el servidor da como mucho 1000 filas por
+    /// petición. Si se llega, el resumen lo dice (`movementsTruncated`) en vez de dar cifras recortadas sin avisar.
+    nonisolated static let cycleLimit = 1000
+
+    /// Lo que necesita el cálculo de la tarjeta: todos los movimientos de los extractos sin cobrar (por fecha, no
+    /// los N más recientes) y la compra de cada aplazado. `truncated` si se ha llegado a `cycleLimit`.
+    private func cardMovements(of accountId: UUID, terms: CreditCardTerms) async throws -> (list: [Movement], truncated: Bool) {
+        let first = CreditCardCalculator.firstUnpaidStatement(terms: terms, today: today())
+        let list = try await finance.movements(in: household.id, accountId: accountId,
+                                               since: terms.cycleStart(forStatement: first), limit: Self.cycleLimit)
+        return (try await addingPurchases(to: list, of: accountId), list.count >= Self.cycleLimit)
+    }
+
+    /// Añade las compras de los aplazados de la tarjeta que falten, por antiguas que sean.
+    private func addingPurchases(to list: [Movement], of accountId: UUID) async throws -> [Movement] {
+        let known = Set(list.map(\.id))
+        let missing = installments.filter { $0.accountId == accountId && !known.contains($0.movementId) }
+        guard !missing.isEmpty else { return list }
+        return list + (try await finance.movements(in: household.id, ids: missing.map(\.movementId)))
+    }
+
+    /// Tras recargar los aplazados: uno creado en otro dispositivo puede ser de una compra que no se había cargado.
+    private func loadMissingPurchases() async throws {
+        for account in cardAccounts where movements[account.id] != nil {
+            movements[account.id] = try await addingPurchases(to: movements(of: account), of: account.id)
+        }
     }
 
     private func recompute(rescheduling: Bool = true) async {
@@ -99,6 +130,7 @@ final class CreditCardModel {
             result[account.id] = CreditCardCalculator.summary(
                 terms: terms, balance: balances[account.id] ?? account.openingBalance, movements: movements(of: account),
                 installments: installments, transferCategories: transferCategories, today: today())
+            result[account.id]?.movementsTruncated = truncatedAccounts.contains(account.id)
         }
         summaries = result
         guard rescheduling else { return }
@@ -126,7 +158,15 @@ final class CreditCardModel {
             let saved = try await service.saveCreditCard(terms)
             self.terms[saved.accountId] = saved
         }
-        if ok { await recompute() }
+        if ok, let saved = self.terms[terms.accountId] {
+            // Con otro día de extracto cambian los ciclos sin cobrar: se vuelven a cargar sus movimientos.
+            await perform {
+                let (list, cut) = try await cardMovements(of: saved.accountId, terms: saved)
+                movements[saved.accountId] = list
+                if cut { truncatedAccounts.insert(saved.accountId) } else { truncatedAccounts.remove(saved.accountId) }
+            }
+            await recompute()
+        }
         return ok
     }
 
@@ -142,6 +182,7 @@ final class CreditCardModel {
         let ok = await perform {
             _ = try await service.saveInstallment(plan)
             installments = try await service.cardInstallments(in: household.id)
+            try await loadMissingPurchases()
         }
         if ok { await recompute() }
         return ok
@@ -152,6 +193,7 @@ final class CreditCardModel {
         let ok = await perform {
             try await service.deleteInstallment(installment.id)
             installments = try await service.cardInstallments(in: household.id)
+            try await loadMissingPurchases()
         }
         if ok { await recompute() }
         return ok

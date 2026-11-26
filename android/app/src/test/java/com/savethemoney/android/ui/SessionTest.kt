@@ -6,7 +6,10 @@ import com.savethemoney.android.data.InMemoryBackend
 import com.savethemoney.android.data.InMemoryFinance
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -135,6 +138,82 @@ class SessionTest {
             // Se avisa en el formulario de entrar.
         }
         assertEquals(Session.State.Offline(AppError.Network.message), session.state)
+    }
+
+    @Test
+    fun errorNoPrevistoAlArrancarSeAvisaSinCerrarLaApp() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        // Como un valor de enumerado nuevo en el servidor que no se sabe leer.
+        val raro = object : Backend by memory {
+            override suspend fun myProfile() = throw NoSuchElementException("fila que falta")
+        }
+        val session = Session(raro, InMemoryFinance(), isDemo = true)
+
+        session.start()
+
+        assertEquals(Session.State.Offline(AppError.Unknown("app").message), session.state)
+        try {
+            session.refresh()
+            fail("debería avisar del fallo")
+        } catch (e: AppError.Unknown) {
+            // Quien pulsó el botón recibe un AppError con mensaje, no la excepción cruda.
+        }
+    }
+
+    @Test
+    fun sinRedAlComprobarLaSesionMuestraSinConexion() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        // Como SupabaseBackend con el token caducado y sin red: la sesión sigue guardada.
+        val caducada = object : Backend by memory {
+            override suspend fun currentUserId() = throw AppError.Network
+        }
+        val session = Session(caducada, InMemoryFinance(), isDemo = true)
+
+        session.start()
+
+        assertEquals(Session.State.Offline(AppError.Network.message), session.state)
+    }
+
+    @Test
+    fun alVolverAPrimerPlanoSinConexionReintenta() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de prueba")
+        val backend = SinRed(memory).apply { offline = true }
+        val session = Session(backend, InMemoryFinance(), isDemo = true)
+        session.start()
+        assertEquals(Session.State.Offline(AppError.Network.message), session.state)
+
+        backend.offline = false
+        session.resume()
+
+        assertTrue("al volver la red debería entrar, no ${session.state}", session.state is Session.State.Ready)
+    }
+
+    @Test
+    fun sesionPerdidaConLaAppAbiertaVuelveAlLogin() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de prueba")
+        val perdida = MutableSharedFlow<Unit>()
+        val backend = object : Backend by memory {
+            override val sessionEnded = perdida
+        }
+        val session = Session(backend, InMemoryFinance(), isDemo = true)
+        session.start()
+        assertTrue(session.state is Session.State.Ready)
+
+        val vigilancia = launch { session.watchSession() }
+        yield()
+        perdida.emit(Unit)
+        yield()
+        vigilancia.cancel()
+
+        assertEquals(Session.State.SignedOut, session.state)
+        assertNull(session.finance)
+        assertEquals(AppError.NotSignedIn.message, session.signOutNotice)
     }
 
     @Test
