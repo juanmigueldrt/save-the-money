@@ -395,11 +395,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     // Cargos pendientes: de quien los crea; se borran con su serie (on delete cascade).
 
     override suspend fun recurringCharges(householdId: String): List<RecurringCharge> = backend.mapped {
-        client.from("recurring_charges").select(Columns.raw(CHARGE)) {
-            filter { eq("household_id", householdId) }
-            order("due_on", Order.DESCENDING)
-            limit(500)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("recurring_charges").select(Columns.raw(CHARGE)) {
+                filter { eq("household_id", householdId) }
+                order("due_on", Order.DESCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<RecurringCharge>()
+        }
     }
 
     override suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge> {
