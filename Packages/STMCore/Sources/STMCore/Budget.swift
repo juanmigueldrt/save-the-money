@@ -195,7 +195,7 @@ public struct BudgetReport: Hashable, Sendable {
         warnPercent = budget?.warnPercent ?? 80
         let range = period
         let inPeriod = movements.filter { !$0.excluded && range.contains($0.bookedOn) }
-        let byId = Dictionary(uniqueKeysWithValues: categories.map { ($0.id, $0) })
+        let byId = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
 
         var income = 0
         var incomeByTitle: [String: Int] = [:]

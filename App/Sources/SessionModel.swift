@@ -83,7 +83,7 @@ final class SessionModel {
     }
 
     func signIn(username: String, password: String) async throws {
-        let user = try Username(username)
+        let user = try Username(username, forSignIn: true)
         _ = try await services.auth.signIn(username: user, password: password)
         try await refresh()
     }

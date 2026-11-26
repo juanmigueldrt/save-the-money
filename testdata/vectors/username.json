@@ -1,0 +1,28 @@
+{
+  "_source": "Reglas de Username (iOS y Android). Tras recortar espacios y pasar a minúsculas: 3 a 30 caracteres; solo a-z, 0-9, '.', '_' y '-'. Al CREAR una cuenta (\"signUp\") además empieza y termina en letra o número; al INICIAR SESIÓN (\"signIn\") no, porque el servidor acepta cualquier nombre que cumpla ^[a-z0-9._-]{3,30}$ (hay cuentas creadas antes de esa regla). \"validation\" indica a qué validación corresponde cada caso (\"both\" = igual en las dos). Resultados derivados a mano de esas reglas.",
+  "vectors": [
+    { "validation": "both", "input": "ana", "normalized": "ana", "error": null },
+    { "validation": "both", "input": "  Ana.Prueba ", "normalized": "ana.prueba", "error": null },
+    { "validation": "both", "input": "a_b-c.9", "normalized": "a_b-c.9", "error": null },
+    { "validation": "both", "input": "ab", "normalized": null, "error": "tooShort" },
+    { "validation": "both", "input": "abcdefghijklmnopqrstuvwxyzabcde", "normalized": null, "error": "tooLong" },
+    { "validation": "both", "input": "ana prueba", "normalized": null, "error": "invalidCharacters" },
+    { "validation": "both", "input": "ana@correo", "normalized": null, "error": "invalidCharacters" },
+    { "validation": "both", "input": "  ..  ", "normalized": null, "error": "tooShort" },
+
+    { "validation": "signUp", "input": "ana_", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": "ana_", "normalized": "ana_", "error": null },
+    { "validation": "signUp", "input": ".ana", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": ".ana", "normalized": ".ana", "error": null },
+    { "validation": "signUp", "input": "...", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": "...", "normalized": "...", "error": null },
+    { "validation": "signUp", "input": "  ...  ", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": "  ...  ", "normalized": "...", "error": null },
+    { "validation": "signUp", "input": ".ana.", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": ".ana.", "normalized": ".ana.", "error": null },
+    { "validation": "signUp", "input": "ana-", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": "ana-", "normalized": "ana-", "error": null },
+    { "validation": "signUp", "input": "_ana", "normalized": null, "error": "invalidEdges" },
+    { "validation": "signIn", "input": "_ana", "normalized": "_ana", "error": null }
+  ]
+}

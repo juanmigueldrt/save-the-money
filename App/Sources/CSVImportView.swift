@@ -144,7 +144,16 @@ struct CSVImportView: View {
 
     private var importTitle: String {
         if isImporting { return "Importando…" }
-        return validDrafts.isEmpty ? "Importar" : "Importar \(validDrafts.count) movimientos"
+        return Self.buttonTitle(validCount: validDrafts.count)
+    }
+
+    /// "Importar", "Importar 1 movimiento", "Importar 2 movimientos".
+    static func buttonTitle(validCount: Int) -> String {
+        switch validCount {
+        case 0: "Importar"
+        case 1: "Importar 1 movimiento"
+        default: "Importar \(validCount) movimientos"
+        }
     }
 
     private func resultText(_ result: ImportResult) -> String {

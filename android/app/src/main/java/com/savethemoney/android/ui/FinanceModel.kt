@@ -104,12 +104,17 @@ class FinanceModel(
         return categories.filter { it.kind == kind }.sortedWith(compareBy(collator) { it.name })
     }
 
-    private fun thisMonth(m: Movement): Boolean = m.day.withDayOfMonth(1) == today().withDayOfMonth(1)
-
-    /** Cambio del patrimonio este mes: lo que ha entrado menos lo que ha salido en las cuentas que cuentan; las transferencias se compensan. */
+    /**
+     * Cambio del patrimonio en el mes del hogar: lo que ha entrado menos lo que ha salido en las cuentas que cuentan;
+     * las transferencias se compensan. Una cuenta archivada cuenta hasta el día en que se archivó (como en iOS).
+     */
     val netThisMonth: Long get() {
-        val ids = activeAccounts.filter { it.includeInNetWorth }.map { it.id }.toSet()
-        return recent.filter { thisMonth(it) && it.accountId in ids }.sumOf { it.amountMinor }
+        val period = ReportPeriod.ThisMonth.range(today(), household.monthStartDay)
+        val counted = accounts.filter { it.includeInNetWorth }.associateBy { it.id }
+        return recent.filter { m ->
+            val account = counted[m.accountId] ?: return@filter false
+            m.day in period && (account.archivedAt?.let { m.day < LocalDate.parse(it.take(10)) } ?: true)
+        }.sumOf { it.amountMinor }
     }
 
     /** Gasto del mes del hogar sin contar transferencias entre cuentas. */
@@ -173,10 +178,7 @@ class FinanceModel(
             service.addTransfer(draft, household.id)
         } catch (e: AppError) {
             // Puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
-            try {
-                reloadAll()
-            } catch (_: AppError) {
-            }
+            reloadAll()
             throw e
         }
         reloadAll()
@@ -188,12 +190,7 @@ class FinanceModel(
             investments.add(trade, cash)
         } finally {
             // Saldos y movimientos al día; también si falla, por si se guardó y no llegó la respuesta.
-            if (cash != null) {
-                try {
-                    reloadAll()
-                } catch (_: AppError) {
-                }
-            }
+            if (cash != null) reloadAll()
         }
     }
     suspend fun update(movement: Movement) { update(listOf(movement)) }
@@ -205,8 +202,8 @@ class FinanceModel(
             movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
         } catch (e: AppError.MovementChanged) {
             // Otro dispositivo lo cambió antes: se recarga (también el que está abierto) para que se vea lo nuevo detrás del aviso.
+            reloadAll()
             try {
-                reloadAll()
                 tappedMovement = tappedMovement?.let { service.movements(household.id, listOf(it.id)).firstOrNull() }
             } catch (_: AppError) {
             }
@@ -248,13 +245,16 @@ class FinanceModel(
 
     suspend fun save(category: BudgetCategory) {
         category.issue(categories)?.let { throw AppError.InvalidInput(it) }
-        if (categories.any { it.id == category.id }) service.updateCategory(category) else service.createCategory(category)
-        categories = service.categories(household.id)
+        val saved = if (categories.any { it.id == category.id }) service.updateCategory(category) else service.createCategory(category)
+        // Se ve ya, aunque falle la recarga: así guardarla otra vez la actualiza en vez de crear otra.
+        categories = categories.filter { it.id != category.id && it.id != saved.id } + saved
+        reloadAfterSave { categories = service.categories(household.id) }?.let { error = it }
     }
 
     suspend fun delete(category: BudgetCategory) {
         service.deleteCategory(category.id)
-        categories = service.categories(household.id)
+        categories = categories.filter { it.id != category.id }
+        reloadAfterSave { categories = service.categories(household.id) }?.let { error = it }
         reloadAll()
     }
 
@@ -268,17 +268,25 @@ class FinanceModel(
         load()
     }
 
+    /** Tras guardar. Nunca lanza: lo guardado sigue guardado y, si falla, [error] lo dice como problema de carga. */
     private suspend fun reloadAccounts() {
+        reloadAfterSave { fetchAccounts() }?.let { error = it }
+    }
+
+    /** Como [reloadAccounts], con los movimientos. */
+    private suspend fun reloadAll() {
+        reloadAfterSave {
+            fetchAccounts()
+            recent = service.movements(household.id, null, RECENT_LIMIT)
+            // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
+            planning.syncCharges(recent)
+        }?.let { error = it }
+    }
+
+    private suspend fun fetchAccounts() {
         accounts = service.accounts(household.id)
         balances = service.balances(household.id)
         cards.load(accounts, balances, categories)
-    }
-
-    private suspend fun reloadAll() {
-        reloadAccounts()
-        recent = service.movements(household.id, null, RECENT_LIMIT)
-        // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
-        planning.syncCharges(recent)
     }
 
     /**

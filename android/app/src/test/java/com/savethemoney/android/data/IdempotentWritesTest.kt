@@ -63,7 +63,9 @@ class IdempotentWritesTest {
         val draft = coffee(checking)
 
         offline = true
-        rejected(AppError.Network.message) { model.add(draft) }
+        // Guardado: el fallo de la recarga queda como problema de carga (ORC-119), no como fallo de guardado.
+        model.add(draft)
+        assertEquals(AppError.Network.message, model.error)
         offline = false
         model.add(draft)
         assertEquals(listOf("m1"), model.recent.map { it.id })

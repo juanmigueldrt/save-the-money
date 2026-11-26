@@ -141,7 +141,8 @@ struct SummaryView: View {
 
     /// "+120 € este mes", como en Android.
     private var netWorthChangeText: String {
-        let change = MonthSummary.netWorthChange(accounts: finance.accounts, movements: finance.recent)
+        let change = MonthSummary.netWorthChange(accounts: finance.accounts, movements: finance.recent,
+                                                 monthStartDay: finance.household.monthStartDay)
         if change.minor == 0 { return "Igual que a final del mes pasado" }
         return (change.isNegative ? "−" : "+") + Money(minor: abs(change.minor)).formatted() + " este mes"
     }
