@@ -130,9 +130,9 @@ struct RootView: View {
         .task { await planning.load() }
         // Reprograma también los avisos de las aportaciones automáticas.
         .task { await investments.load() }
-        // El presupuesto y el flujo se recalculan cuando cambian los movimientos.
-        // y avisa si algún límite del mes llega al 80 % o se pasa.
-        .task(id: finance.recent) {
+        // El presupuesto y el flujo se recalculan cuando cambian los movimientos, las cuentas o sus saldos
+        // (la tarjeta guarda su copia de las cuentas) y avisa si algún límite del mes llega al 80 % o se pasa.
+        .task(id: CreditCardModel.Inputs(finance: finance)) {
             await budgets.load()
             await budgets.checkAlerts(categories: finance.categories)
             // Las tarjetas: próximo cargo, avisos antes del cargo y del límite.
