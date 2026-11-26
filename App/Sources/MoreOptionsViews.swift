@@ -189,7 +189,7 @@ struct MoreView: View {
                     themeError = nil
                     try await session.setTheme(newTheme)
                 } catch {
-                    themeError = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+                    themeError = (error as? AppError)?.text ?? AppError.unknown("").errorDescription
                 }
             }
         })

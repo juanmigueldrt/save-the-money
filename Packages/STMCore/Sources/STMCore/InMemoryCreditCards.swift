@@ -17,7 +17,7 @@ extension InMemoryBackend: CreditCardService {
 
     public func saveCreditCard(_ terms: CreditCardTerms) async throws -> CreditCardTerms {
         let user = try requireCardMember(of: terms.householdId)
-        if let issue = terms.issue { throw AppError.invalidInput(issue) }
+        if let issue = terms.issue { throw AppError.validation(.cardTerms(issue)) }
         let index = creditCardList.firstIndex(where: { $0.accountId == terms.accountId })
         if terms.updatedAt != nil {
             // Cambio: solo de unas condiciones propias y sobre la versión leída (el STM05 del servidor).
@@ -55,7 +55,7 @@ extension InMemoryBackend: CreditCardService {
 
     public func saveInstallment(_ installment: CardInstallment) async throws -> CardInstallment {
         let user = try requireCardMember(of: installment.householdId)
-        if let issue = installment.issue { throw AppError.invalidInput(issue) }
+        if let issue = installment.issue { throw AppError.validation(.installment(issue)) }
         if installment.updatedAt != nil {
             // Cambio: solo plazo e interés, de un aplazado propio y sobre la versión leída (el STM05 del servidor).
             guard let index = installmentList.firstIndex(where: { $0.id == installment.id }),

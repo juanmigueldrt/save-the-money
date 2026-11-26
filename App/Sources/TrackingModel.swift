@@ -85,7 +85,7 @@ final class TrackingModel: ServerModel {
 
     @discardableResult
     func add(_ score: CreditScore) async -> Bool {
-        if let issue = score.issue { error = issue; return false }
+        if let issue = score.issue { error = issue.text; return false }
         return await perform {
             let saved = try await scores.addCreditScore(score)
             // Se ve ya, aunque falle la recarga: así no se vuelve a apuntar.

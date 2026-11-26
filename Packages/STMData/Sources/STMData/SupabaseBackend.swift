@@ -305,8 +305,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
         case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
         // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
-        case "STM02": .invalidInput(InvestmentTrade.notEnoughShares)
-        case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
+        case "STM02": .validation(.trade(.notEnoughShares))
+        case "STM03": .validation(.trade(.neededByLaterSale))
         // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
         // update_movement: el movimiento cambió (o se borró) después de leerlo.
         case "STM05": .movementChanged

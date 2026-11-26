@@ -32,7 +32,7 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account {
-        if let issue = draft.issue { throw AppError.invalidInput(issue) }
+        if let issue = draft.issue { throw AppError.validation(.account(issue)) }
         // `create_account` no repite una cuenta ya guardada con ese id: devuelve la que había.
         return try await saved(Self.createAccountCall(draft, in: householdId), columns: Self.accountColumns)
     }
@@ -80,7 +80,7 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
-        if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
+        if let issue = category.issue(among: []) { throw AppError.validation(.category(issue)) }
         // `create_category` no repite una categoría ya guardada con ese id: devuelve la que había.
         return try await saved(Self.createCategoryCall(category), columns: Self.categoryColumns)
     }
@@ -94,7 +94,7 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
-        if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
+        if let issue = category.issue(among: []) { throw AppError.validation(.category(issue)) }
         // `update_category` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
         // Solo nombre, grupo e icono: el tipo de una categoría no se cambia.
         return try await saved(Self.updateCategoryCall(category), columns: Self.categoryColumns)
@@ -245,7 +245,7 @@ extension SupabaseBackend: FinanceService {
 
     /// `create_movement` no repite un movimiento ya guardado con ese id: devuelve el que había.
     public func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement {
-        if let issue = draft.issue { throw AppError.invalidInput(issue) }
+        if let issue = draft.issue { throw AppError.validation(.movement(issue)) }
         let rows: [Movement] = try await mapped {
             try await client.rpc("create_movement", params: MovementParams(draft, householdId: householdId))
                 .select(Self.movementColumns)
@@ -258,7 +258,7 @@ extension SupabaseBackend: FinanceService {
 
     /// `create_transfer` guarda las dos patas en una sola transacción y no repite una ya guardada.
     public func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement] {
-        if let issue = transfer.issue { throw AppError.invalidInput(issue) }
+        if let issue = transfer.issue { throw AppError.validation(.transfer(issue)) }
         return try await mapped {
             try await client.rpc("create_transfer", params: TransferParams(transfer, householdId: householdId))
                 .select(Self.movementColumns)
@@ -271,7 +271,7 @@ extension SupabaseBackend: FinanceService {
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
                                   amount: movement.amount, description: movement.description, notes: movement.notes,
                                   excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
-        if let issue = draft.issue { throw AppError.invalidInput(issue) }
+        if let issue = draft.issue { throw AppError.validation(.movement(issue)) }
         // `update_movement` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
         let rows: [Movement] = try await mapped {
             try await client.rpc("update_movement", params: MovementChanges(movement))
@@ -300,7 +300,7 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func importMovements(_ drafts: [MovementDraft], in householdId: UUID) async throws -> ImportResult {
-        if let issue = drafts.lazy.compactMap(\.issue).first { throw AppError.invalidInput(issue) }
+        if let issue = drafts.lazy.compactMap(\.issue).first { throw AppError.validation(.movement(issue)) }
         var inserted = 0
         for start in stride(from: 0, to: drafts.count, by: Self.importBatchSize) {
             let batch = drafts[start..<min(start + Self.importBatchSize, drafts.count)]

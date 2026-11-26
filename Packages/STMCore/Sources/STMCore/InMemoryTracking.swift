@@ -9,7 +9,7 @@ extension InMemoryBackend: CreditScoreService {
 
     public func addCreditScore(_ score: CreditScore) async throws -> CreditScore {
         let user = try requireUser()
-        if let issue = score.issue { throw AppError.invalidInput(issue) }
+        if let issue = score.issue { throw AppError.validation(.creditScore(issue)) }
         let saved = CreditScore(score: score.score, maxScore: score.maxScore, provider: score.trimmedProvider,
                                 recordedOn: score.recordedOn, note: score.note)
         scoresByUser[user, default: []].append(saved)

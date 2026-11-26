@@ -174,7 +174,7 @@ struct CreditScoreFormView: View {
         }
         let item = CreditScore(score: value, maxScore: maxScore, provider: provider, recordedOn: CalendarDay(recordedOn),
                                note: note)
-        if let issue = item.issue { error = issue; return }
+        if let issue = item.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         if await tracking.add(item) { dismiss() } else { error = tracking.error }

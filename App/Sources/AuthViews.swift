@@ -83,7 +83,7 @@ struct LoginView: View {
             do {
                 try await session.signIn(username: username, password: password)
             } catch let appError as AppError {
-                error = appError.errorDescription
+                error = appError.text
             } catch {
                 // Un nombre de usuario mal escrito no debe revelar más que una contraseña mala.
                 self.error = AppError.invalidCredentials.errorDescription
@@ -145,7 +145,7 @@ struct SignUpView: View {
             do {
                 try await session.signUp(form)
             } catch let appError as AppError {
-                error = appError.errorDescription
+                error = appError.text
             } catch {
                 self.error = AppError.unknown("").errorDescription
             }

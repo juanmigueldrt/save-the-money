@@ -17,7 +17,7 @@ extension SupabaseBackend: CreditScoreService {
     }
 
     public func addCreditScore(_ score: CreditScore) async throws -> CreditScore {
-        if let issue = score.issue { throw AppError.invalidInput(issue) }
+        if let issue = score.issue { throw AppError.validation(.creditScore(issue)) }
         return try await mapped {
             try await client.from("credit_scores")
                 .insert(NewCreditScoreRow(score: score))

@@ -3,30 +3,6 @@ import Foundation
 public enum AccountKind: String, Codable, CaseIterable, Sendable {
     case checking, savings, creditCard = "credit_card", cash, investment, loan, other
 
-    public var title: String {
-        switch self {
-        case .checking: "Cuenta corriente"
-        case .savings: "Ahorro"
-        case .creditCard: "Tarjeta de crédito"
-        case .cash: "Efectivo"
-        case .investment: "Inversión"
-        case .loan: "Préstamo"
-        case .other: "Otra"
-        }
-    }
-
-    public var systemImage: String {
-        switch self {
-        case .checking: "building.columns"
-        case .savings: "banknote"
-        case .creditCard: "creditcard"
-        case .cash: "eurosign"
-        case .investment: "chart.line.uptrend.xyaxis"
-        case .loan: "doc.text"
-        case .other: "wallet.pass"
-        }
-    }
-
     /// Tarjetas y préstamos son deudas: su saldo suele ser negativo.
     public var isLiability: Bool { self == .creditCard || self == .loan }
 }
@@ -118,14 +94,6 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
 
 public enum CategoryKind: String, Codable, CaseIterable, Sendable {
     case income, expense, transfer
-
-    public var title: String {
-        switch self {
-        case .income: "Ingreso"
-        case .expense: "Gasto"
-        case .transfer: "Transferencia"
-        }
-    }
 }
 
 public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable, Named {
@@ -158,16 +126,23 @@ public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable, Named {
 
     public static let maxNameLength = 40
 
-    /// Qué falla antes de guardarla, mirando también las demás categorías del hogar.
-    public func issue(among others: [BudgetCategory]) -> String? {
-        if trimmedName.isEmpty { return "Ponle un nombre a la categoría." }
-        if trimmedName.count > Self.maxNameLength { return "El nombre es demasiado largo (máximo \(Self.maxNameLength) letras)." }
-        if kind != .expense && budgetGroup != nil { return "Sólo los gastos van en un grupo del 50/30/20." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+        case groupOnlyForExpenses
+        case duplicateName(CategoryKind)
+    }
+
+    /// Qué falla antes de guardarla, mirando también las demás categorías del hogar. El texto lo pone la app.
+    public func issue(among others: [BudgetCategory]) -> Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > Self.maxNameLength { return .nameTooLong }
+        if kind != .expense && budgetGroup != nil { return .groupOnlyForExpenses }
         let repeated = others.contains {
             $0.id != id && $0.householdId == householdId && $0.kind == kind
                 && $0.trimmedName.lowercased() == trimmedName.lowercased()
         }
-        if repeated { return "Ya hay una categoría de \(kind.title.lowercased()) con ese nombre." }
+        if repeated { return .duplicateName(kind) }
         return nil
     }
 
@@ -333,17 +308,24 @@ public struct MovementDraft: Hashable, Sendable {
         self.tags = tags
     }
 
-    /// Problema que impide guardarlo, en español, o nil si es válido.
-    public var issue: String? {
+    public enum Issue: Equatable, Sendable {
+        case descriptionMissing
+        case descriptionTooLong
+        case amountZero
+        case notesTooLong
+        case payeeTooLong
+        case tags(MovementTags.Issue)
+    }
+
+    /// Problema que impide guardarlo, o nil si es válido. El texto lo pone la app.
+    public var issue: Issue? {
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        if text.isEmpty { return "Escribe un concepto." }
-        if text.count > 200 { return "El concepto es demasiado largo (máximo 200 caracteres)." }
-        if amount.minor == 0 { return "El importe no puede ser cero." }
-        if let notes, notes.count > 500 { return "Las notas son demasiado largas (máximo 500 caracteres)." }
-        if let payee, payee.trimmingCharacters(in: .whitespacesAndNewlines).count > 80 {
-            return "El beneficiario es demasiado largo (máximo 80 caracteres)."
-        }
-        if let issue = MovementTags.issue(tags) { return issue }
+        if text.isEmpty { return .descriptionMissing }
+        if text.count > 200 { return .descriptionTooLong }
+        if amount.minor == 0 { return .amountZero }
+        if let notes, notes.count > 500 { return .notesTooLong }
+        if let payee, payee.trimmingCharacters(in: .whitespacesAndNewlines).count > 80 { return .payeeTooLong }
+        if let issue = MovementTags.issue(tags) { return .tags(issue) }
         return nil
     }
 }
@@ -365,9 +347,14 @@ public struct AccountDraft: Hashable, Sendable, Named {
         self.ownerId = ownerId
     }
 
-    public var issue: String? {
-        if trimmedName.isEmpty { return "Ponle un nombre a la cuenta." }
-        if trimmedName.count > 60 { return "El nombre es demasiado largo (máximo 60 caracteres)." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+    }
+
+    public var issue: Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > 60 { return .nameTooLong }
         return nil
     }
 }

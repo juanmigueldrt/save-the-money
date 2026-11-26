@@ -145,7 +145,7 @@ struct PayScheduleView: View {
     }
 
     private func save() async {
-        if let issue = schedule.issue { error = issue; return }
+        if let issue = schedule.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         if await budgets.save(schedule) { dismiss() } else { error = budgets.error }
@@ -345,7 +345,7 @@ struct ExtraBudgetFormView: View {
         updated.categoryIds = categoryIds.sorted { $0.uuidString < $1.uuidString }
         updated.accountIds = accountIds.sorted { $0.uuidString < $1.uuidString }
         updated.isFavorite = isFavorite
-        if let issue = updated.issue { error = issue; return }
+        if let issue = updated.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         if await budgets.save(updated) { dismiss() } else { error = budgets.error }

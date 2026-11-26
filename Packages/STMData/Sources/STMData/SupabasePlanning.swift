@@ -23,12 +23,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     }
 
     public func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
-        if let issue = series.issue { throw AppError.invalidInput(issue) }
+        if let issue = series.issue { throw AppError.validation(.recurring(issue)) }
         return try await saved(Self.createRecurringCall(series), columns: Self.seriesColumns)
     }
 
     public func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
-        if let issue = series.issue { throw AppError.invalidInput(issue) }
+        if let issue = series.issue { throw AppError.validation(.recurring(issue)) }
         return try await saved(Self.updateRecurringCall(series), columns: Self.seriesColumns)
     }
 
@@ -134,12 +134,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     }
 
     public func createGoal(_ goal: Goal) async throws -> Goal {
-        if let issue = goal.issue { throw AppError.invalidInput(issue) }
+        if let issue = goal.issue { throw AppError.validation(.goal(issue)) }
         return try await saved(Self.createGoalCall(goal), columns: Self.goalColumns)
     }
 
     public func updateGoal(_ goal: Goal) async throws -> Goal {
-        if let issue = goal.issue { throw AppError.invalidInput(issue) }
+        if let issue = goal.issue { throw AppError.validation(.goal(issue)) }
         return try await saved(Self.updateGoalCall(goal), columns: Self.goalColumns)
     }
 
@@ -180,7 +180,7 @@ extension SupabaseBackend: RecurringService, GoalService {
     }
 
     public func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution {
-        if let issue = contribution.issue { throw AppError.invalidInput(issue) }
+        if let issue = contribution.issue { throw AppError.validation(.contribution(issue)) }
         return try await saved(Self.addContributionCall(contribution), columns: Self.contributionColumns)
     }
 

@@ -75,7 +75,7 @@ final class MerchantTests: XCTestCase {
             CSVImportRow(line: 3, draft: MovementDraft(accountId: account, categoryId: other.id, bookedOn: day,
                                                        amount: Money(minor: -900), description: "Lidl", importHash: "b"),
                          issue: nil),
-            CSVImportRow(line: 4, draft: nil, issue: "Importe vacío o no válido"),
+            CSVImportRow(line: 4, draft: nil, issue: .invalidAmount)
         ]
         let result = MerchantDirectory.categorize(rows, with: [food, other])
         XCTAssertEqual(result[0].draft?.categoryId, food.id)

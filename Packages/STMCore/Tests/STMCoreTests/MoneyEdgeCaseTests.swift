@@ -126,7 +126,7 @@ final class MoneyEdgeCaseTests: XCTestCase {
                                        quantity: dec("15"), price: dec("12"), fee: Money(minor: 50))
 
         // Al apuntarla se rechaza.
-        XCTAssertEqual(oversell.issue(given: [buy]), "No tienes tantas participaciones para vender.")
+        XCTAssertEqual(oversell.issue(given: [buy]), .notEnoughShares)
 
         // Si llega igualmente (datos antiguos o de otro dispositivo), la posición no queda en negativo.
         let position = Position(holding: holding, trades: [buy, oversell])

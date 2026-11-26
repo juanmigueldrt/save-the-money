@@ -176,7 +176,7 @@ final class CreditCardModel: ServerModel {
     @discardableResult
     func save(_ terms: CreditCardTerms) async -> Bool {
         if let issue = terms.issue {
-            error = issue
+            error = issue.text
             return false
         }
         let ok = await perform {

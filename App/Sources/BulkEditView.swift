@@ -113,7 +113,7 @@ struct BulkEditView: View {
 
     private func save() async {
         let tagsToAdd = MovementTags.normalize(addTags)
-        if let issue = MovementTags.issue(tagsToAdd) { error = issue; return }
+        if let issue = MovementTags.issue(tagsToAdd) { error = issue.text; return }
         let changed = edit.changes(for: movements)
         guard !changed.isEmpty else { dismiss(); return }
         isWorking = true

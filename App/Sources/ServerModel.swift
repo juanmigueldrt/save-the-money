@@ -128,6 +128,6 @@ extension ServerModel {
     /// El texto para la pantalla, o nil si la tarea se ha cancelado: eso no es un fallo que enseñar.
     static func message(for error: any Error) -> String? {
         if Task.isCancelled || error is CancellationError { return nil }
-        return (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+        return (error as? AppError)?.text ?? AppError.unknown("").errorDescription
     }
 }

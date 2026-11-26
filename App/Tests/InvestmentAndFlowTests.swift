@@ -396,13 +396,13 @@ final class MultiStepFlowTests: XCTestCase {
                                       quantity: 7, price: 12)
         let oversold = await investments.sell(earlier, of: fund, into: s.checking.id, finance: s.finance)
         XCTAssertFalse(oversold)
-        XCTAssertEqual(investments.error, InvestmentTrade.notEnoughShares)
+        XCTAssertEqual(investments.error, InvestmentTrade.Issue.notEnoughShares.text)
 
         // Y la compra de la que depende la venta no se puede borrar; la venta sí, y después la compra.
         let buy = try XCTUnwrap(investments.trades.first { $0.side == .buy })
         let deleted = await investments.delete(buy)
         XCTAssertFalse(deleted)
-        XCTAssertEqual(investments.error, InvestmentTrade.neededByLaterSale)
+        XCTAssertEqual(investments.error, InvestmentTrade.Issue.neededByLaterSale.text)
         var storedTrades = try await s.backend.trades(in: s.home.id)
         XCTAssertEqual(storedTrades.count, 2)
         let stored = try await storedBalances(s)

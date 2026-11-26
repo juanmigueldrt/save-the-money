@@ -30,16 +30,18 @@ public enum MovementTags {
     /// Texto para el campo de edición: "viaje, cumple".
     public static func text(_ tags: [String]) -> String { tags.joined(separator: ", ") }
 
-    /// Problema con las etiquetas, o nil si valen (las mismas reglas que la base de datos).
-    public static func issue(_ tags: [String]) -> String? {
-        if tags.count > maxCount { return "Como mucho \(maxCount) etiquetas por movimiento." }
+    public enum Issue: Equatable, Sendable {
+        case tooMany
+        case badLength
+        case badCharacters
+    }
+
+    /// Problema con las etiquetas, o nil si valen (las mismas reglas que la base de datos). El texto lo pone la app.
+    public static func issue(_ tags: [String]) -> Issue? {
+        if tags.count > maxCount { return .tooMany }
         for tag in tags {
-            if tag.isEmpty || tag.count > maxLength {
-                return "Cada etiqueta debe tener entre 1 y \(maxLength) caracteres."
-            }
-            if tag != tag.lowercased() || !tag.unicodeScalars.allSatisfy(allowed.contains) {
-                return "Las etiquetas sólo pueden tener letras, números, «-» y «_»."
-            }
+            if tag.isEmpty || tag.count > maxLength { return .badLength }
+            if tag != tag.lowercased() || !tag.unicodeScalars.allSatisfy(allowed.contains) { return .badCharacters }
         }
         return nil
     }

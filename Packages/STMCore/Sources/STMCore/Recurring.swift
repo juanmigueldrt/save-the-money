@@ -48,30 +48,6 @@ extension CalendarDay {
 
 public enum RecurringKind: String, Codable, CaseIterable, Sendable {
     case subscription, essential, income
-
-    public var title: String {
-        switch self {
-        case .subscription: "Suscripción"
-        case .essential: "Gasto esencial"
-        case .income: "Ingreso fijo"
-        }
-    }
-
-    public var pluralTitle: String {
-        switch self {
-        case .subscription: "Suscripciones"
-        case .essential: "Gastos esenciales"
-        case .income: "Ingresos fijos"
-        }
-    }
-
-    public var systemImage: String {
-        switch self {
-        case .subscription: "play.rectangle"
-        case .essential: "bolt.house"
-        case .income: "banknote"
-        }
-    }
 }
 
 public enum RecurrenceUnit: String, Codable, CaseIterable, Sendable {
@@ -227,16 +203,28 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable, Named,
         Money(minor: recurrence.monthly(amount.minor), currency: amount.currency)
     }
 
-    public var issue: String? {
-        if trimmedName.isEmpty { return "Ponle un nombre." }
-        if trimmedName.count > 60 { return "El nombre es demasiado largo." }
-        if amount.minor <= 0 { return "El importe tiene que ser mayor que cero." }
-        if !(1...52).contains(recurrence.every) { return "La frecuencia no es válida." }
-        if let endsOn, endsOn < startsOn { return "No puede terminar antes de empezar." }
-        if let days = remindDaysBefore, !(0...14).contains(days) { return "El aviso puede ser de 0 a 14 días antes." }
-        if (introAmount == nil) != (introCharges == nil) { return "Indica el precio de oferta y cuántos cargos dura." }
-        if let introAmount, introAmount.minor <= 0 { return "El precio de oferta tiene que ser mayor que cero." }
-        if let introCharges, !(1...36).contains(introCharges) { return "La oferta puede durar de 1 a 36 cargos." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+        case amountNotPositive
+        case badFrequency
+        case endsBeforeStart
+        case reminderOutOfRange
+        case introIncomplete
+        case introAmountNotPositive
+        case introChargesOutOfRange
+    }
+
+    public var issue: Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > 60 { return .nameTooLong }
+        if amount.minor <= 0 { return .amountNotPositive }
+        if !(1...52).contains(recurrence.every) { return .badFrequency }
+        if let endsOn, endsOn < startsOn { return .endsBeforeStart }
+        if let days = remindDaysBefore, !(0...14).contains(days) { return .reminderOutOfRange }
+        if (introAmount == nil) != (introCharges == nil) { return .introIncomplete }
+        if let introAmount, introAmount.minor <= 0 { return .introAmountNotPositive }
+        if let introCharges, !(1...36).contains(introCharges) { return .introChargesOutOfRange }
         return nil
     }
 

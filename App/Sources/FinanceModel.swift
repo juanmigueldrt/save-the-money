@@ -323,7 +323,7 @@ final class FinanceModel: ServerModel {
     @discardableResult
     func save(_ category: BudgetCategory) async -> Bool {
         if let issue = category.issue(among: categories) {
-            error = issue
+            error = issue.text
             return false
         }
         let ok = await perform {

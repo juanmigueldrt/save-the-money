@@ -44,15 +44,19 @@ public struct PaySchedule: Hashable, Sendable, Codable {
     /// Mensual desde el día de inicio de mes del hogar (lo de antes de la fase C).
     public static func monthly(startDay: Int) -> PaySchedule { PaySchedule(frequency: .monthly, day1: startDay) }
 
-    public var issue: String? {
-        guard (1...31).contains(day1) else { return "El día de cobro tiene que estar entre 1 y 31." }
+    public enum Issue: Equatable, Sendable {
+        case dayOutOfRange
+        case secondDayNotAfterFirst
+        case anchorMissing
+    }
+
+    public var issue: Issue? {
+        guard (1...31).contains(day1) else { return .dayOutOfRange }
         switch frequency {
         case .twiceMonthly:
-            guard let day2, (1...31).contains(day2), day2 > day1 else {
-                return "El segundo día de cobro tiene que ir después del primero."
-            }
+            guard let day2, (1...31).contains(day2), day2 > day1 else { return .secondDayNotAfterFirst }
         case .weekly, .biweekly, .yearly:
-            if anchor == nil { return "Elige un día en que hayas cobrado." }
+            if anchor == nil { return .anchorMissing }
         case .monthly:
             break
         }
@@ -325,12 +329,20 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
         self.isFavorite = isFavorite
     }
 
-    public var issue: String? {
-        if trimmedName.isEmpty { return "Ponle un nombre." }
-        if trimmedName.count > 60 { return "El nombre es demasiado largo (máximo 60 caracteres)." }
-        if limit.minor <= 0 { return "El límite tiene que ser mayor que cero." }
-        if let endsOn, endsOn < startsOn { return "La fecha de fin no puede ser anterior a la de inicio." }
-        if categoryIds.count > 50 || accountIds.count > 50 { return "Demasiadas categorías o cuentas." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+        case limitNotPositive
+        case endsBeforeStart
+        case tooManyFilters
+    }
+
+    public var issue: Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > 60 { return .nameTooLong }
+        if limit.minor <= 0 { return .limitNotPositive }
+        if let endsOn, endsOn < startsOn { return .endsBeforeStart }
+        if categoryIds.count > 50 || accountIds.count > 50 { return .tooManyFilters }
         return nil
     }
 

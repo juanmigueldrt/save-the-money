@@ -259,7 +259,15 @@ public struct CSVImportRow: Hashable, Sendable, Identifiable {
     /// Número de fila del archivo (sin contar las vacías), empezando en 1.
     public var line: Int
     public var draft: MovementDraft?
-    public var issue: String?
+    public var issue: Issue?
+
+    /// Por qué no se puede importar la fila. El texto lo pone la app.
+    public enum Issue: Hashable, Sendable {
+        /// Con los primeros 20 caracteres de la fecha tal cual venía.
+        case unrecognizedDate(String)
+        case chargeAndCredit
+        case invalidAmount
+    }
 
     public var id: Int { line }
 }
@@ -282,7 +290,7 @@ public enum CSVImporter {
             if rawDate.isEmpty || row.allSatisfy(\.isEmpty) { continue }
             let line = index + 1
             guard let day = mapping.dateOrder.parse(rawDate) else {
-                result.append(CSVImportRow(line: line, draft: nil, issue: "Fecha no reconocida: «\(rawDate.prefix(20))»"))
+                result.append(CSVImportRow(line: line, draft: nil, issue: .unrecognizedDate(String(rawDate.prefix(20)))))
                 continue
             }
 
@@ -295,13 +303,13 @@ public enum CSVImporter {
                 let into = money(cell(credit)).map { Money(minor: abs($0.minor)) }
                 // Con cargo y abono a la vez no se sabe cuál vale: se avisa en vez de quedarse con uno.
                 if let out, let into, out.minor != 0, into.minor != 0 {
-                    result.append(CSVImportRow(line: line, draft: nil, issue: "Tiene cargo y abono a la vez"))
+                    result.append(CSVImportRow(line: line, draft: nil, issue: .chargeAndCredit))
                     continue
                 }
                 amount = [out, into].compactMap { $0 }.first { $0.minor != 0 } ?? out ?? into
             }
             guard let amount, amount.minor != 0 else {
-                result.append(CSVImportRow(line: line, draft: nil, issue: "Importe vacío o no válido"))
+                result.append(CSVImportRow(line: line, draft: nil, issue: .invalidAmount))
                 continue
             }
 

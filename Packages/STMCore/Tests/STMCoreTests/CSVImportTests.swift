@@ -76,7 +76,7 @@ final class CSVImportTests: XCTestCase {
         let mapping = try XCTUnwrap(CSVMapping.detect(in: table))
         let rows = CSVImporter.rows(in: table, mapping: mapping, accountId: account)
         XCTAssertNil(rows[0].draft, "no se queda con uno de los dos importes")
-        XCTAssertEqual(rows[0].issue, "Tiene cargo y abono a la vez")
+        XCTAssertEqual(rows[0].issue, .chargeAndCredit)
         XCTAssertEqual(rows[1].draft?.amount.minor, 700)
         XCTAssertNil(rows[1].issue)
     }
@@ -121,7 +121,7 @@ final class CSVImportTests: XCTestCase {
         XCTAssertEqual(rows.count, 3)
         XCTAssertNotNil(rows[0].draft)
         XCTAssertNotNil(rows[1].issue)
-        XCTAssertEqual(rows[2].issue, "Importe vacío o no válido")
+        XCTAssertEqual(rows[2].issue, .invalidAmount)
     }
 
     func testIdenticalRowsGetDifferentHashesButReimportMatches() throws {

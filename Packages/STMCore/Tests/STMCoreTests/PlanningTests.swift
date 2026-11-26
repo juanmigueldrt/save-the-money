@@ -44,13 +44,13 @@ final class PlanningTests: XCTestCase {
 
     func testSeriesValidation() {
         var series = RecurringSeries(householdId: home, name: "  ", amount: Money(minor: 100), startsOn: day(2026, 11, 1))
-        XCTAssertEqual(series.issue, "Ponle un nombre.")
+        XCTAssertEqual(series.issue, .nameMissing)
         series.name = "Música"
         series.amount = .zero
         XCTAssertNotNil(series.issue)
         series.amount = Money(minor: 999)
         series.endsOn = day(2026, 10, 1)
-        XCTAssertEqual(series.issue, "No puede terminar antes de empezar.")
+        XCTAssertEqual(series.issue, .endsBeforeStart)
         series.endsOn = nil
         XCTAssertNil(series.issue)
     }

@@ -102,7 +102,7 @@ final class InvestmentModel: ServerModel {
     /// formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ holding: Holding) async -> Holding? {
-        if let issue = holding.issue { error = issue; return nil }
+        if let issue = holding.issue { error = issue.text; return nil }
         let isNew = holding.updatedAt == nil
         var result: Holding?
         let ok = await perform {
@@ -160,7 +160,7 @@ final class InvestmentModel: ServerModel {
     /// Con el mismo `trade.id` (uno por formulario) reintentar no duplica.
     @discardableResult
     func add(_ trade: InvestmentTrade, cash: TradeCash? = nil) async -> Bool {
-        if let issue = trade.issue(given: trades) { error = issue; return false }
+        if let issue = trade.issue(given: trades) { error = issue.text; return false }
         let saved = await perform {
             let stored = try await service.addTrade(trade, cash: cash)
             markChanged(\.trades)
@@ -207,7 +207,7 @@ final class InvestmentModel: ServerModel {
 
     @discardableResult
     func delete(_ trade: InvestmentTrade) async -> Bool {
-        if let issue = trade.deletionIssue(given: trades) { error = issue; return false }
+        if let issue = trade.deletionIssue(given: trades) { error = issue.text; return false }
         return await perform {
             try await service.deleteTrade(trade.id)
             markChanged(\.trades)
@@ -220,7 +220,7 @@ final class InvestmentModel: ServerModel {
     /// Como `save(_ holding:)`: sin versión es un alta con el id del formulario; con versión, un cambio sobre ella.
     @discardableResult
     func save(_ plan: InvestmentPlan) async -> Bool {
-        if let issue = plan.issue { error = issue; return false }
+        if let issue = plan.issue { error = issue.text; return false }
         let isNew = plan.updatedAt == nil
         let ok = await perform {
             let saved = isNew ? try await service.createPlan(plan) : try await service.updatePlan(plan)
