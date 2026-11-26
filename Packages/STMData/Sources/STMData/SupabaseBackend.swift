@@ -225,6 +225,9 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
         case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
+        // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
+        case "STM02": .invalidInput(InvestmentTrade.notEnoughShares)
+        case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

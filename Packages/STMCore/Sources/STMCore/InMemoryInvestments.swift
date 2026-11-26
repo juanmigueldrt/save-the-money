@@ -100,10 +100,30 @@ extension InMemoryBackend: InvestmentService {
         return tradeList.filter { $0.householdId == householdId }.sorted { $0.tradedOn < $1.tradedOn }
     }
 
-    public func addTrade(_ trade: InvestmentTrade) async throws -> InvestmentTrade {
+    public func addTrade(_ trade: InvestmentTrade, cash: TradeCash?) async throws -> InvestmentTrade {
         try requireInvestmentMember(of: trade.householdId)
         _ = try holding(trade.holdingId, in: trade.householdId)
+        if let stored = tradeList.first(where: { $0.id == trade.id }) {
+            // Como el servidor: repetirla solo vale con los mismos datos, también los del movimiento.
+            let movement = tradeMovements[trade.id].flatMap { id in financeMovements.first { $0.id == id } }
+            guard stored.holdingId == trade.holdingId, stored.tradedOn == trade.tradedOn, stored.side == trade.side,
+                  stored.quantity == trade.quantity, stored.price == trade.price, stored.fee == trade.fee,
+                  movement?.accountId == cash?.accountId, movement?.amount == cash?.amount else {
+                throw AppError.invalidInput(TransferDraft.storedWithOtherData)
+            }
+            return stored
+        }
         if let issue = trade.issue(given: tradeList) { throw AppError.invalidInput(issue) }
+        if let cash {
+            let movement = try validated(MovementDraft(accountId: cash.accountId, categoryId: cash.categoryId,
+                                                       bookedOn: trade.tradedOn, amount: cash.amount,
+                                                       description: cash.description), in: trade.householdId)
+            // El movimiento pasa por el mismo punto de fallo que `addMovement`: si falla, tampoco
+            // queda la operación, como la transacción del servidor.
+            try throwIfInjected("addMovement(_:in:)")
+            financeMovements.append(movement)
+            tradeMovements[trade.id] = movement.id
+        }
         tradeList.append(trade)
         return trade
     }
@@ -111,6 +131,7 @@ extension InMemoryBackend: InvestmentService {
     public func deleteTrade(_ tradeId: UUID) async throws {
         guard let trade = tradeList.first(where: { $0.id == tradeId }) else { return }
         try requireInvestmentMember(of: trade.householdId)
+        if let issue = trade.deletionIssue(given: tradeList) { throw AppError.invalidInput(issue) }
         tradeList.removeAll { $0.id == tradeId }
     }
 
