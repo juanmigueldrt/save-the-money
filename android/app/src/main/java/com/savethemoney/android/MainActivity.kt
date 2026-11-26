@@ -19,13 +19,20 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AccountKind
@@ -58,6 +65,7 @@ import com.savethemoney.android.ui.screens.ScreenFor
 import com.savethemoney.android.ui.screens.SinConexion
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmTheme
+import com.savethemoney.android.ui.theme.StmType
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.YearMonth
@@ -183,9 +191,26 @@ fun App(capture: Int? = null) {
         return
     }
     BackHandler(enabled = nav.canGoBack) { nav.back() }
-    AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { number ->
-        ScreenFor(number, nav)
+    Column(Modifier.fillMaxSize()) {
+        if (session.isDemo && capture == null) AvisoDemo()
+        Box(Modifier.weight(1f)) {
+            AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { number ->
+                ScreenFor(number, nav)
+            }
+        }
     }
+}
+
+/** Modo demo (sin Supabase en la compilación de depuración): avisa de que nada se guarda. */
+@Composable
+private fun AvisoDemo() {
+    Text(
+        "Modo demo: los datos no se guardan y se pierden al cerrar la app.",
+        Modifier.fillMaxWidth().background(Stm.colors.errorContainer).statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp),
+        color = Stm.colors.onErrorContainer,
+        style = StmType.bodySmall,
+        textAlign = TextAlign.Center,
+    )
 }
 
 /** Día que muestra el diseño. */

@@ -24,11 +24,16 @@ fun local(key: String) = (findProperty(key) as String? ?: localProps.getProperty
 
 // Firma de la versión release: almacén y contraseñas en local.properties (nunca en git):
 //   release.storeFile=/ruta/al/almacen.jks   release.storePassword=…
-//   release.keyAlias=…                       release.keyPassword=…
-// Sin ellas, la release se firma con la clave de depuración y no se instala encima de la buena.
+//   release.keyAlias=…                       release.keyPassword=… (opcional: si falta, la del almacén)
+// Sin ellas, la release no se compila (ver gradle.taskGraph más abajo).
 val releaseStore = (findProperty("release.storeFile") as String? ?: localProps.getProperty("release.storeFile"))
     ?.let { file(it) }?.takeIf { it.exists() }
 fun rawLocal(key: String) = findProperty(key) as String? ?: localProps.getProperty(key)
+
+// Código de versión derivado de versionName (MAYOR.MENOR.PARCHE → MMmmpp, 0.8.0 → 800): cada versión nueva lo sube.
+// shortcut: MENOR y PARCHE deben ser menores de 100, si no el código se solapa; subir el esquema cuando haga falta.
+val appVersionName = "0.8.0"
+val appVersionCode = appVersionName.split(".").map { it.toInt() }.let { (mayor, menor, parche) -> mayor * 10000 + menor * 100 + parche }
 
 android {
     namespace = "com.savethemoney.android"
@@ -38,8 +43,8 @@ android {
         applicationId = "com.savethemoney.android"
         minSdk = 28
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.8.0"
+        versionCode = appVersionCode
+        versionName = appVersionName
         buildConfigField("String", "SUPABASE_URL", "\"${local("supabase.url")}\"")
         buildConfigField("String", "SUPABASE_ANON_KEY", "\"${local("supabase.anonKey")}\"")
         // Logos de comercios: clave PUBLICABLE de logo.dev (pk_…) en local.properties como logodev.token. Opcional.
@@ -52,7 +57,7 @@ android {
                 storeFile = releaseStore
                 storePassword = rawLocal("release.storePassword")
                 keyAlias = rawLocal("release.keyAlias")
-                keyPassword = rawLocal("release.keyPassword")
+                keyPassword = rawLocal("release.keyPassword") ?: rawLocal("release.storePassword")
             }
         }
     }
@@ -83,14 +88,25 @@ android {
     lint { baseline = file("lint-baseline.xml") }
 }
 
-// Una release nunca debe apuntar al Supabase local ni salir con la clave de depuración:
-// con la clave local la app recibe "Invalid API key" y cierra la sesión.
+// Una release nunca debe apuntar al Supabase local, salir sin URL o clave (arrancaría en modo demo sin avisar),
+// ni salir sin firma. Con la clave local la app recibe "Invalid API key" y cierra la sesión.
 gradle.taskGraph.whenReady {
-    if (allTasks.any { it.name.startsWith("assembleRelease") || it.name.startsWith("bundleRelease") }) {
-        val url = rawLocal("supabase.url") ?: ""
+    // Sólo las tareas que generan o instalan la release: ktlintCheck también arrastra tareas de release.
+    if (allTasks.any { Regex("(assemble|bundle|install)Release.*").matches(it.name) }) {
+        val url = (rawLocal("supabase.url") ?: "").trim()
+        val key = (rawLocal("supabase.anonKey") ?: "").trim()
         val local = listOf("127.0.0.1", "localhost", "10.0.2.2").any { url.contains(it) }
         check(!local) { "La release apunta al Supabase local ($url). Pon la URL y la clave anon de la nube en local.properties." }
+        check(url.isNotEmpty()) { "Falta supabase.url: la release no se compila sin ella. Ponla en local.properties." }
+        check(url.startsWith("https://")) { "supabase.url debe ser una URL https (valor actual: \"$url\")." }
+        check(key.isNotEmpty() && !key.startsWith("pega-aqui")) { "Falta supabase.anonKey: la release no se compila sin ella. Ponla en local.properties." }
         check(releaseStore != null) { "Falta la firma de release (release.storeFile y compañía en local.properties)." }
+        check(!rawLocal("release.storePassword").isNullOrEmpty() && !rawLocal("release.keyAlias").isNullOrEmpty()) {
+            "Falta release.storePassword o release.keyAlias en local.properties: sin ellos la release saldría sin firmar."
+        }
+    }
+    if (project.hasProperty("entrega") && allTasks.any { it.name.startsWith("assembleDebug") }) {
+        logger.warn("-Pentrega genera un APK de depuración (clave de depuración): no lo entregues a móviles reales; usa assembleRelease.")
     }
 }
 
