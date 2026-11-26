@@ -8,3 +8,7 @@ updates:
     directory: /Packages/STMData
     schedule:
       interval: monthly
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: monthly
