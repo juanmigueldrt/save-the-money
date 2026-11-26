@@ -37,6 +37,7 @@ struct LocalReminders: ReminderScheduling {
             content.body = reminder.body
             content.sound = .default
             var when = DateComponents()
+            when.calendar = CalendarDay.gregorian
             when.year = reminder.fireOn.year
             when.month = reminder.fireOn.month
             when.day = reminder.fireOn.day

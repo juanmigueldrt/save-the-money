@@ -263,7 +263,7 @@ struct MovementsView: View {
     @Environment(FinanceModel.self) private var finance
     @State private var accountMovements: [Movement] = []
     @State private var filter = MovementFilter()
-    @State private var customFrom = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
+    @State private var customFrom = CalendarDay.gregorian.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var customThrough = Date()
     @State private var editing: Movement?
     @State private var adding = false
