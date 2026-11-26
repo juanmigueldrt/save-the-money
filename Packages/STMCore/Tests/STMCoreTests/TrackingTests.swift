@@ -128,6 +128,39 @@ final class TrackingTests: XCTestCase {
         XCTAssertEqual(ReportPeriod.thisYear.range(today: day(2026, 3, 15)).lowerBound, day(2026, 1, 1))
     }
 
+    func testInformesConInicioDeMesDia25() {
+        let account = Account(householdId: home, name: "Cuenta común")
+        let movements = [
+            move(account, -1_000, on: day(2026, 10, 24)),
+            move(account, -2_000, on: day(2026, 10, 25)),
+            move(account, -3_000, on: day(2026, 11, 10)),
+            move(account, -4_000, on: day(2026, 9, 25)),
+            move(account, -5_000, on: day(2026, 9, 24)),
+            move(account, -8_000, on: day(2026, 11, 11))
+        ]
+        let today = day(2026, 11, 10)
+
+        // El mes del hogar va del 25 al 24: "este mes" es del 25 de octubre al 10 de noviembre.
+        let thisMonth = ReportPeriod.thisMonth.range(today: today, monthStartDay: 25)
+        XCTAssertEqual(thisMonth, day(2026, 10, 25)...day(2026, 11, 10))
+        let report = SpendingReport(movements: movements, categories: [], range: thisMonth, monthStartDay: 25)
+        XCTAssertEqual(report.total, Money(minor: 5_000), "el 24 de octubre es del mes anterior; el 11 aún no ha llegado")
+        XCTAssertEqual(report.byMonth.map(\.month), [MonthKey(year: 2026, month: 11)])
+
+        // Frente al mes anterior, del 25 de septiembre al 11 de octubre (mismo día del periodo).
+        XCTAssertEqual(ReportPeriod.thisMonth.previousRange(today: today, monthStartDay: 25), day(2026, 9, 25)...day(2026, 10, 11))
+
+        // El mes pasado es el periodo completo, del 25 de septiembre al 24 de octubre.
+        let lastMonth = ReportPeriod.lastMonth.range(today: today, monthStartDay: 25)
+        XCTAssertEqual(lastMonth, day(2026, 9, 25)...day(2026, 10, 24))
+        XCTAssertEqual(SpendingReport(movements: movements, categories: [], range: lastMonth, monthStartDay: 25).total,
+                       Money(minor: 5_000))
+        XCTAssertEqual(ReportPeriod.lastMonth.previousRange(today: today, monthStartDay: 25), day(2026, 8, 25)...day(2026, 9, 24))
+
+        // Con inicio 1 no cambia nada.
+        XCTAssertEqual(ReportPeriod.thisMonth.range(today: today), day(2026, 11, 1)...today)
+    }
+
     func testParityWithAndroidSummaryAndReports() {
         let checking = Account(householdId: home, name: "Cuenta común", openingBalance: Money(minor: 100_000))
         let savings = Account(householdId: home, name: "Ahorro")

@@ -1,0 +1,81 @@
+{
+  "_source": "Worked out by hand from the rule the server enforces (trigger private.check_trade_timeline): add the buys and subtract the sells of one holding day by day, in date order; the holding is oversold if the running total is below zero at the end of any day. Buys of a day count before the sells of that same day, whatever the order of the list. Quantities are exact decimals (up to 8 decimal places), never floating point. Used by Position.isOversold on iOS and Android.",
+  "vectors": [
+    {
+      "name": "sin operaciones",
+      "trades": [],
+      "oversold": false
+    },
+    {
+      "name": "vender todo el mismo día de la compra, con la venta antes en la lista",
+      "trades": [
+        { "day": "2026-11-02", "side": "sell", "quantity": "10" },
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" }
+      ],
+      "oversold": false
+    },
+    {
+      "name": "vender una participación de más: 10 - 10.00000001",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" },
+        { "day": "2026-11-03", "side": "sell", "quantity": "10.00000001" }
+      ],
+      "oversold": true
+    },
+    {
+      "name": "vender antes de la primera compra, aunque al final sobre: -1 el día 1",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" },
+        { "day": "2026-11-01", "side": "sell", "quantity": "1" }
+      ],
+      "oversold": true
+    },
+    {
+      "name": "venta con fecha anterior que cabe: 10, 8, 13, 1",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" },
+        { "day": "2026-11-10", "side": "buy", "quantity": "5" },
+        { "day": "2026-11-12", "side": "sell", "quantity": "12" },
+        { "day": "2026-11-05", "side": "sell", "quantity": "2" }
+      ],
+      "oversold": false
+    },
+    {
+      "name": "venta con fecha anterior que deja sin participaciones a la posterior: 10, 4, 9, -3",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" },
+        { "day": "2026-11-10", "side": "buy", "quantity": "5" },
+        { "day": "2026-11-12", "side": "sell", "quantity": "12" },
+        { "day": "2026-11-05", "side": "sell", "quantity": "2" },
+        { "day": "2026-11-05", "side": "sell", "quantity": "4" }
+      ],
+      "oversold": true
+    },
+    {
+      "name": "una compra posterior no arregla un día en negativo: 10, -2, 18",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "10" },
+        { "day": "2026-11-04", "side": "sell", "quantity": "12" },
+        { "day": "2026-11-06", "side": "buy", "quantity": "20" }
+      ],
+      "oversold": true
+    },
+    {
+      "name": "decimales exactos: 0.1 + 0.2 - 0.3 = 0",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "0.1" },
+        { "day": "2026-11-03", "side": "buy", "quantity": "0.2" },
+        { "day": "2026-11-04", "side": "sell", "quantity": "0.3" }
+      ],
+      "oversold": false
+    },
+    {
+      "name": "la fracción más pequeña: 0.00000001 - 0.00000002",
+      "trades": [
+        { "day": "2026-11-02", "side": "buy", "quantity": "0.00000001" },
+        { "day": "2026-11-02", "side": "sell", "quantity": "0.00000002" }
+      ],
+      "oversold": true
+    }
+  ]
+}

@@ -345,7 +345,16 @@ interface FinanceService {
     /** Apunta el precio de un día (sustituye al de ese día) y devuelve el activo; uno antiguo no cambia el actual. */
     suspend fun recordPrice(price: java.math.BigDecimal, day: LocalDate, holdingId: String): Holding
     suspend fun trades(householdId: String): List<InvestmentTrade>
-    suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade
+
+    /**
+     * Guarda una compra o venta y, con [cash], su movimiento en la cuenta: los dos o ninguno (RPC `create_trade`).
+     * Repetir la llamada con el mismo id devuelve la operación ya guardada y no apunta nada nuevo; con otros datos
+     * falla con [TransferDraft.STORED_WITH_OTHER_DATA]. Una venta que deje la posición en negativo en cualquier
+     * fecha falla con [InvestmentTrade.NOT_ENOUGH_SHARES].
+     */
+    suspend fun addTrade(trade: InvestmentTrade, cash: TradeCash? = null): InvestmentTrade
+
+    /** Borrar una compra de la que depende una venta posterior falla con [InvestmentTrade.NEEDED_BY_LATER_SALE]. */
     suspend fun deleteTrade(tradeId: String)
     suspend fun investmentPlans(householdId: String): List<InvestmentPlan>
     suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan
@@ -665,6 +674,9 @@ class InMemoryFinance : FinanceService {
     private val holdings = mutableListOf<Holding>()
     private val prices = mutableListOf<HoldingPrice>()
     private val trades = mutableListOf<InvestmentTrade>()
+
+    /** El movimiento que apuntó cada operación guardada con cuenta, por el id de la operación. */
+    private val tradeMovements = mutableMapOf<String, String>()
     private val plans = mutableListOf<InvestmentPlan>()
 
     override suspend fun holdings(householdId: String) = holdings.filter { it.householdId == householdId }.sortedBy { it.trimmedName }
@@ -702,12 +714,32 @@ class InMemoryFinance : FinanceService {
 
     override suspend fun trades(householdId: String) = trades.filter { it.householdId == householdId }.sortedBy { it.tradedOn }
 
-    override suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade {
-        trade.issue(trades.filter { it.holdingId == trade.holdingId })?.let(::fail)
-        return trade.copy(id = id()).also { trades += it }
+    override suspend fun addTrade(trade: InvestmentTrade, cash: TradeCash?): InvestmentTrade {
+        trades.firstOrNull { trade.id.isNotEmpty() && it.id == trade.id }?.let { stored ->
+            // Como el servidor: repetirla solo vale con los mismos datos, también los del movimiento.
+            val movement = movements.firstOrNull { it.id == tradeMovements[trade.id] }
+            val same = stored.holdingId == trade.holdingId && stored.tradedOn == trade.tradedOn && stored.side == trade.side &&
+                stored.quantity.compareTo(trade.quantity) == 0 && stored.price.compareTo(trade.price) == 0 &&
+                stored.feeMinor == trade.feeMinor && movement?.accountId == cash?.accountId && movement?.amountMinor == cash?.amountMinor
+            if (!same) fail(TransferDraft.STORED_WITH_OTHER_DATA)
+            return stored
+        }
+        trade.issue(trades)?.let(::fail)
+        val saved = trade.copy(id = trade.id.ifEmpty { id() })
+        // El movimiento se valida antes de guardar nada: o quedan los dos o ninguno.
+        cash?.let {
+            val movement = build(MovementDraft(it.accountId, it.categoryId, trade.day, it.amountMinor, it.description), trade.householdId)
+            movements += movement
+            tradeMovements[saved.id] = movement.id
+        }
+        trades += saved
+        return saved
     }
 
-    override suspend fun deleteTrade(tradeId: String) { trades.removeAll { it.id == tradeId } }
+    override suspend fun deleteTrade(tradeId: String) {
+        trades.firstOrNull { it.id == tradeId }?.deletionIssue(trades)?.let(::fail)
+        trades.removeAll { it.id == tradeId }
+    }
 
     override suspend fun investmentPlans(householdId: String) = plans.filter { it.householdId == householdId }.sortedBy { it.startsOn }
 

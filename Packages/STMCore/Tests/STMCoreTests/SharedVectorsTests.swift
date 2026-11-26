@@ -185,6 +185,39 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testReportPeriods() throws {
+        struct File: Decodable { var monthStartDay: Int; var today: String; var movements: [Apunte]; var vectors: [Caso] }
+        struct Apunte: Decodable { var day: String; var minor: Int }
+        struct Caso: Decodable {
+            var preset: String; var range: [String]; var total: Int; var months: [Month]
+            var previousRange: [String]; var previousTotal: Int
+        }
+        struct Month: Decodable { var month: String; var minor: Int }
+        let file: File = try load("report_periods.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        let home = UUID(), account = UUID()
+        let movements = file.movements.map {
+            Movement(householdId: home, accountId: account, categoryId: nil, bookedOn: day($0.day),
+                     amount: Money(minor: $0.minor), description: "Gasto")
+        }
+        let today = day(file.today)
+        for v in file.vectors {
+            let preset = try XCTUnwrap(ReportPeriod(rawValue: v.preset), v.preset)
+            let range = preset.range(today: today, monthStartDay: file.monthStartDay)
+            XCTAssertEqual("\(range.lowerBound.iso)..\(range.upperBound.iso)", v.range.joined(separator: ".."), v.preset)
+            let report = SpendingReport(movements: movements, categories: [], range: range, monthStartDay: file.monthStartDay)
+            XCTAssertEqual(report.total.minor, v.total, v.preset)
+            let months = report.byMonth.map { String(format: "%04ld-%02ld=%ld", $0.month.year, $0.month.month, $0.amount.minor) }
+            XCTAssertEqual(months, v.months.map { "\($0.month)=\($0.minor)" }, v.preset)
+
+            let previous = preset.previousRange(today: today, monthStartDay: file.monthStartDay)
+            XCTAssertEqual("\(previous.lowerBound.iso)..\(previous.upperBound.iso)", v.previousRange.joined(separator: ".."), v.preset)
+            let previousReport = SpendingReport(movements: movements, categories: [], range: previous,
+                                                monthStartDay: file.monthStartDay)
+            XCTAssertEqual(previousReport.total.minor, v.previousTotal, v.preset)
+        }
+    }
+
     func testImportFingerprint() throws {
         struct File: Decodable { var vectors: [Vector] }
         struct Vector: Decodable { var name: String; var csv: String; var rows: [Row] }
@@ -196,6 +229,23 @@ final class SharedVectorsTests: XCTestCase {
             let mapping = try XCTUnwrap(CSVMapping.detect(in: table), v.name)
             let hashes = CSVImporter.rows(in: table, mapping: mapping, accountId: UUID()).map { $0.draft?.importHash }
             XCTAssertEqual(hashes, v.rows.map(\.importHash), v.name)
+        }
+    }
+
+    func testTradeTimeline() throws {
+        struct File: Decodable { var vectors: [Vector] }
+        struct Vector: Decodable { var name: String; var trades: [Entry]; var oversold: Bool }
+        struct Entry: Decodable { var day: String; var side: TradeSide; var quantity: String }
+        let file: File = try load("trade_timeline.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        let holding = UUID()
+        for v in file.vectors {
+            let trades = try v.trades.map {
+                InvestmentTrade(householdId: UUID(), holdingId: holding, tradedOn: day($0.day), side: $0.side,
+                                quantity: try XCTUnwrap(Decimal(string: $0.quantity, locale: Locale(identifier: "en_US_POSIX"))),
+                                price: 10)
+            }
+            XCTAssertEqual(Position.isOversold(holding, in: trades), v.oversold, v.name)
         }
     }
 

@@ -252,8 +252,9 @@ public struct SpendingReport: Hashable, Sendable {
 
     /// - Parameter categoryIds: si no está vacío, sólo esas categorías.
     /// - Parameter accountIds: si no está vacío, sólo esas cuentas.
+    /// - Parameter monthStartDay: día en que empieza el mes del hogar; los meses de `byMonth` son esos periodos.
     public init(movements: [Movement], categories: [BudgetCategory], range: ClosedRange<CalendarDay>,
-                kind: Kind = .expense, categoryIds: Set<UUID> = [], accountIds: Set<UUID> = []) {
+                kind: Kind = .expense, categoryIds: Set<UUID> = [], accountIds: Set<UUID> = [], monthStartDay: Int = 1) {
         self.kind = kind
         self.range = range
         let byId = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -279,7 +280,7 @@ public struct SpendingReport: Hashable, Sendable {
             entry.minor += value
             entry.count += 1
             totals[key] = entry
-            months[MonthKey(movement.bookedOn), default: 0] += value
+            months[MonthKey.containing(movement.bookedOn, startDay: monthStartDay), default: 0] += value
             total += value
         }
         self.total = Money(minor: total)
@@ -290,8 +291,8 @@ public struct SpendingReport: Hashable, Sendable {
         .sorted { $0.amount.minor != $1.amount.minor ? $0.amount.minor > $1.amount.minor : $0.title < $1.title }
 
         var monthList: [MonthTotal] = []
-        var month = MonthKey(range.lowerBound)
-        let last = MonthKey(range.upperBound)
+        var month = MonthKey.containing(range.lowerBound, startDay: monthStartDay)
+        let last = MonthKey.containing(range.upperBound, startDay: monthStartDay)
         while month <= last {
             monthList.append(MonthTotal(month: month, amount: Money(minor: months[month] ?? 0)))
             month = month.adding(months: 1)
@@ -319,8 +320,8 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
 
     /// El mismo tramo justo antes, para comparar: este mes hasta hoy frente al mes pasado hasta el mismo día,
     /// los últimos 3 meses frente a los 3 anteriores, este año hasta hoy frente al año pasado hasta el mismo día.
-    public func previousRange(today: CalendarDay = CalendarDay()) -> ClosedRange<CalendarDay> {
-        let current = range(today: today)
+    public func previousRange(today: CalendarDay = CalendarDay(), monthStartDay: Int = 1) -> ClosedRange<CalendarDay> {
+        let current = range(today: today, monthStartDay: monthStartDay)
         let shift: Int
         switch self {
         case .thisMonth, .lastMonth: shift = 1
@@ -328,13 +329,20 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
         case .last6Months: shift = 6
         case .thisYear, .last12Months: shift = 12
         }
-        let start = current.lowerBound.adding(months: -shift)
-        var end = current.upperBound.adding(months: -shift)
-        // Un mes completo se compara con el mes anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
-        if self == .lastMonth {
-            end = MonthKey(start).adding(months: 1).firstDay.adding(days: -1)
-        }
+        let start = Self.shifted(current.lowerBound, months: -shift, startDay: monthStartDay)
+        // Un mes completo se compara con el periodo anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
+        let end = self == .lastMonth
+            ? MonthKey.containing(start, startDay: monthStartDay).period(startDay: monthStartDay).upperBound
+            : Self.shifted(current.upperBound, months: -shift, startDay: monthStartDay)
         return start...max(start, end)
+    }
+
+    /// Mismo día dentro de su periodo del hogar, [months] meses antes; sin pasarse del final de ese periodo.
+    private static func shifted(_ day: CalendarDay, months: Int, startDay: Int) -> CalendarDay {
+        let key = MonthKey.containing(day, startDay: startDay)
+        let offset = key.period(startDay: startDay).lowerBound.days(until: day)
+        let target = key.adding(months: months).period(startDay: startDay)
+        return min(target.upperBound, target.lowerBound.adding(days: offset))
     }
 
     /// "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación.
@@ -349,16 +357,17 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
         }
     }
 
-    public func range(today: CalendarDay = CalendarDay()) -> ClosedRange<CalendarDay> {
-        let month = MonthKey(today)
-        func lastDay(_ m: MonthKey) -> CalendarDay { m.adding(months: 1).firstDay.adding(days: -1) }
+    /// Periodos del hogar: empiezan el día `monthStartDay`, como el presupuesto. "Este año" son los periodos
+    /// del año del mes en curso (con inicio 25, el primero es del 25 de diciembre anterior).
+    public func range(today: CalendarDay = CalendarDay(), monthStartDay: Int = 1) -> ClosedRange<CalendarDay> {
+        let month = MonthKey.containing(today, startDay: monthStartDay)
         switch self {
-        case .thisMonth: return month.firstDay...today
-        case .lastMonth: return month.adding(months: -1).firstDay...lastDay(month.adding(months: -1))
-        case .last3Months: return month.adding(months: -2).firstDay...today
-        case .last6Months: return month.adding(months: -5).firstDay...today
-        case .thisYear: return MonthKey(year: today.year, month: 1).firstDay...today
-        case .last12Months: return month.adding(months: -11).firstDay...today
+        case .thisMonth: return month.period(startDay: monthStartDay).lowerBound...today
+        case .lastMonth: return month.adding(months: -1).period(startDay: monthStartDay)
+        case .last3Months: return month.adding(months: -2).period(startDay: monthStartDay).lowerBound...today
+        case .last6Months: return month.adding(months: -5).period(startDay: monthStartDay).lowerBound...today
+        case .thisYear: return MonthKey(year: month.year, month: 1).period(startDay: monthStartDay).lowerBound...today
+        case .last12Months: return month.adding(months: -11).period(startDay: monthStartDay).lowerBound...today
         }
     }
 }
