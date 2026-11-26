@@ -86,6 +86,12 @@ class CoreTest {
         assertEquals(AppError.InvalidOrExpiredInvite, SupabaseBackend.postgresError("P0002", ""))
         assertEquals(AppError.AlreadyMember, SupabaseBackend.postgresError("23505", "already a member"))
         assertEquals(TransferDraft.STORED_WITH_OTHER_DATA, SupabaseBackend.postgresError("STM01", "").message)
+        assertEquals(AppError.TooManyInviteAttempts(7), SupabaseBackend.postgresError("STM04", "too many invite attempts; retry in 7 min"))
+        assertEquals(
+            "Has probado demasiados códigos. Vuelve a intentarlo dentro de 1 minuto.",
+            SupabaseBackend.postgresError("STM04", "too many invite attempts; retry in 1 min").message,
+        )
+        assertEquals(AppError.TooManyInviteAttempts(15), SupabaseBackend.postgresError("STM04", "otro texto"))
         assertEquals(AppError.InvalidCredentials, SupabaseBackend.authError("Invalid login credentials"))
         assertEquals(AppError.UsernameTaken, SupabaseBackend.authError("user_already_exists"))
     }

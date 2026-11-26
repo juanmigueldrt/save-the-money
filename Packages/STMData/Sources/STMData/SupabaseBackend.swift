@@ -145,11 +145,14 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     }
 
     public func acceptInvite(_ code: InviteCode) async throws -> Household {
-        try await mapped {
+        // Un código que no sirve devuelve null en vez de un error, para que el servidor guarde el intento fallido.
+        let joined: Household? = try await mapped {
             try await client.rpc("accept_invite", params: ["invite_code": code.value])
                 .execute()
                 .value
         }
+        guard let joined else { throw AppError.invalidOrExpiredInvite }
+        return joined
     }
 
     public func leave(householdId: UUID) async throws {
@@ -219,6 +222,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
         case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
+        // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
+        case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }
