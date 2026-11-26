@@ -7,6 +7,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import com.savethemoney.android.data.AppError
+import com.savethemoney.android.data.registrarError
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -35,6 +36,8 @@ class Action(private val scope: CoroutineScope) {
             } catch (e: AppError) {
                 error = e.message
             } catch (e: Exception) {
+                // Los fallos del servidor ya los registra `mapped`; este no viene de ahí (ORC-72).
+                registrarError("Action.run", e)
                 error = AppError.Unknown("app").message
             } finally {
                 busy = false
@@ -56,6 +59,7 @@ suspend fun reloadAfterSave(block: suspend () -> Unit): String? = try {
 } catch (e: AppError) {
     e.message
 } catch (e: Exception) {
+    registrarError("reloadAfterSave", e)
     AppError.Unknown("app").message
 }
 

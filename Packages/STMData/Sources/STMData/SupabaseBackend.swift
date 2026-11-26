@@ -66,6 +66,7 @@ public struct SupabaseBackend: AuthService, HouseholdService {
             return try await client.auth.session.user.id
         } catch {
             guard client.auth.currentSession != nil else { throw AppError.notSignedIn }
+            if !Task.isCancelled { ErrorLog.record(error, in: #function) }
             throw error is URLError ? AppError.network : AppError.unknown("auth")
         }
     }
@@ -229,19 +230,20 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     // MARK: Errores
 
     /// Ejecuta la llamada y convierte cualquier error en un AppError con mensaje en español.
-    /// Nunca se registran datos del usuario: sólo el tipo de error.
+    /// El fallo se registra antes de traducirlo (ORC-72), con `ErrorLog`: sin datos del usuario.
     @discardableResult
-    func mapped<T>(_ operation: () async throws -> T) async throws -> T {
+    func mapped<T>(_ function: String = #function, _ operation: () async throws -> T) async throws -> T {
         do {
             return try await operation()
         } catch let error as AppError {
             throw error
-        } catch let error as PostgrestError {
-            throw Self.appError(postgresCode: error.code, message: error.message)
-        } catch is URLError {
-            throw AppError.network
         } catch {
-            throw Self.appError(authMessage: String(describing: error))
+            if !Task.isCancelled && !(error is CancellationError) { ErrorLog.record(error, in: function) }
+            switch error {
+            case let error as PostgrestError: throw Self.appError(postgresCode: error.code, message: error.message)
+            case is URLError: throw AppError.network
+            default: throw Self.appError(authMessage: String(describing: error))
+            }
         }
     }
 
@@ -250,7 +252,7 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     /// Llama a una función `create_…` o `update_…` y devuelve la fila guardada. Los parámetros van todos, también
     /// los nulos: las funciones de cambio no tienen valores por defecto.
     func saved<Row: Decodable & Sendable>(_ call: RpcCall, columns: String) async throws -> Row {
-        let rows: [Row] = try await mapped {
+        let rows: [Row] = try await mapped(call.function) {
             try await client.rpc(call.function, params: call.params).select(columns).execute().value
         }
         guard let row = rows.first else { throw AppError.unknown(call.function) }
@@ -265,9 +267,11 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     /// Todas las filas de una consulta, pedidas por páginas. `query` crea la consulta de cada página
     /// y debe ordenar por una clave única (`id` al final) para que las páginas no salten ni repitan filas.
     /// Un error en cualquier página hace fallar la carga entera: nunca se devuelve una lista a medias.
-    func allRows<Row: Decodable & Sendable>(_ query: () -> PostgrestTransformBuilder) async throws -> [Row] {
+    func allRows<Row: Decodable & Sendable>(
+        _ function: String = #function, _ query: () -> PostgrestTransformBuilder
+    ) async throws -> [Row] {
         try await Self.allPages { from, to in
-            try await mapped { try await query().range(from: from, to: to).execute().value }
+            try await mapped(function) { try await query().range(from: from, to: to).execute().value }
         }
     }
 

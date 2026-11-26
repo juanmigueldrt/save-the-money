@@ -230,24 +230,29 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         if (removed.isEmpty()) throw AppError.InvalidInput("Solo quien creó el hogar puede quitar a alguien.")
     }
 
-    /** Convierte cualquier error en un AppError con mensaje en español. Nunca registra datos del usuario. */
-    internal suspend fun <T> mapped(block: suspend () -> T): T = try {
-        block()
-    } catch (e: AppError) {
-        throw e
-    } catch (e: PostgrestRestException) {
-        throw postgresError(e.code, e.message ?: "")
-    } catch (e: RestException) {
-        throw authError(listOfNotNull(e.error, e.description, e.message).joinToString(" "))
-    } catch (e: HttpRequestException) {
-        throw AppError.Network
-    } catch (e: IOException) {
-        throw AppError.Network
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        // Respuesta inesperada (un valor de enumerado nuevo, una fila que falta…): se avisa en vez de cerrar la app.
-        throw AppError.Unknown("app")
+    /**
+     * Convierte cualquier error en un AppError con mensaje en español. El fallo se registra antes de traducirlo
+     * (ORC-72), con [registrarError]: sin datos del usuario.
+     */
+    internal suspend fun <T> mapped(block: suspend () -> T): T {
+        // La operación es la función que llama (households, createAccount…): se toma antes de la primera suspensión.
+        val operacion = Throwable().stackTrace.getOrNull(1)?.methodName ?: "servidor"
+        return try {
+            block()
+        } catch (e: AppError) {
+            throw e
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            registrarError(operacion, e)
+            throw when (e) {
+                is PostgrestRestException -> postgresError(e.code, e.message ?: "")
+                is RestException -> authError(listOfNotNull(e.error, e.description, e.message).joinToString(" "))
+                is HttpRequestException, is IOException -> AppError.Network
+                // Respuesta inesperada (un valor de enumerado nuevo, una fila que falta…): se avisa en vez de cerrar la app.
+                else -> AppError.Unknown("app")
+            }
+        }
     }
 
     companion object {
