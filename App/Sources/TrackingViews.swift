@@ -400,7 +400,8 @@ struct ReportsView: View {
         let bars = income.byMonth.map { MonthBar(month: $0.month, kind: "Ingresos", amount: $0.amount) }
             + spending.byMonth.map { MonthBar(month: $0.month, kind: "Gastos", amount: $0.amount) }
         let saving = income.averagePerMonth - spending.averagePerMonth
-        let rise = BiggestRise.find(movements: movements, categories: finance.categories, month: MonthKey(CalendarDay()))
+        let rise = BiggestRise.find(movements: movements, categories: finance.categories,
+                                    month: MonthKey.containing(CalendarDay(), startDay: startDay), monthStartDay: startDay)
 
         VStack(alignment: .leading, spacing: Spacing.s16) {
             HStack(alignment: .firstTextBaseline) {

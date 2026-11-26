@@ -246,8 +246,9 @@ class SpendingReport(
 /** La categoría de gasto que más sube de un mes al anterior; el porcentaje es nulo si antes no se gastaba nada. */
 data class BiggestRise(val title: String, val percent: Long?, val previous: YearMonth)
 
-fun biggestRise(movements: List<Movement>, categories: List<BudgetCategory>, month: YearMonth): BiggestRise? {
-    fun report(m: YearMonth) = SpendingReport(movements, categories, m.atDay(1)..m.atEndOfMonth()).byCategory.associateBy { it.id }
+/** [month] es el mes del hogar (con [monthContaining]); cada mes abarca su [period]. */
+fun biggestRise(movements: List<Movement>, categories: List<BudgetCategory>, month: YearMonth, monthStartDay: Int = 1): BiggestRise? {
+    fun report(m: YearMonth) = SpendingReport(movements, categories, m.period(monthStartDay)).byCategory.associateBy { it.id }
     val previous = month.minusMonths(1)
     val before = report(previous)
     val best = report(month).values.filter { it.amount > (before[it.id]?.amount ?: 0) }

@@ -1,7 +1,6 @@
 package com.savethemoney.android.data
 
 import java.time.LocalDate
-import java.time.YearMonth
 import kotlin.math.abs
 
 // MovementFilter.swift de STMCore.
@@ -21,18 +20,15 @@ enum class MovementDateFilter(val title: String) {
     All("Cualquier fecha"), ThisMonth("Este mes"), LastMonth("El mes pasado"), Last30Days("Últimos 30 días"),
     Last90Days("Últimos 90 días"), ThisYear("Este año"), Custom("Fechas a medida");
 
-    /** Días incluidos; nulo = sin límite. [Custom] usa las fechas dadas. */
-    fun range(today: LocalDate, custom: ClosedRange<LocalDate>? = null): ClosedRange<LocalDate>? {
-        val month = YearMonth.from(today)
-        return when (this) {
-            All -> null
-            ThisMonth -> month.atDay(1)..today
-            LastMonth -> month.minusMonths(1).atDay(1)..month.minusMonths(1).atEndOfMonth()
-            Last30Days -> today.minusDays(29)..today
-            Last90Days -> today.minusDays(89)..today
-            ThisYear -> LocalDate.of(today.year, 1, 1)..today
-            Custom -> custom
-        }
+    /** Días incluidos; nulo = sin límite. [Custom] usa las fechas dadas. Los meses y el año siguen el mes del hogar. */
+    fun range(today: LocalDate, custom: ClosedRange<LocalDate>? = null, monthStartDay: Int = 1): ClosedRange<LocalDate>? = when (this) {
+        All -> null
+        ThisMonth -> ReportPeriod.ThisMonth.range(today, monthStartDay)
+        LastMonth -> ReportPeriod.LastMonth.range(today, monthStartDay)
+        Last30Days -> today.minusDays(29)..today
+        Last90Days -> today.minusDays(89)..today
+        ThisYear -> ReportPeriod.ThisYear.range(today, monthStartDay)
+        Custom -> custom
     }
 }
 
@@ -56,16 +52,16 @@ data class MovementFilter(
             status != MovementStatusFilter.All, tag != null,
         ).count { it }
 
-    fun dateRange(today: LocalDate): ClosedRange<LocalDate>? {
+    fun dateRange(today: LocalDate, monthStartDay: Int = 1): ClosedRange<LocalDate>? {
         val from = customFrom
         val through = customThrough
         val custom: ClosedRange<LocalDate>? = if (from != null && through != null) minOf(from, through)..maxOf(from, through) else null
-        return dates.range(today, custom)
+        return dates.range(today, custom, monthStartDay)
     }
 
-    fun apply(movements: List<Movement>, categories: List<BudgetCategory>, today: LocalDate): List<Movement> {
+    fun apply(movements: List<Movement>, categories: List<BudgetCategory>, today: LocalDate, monthStartDay: Int = 1): List<Movement> {
         val byId = categories.associateBy { it.id }
-        val range = dateRange(today)
+        val range = dateRange(today, monthStartDay)
         val query = search.trim()
         val amountQuery = if (query.isEmpty()) null else Money.parse(query)
         val signed = query.startsWith("-") || query.startsWith(Money.MINUS)

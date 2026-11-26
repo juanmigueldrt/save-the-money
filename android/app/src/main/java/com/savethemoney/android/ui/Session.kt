@@ -64,29 +64,48 @@ class Session(
         }
     }
 
+    /** Al volver a primer plano: si se quedó «sin conexión» se reintenta; si no, se recargan las finanzas. */
+    suspend fun resume() {
+        if (state is State.Offline) start() else finance?.load()
+    }
+
+    /** Mientras la app está abierta: si la sesión se pierde (el servidor rechaza el refresco), vuelve al login. */
+    suspend fun watchSession() {
+        backend.sessionEnded.collect {
+            if (state == State.Loading || state == State.SignedOut) return@collect
+            notifier.replaceReminders(emptyList())
+            finance = null
+            state = State.SignedOut
+            signOutNotice = AppError.NotSignedIn.message
+        }
+    }
+
     /**
      * Sólo AppError.NotSignedIn (no hay sesión o el servidor la rechaza) lleva al login.
-     * Cualquier otro fallo no descarta la sesión guardada: se lanza para avisar y, si aún no
-     * había un hogar abierto, se pasa a «sin conexión» con reintento.
+     * Cualquier otro fallo no descarta la sesión guardada: se lanza como AppError para avisar y,
+     * si aún no había un hogar abierto, se pasa a «sin conexión» con reintento.
      */
     suspend fun refresh() {
         signOutNotice = null
-        if (backend.currentUserId() == null) {
-            finance = null
-            state = State.SignedOut
-            return
-        }
         val next = try {
-            val profile = backend.myProfile()
-            val homes = backend.households()
-            val home = homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
-            if (home != null) State.Ready(profile, home) else State.NeedsHousehold(profile)
+            if (backend.currentUserId() == null) {
+                State.SignedOut
+            } else {
+                val profile = backend.myProfile()
+                val homes = backend.households()
+                val home = homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
+                if (home != null) State.Ready(profile, home) else State.NeedsHousehold(profile)
+            }
         } catch (e: AppError.NotSignedIn) {
             State.SignedOut
-        } catch (e: AppError) {
-            // Con un hogar ya abierto se queda donde estaba; quien llamó enseña el aviso.
-            if (state !is State.Ready) state = State.Offline(e.message)
+        } catch (e: CancellationException) {
             throw e
+        } catch (e: Exception) {
+            // Cualquier otro fallo, también uno no previsto, se enseña en vez de cerrar la app.
+            val error = e as? AppError ?: AppError.Unknown("app")
+            // Con un hogar ya abierto se queda donde estaba; quien llamó enseña el aviso.
+            if (state !is State.Ready) state = State.Offline(error.message)
+            throw error
         }
         if (next is State.Ready) {
             // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros.
