@@ -744,6 +744,11 @@ struct AccountFormView: View {
     var initialKind: AccountKind = .checking
 
     @Environment(FinanceModel.self) private var finance
+    @Environment(BudgetModel.self) private var budgets
+    @Environment(PlanningModel.self) private var planning
+    @Environment(InvestmentModel.self) private var investments
+    @Environment(CreditCardModel.self) private var cards
+    @Environment(TrackingModel.self) private var tracking
     @Environment(SessionModel.self) private var session
     @Environment(\.dismiss) private var dismiss
     @State private var name = ""
@@ -874,7 +879,10 @@ struct AccountFormView: View {
 
     private func delete() async {
         guard let account else { return }
-        if await finance.deleteAccount(account) { dismiss() } else { error = finance.error }
+        // Recarga también lo que usaba la cuenta: el servidor lo ha dejado sin ella y con versión nueva.
+        let reload = HouseholdReload(finance: finance, budgets: budgets, planning: planning, investments: investments,
+                                 cards: cards, tracking: tracking)
+        if await reload.deleteAccount(account) { dismiss() } else { error = finance.error }
     }
 }
 

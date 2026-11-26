@@ -482,6 +482,8 @@ fun Pantalla32(nav: Nav) {
     var marcando by remember { mutableStateOf<CsvImportRow?>(null) }
     var verTodas by remember { mutableStateOf(false) }
     var creados by remember { mutableStateOf<Int?>(null) }
+    // Id de cada pago fijo que crea la importación, por su nombre: el mismo en cada reintento (ImportMarks.pinned).
+    val idsSeries = remember { mutableMapOf<String, String>() }
     val tarjetas = finance.cards.cardAccounts
     var tarjeta by remember { mutableStateOf(tarjetas.firstOrNull()?.id) }
     val action = rememberAction()
@@ -567,7 +569,7 @@ fun Pantalla32(nav: Nav) {
                             val fijos = ImportMark.Recurring in marcas.values || ImportMark.Subscription in marcas.values
                             if (fijos) {
                                 val nuevos = ImportMarks.series(revisadas, marcas, finance.planning.series, finance.planning.household.id)
-                                nuevos.forEach { finance.planning.save(it) }
+                                finance.planning.save(ImportMarks.pinned(nuevos, idsSeries))
                                 creados = nuevos.size
                             }
                         }

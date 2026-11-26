@@ -244,6 +244,12 @@ class PlanningModel(
     suspend fun setArchived(item: RecurringSeries, archived: Boolean) =
         save(item.copy(archivedAt = if (archived) Instant.now().toString() else null))
 
+    /**
+     * Los pagos fijos que crea una importación CSV, en una sola escritura: salir de la pantalla a mitad no deja de guardar
+     * los que faltan. Para en el primero que falla, como guardarlos uno a uno.
+     */
+    suspend fun save(items: List<RecurringSeries>): Unit = escritura(::sinPantalla) { items.forEach { save(it) } }
+
     suspend fun delete(item: RecurringSeries): Unit = escritura(::sinPantalla) {
         service.deleteRecurring(item.id)
         turns.changed(::series, series.filter { it.id != item.id })
