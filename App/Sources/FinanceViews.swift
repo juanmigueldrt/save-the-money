@@ -198,10 +198,12 @@ struct MovementRow: View {
         return parts.joined(separator: " · ")
     }
 
-    /// En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina».
+    /// En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina». La otra pata se
+    /// busca en los recientes y en las páginas cargadas de la lista; si no está en ninguno, no se pone.
     private var transferCounterpart: String? {
         guard let transferId = movement.transferId,
-              let other = finance.recent.first(where: { $0.transferId == transferId && $0.id != movement.id }),
+              let other = finance.recent.first(where: { $0.transferId == transferId && $0.id != movement.id })
+                ?? finance.list.rows.first(where: { $0.transferId == transferId && $0.id != movement.id }),
               let account = finance.account(other.accountId) else { return nil }
         return (movement.isExpense ? "Hacia " : "Desde ") + account.name
     }
@@ -272,9 +274,6 @@ struct MovementsView: View {
     var account: Account?
 
     @Environment(FinanceModel.self) private var finance
-    @State private var accountMovements: [Movement] = []
-    /// Aviso si no se han podido cargar los movimientos de la cuenta (no es lo mismo que estar vacía).
-    @State private var accountLoadError: String?
     @State private var filter = MovementFilter()
     @State private var customFrom = CalendarDay.gregorian.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var customThrough = Date()
@@ -291,10 +290,15 @@ struct MovementsView: View {
 
     private var selectedMovements: [Movement] { filtered.filter { selection.contains($0.id) } }
 
-    private var source: [Movement] { account == nil ? finance.recent : accountMovements }
+    /// Las filas cargadas de esta lista (ORC-85). Si el modelo tiene abierta otra (la de otra cuenta), ninguna.
+    private var source: [Movement] { isThisList ? finance.list.rows : [] }
 
+    private var isThisList: Bool { finance.list.accountId == account?.id }
+
+    /// La búsqueda la hace el servidor; lo demás se filtra aquí, sobre lo cargado.
     private var effectiveFilter: MovementFilter {
         var current = filter
+        current.search = ""
         if let account { current.accountId = account.id }
         if current.dates == .custom {
             current.customFrom = CalendarDay(customFrom)
@@ -321,12 +325,9 @@ struct MovementsView: View {
                 }
                 .environment(\.locale, Locale(identifier: "es_ES"))
             }
-            if let accountLoadError {
-                Section { ErrorText(message: accountLoadError) }
-            }
             if source.isEmpty {
-                if accountLoadError == nil {
-                    EmptyHint(text: finance.isLoading ? "Cargando…" : "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+                if finance.listError == nil {
+                    EmptyHint(text: finance.isLoading || finance.isLoadingList || !isThisList ? "Cargando…" : emptyText)
                 }
             } else if isFiltering {
                 Section {
@@ -354,7 +355,7 @@ struct MovementsView: View {
                         .swipeActions(edge: .leading) {
                             Button(movement.isReviewed ? "Sin revisar" : "Revisado",
                                    systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
-                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])); await reloadAccount() }
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
                             }
                             .tint(Palette.positive)
                         }
@@ -373,11 +374,11 @@ struct MovementsView: View {
                             Button("Editar", systemImage: "pencil") { editing = movement }
                             Button(movement.isReviewed ? "Marcar sin revisar" : "Marcar revisado",
                                    systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
-                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])); await reloadAccount() }
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
                             }
                             Button(movement.excluded ? "Volver a contar en el presupuesto" : "Excluir del presupuesto",
                                    systemImage: movement.excluded ? "eye" : "eye.slash") {
-                                Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])); await reloadAccount() }
+                                Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])) }
                             }
                             // Duplicar una pata apuntaría solo un lado de la transferencia.
                             if movement.transferId == nil {
@@ -403,11 +404,7 @@ struct MovementsView: View {
                     .accessibilityElement(children: .combine)
                 }
             }
-            if account == nil, finance.recent.count >= FinanceModel.recentLimit {
-                Text("Se muestran los últimos \(FinanceModel.recentLimit) movimientos. Para ver más antiguos, abre la cuenta o usa Informes.")
-                    .font(Typography.footnote)
-                    .foregroundStyle(Palette.labelSecondary)
-            }
+            if isThisList { listFooter }
         }
         .searchable(text: $filter.search, prompt: "Buscar concepto, beneficiario, #etiqueta o importe")
         .brandBackground()
@@ -442,7 +439,6 @@ struct MovementsView: View {
                     if await finance.delete(selectedMovements) {
                         selection = []
                         selecting = false
-                        await reloadAccount()
                     }
                 }
             }
@@ -455,12 +451,17 @@ struct MovementsView: View {
                             isPresented: Binding(get: { deletingTransfer != nil }, set: { if !$0 { deletingTransfer = nil } }),
                             titleVisibility: .visible, presenting: deletingTransfer) { movement in
             Button("Borrar los dos movimientos", role: .destructive) {
-                Task { if await finance.delete(movement) { await reloadAccount() } }
+                Task { await finance.delete(movement) }
             }
         } message: { _ in
             Text(TransferDraft.deleteWarning)
         }
-        .task(id: finance.recent) { await reloadAccount() }
+        .task(id: ListKey(accountId: account?.id, search: filter.search)) {
+            // Al escribir, espera a que se pare un momento antes de preguntar al servidor.
+            if finance.list.search != filter.search { try? await Task.sleep(for: .milliseconds(300)) }
+            guard !Task.isCancelled else { return }
+            await finance.showList(accountId: account?.id, search: filter.search)
+        }
         .refreshable { await finance.load() }
         .sheet(item: $editing) { MovementFormView(movement: $0, accountId: nil) }
         .sheet(isPresented: $adding) { MovementFormView(movement: nil, accountId: account?.id) }
@@ -579,7 +580,7 @@ struct MovementsView: View {
             }
             HStack(spacing: Spacing.s16) {
                 Button("Revisado", systemImage: "checkmark.circle") {
-                    Task { await finance.update(MovementBulkEdit(reviewed: true).changes(for: chosen)); await reloadAccount() }
+                    Task { await finance.update(MovementBulkEdit(reviewed: true).changes(for: chosen)) }
                 }
                 Button("Editar", systemImage: "slider.horizontal.3") { bulkEditing = true }
                 Spacer()
@@ -593,15 +594,33 @@ struct MovementsView: View {
         .padding(Spacing.s16)
     }
 
-    private func reloadAccount() async {
-        guard let account else { return }
-        do {
-            accountMovements = try await finance.movements(of: account)
-            accountLoadError = nil
-        } catch is CancellationError {
-            return
-        } catch {
-            accountLoadError = "No se han podido cargar los movimientos. " + ((error as? AppError)?.errorDescription ?? "")
+    private struct ListKey: Hashable {
+        var accountId: UUID?
+        var search: String
+    }
+
+    private var emptyText: String {
+        filter.search.trimmingCharacters(in: .whitespaces).isEmpty
+            ? "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones."
+            : "Nada coincide con la búsqueda."
+    }
+
+    /// Al final de la lista: la página siguiente se pide al llegar aquí (y con el botón, si no se ha pedido sola).
+    /// Si falla, el aviso y «Reintentar»: nunca parece que la lista se ha acabado.
+    @ViewBuilder
+    private var listFooter: some View {
+        if let listError = finance.listError {
+            Section {
+                ErrorText(message: listError)
+                Button("Reintentar") { Task { await finance.retryList() } }
+                    .disabled(finance.isLoadingList)
+            }
+        } else if finance.list.hasMore {
+            Button(finance.isLoadingList ? "Cargando…" : "Cargar más movimientos") {
+                Task { await finance.loadMoreList() }
+            }
+            .disabled(finance.isLoadingList)
+            .onAppear { Task { await finance.loadMoreList() } }
         }
     }
 
@@ -619,7 +638,7 @@ struct MovementsView: View {
                                   bookedOn: movement.bookedOn, amount: movement.amount,
                                   description: movement.description, notes: movement.notes,
                                   excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
-        if await finance.add(draft) { await reloadAccount() }
+        await finance.add(draft)
     }
 }
 

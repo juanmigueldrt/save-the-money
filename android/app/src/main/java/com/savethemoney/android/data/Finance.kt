@@ -290,6 +290,13 @@ interface FinanceService {
 
     suspend fun movements(householdId: String, accountId: String?, limit: Int): List<Movement>
 
+    /**
+     * Una página de la lista de movimientos (ORC-85): más recientes primero por día y, dentro del día, por id descendente,
+     * como mucho [limit], empezando justo después de [after] (la última fila de la página anterior). Con [accountId], sólo
+     * los de esa cuenta; con [search], sólo los que encuentra la búsqueda.
+     */
+    suspend fun movements(householdId: String, accountId: String?, search: MovementSearch?, after: Movement?, limit: Int): List<Movement>
+
     /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
     suspend fun movements(householdId: String, ids: List<String>): List<Movement>
 
@@ -578,6 +585,18 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
             .filter { it.householdId == householdId && (accountId == null || it.accountId == accountId) && mine(it.id) }
             .asReversed()
             .sortedByDescending { it.bookedOn }
+            .take(limit)
+    }
+
+    override suspend fun movements(householdId: String, accountId: String?, search: MovementSearch?, after: Movement?, limit: Int): List<Movement> {
+        val mine = mine(householdId)
+        // El mismo orden que el servidor: día y, dentro del día, id (como uuid de Postgres), de mayor a menor.
+        val order = compareByDescending<Movement> { it.bookedOn }.thenByDescending { it.id.lowercase() }
+        return movements
+            .filter { it.householdId == householdId && (accountId == null || it.accountId == accountId) && mine(it.id) }
+            .filter { search?.matches(it) ?: true }
+            .filter { after == null || order.compare(it, after) > 0 }
+            .sortedWith(order)
             .take(limit)
     }
 

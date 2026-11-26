@@ -20,8 +20,21 @@ final class FinanceModel: ServerModel {
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
 
-    /// Movimientos que se cargan para la lista general.
+    /// Movimientos recientes que se cargan para resúmenes, sugerencias y pagos fijos (la lista va por páginas).
     nonisolated static let recentLimit = 500
+
+    /// La lista de Movimientos que se ve (la general o la de una cuenta), por páginas y con la búsqueda hecha en el
+    /// servidor (ORC-85). Va aparte de `recent`: saldos, resúmenes y sugerencias siguen viendo lo mismo que antes.
+    private(set) var list = MovementList()
+    /// Por qué no se ha podido cargar la lista o su página siguiente. Lo ya cargado se queda.
+    private(set) var listError: String?
+    /// true mientras se carga la lista o una página.
+    private(set) var isLoadingList = false
+    @ObservationIgnored private var listLoads = 0
+    /// La lista se ha abierto alguna vez: desde entonces se recarga con cada cambio.
+    @ObservationIgnored private var listShown = false
+    /// Filas por página de la lista.
+    nonisolated static let listPageSize = 200
 
     init(household: Household, service: any FinanceService) {
         self.household = household
@@ -62,11 +75,89 @@ final class FinanceModel: ServerModel {
             store(loaded.3, in: \.recent, turn: turn)
         }
         if !Task.isCancelled { hasLoaded = true }
+        await reloadList()
     }
 
-    /// Lanza el error: la pantalla distingue «sin movimientos» de «no se han podido cargar».
+    /// Los últimos movimientos de la cuenta, para su gráfico. Lanza el error: la pantalla distingue «sin
+    /// movimientos» de «no se han podido cargar».
     func movements(of account: Account) async throws -> [Movement] {
         try await service.movements(in: household.id, accountId: account.id, limit: Self.recentLimit)
+    }
+
+    /// Enseña la lista de esa cuenta (nil: todas) con esa búsqueda. Si es otra lista empieza de cero; si es la misma,
+    /// vuelve a cargar lo que ya se veía.
+    func showList(accountId: UUID?, search: String) async {
+        listShown = true
+        if list.accountId != accountId || list.search != search {
+            // Desde aquí, una lectura de la lista anterior que llegue tarde ya no la pisa.
+            markChanged(\.list)
+            list = MovementList(accountId: accountId, search: search)
+            markChanged(\.listError)
+            listError = nil
+        }
+        await reloadList()
+    }
+
+    /// La página siguiente, al llegar al final. Si falla, lo cargado se queda, `listError` lo dice y se puede
+    /// volver a pedir. No pide nada mientras otra lectura de la lista está en marcha: empezaría en un sitio viejo.
+    func loadMoreList() async {
+        guard list.hasMore, listLoads == 0, let last = list.rows.last else { return }
+        let base = list
+        await readList { [self] in
+            let page = try await fetchList(base, after: last, count: Self.listPageSize)
+            return MovementList(accountId: base.accountId, search: base.search, rows: base.rows + page.rows, hasMore: page.hasMore)
+        }
+    }
+
+    /// «Reintentar»: vuelve a cargar lo que había y una página más.
+    func retryList() async {
+        await reloadList(extra: Self.listPageSize)
+    }
+
+    /// Vuelve a pedir la lista abierta desde el principio, tantas filas como se veían (como poco una página).
+    private func reloadList(extra: Int = 0) async {
+        guard listShown else { return }
+        let current = list
+        await readList { [self] in
+            let page = try await fetchList(current, after: nil, count: max(current.rows.count + extra, Self.listPageSize))
+            return MovementList(accountId: current.accountId, search: current.search, rows: page.rows, hasMore: page.hasMore)
+        }
+    }
+
+    /// Una lectura de la lista con su turno: lo que trae (o su error) sólo se guarda si nada que empezó después lo ha
+    /// guardado ya. Un fallo deja la lista como estaba.
+    private func readList(_ read: () async throws -> MovementList) async {
+        let turn = nextTurn()
+        listLoads += 1
+        isLoadingList = true
+        defer {
+            listLoads -= 1
+            isLoadingList = listLoads > 0
+        }
+        do {
+            let loaded = try await read()
+            store(loaded, in: \.list, turn: turn)
+            store(nil, in: \.listError, turn: turn)
+        } catch {
+            guard let message = Self.message(for: error) else { return }
+            store("No se han podido cargar los movimientos. " + message, in: \.listError, turn: turn)
+        }
+    }
+
+    /// Pide al menos `count` filas detrás de `after`, página a página, hasta tenerlas o llegar al final. Cada página
+    /// es de `listPageSize`: una que llega incompleta es el final; una llena dice que puede haber más.
+    private func fetchList(_ list: MovementList, after: Movement?, count: Int) async throws -> (rows: [Movement], hasMore: Bool) {
+        let search = MovementSearch(list.search, categories: categories)
+        var rows: [Movement] = []
+        var cursor = after
+        while true {
+            let page = try await service.movements(in: household.id, accountId: list.accountId, search: search,
+                                                    after: cursor, limit: Self.listPageSize)
+            rows += page
+            if page.count < Self.listPageSize { return (rows, false) }
+            if rows.count >= count { return (rows, true) }
+            cursor = page.last
+        }
     }
 
     @discardableResult
@@ -299,8 +390,10 @@ final class FinanceModel: ServerModel {
     private func reloadAll() async throws {
         try await reloadAccounts()
         let turn = nextTurn()
-        let list = try await service.movements(in: household.id, accountId: nil, limit: Self.recentLimit)
-        store(list, in: \.recent, turn: turn)
+        let movements = try await service.movements(in: household.id, accountId: nil, limit: Self.recentLimit)
+        store(movements, in: \.recent, turn: turn)
+        // Lo cambiado puede estar en una página de la lista que no entra en `recent`.
+        await reloadList()
     }
 
     private func reloadCategories() async throws {
@@ -308,4 +401,14 @@ final class FinanceModel: ServerModel {
         let list = try await service.categories(in: household.id)
         store(list, in: \.categories, turn: turn)
     }
+}
+
+/// Lo que se ve en la lista de Movimientos: de qué cuenta (nil: todas), qué se busca y las filas cargadas, en el
+/// orden del servidor.
+struct MovementList: Equatable {
+    var accountId: UUID?
+    var search = ""
+    var rows: [Movement] = []
+    /// Puede haber más en el servidor: la última página llegó llena.
+    var hasMore = false
 }

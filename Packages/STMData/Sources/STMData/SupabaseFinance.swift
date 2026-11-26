@@ -135,6 +135,73 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    /// Páginas por cursor (día e id de la última fila) y no por `range`: si entra o se borra un movimiento entre
+    /// página y página, la siguiente no repite ni se salta filas.
+    public func movements(in householdId: UUID, accountId: UUID?, search: MovementSearch?, after: Movement?,
+                          limit: Int) async throws -> [Movement] {
+        try await mapped {
+            var query = client.from("transactions")
+                .select(Self.movementColumns)
+                .eq("household_id", value: householdId.uuidString)
+            if let accountId {
+                query = query.eq("account_id", value: accountId.uuidString)
+            }
+            if let search {
+                query = query.or(Self.searchFilter(search))
+            }
+            if let after {
+                query = query.or(Self.afterFilter(after))
+            }
+            return try await query
+                .order("booked_on", ascending: false)
+                .order("id", ascending: false)
+                .limit(limit)
+                .execute()
+                .value
+        }
+    }
+
+    /// Lo que va dentro de `or=(…)` para buscar. El texto del usuario va siempre entre comillas (así comas, puntos,
+    /// paréntesis y dos puntos no son sintaxis de PostgREST) y con los comodines de LIKE escapados. La etiqueta, los
+    /// ids y el importe no llevan nada que escapar: sólo letras, números, «-», «_» o un entero.
+    static func searchFilter(_ search: MovementSearch) -> String {
+        let pattern = quoted("*" + likeEscaped(search.text) + "*")
+        var parts = ["description", "notes", "payee"].map { "\($0).ilike.\(pattern)" }
+        if let tag = search.tag { parts.append("tags.cs.{\(tag)}") }
+        if !search.categoryIds.isEmpty {
+            parts.append("category_id.in.(\(search.categoryIds.map { $0.uuidString.lowercased() }.joined(separator: ",")))")
+        }
+        if let amount = search.amount {
+            parts.append(search.signedAmount ? "amount_minor.eq.\(amount.minor)"
+                                             : "amount_minor.in.(\(abs(amount.minor)),\(-abs(amount.minor)))")
+        }
+        return parts.joined(separator: ",")
+    }
+
+    /// Las filas que van detrás de `after` en el orden de la lista: un día anterior, o el mismo día y un id menor.
+    static func afterFilter(_ after: Movement) -> String {
+        "booked_on.lt.\(after.bookedOn.iso),and(booked_on.eq.\(after.bookedOn.iso),id.lt.\(after.id.uuidString.lowercased()))"
+    }
+
+    /// `\`, `%` y `_` se buscan tal cual. PostgREST convierte cada `*` en `%` y no deja escaparlo, así que un `*`
+    /// escrito cuenta como «un carácter cualquiera» (`_`): encuentra lo mismo y algo más, nunca menos.
+    static func likeEscaped(_ text: String) -> String {
+        var result = ""
+        for character in text {
+            switch character {
+            case "\\", "%", "_": result += "\\" + String(character)
+            case "*": result += "_"
+            default: result.append(character)
+            }
+        }
+        return result
+    }
+
+    /// Un valor entre comillas dobles para un filtro de PostgREST: dentro, `\` y `"` van con `\` delante.
+    static func quoted(_ value: String) -> String {
+        "\"" + value.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") + "\""
+    }
+
     public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
         guard !ids.isEmpty else { return [] }
         return try await allRows {

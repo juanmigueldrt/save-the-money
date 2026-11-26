@@ -151,6 +151,20 @@ extension InMemoryBackend: FinanceService {
             .map { $0 }
     }
 
+    public func movements(in householdId: UUID, accountId: UUID?, search: MovementSearch?, after: Movement?,
+                          limit: Int) async throws -> [Movement] {
+        let user = try requireMember(of: householdId)
+        // El mismo orden que el servidor: día y, dentro del día, id (como uuid de Postgres), de mayor a menor.
+        func key(_ movement: Movement) -> (CalendarDay, String) { (movement.bookedOn, movement.id.uuidString.lowercased()) }
+        return financeMovements
+            .filter { $0.householdId == householdId && (accountId == nil || $0.accountId == accountId) && creators[$0.id] == user }
+            .filter { search?.matches($0) ?? true }
+            .filter { movement in after.map { key(movement) < key($0) } ?? true }
+            .sorted { key($0) > key($1) }
+            .prefix(limit)
+            .map { $0 }
+    }
+
     public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
         let user = try requireMember(of: householdId)
         return financeMovements.filter { $0.householdId == householdId && ids.contains($0.id) && creators[$0.id] == user }
