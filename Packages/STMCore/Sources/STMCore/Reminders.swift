@@ -17,9 +17,10 @@ public enum ReminderPlanner {
 
     /// Avisos de los próximos cargos de las series activas que tienen aviso.
     /// iOS guarda como mucho 64 avisos pendientes por app, así que se limita a `limit`
-    /// y la app los vuelve a calcular cada vez que se abre.
+    /// y la app los vuelve a calcular cada vez que se abre. Reparto de los 64: 20 de pagos fijos,
+    /// 10 de tarjetas, 10 de aportaciones y hasta 24 de hábito (21 para apuntar gastos y 3 resúmenes).
     public static func plan(_ series: [RecurringSeries], today: CalendarDay, horizonDays: Int = 45,
-                            limit: Int = 50, hour: Int = 9) -> [PlannedReminder] {
+                            limit: Int = 20, hour: Int = 9) -> [PlannedReminder] {
         let end = today.adding(days: horizonDays)
         var result: [PlannedReminder] = []
         for item in series where !item.isArchived {

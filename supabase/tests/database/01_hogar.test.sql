@@ -76,9 +76,9 @@ select throws_ok(
   $$ select public.create_invite((select id from hogar_ana)) $$,
   '42501', null, 'Bruno no puede crear invitaciones de un hogar ajeno'
 );
-select throws_ok(
-  $$ select public.accept_invite('ZZZZZZ') $$,
-  'P0002', null, 'un código inexistente da el mismo error que uno caducado'
+select is(
+  public.accept_invite('ZZZZZZ'), null,
+  'un código inexistente da el mismo resultado que uno caducado'
 );
 update public.households set name = 'Hackeado' where id = (select id from hogar_ana);
 select pg_temp.logout();
@@ -112,9 +112,9 @@ select is(
 
 -- Carla intenta reutilizar el código ---------------------------------------------
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');
-select throws_ok(
-  format('select public.accept_invite(%L)', (select code from invitacion)),
-  'P0002', null, 'un código ya usado no sirve'
+select is(
+  public.accept_invite((select code from invitacion)), null,
+  'un código ya usado no sirve'
 );
 select is((select count(*)::int from public.household_members), 0, 'Carla no ve miembros de hogares ajenos');
 select is((select count(*)::int from public.profiles), 1, 'Carla sólo ve su perfil');
@@ -124,9 +124,9 @@ select pg_temp.logout();
 insert into public.household_invites (household_id, code, expires_at)
 select id, 'QWERTY', now() - interval '1 minute' from hogar_ana;
 select pg_temp.login('00000000-0000-0000-0000-00000000000c');
-select throws_ok(
-  $$ select public.accept_invite('QWERTY') $$,
-  'P0002', null, 'una invitación caducada no sirve'
+select is(
+  public.accept_invite('QWERTY'), null,
+  'una invitación caducada no sirve'
 );
 
 -- Anon --------------------------------------------------------------------------

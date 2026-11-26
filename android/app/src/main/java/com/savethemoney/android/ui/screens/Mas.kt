@@ -381,6 +381,7 @@ fun Pantalla30(nav: Nav) {
                         alerts = it
                         finance?.planning?.alertsEnabled = it
                         finance?.cards?.reschedule()
+                        finance?.investments?.reschedule()
                     }
                 },
             )

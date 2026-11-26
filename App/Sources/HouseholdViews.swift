@@ -286,8 +286,15 @@ struct HouseholdView: View {
 
     private func revoke(_ invite: HouseholdInvite) {
         Task {
-            try? await session.services.households.revokeInvite(invite.id)
+            var failure: String?
+            do {
+                try await session.services.households.revokeInvite(invite.id)
+            } catch {
+                failure = "No se ha podido anular la invitación. " + ((error as? AppError)?.errorDescription ?? "")
+            }
             await load()
+            // Después de cargar: load() borra el aviso anterior.
+            if let failure { self.error = failure }
         }
     }
 }
