@@ -41,6 +41,42 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testNetWorthHistory() throws {
+        struct File: Decodable { var cases: [Case] }
+        struct Case: Decodable {
+            var name: String; var through: String; var months: Int; var accounts: [Acc]; var movements: [Move]
+            var assets: [Int]; var liabilities: [Int]; var net: [Int]
+        }
+        struct Acc: Decodable {
+            var key: String; var opening: Int; var createdAt: String?; var archivedAt: String?; var includeInNetWorth: Bool?
+        }
+        struct Move: Decodable { var account: String; var day: String; var amount: Int }
+        let file: File = try load("net_worth.json")
+        XCTAssertFalse(file.cases.isEmpty)
+        let home = UUID()
+        func instant(_ text: String?) throws -> Date? { try text.map { try XCTUnwrap(ISO8601DateFormatter().date(from: $0)) } }
+        for v in file.cases {
+            var ids: [String: UUID] = [:]
+            let accounts = try v.accounts.map { a -> Account in
+                let account = Account(householdId: home, name: a.key, openingBalance: Money(minor: a.opening),
+                                      archivedAt: try instant(a.archivedAt), includeInNetWorth: a.includeInNetWorth ?? true,
+                                      createdAt: try instant(a.createdAt))
+                ids[a.key] = account.id
+                return account
+            }
+            let movements = try v.movements.map {
+                Movement(householdId: home, accountId: try XCTUnwrap(ids[$0.account]), categoryId: nil,
+                         bookedOn: day($0.day), amount: Money(minor: $0.amount), description: "Movimiento")
+            }
+            let through = day(v.through + "-01")
+            let history = NetWorth.history(accounts: accounts, movements: movements, months: v.months,
+                                           through: MonthKey(year: through.year, month: through.month))
+            XCTAssertEqual(history.map(\.assets.minor), v.assets, v.name)
+            XCTAssertEqual(history.map(\.liabilities.minor), v.liabilities, v.name)
+            XCTAssertEqual(history.map(\.net.minor), v.net, v.name)
+        }
+    }
+
     func testCardInstallmentsAndStatementDates() throws {
         struct File: Decodable { var installments: [I]; var statementDates: [S] }
         struct I: Decodable { var principal: Int; var months: Int; var rate: Decimal; var payment: Int }

@@ -31,6 +31,8 @@ data class Account(
     @SerialName("opening_balance_minor") val openingMinor: Long = 0,
     @SerialName("owner_id") val ownerId: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
+    /** Cuándo se dio de alta: el saldo inicial es el que tenía ese día. Null si no se sabe: cuenta desde siempre. */
+    @SerialName("created_at") val createdAt: String? = null,
     /** La que sale elegida al apuntar un movimiento. */
     @SerialName("is_default") val isDefault: Boolean = false,
     /** Si suma en el patrimonio neto. */

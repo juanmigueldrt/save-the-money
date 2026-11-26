@@ -36,18 +36,30 @@ public enum NetWorth {
 
     /// Patrimonio al final de cada uno de los últimos `months` meses (el último, el de `through`),
     /// rehecho a partir del saldo inicial de cada cuenta y sus movimientos.
+    ///
+    /// Reglas (las mismas en Android, con vectores en `testdata/vectors/net_worth.json`):
+    /// - El saldo inicial cuenta desde el día de alta de la cuenta (`createdAt`), o desde su primer
+    ///   movimiento si es anterior (movimientos importados): es el saldo de antes de todos sus movimientos.
+    ///   Antes de eso la cuenta no existía y suma 0. Sin `createdAt` cuenta desde siempre.
+    /// - Una cuenta archivada sigue en los meses que terminan antes del día en que se archivó.
+    /// - Las inversiones no suman: su valor no es el saldo de ninguna cuenta, no hay precio de cada fin
+    ///   de mes y el dinero de una cartera puede estar ya en una cuenta de inversión (se contaría dos veces).
     public static func history(accounts: [Account], movements: [Movement], months: Int = 12,
                                through: MonthKey) -> [NetWorthPoint] {
-        let active = accounts.filter { !$0.isArchived && $0.includeInNetWorth }
-        let ids = Set(active.map(\.id))
+        let counted = accounts.filter(\.includeInNetWorth)
+        let ids = Set(counted.map(\.id))
         let byAccount = Dictionary(grouping: movements.filter { ids.contains($0.accountId) }, by: \.accountId)
             .mapValues { $0.sorted { $0.bookedOn < $1.bookedOn } }
         var points: [NetWorthPoint] = []
         for offset in stride(from: months - 1, through: 0, by: -1) {
             let month = through.adding(months: -offset)
             let lastDay = month.adding(months: 1).firstDay.adding(days: -1)
-            let balances = active.map { account -> Money in
-                let moved = (byAccount[account.id] ?? []).prefix { $0.bookedOn <= lastDay }.reduce(0) { $0 + $1.amount.minor }
+            let balances = counted.compactMap { account -> Money? in
+                if let archived = account.archivedAt, CalendarDay(archived) <= lastDay { return nil }
+                let done = (byAccount[account.id] ?? []).prefix { $0.bookedOn <= lastDay }
+                let opened = account.createdAt.map { CalendarDay($0) <= lastDay } ?? true
+                guard opened || !done.isEmpty else { return nil }
+                let moved = done.reduce(0) { $0 + $1.amount.minor }
                 return Money(minor: account.openingBalance.minor + moved, currency: account.currency)
             }
             points.append(NetWorthPoint(month: month, balances: balances))

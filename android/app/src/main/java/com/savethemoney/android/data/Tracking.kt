@@ -3,7 +3,9 @@ package com.savethemoney.android.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.time.YearMonth
+import java.time.ZoneId
 import kotlin.math.max
 
 // Tracking.swift de STMCore: patrimonio neto, score crediticio e informes.
@@ -23,16 +25,37 @@ object NetWorth {
     fun current(accounts: List<Account>, balances: Map<String, Long>, today: LocalDate): NetWorthPoint =
         NetWorthPoint.of(YearMonth.from(today), accounts.filter { !it.isArchived && it.includeInNetWorth }.map { balances[it.id] ?: it.openingMinor })
 
-    /** Patrimonio al final de cada uno de los últimos [months] meses, rehecho con el saldo inicial y los movimientos. */
+    /**
+     * Patrimonio al final de cada uno de los últimos [months] meses, rehecho con el saldo inicial y los movimientos.
+     *
+     * Reglas (las mismas que en iOS, con vectores en `testdata/vectors/net_worth.json`):
+     * - El saldo inicial cuenta desde el día de alta de la cuenta (`createdAt`), o desde su primer
+     *   movimiento si es anterior (movimientos importados): es el saldo de antes de todos sus movimientos.
+     *   Antes de eso la cuenta no existía y suma 0. Sin `createdAt` cuenta desde siempre.
+     * - Una cuenta archivada sigue en los meses que terminan antes del día en que se archivó.
+     * - Las inversiones no suman: su valor no es el saldo de ninguna cuenta, no hay precio de cada fin
+     *   de mes y el dinero de una cartera puede estar ya en una cuenta de inversión (se contaría dos veces).
+     */
     fun history(accounts: List<Account>, movements: List<Movement>, months: Int, through: YearMonth): List<NetWorthPoint> {
-        val active = accounts.filter { !it.isArchived && it.includeInNetWorth }
+        val counted = accounts.filter { it.includeInNetWorth }
         val byAccount = movements.groupBy { it.accountId }
         return (months - 1 downTo 0).map { offset ->
             val month = through.minusMonths(offset.toLong())
             val last = month.atEndOfMonth()
-            NetWorthPoint.of(month, active.map { a -> a.openingMinor + byAccount[a.id].orEmpty().filter { !it.day.isAfter(last) }.sumOf { it.amountMinor } })
+            NetWorthPoint.of(
+                month,
+                counted.mapNotNull { a ->
+                    if (a.archivedAt != null && !localDay(a.archivedAt).isAfter(last)) return@mapNotNull null
+                    val done = byAccount[a.id].orEmpty().filter { !it.day.isAfter(last) }
+                    val opened = a.createdAt == null || !localDay(a.createdAt).isAfter(last)
+                    if (!opened && done.isEmpty()) null else a.openingMinor + done.sumOf { it.amountMinor }
+                },
+            )
         }
     }
+
+    /** Día en la zona del usuario de una marca de tiempo del servidor ("2026-11-02T10:00:00+00:00"). */
+    private fun localDay(timestamp: String): LocalDate = OffsetDateTime.parse(timestamp).atZoneSameInstant(ZoneId.systemDefault()).toLocalDate()
 }
 
 /** Predicción del patrimonio hasta final de año: sigue el cambio medio mensual de los últimos meses. */
