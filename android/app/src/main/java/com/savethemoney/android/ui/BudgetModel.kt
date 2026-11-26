@@ -54,6 +54,9 @@ class BudgetModel(val household: Household, private val service: FinanceService,
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** Qué lectura gana cuando dos se cruzan (ORC-144). */
+    private val turns = ReadTurns()
+
     /** El presupuesto extra que abre el formulario (nulo = uno nuevo). */
     private var extraToEdit: ExtraBudget? = null
 
@@ -111,9 +114,10 @@ class BudgetModel(val household: Household, private val service: FinanceService,
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {
+        val turn = turns.next()
         try {
             val saved = service.paySchedule()
-            if (saved != null && (saved != schedule || !hasOwnSchedule)) {
+            if (saved != null && (saved != schedule || !hasOwnSchedule) && turns.mayStore(::schedule, turn)) {
                 val wasCurrent = isCurrentPeriod
                 schedule = saved
                 hasOwnSchedule = true
@@ -134,43 +138,53 @@ class BudgetModel(val household: Household, private val service: FinanceService,
                 val extraList = extras.await()
                 // Si ya se cambió de periodo mientras cargaba, no se pisa.
                 if (target != period) return@coroutineScope
-                budget = found
-                proposal = if (found == null) latest else null
-                previousBudget = latest
-                movements = rows
-                extraBudgets = extraList
+                turns.store(::budget, found, turn)
+                turns.store(::proposal, if (found == null) latest else null, turn)
+                turns.store(::previousBudget, latest, turn)
+                turns.store(::movements, rows, turn)
+                turns.store(::extraBudgets, extraList, turn)
             }
-            error = null
+            turns.store(::error, null, turn)
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
-            error = e.message
+            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            error = AppError.Unknown("app").message
+            turns.store(::error, AppError.Unknown("app").message, turn)
         }
     }
 
-    suspend fun save(next: Budget) {
-        budget = service.saveBudget(next)
-        proposal = null
+    // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
+
+    /** Una escritura falló cuando su pantalla ya no estaba: el aviso sale en el error del modelo. */
+    private fun sinPantalla(e: Exception) {
+        turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
     }
 
-    suspend fun save(next: PaySchedule) {
-        schedule = service.savePaySchedule(next)
+    suspend fun save(next: Budget): Unit = escritura(::sinPantalla) {
+        turns.changed(::budget, service.saveBudget(next))
+        turns.changed(::proposal, null)
+    }
+
+    suspend fun save(next: PaySchedule): Unit = escritura(::sinPantalla) {
+        turns.changed(::schedule, service.savePaySchedule(next))
         hasOwnSchedule = true
         period = next.period(today())
         load()
     }
 
-    suspend fun save(extra: ExtraBudget) {
+    suspend fun save(extra: ExtraBudget): Unit = escritura(::sinPantalla) {
         val saved = service.saveExtraBudget(extra)
-        extraBudgets = extraBudgets.filter { it.id != saved.id } + saved
-        reloadAfterSave { extraBudgets = service.extraBudgets(household.id) }?.let { error = it }
+        turns.changed(::extraBudgets, extraBudgets.filter { it.id != saved.id } + saved)
+        reloadAfterSave {
+            val turn = turns.next()
+            turns.store(::extraBudgets, service.extraBudgets(household.id), turn)
+        }?.let { turns.changed(::error, it) }
     }
 
-    suspend fun delete(extra: ExtraBudget) {
+    suspend fun delete(extra: ExtraBudget): Unit = escritura(::sinPantalla) {
         service.deleteExtraBudget(extra.id)
-        extraBudgets = extraBudgets.filter { it.id != extra.id }
+        turns.changed(::extraBudgets, extraBudgets.filter { it.id != extra.id })
     }
 
     /** Movimientos que puede necesitar un presupuesto extra (sus fechas pueden salirse del periodo). */

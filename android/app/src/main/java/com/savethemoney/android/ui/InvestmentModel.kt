@@ -50,6 +50,9 @@ class InvestmentModel(
     var error by mutableStateOf<String?>(null)
         private set
 
+    /** Qué lectura gana cuando dos se cruzan (ORC-144). */
+    private val turns = ReadTurns()
+
     // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
     var selectedId by mutableStateOf<String?>(null)
     var holdingToEdit: Holding? = null
@@ -83,49 +86,66 @@ class InvestmentModel(
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {
+        val turn = turns.next()
         try {
-            holdings = service.holdings(household.id)
-            prices = service.holdingPrices(household.id)
-            trades = service.trades(household.id)
-            plans = service.investmentPlans(household.id)
-            error = null
+            // Todo o nada: se leen las cuatro antes de guardar ninguna.
+            val newHoldings = service.holdings(household.id)
+            val newPrices = service.holdingPrices(household.id)
+            val newTrades = service.trades(household.id)
+            val newPlans = service.investmentPlans(household.id)
+            turns.store(::holdings, newHoldings, turn)
+            turns.store(::prices, newPrices, turn)
+            turns.store(::trades, newTrades, turn)
+            turns.store(::plans, newPlans, turn)
+            turns.store(::error, null, turn)
             reschedule()
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
-            error = e.message
+            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            error = AppError.Unknown("app").message
+            turns.store(::error, AppError.Unknown("app").message, turn)
         }
     }
 
     suspend fun loadMembers(backend: Backend) {
-        members = runCatching { backend.members(household.id) }.getOrElse { if (it is CancellationException) throw it else members }
+        val turn = turns.next()
+        turns.store(::members, runCatching { backend.members(household.id) }.getOrElse { if (it is CancellationException) throw it else return }, turn)
     }
 
     /** También al volver a encender los avisos en Más opciones. */
     fun reschedule() = notifier.replaceReminders(InvestmentReminders.plan(plans, holdings, today()), InvestmentReminders.PREFIX)
 
-    suspend fun save(holding: Holding): Holding {
-        val isNew = holdings.none { it.id == holding.id }
-        val saved = if (isNew) service.createHolding(holding) else service.updateHolding(holding)
-        holdings = (holdings.filter { it.id != saved.id } + saved).sortedBy { it.trimmedName.lowercase() }
-        return saved
+    // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
+
+    /** Una escritura falló cuando su pantalla ya no estaba: el aviso sale en el error del modelo. */
+    private fun sinPantalla(e: Exception) {
+        turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
     }
 
-    suspend fun delete(holding: Holding) {
+    suspend fun save(holding: Holding): Holding = escritura(::sinPantalla) {
+        val isNew = holdings.none { it.id == holding.id }
+        val saved = if (isNew) service.createHolding(holding) else service.updateHolding(holding)
+        turns.changed(::holdings, (holdings.filter { it.id != saved.id } + saved).sortedBy { it.trimmedName.lowercase() })
+        saved
+    }
+
+    suspend fun delete(holding: Holding): Unit = escritura(::sinPantalla) {
         service.deleteHolding(holding.id)
-        holdings = holdings.filter { it.id != holding.id }
-        prices = prices.filter { it.holdingId != holding.id }
-        trades = trades.filter { it.holdingId != holding.id }
-        plans = plans.filter { it.holdingId != holding.id }
+        turns.changed(::holdings, holdings.filter { it.id != holding.id })
+        turns.changed(::prices, prices.filter { it.holdingId != holding.id })
+        turns.changed(::trades, trades.filter { it.holdingId != holding.id })
+        turns.changed(::plans, plans.filter { it.holdingId != holding.id })
         reschedule()
     }
 
-    suspend fun recordPrice(price: BigDecimal, day: LocalDate, holding: Holding) {
+    suspend fun recordPrice(price: BigDecimal, day: LocalDate, holding: Holding): Unit = escritura(::sinPantalla) {
         val saved = service.recordPrice(price, day, holding.id)
-        holdings = holdings.map { if (it.id == saved.id) saved else it }
-        reloadAfterSave { prices = service.holdingPrices(household.id) }?.let { error = it }
+        turns.changed(::holdings, holdings.map { if (it.id == saved.id) saved else it })
+        reloadAfterSave {
+            val turn = turns.next()
+            turns.store(::prices, service.holdingPrices(household.id), turn)
+        }?.let { turns.changed(::error, it) }
     }
 
     /**
@@ -133,39 +153,40 @@ class InvestmentModel(
      * Con el mismo id (uno por formulario) reintentar no duplica. Desde las pantallas se llama por
      * FinanceModel.addTrade, que además recarga los saldos.
      */
-    suspend fun add(trade: InvestmentTrade, cash: TradeCash? = null) {
+    suspend fun add(trade: InvestmentTrade, cash: TradeCash? = null): Unit = escritura(::sinPantalla) {
         trade.issue(trades)?.let { throw AppError.InvalidInput(it) }
         val saved = try {
             service.addTrade(trade, cash)
         } catch (e: AppError) {
             // Puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
             try {
-                trades = service.trades(household.id)
+                val turn = turns.next()
+                turns.store(::trades, service.trades(household.id), turn)
             } catch (_: AppError) {
             }
             throw e
         }
-        trades = trades.filter { it.id != saved.id } + saved
+        turns.changed(::trades, trades.filter { it.id != saved.id } + saved)
     }
 
-    suspend fun delete(trade: InvestmentTrade) {
+    suspend fun delete(trade: InvestmentTrade): Unit = escritura(::sinPantalla) {
         trade.deletionIssue(trades)?.let { throw AppError.InvalidInput(it) }
         service.deleteTrade(trade.id)
-        trades = trades.filter { it.id != trade.id }
+        turns.changed(::trades, trades.filter { it.id != trade.id })
     }
 
-    suspend fun save(plan: InvestmentPlan) {
+    suspend fun save(plan: InvestmentPlan): Unit = escritura(::sinPantalla) {
         val isNew = plans.none { it.id == plan.id }
         val saved = if (isNew) service.createPlan(plan) else service.updatePlan(plan)
-        plans = (plans.filter { it.id != saved.id } + saved).sortedBy { it.startsOn }
+        turns.changed(::plans, (plans.filter { it.id != saved.id } + saved).sortedBy { it.startsOn })
         reschedule()
     }
 
     suspend fun setPaused(paused: Boolean, plan: InvestmentPlan) = save(plan.copy(pausedAt = if (paused) Instant.now().toString() else null))
 
-    suspend fun delete(plan: InvestmentPlan) {
+    suspend fun delete(plan: InvestmentPlan): Unit = escritura(::sinPantalla) {
         service.deletePlan(plan.id)
-        plans = plans.filter { it.id != plan.id }
+        turns.changed(::plans, plans.filter { it.id != plan.id })
         reschedule()
     }
 }
