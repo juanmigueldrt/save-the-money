@@ -831,8 +831,11 @@ fun Pantalla09(nav: Nav) {
     var predeterminada by remember { mutableStateOf(editando?.isDefault ?: false) }
     var patrimonio by remember { mutableStateOf(editando?.includeInNetWorth ?: true) }
     val action = rememberAction()
+    // Una tarjeta ya creada no puede cambiar de tipo (el servidor también lo rechaza).
+    val tarjetaFija = editando?.kind == AccountKind.CreditCard
     val tipos = listOf(AccountKind.Checking, AccountKind.Savings, AccountKind.CreditCard, AccountKind.Cash, AccountKind.Investment)
         .let { if (tipo in it) it else it + tipo }
+        .filter { !tarjetaFija || it == AccountKind.CreditCard }
 
     fun guardar() = action.run {
         val apertura = if (saldo.isBlank()) 0L else Money.entered(saldo) ?: throw AppError.InvalidInput("El saldo inicial no es un importe válido.")
@@ -870,6 +873,10 @@ fun Pantalla09(nav: Nav) {
             tipos.forEach { t ->
                 Chip(if (t == AccountKind.Checking) "Corriente" else t.title, selected = t == tipo, onClick = { tipo = t })
             }
+        }
+        if (tarjetaFija) {
+            Spacer(Modifier.height(8.dp))
+            Text("Una tarjeta de crédito no puede cambiar de tipo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
         FilledField("Saldo inicial", saldo, { saldo = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)

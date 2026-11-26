@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.content.edit
 import com.savethemoney.android.MainActivity
 import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetAlert
@@ -19,6 +20,7 @@ import com.savethemoney.android.data.PlannedReminder
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.ZoneId
 
 /**
@@ -57,32 +59,48 @@ class LocalNotifier(private val context: Context) : Notifier {
         arm()
     }
 
-    /** Programa lo guardado; al reiniciar el teléfono lo llama [AvisosReceiver]. */
+    /**
+     * Programa lo guardado y muestra ya lo de hoy cuya hora ha pasado. [AvisosReceiver] lo llama al reiniciar
+     * el teléfono, al actualizar la app y al cambiar la hora o la zona horaria.
+     */
     fun arm() {
-        val now = System.currentTimeMillis()
-        for (reminder in pending()) {
-            val at = LocalDate.parse(reminder.fireOn).atTime(reminder.hour, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val (due, later) = split(pending(), shown(), LocalDateTime.now())
+        for (reminder in later) {
+            val at = reminder.at().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             // Inexacta a propósito: un aviso a las 9:00 no necesita el permiso de alarma exacta.
-            if (at > now) alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, alarm(reminder))
+            alarms.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, alarm(reminder))
         }
+        due.forEach { showReminder(it.id, it.title, it.body) }
+    }
+
+    /** Muestra un aviso programado una sola vez; si Android no deja mostrarlo, sigue pendiente para el próximo [arm]. */
+    fun showReminder(id: String, title: String, body: String) {
+        if (id in shown() || !show(id, title, body)) return
+        // Sólo los que siguen pendientes, para que la lista no crezca sin fin.
+        val ids = pending().mapTo(mutableSetOf()) { it.id }
+        prefs.edit { putStringSet(KEY_SHOWN, (shown() + id).filterTo(mutableSetOf()) { it in ids }) }
     }
 
     override fun budgetAlerts(alerts: List<BudgetAlert>) {
         if (!budgetAlertsEnabled) return
-        val sent = prefs.getStringSet(KEY_SENT, emptySet()).orEmpty().toMutableSet()
-        val fresh = alerts.filter { it.id !in sent }
-        if (fresh.isEmpty()) return
-        fresh.forEach {
-            show(it.id, it.title, it.body)
-            sent += it.id
-        }
+        val sent = prefs.getStringSet(KEY_SENT, emptySet()).orEmpty()
+        val updated = sendAlerts(alerts, sent) { show(it.id, it.title, it.body) }
+        if (updated == sent) return
         // Sólo los últimos, para que la lista no crezca sin fin.
-        prefs.edit().putStringSet(KEY_SENT, sent.sorted().takeLast(300).toSet()).apply()
+        prefs.edit { putStringSet(KEY_SENT, updated.sorted().takeLast(300).toSet()) }
     }
 
-    fun show(id: String, title: String, body: String) {
+    /** Sin permiso de notificaciones (Android 13+) o con los avisos de la app apagados en Ajustes, no se ve nada. */
+    val canShow: Boolean
+        get() = context.getSystemService(NotificationManager::class.java).let {
+            it.areNotificationsEnabled() && it.getNotificationChannel(CHANNEL)?.importance != NotificationManager.IMPORTANCE_NONE
+        }
+
+    /** Devuelve false si Android no deja mostrarla. */
+    fun show(id: String, title: String, body: String): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(NotificationChannel(CHANNEL, "Avisos", NotificationManager.IMPORTANCE_DEFAULT))
+        if (!canShow) return false
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
@@ -91,7 +109,10 @@ class LocalNotifier(private val context: Context) : Notifier {
             Notification.Builder(context, CHANNEL).setSmallIcon(R.drawable.ic_launcher_foreground).setContentTitle(title)
                 .setContentText(body).setStyle(Notification.BigTextStyle().bigText(body)).setContentIntent(open).setAutoCancel(true).build(),
         )
+        return true
     }
+
+    private fun shown(): Set<String> = prefs.getStringSet(KEY_SHOWN, emptySet()).orEmpty()
 
     private fun pending(): List<PlannedReminder> =
         prefs.getString(KEY_PENDING, null)?.let { runCatching { Json.decodeFromString<List<PlannedReminder>>(it) }.getOrNull() }.orEmpty()
@@ -108,21 +129,41 @@ class LocalNotifier(private val context: Context) : Notifier {
         private const val KEY_BUDGET = "limites"
         private const val KEY_PENDING = "pendientes"
         private const val KEY_SENT = "enviados"
+        private const val KEY_SHOWN = "mostrados"
         private const val KEY_LOG = "habito_apuntar"
         private const val KEY_LOG_HOUR = "habito_hora"
         private const val KEY_WEEKLY = "habito_semanal"
         const val EXTRA_TITLE = "titulo"
         const val EXTRA_BODY = "cuerpo"
+
+        /**
+         * Separa lo pendiente en lo que hay que mostrar ya (hoy, con la hora pasada) y lo que hay que programar.
+         * Lo ya mostrado y lo de días anteriores se descarta: Android no avisa de lo que se perdió con el teléfono apagado.
+         */
+        internal fun split(
+            pending: List<PlannedReminder>,
+            shown: Set<String>,
+            now: LocalDateTime,
+        ): Pair<List<PlannedReminder>, List<PlannedReminder>> = pending
+            .filter { it.id !in shown && !LocalDate.parse(it.fireOn).isBefore(now.toLocalDate()) }
+            .partition { !it.at().isAfter(now) }
+
+        /** Devuelve los ids enviados más los de las alertas que [show] ha podido mostrar; las demás se reintentan. */
+        internal fun sendAlerts(alerts: List<BudgetAlert>, sent: Set<String>, show: (BudgetAlert) -> Boolean): Set<String> =
+            sent + alerts.filter { it.id !in sent && show(it) }.map { it.id }
+
+        private fun PlannedReminder.at(): LocalDateTime = LocalDate.parse(fireOn).atTime(hour, 0)
     }
 }
 
 class AvisosReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val notifier = LocalNotifier(context)
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            notifier.arm()
-        } else {
-            notifier.show(intent.data?.schemeSpecificPart.orEmpty(), intent.getStringExtra(LocalNotifier.EXTRA_TITLE).orEmpty(), intent.getStringExtra(LocalNotifier.EXTRA_BODY).orEmpty())
+        when (intent.action) {
+            // Android borra las alarmas al reiniciar; al actualizar la app o cambiar la zona, la hora local se recalcula.
+            Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_MY_PACKAGE_REPLACED, Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_TIME_CHANGED ->
+                notifier.arm()
+            else -> notifier.showReminder(intent.data?.schemeSpecificPart.orEmpty(), intent.getStringExtra(LocalNotifier.EXTRA_TITLE).orEmpty(), intent.getStringExtra(LocalNotifier.EXTRA_BODY).orEmpty())
         }
     }
 }
