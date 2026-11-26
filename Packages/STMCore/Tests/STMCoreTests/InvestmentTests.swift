@@ -54,6 +54,16 @@ final class InvestmentTests: XCTestCase {
         XCTAssertNil(trade(holding, .sell, "2.5", at: "11", on: day(2026, 6, 1)).issue(given: bought))
         XCTAssertNotNil(trade(holding, .sell, "3", at: "11", on: day(2026, 6, 1)).issue(given: bought))
         XCTAssertNotNil(trade(holding, .sell, "1", at: "11", on: day(2026, 4, 1)).issue(given: bought), "antes de comprar")
+
+        // Con una venta ya apuntada el 1 de junio, otra con fecha anterior no puede dejarla sin participaciones.
+        let sold = trade(holding, .sell, "2", at: "11", on: day(2026, 6, 1))
+        let earlier = trade(holding, .sell, "1", at: "11", on: day(2026, 5, 15))
+        XCTAssertEqual(earlier.issue(given: bought + [sold]), InvestmentTrade.notEnoughShares, "2,5 − 1 − 2 = −0,5 el 1 de junio")
+        XCTAssertNil(trade(holding, .sell, "0.5", at: "11", on: day(2026, 5, 15)).issue(given: bought + [sold]))
+        // Ni se borra la compra de la que depende; la venta sí.
+        XCTAssertEqual(bought[0].deletionIssue(given: bought + [sold]), InvestmentTrade.neededByLaterSale)
+        XCTAssertNil(sold.deletionIssue(given: bought + [sold]))
+        XCTAssertNil(bought[0].deletionIssue(given: bought))
         XCTAssertNotNil(trade(holding, .buy, "0", at: "11", on: day(2026, 6, 1)).issue)
         XCTAssertNotNil(trade(holding, .buy, "0.123456789", at: "11", on: day(2026, 6, 1)).issue)
     }
@@ -215,6 +225,71 @@ final class InvestmentTests: XCTestCase {
         let planEncoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as! [String: Any]
         XCTAssertNil(planEncoded["holding_id"], "el activo de un plan no se cambia")
         XCTAssertEqual(planEncoded["amount_minor"] as? Int, 15_000)
+    }
+
+    func testInMemoryTradeWithCashIsAtomicAndNotRepeated() async throws {
+        let backend = InMemoryBackend()
+        _ = try await backend.signUp(username: Username("ana"), password: "contrasena-de-prueba", displayName: nil)
+        let house = try await backend.createHousehold(name: "Casa")
+        let account = try await backend.createAccount(AccountDraft(name: "Corriente", openingBalance: Money(minor: 100_000)), in: house.id)
+        let holding = try await backend.createHolding(Holding(householdId: house.id, name: "Fondo global", price: 10))
+        let buy = InvestmentTrade(householdId: house.id, holdingId: holding.id, tradedOn: day(2026, 11, 2), quantity: 10, price: 10)
+        let cash = TradeCash(accountId: account.id, amount: Money(minor: -10_000), description: "Compra de Fondo global")
+        func stored() async throws -> [Int] {
+            let trades = try await backend.trades(in: house.id).count
+            let balance = try await backend.balances(in: house.id)[account.id]?.minor ?? 0
+            return [trades, balance]
+        }
+        func assertRejected(_ message: String, _ operation: () async throws -> Void) async {
+            do {
+                try await operation()
+                XCTFail("tenía que fallar: \(message)")
+            } catch {
+                XCTAssertEqual(error as? AppError, .invalidInput(message))
+            }
+        }
+
+        // Si el movimiento no vale o no se guarda, tampoco queda la operación.
+        await assertRejected("Escribe un concepto.") {
+            _ = try await backend.addTrade(buy, cash: TradeCash(accountId: account.id, amount: Money(minor: -10_000), description: "  "))
+        }
+        await backend.failCalls("addMovement(_:in:)")
+        do {
+            _ = try await backend.addTrade(buy, cash: cash)
+            XCTFail("sin red no se guarda")
+        } catch {
+            XCTAssertEqual(error as? AppError, .network)
+        }
+        await backend.clearFailures()
+        var now = try await stored()
+        XCTAssertEqual(now, [0, 100_000])
+
+        // Repetirla con el mismo id no duplica; con otros datos, avisa.
+        for _ in 1...2 { _ = try await backend.addTrade(buy, cash: cash) }
+        now = try await stored()
+        XCTAssertEqual(now, [1, 90_000])
+        var changed = buy
+        changed.quantity = 11
+        await assertRejected(TransferDraft.storedWithOtherData) { _ = try await backend.addTrade(changed, cash: cash) }
+        await assertRejected(TransferDraft.storedWithOtherData) { _ = try await backend.addTrade(buy, cash: nil) }
+        await assertRejected(TransferDraft.storedWithOtherData) {
+            _ = try await backend.addTrade(buy, cash: TradeCash(accountId: account.id, amount: Money(minor: -9_000), description: "Compra"))
+        }
+
+        // La venta ingresa en la cuenta; la compra de la que depende no se puede borrar.
+        let sell = InvestmentTrade(householdId: house.id, holdingId: holding.id, tradedOn: day(2026, 11, 4), side: .sell, quantity: 4, price: 12)
+        _ = try await backend.addTrade(sell, cash: TradeCash(accountId: account.id, amount: sell.cashImpact, description: "Venta de Fondo global"))
+        await assertRejected(InvestmentTrade.neededByLaterSale) { try await backend.deleteTrade(buy.id) }
+        await assertRejected(InvestmentTrade.notEnoughShares) {
+            _ = try await backend.addTrade(InvestmentTrade(householdId: house.id, holdingId: holding.id, tradedOn: day(2026, 11, 3),
+                                                           side: .sell, quantity: 7, price: 12))
+        }
+        now = try await stored()
+        XCTAssertEqual(now, [2, 94_800])
+        try await backend.deleteTrade(sell.id)
+        try await backend.deleteTrade(buy.id)
+        now = try await stored()
+        XCTAssertEqual(now, [0, 94_800], "borrar la operación no borra su movimiento")
     }
 
     func testInMemoryRulesAndHouseholdsApart() async throws {

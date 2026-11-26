@@ -176,6 +176,21 @@ class FinanceModel(
         }
         reloadAll()
     }
+
+    /** Una compra o venta y, con [cash], su movimiento en la cuenta: los dos o ninguno, y repetirla no duplica. */
+    suspend fun addTrade(trade: com.savethemoney.android.data.InvestmentTrade, cash: com.savethemoney.android.data.TradeCash?) {
+        try {
+            investments.add(trade, cash)
+        } finally {
+            // Saldos y movimientos al día; también si falla, por si se guardó y no llegó la respuesta.
+            if (cash != null) {
+                try {
+                    reloadAll()
+                } catch (_: AppError) {
+                }
+            }
+        }
+    }
     suspend fun update(movement: Movement) { update(listOf(movement)) }
 
     /** Guarda varios movimientos ya cambiados (edición masiva, «cambiar similares»). Recarga una vez al final. */
