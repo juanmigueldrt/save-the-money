@@ -1,5 +1,7 @@
 package com.savethemoney.android.data
 
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -7,6 +9,9 @@ import java.util.UUID
 /** Registro, sesión, perfil, hogares e invitaciones (AuthService + HouseholdService de iOS). */
 interface Backend {
     suspend fun currentUserId(): String?
+
+    /** Avisa cuando la sesión se pierde sin que la persona la cierre (p. ej. el servidor rechaza el refresco). */
+    val sessionEnded: Flow<Unit> get() = emptyFlow()
     suspend fun signUp(username: Username, password: String, displayName: String?): String
     suspend fun signIn(username: Username, password: String): String
     suspend fun signOut()
