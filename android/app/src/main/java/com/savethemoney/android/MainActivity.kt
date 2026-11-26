@@ -18,6 +18,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
+import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import com.savethemoney.android.data.AppTheme
 import androidx.compose.animation.AnimatedContent
@@ -62,6 +63,7 @@ import com.savethemoney.android.ui.borrarExportados
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.ScreenFor
 import com.savethemoney.android.ui.screens.SinConexion
+import com.savethemoney.android.ui.screens.UnirseDesdeEnlace
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmTheme
 import com.savethemoney.android.ui.theme.StmType
@@ -214,7 +216,13 @@ class StmApp : android.app.Application() {
             finance = SupabaseFinance(remote)
         }
         val avisos = LocalNotifier(this)
-        Session(backend, finance, isDemo = demo, notifier = avisos, borrarLocal = { borrarExportados(this); avisos.borrarTodo() }).also { session = it }
+        // El hogar elegido se recuerda por persona en este dispositivo, con el resto de ajustes.
+        val ajustes = getSharedPreferences("ajustes", MODE_PRIVATE)
+        Session(
+            backend, finance, isDemo = demo, notifier = avisos, borrarLocal = { borrarExportados(this); avisos.borrarTodo() },
+            hogarElegido = { usuario -> ajustes.getString("hogar_abierto_$usuario", null) },
+            eligeHogar = { usuario, hogar -> ajustes.edit { putString("hogar_abierto_$usuario", hogar) } },
+        ).also { session = it }
     }
 }
 
@@ -259,6 +267,8 @@ fun App() {
             AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { number ->
                 ScreenFor(number, nav)
             }
+            // Un enlace de invitación con un hogar ya abierto: nunca se une solo, pregunta antes.
+            if (session.state is Session.State.Ready && session.pendingInvite != null) UnirseDesdeEnlace()
         }
     }
 }

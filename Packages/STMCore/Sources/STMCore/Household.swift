@@ -18,6 +18,11 @@ public struct Household: Identifiable, Hashable, Codable, Sendable {
     public static let currencyLocked =
         "No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados."
 
+    /// Días en que puede empezar el mes del hogar: del 1 al 28, que existen en todos los meses (igual que el servidor).
+    public static let monthStartDays = 1...28
+    public static let monthStartDayInvalid = "El mes del hogar puede empezar entre el día 1 y el 28."
+    public static let monthStartDayOwnerOnly = "Solo quien creó el hogar puede cambiar el día en que empieza el mes."
+
     enum CodingKeys: String, CodingKey {
         case id, name
         case baseCurrency = "base_currency"

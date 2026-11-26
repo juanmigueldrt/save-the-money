@@ -1,9 +1,13 @@
 package com.savethemoney.android.ui
 
+import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Backend
 import com.savethemoney.android.data.InMemoryBackend
 import com.savethemoney.android.data.InMemoryFinance
+import com.savethemoney.android.data.InviteCode
+import com.savethemoney.android.data.MONTH_START_DAY_OWNER_ONLY
+import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -11,10 +15,12 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.time.LocalDate
 
 class SessionTest {
     @Test
@@ -248,5 +254,116 @@ class SessionTest {
         val session = Session(rechazada, InMemoryFinance(), isDemo = true)
         session.start()
         assertEquals(Session.State.SignedOut, session.state)
+    }
+
+    // ORC-112: día de inicio del mes, nombre visible, elegir hogar y unirse con un hogar abierto.
+
+    /** Ana tiene su hogar y entra además en el de Bea con una invitación de Bea. El hogar elegido se guarda en [elegidos]. */
+    private suspend fun anaConDosHogares(memory: InMemoryBackend, finance: InMemoryFinance, elegidos: MutableMap<String, String>): Session {
+        memory.signUp(Username.parse("bea").getOrThrow(), "secreto123", null)
+        val deBea = memory.createHousehold("Casa de Bea")
+        val invite = memory.createInvite(deBea.id)
+        memory.signOut()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de Ana")
+        val session = Session(memory, finance, isDemo = true, hogarElegido = { elegidos[it] }, eligeHogar = { u, h -> elegidos[u] = h })
+        session.refresh()
+        session.join(InviteCode.parse(invite.code)!!)
+        return session
+    }
+
+    @Test
+    fun cambiarElDiaDeInicioRehaceLasFinanzasSinTocarMovimientos() = runBlocking {
+        val memory = InMemoryBackend()
+        val finance = InMemoryFinance(memory)
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        val casa = memory.createHousehold("Casa")
+        val cuenta = finance.createAccount(AccountDraft("Corriente"), casa.id)
+        finance.addMovement(MovementDraft(cuenta.id, bookedOn = LocalDate.of(2026, 11, 20), amountMinor = -4_250, description = "Compra"), casa.id)
+        val antes = finance.movements(casa.id, null, 100)
+        val session = Session(memory, finance, isDemo = true)
+        session.refresh()
+        val anterior = session.finance!!
+
+        session.setMonthStartDay(25)
+
+        val nuevo = session.finance!!
+        assertNotSame(anterior, nuevo)
+        assertEquals(25, nuevo.household.monthStartDay)
+        assertEquals(25, nuevo.budgets.household.monthStartDay)
+        assertEquals(25, session.household?.monthStartDay)
+        assertEquals(listOf(25), session.households.map { it.monthStartDay })
+        assertEquals(antes, finance.movements(casa.id, null, 100))
+    }
+
+    @Test
+    fun soloElDuenoCambiaElDiaDeInicio() = runBlocking {
+        val memory = InMemoryBackend()
+        val session = anaConDosHogares(memory, InMemoryFinance(memory), mutableMapOf())
+        assertEquals("Casa de Bea", session.household?.name)
+
+        try {
+            session.setMonthStartDay(10)
+            fail("un miembro no debería poder cambiarlo")
+        } catch (e: AppError.InvalidInput) {
+            assertEquals(MONTH_START_DAY_OWNER_ONLY, e.message)
+        }
+        assertEquals(1, session.household?.monthStartDay)
+    }
+
+    @Test
+    fun nombreVisibleRecortadoYVacioVuelveAlUsuario() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa")
+        val session = Session(memory, InMemoryFinance(memory), isDemo = true)
+        session.refresh()
+
+        session.setDisplayName("  Ana María  ")
+        assertEquals("Ana María", session.profile?.displayName)
+        session.setDisplayName("   ")
+        assertNull(session.profile?.displayName)
+        assertEquals("ana", session.profile?.name)
+    }
+
+    @Test
+    fun alUnirseConUnHogarAbiertoSeAbreElNuevoYSeSigueEnLosDos() = runBlocking {
+        val memory = InMemoryBackend()
+        val session = anaConDosHogares(memory, InMemoryFinance(memory), mutableMapOf())
+
+        assertEquals(setOf("Casa de Ana", "Casa de Bea"), session.households.map { it.name }.toSet())
+        assertEquals("Casa de Bea", session.household?.name)
+        assertEquals(session.household?.id, session.finance?.household?.id)
+        assertNull(session.pendingInvite)
+    }
+
+    @Test
+    fun cambiarDeHogarDaFinanzasNuevasYSeRecuerdaEnElDispositivo() = runBlocking {
+        val memory = InMemoryBackend()
+        val finance = InMemoryFinance(memory)
+        val elegidos = mutableMapOf<String, String>()
+        val session = anaConDosHogares(memory, finance, elegidos)
+        val deBea = session.household!!
+        val deAna = session.households.first { it.id != deBea.id }
+        val cuenta = finance.createAccount(AccountDraft("Solo de Bea"), deBea.id)
+        val anterior = session.finance!!
+        anterior.load()
+        assertEquals(listOf(cuenta.id), anterior.accounts.map { it.id })
+
+        session.open(deAna)
+
+        val nuevo = session.finance!!
+        assertNotSame(anterior, nuevo)
+        assertEquals(deAna.id, session.household?.id)
+        assertEquals(deAna.id, nuevo.household.id)
+        assertTrue("no debe verse nada del otro hogar", nuevo.accounts.isEmpty())
+        // Una carga del hogar anterior que acaba tarde se queda en sus finanzas, que ya no se ven.
+        anterior.load()
+        assertTrue(session.finance!!.accounts.isEmpty())
+
+        // Otra sesión en el mismo dispositivo abre el que se eligió, no el predeterminado.
+        val otra = Session(memory, finance, isDemo = true, hogarElegido = { elegidos[it] })
+        otra.refresh()
+        assertEquals(deAna.id, otra.household?.id)
     }
 }

@@ -201,6 +201,21 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    public func setMonthStartDay(_ householdId: UUID, to day: Int) async throws -> Household {
+        guard Household.monthStartDays.contains(day) else { throw AppError.invalidInput(Household.monthStartDayInvalid) }
+        // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila.
+        let rows: [Household] = try await mapped {
+            try await client.from("households")
+                .update(["month_start_day": day])
+                .eq("id", value: householdId.uuidString)
+                .select(Self.householdColumns)
+                .execute()
+                .value
+        }
+        guard let household = rows.first else { throw AppError.invalidInput(Household.monthStartDayOwnerOnly) }
+        return household
+    }
+
     public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
         try await mapped {
             try await client.from("household_members")

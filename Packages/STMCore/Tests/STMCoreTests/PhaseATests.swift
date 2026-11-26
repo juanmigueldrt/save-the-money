@@ -213,4 +213,33 @@ final class PhaseATests: XCTestCase {
             XCTFail("Sólo el dueño cambia el nombre")
         } catch {}
     }
+
+    func testDiaDeInicioDelMesEntre1Y28YSoloElDueno() async throws {
+        let backend = InMemoryBackend()
+        _ = try await backend.signUp(username: Username("ana"), password: "contrasena-de-prueba", displayName: "Ana")
+        let home = try await backend.createHousehold(name: "Casa")
+        let changed = try await backend.setMonthStartDay(home.id, to: 28)
+        XCTAssertEqual(changed.monthStartDay, 28)
+        for invalid in [0, 29] {
+            do {
+                _ = try await backend.setMonthStartDay(home.id, to: invalid)
+                XCTFail("El día \(invalid) no vale")
+            } catch let error as AppError {
+                XCTAssertEqual(error, .invalidInput(Household.monthStartDayInvalid))
+            }
+        }
+        let stored = try await backend.households()
+        XCTAssertEqual(stored.first?.monthStartDay, 28)
+
+        let invite = try await backend.createInvite(for: home.id)
+        try await backend.signOut()
+        _ = try await backend.signUp(username: Username("luis"), password: "contrasena-de-prueba", displayName: "Luis")
+        _ = try await backend.acceptInvite(try XCTUnwrap(InviteCode(invite.code)))
+        do {
+            _ = try await backend.setMonthStartDay(home.id, to: 5)
+            XCTFail("Sólo el dueño cambia el día")
+        } catch let error as AppError {
+            XCTAssertEqual(error, .invalidInput(Household.monthStartDayOwnerOnly))
+        }
+    }
 }

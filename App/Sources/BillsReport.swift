@@ -4,6 +4,7 @@ import STMUI
 
 /// Cuentas a pagar del mes según los pagos fijos, con vista previa y PDF para compartir o imprimir.
 struct BillsReportView: View {
+    @Environment(SessionModel.self) private var session
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
     @State private var monthOffset = 0
@@ -47,7 +48,9 @@ struct BillsReportView: View {
     private func makePDF() {
         error = nil
         do {
-            pdf = try BillsPDF.render(bills, householdName: finance.household.name, today: CalendarDay())
+            // El nombre del hogar abierto, al día aunque se haya cambiado después de crear los modelos.
+            let name = if case .ready(_, let household) = session.state { household.name } else { finance.household.name }
+            pdf = try BillsPDF.render(bills, householdName: name, today: CalendarDay())
         } catch {
             self.error = "No se ha podido crear el PDF."
         }

@@ -270,6 +270,18 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         return household
     }
 
+    public func setMonthStartDay(_ householdId: UUID, to day: Int) async throws -> Household {
+        let user = try requireUser()
+        guard memberships.contains(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
+            throw AppError.invalidInput(Household.monthStartDayOwnerOnly)
+        }
+        guard Household.monthStartDays.contains(day) else { throw AppError.invalidInput(Household.monthStartDayInvalid) }
+        guard var household = householdsById[householdId] else { throw AppError.unknown("hogar") }
+        household.monthStartDay = day
+        householdsById[householdId] = household
+        return household
+    }
+
     public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
         let user = try requireUser()
         guard memberships.contains(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
