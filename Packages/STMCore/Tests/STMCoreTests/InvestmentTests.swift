@@ -19,6 +19,25 @@ final class InvestmentTests: XCTestCase {
                         quantity: dec(quantity), price: dec(price), fee: Money(minor: fee))
     }
 
+    func testIdsRepetidosDeFondosNoCierranLaApp() {
+        let id = UUID()
+        let first = Holding(id: id, householdId: home, name: "Fondo A", priceOn: day(2026, 11, 1))
+        let second = Holding(id: id, householdId: home, name: "Fondo B", priceOn: day(2026, 11, 1))
+        let points = PriceHistory.evolution(holdings: [first, second], prices: [], trades: [], range: .month,
+                                            today: day(2026, 11, 20))
+        XCTAssertFalse(points.isEmpty)
+        let plan = InvestmentPlan(householdId: home, holdingId: id, amount: Money(minor: 15_000),
+                                  startsOn: day(2026, 11, 5), remindDaysBefore: 1)
+        XCTAssertFalse(ReminderPlanner.plan([plan], holdings: [first, second], today: day(2026, 11, 3)).isEmpty)
+    }
+
+    func testPrecioConMasDeSeisDecimalesNoSeAcepta() {
+        XCTAssertNil(fund(price: "1.123456").issue)
+        XCTAssertNotNil(fund(price: "1.1234567").issue, "la columna es numeric(18, 6)")
+        XCTAssertNotNil(trade(fund(), .buy, "1", at: "1.1234567", on: day(2026, 6, 1)).issue(given: []))
+        XCTAssertNil(trade(fund(), .buy, "1", at: "1.123456", on: day(2026, 6, 1)).issue(given: []))
+    }
+
     func testMoneyFromDecimalRoundsToCents() {
         XCTAssertEqual(Money(decimal: dec("12.345")), Money(minor: 1235))
         XCTAssertEqual(Money(decimal: dec("12.344")), Money(minor: 1234))

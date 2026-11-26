@@ -96,6 +96,31 @@ final class BudgetTests: XCTestCase {
         XCTAssertEqual(into, needs.height, accuracy: 0.001, "las bandas llenan el nodo")
     }
 
+    func testReembolsoNetoNoSacaBandasDelNodo() throws {
+        let categories = BudgetCategory.defaults(for: home)
+        let needs = categories.filter { $0.budgetGroup == .needs && $0.kind == .expense }
+        let movements = [
+            movement(-80_000, needs[0], on: day(2026, 11, 3)),
+            movement(30_000, needs[1], on: day(2026, 11, 4))
+        ]
+        let report = BudgetReport(budget: nil, month: MonthKey(year: 2026, month: 11), categories: categories, movements: movements)
+        let flow = CashFlow(report: report)
+
+        let group = try XCTUnwrap(flow.nodes.first { $0.id == "grupo:needs" })
+        XCTAssertEqual(group.value, 80_000)
+        let out = flow.links.filter { $0.from == "grupo:needs" }.reduce(0) { $0 + $1.value }
+        XCTAssertEqual(out, group.value, "las bandas que salen del grupo caben en el nodo")
+    }
+
+    func testCategoriaRepetidaNoCierraLaApp() {
+        let id = UUID()
+        let first = BudgetCategory(id: id, householdId: home, name: "Comida", kind: .expense, budgetGroup: .needs)
+        let second = BudgetCategory(id: id, householdId: home, name: "Comida 2", kind: .expense, budgetGroup: .needs)
+        let report = BudgetReport(budget: nil, month: MonthKey(year: 2026, month: 11), categories: [first, second],
+                                  movements: [movement(-1_000, first, on: day(2026, 11, 3))])
+        XCTAssertEqual(report.uncategorized, Money(minor: 0))
+    }
+
     func testOverspendingAddsFromBalance() {
         let categories = BudgetCategory.defaults(for: home)
         let rent = categories.first { $0.name == "Vivienda" }

@@ -123,4 +123,13 @@ class PlanningTest {
         assertEquals(listOf("stm.budget.2026-11.c.80", "stm.budget.2026-11.o.100"), avisos.map { it.id })
         assertEquals("Te has pasado en Ocio", avisos[1].title)
     }
+
+    @Test
+    fun alertaEnElLimiteNoDiceQueTePasaste() {
+        val nov = YearMonth.of(2026, 11)
+        val ocio = BudgetCategory("o", "h", "Ocio", CategoryKind.Expense, BudgetGroup.Wants)
+        val movs = listOf(Movement("1", "h", "a", "o", "2026-11-02", -10_000, "x"))
+        val r = BudgetReport(Budget("h", nov, 100_000, limits = mapOf("o" to 10_000)), nov.period(), listOf(ocio), movs)
+        assertEquals(listOf("Has llegado al límite en Ocio"), BudgetAlertPlanner.alerts(r).map { it.title })
+    }
 }

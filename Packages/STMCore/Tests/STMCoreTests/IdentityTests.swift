@@ -15,6 +15,21 @@ final class IdentityTests: XCTestCase {
         XCTAssertThrowsError(try Username("ana@correo")) { XCTAssertEqual($0 as? Username.ValidationError, .invalidCharacters) }
     }
 
+    func testUsernameEdgesMustBeLetterOrDigit() throws {
+        for raw in ["...", ".ana.", "ana-", "_ana", "a.b."] {
+            XCTAssertThrowsError(try Username(raw), raw) { XCTAssertEqual($0 as? Username.ValidationError, .invalidEdges) }
+        }
+        XCTAssertEqual(try Username("a.b").value, "a.b")
+        XCTAssertEqual(try Username("ana_1-x").value, "ana_1-x")
+    }
+
+    func testUsernameSignInAcceptsExistingEdges() throws {
+        for raw in ["ana_", ".ana", "...", "juan-"] {
+            XCTAssertEqual(try Username(raw, forSignIn: true).value, raw, "al iniciar sesión, como el servidor")
+        }
+        XCTAssertThrowsError(try Username("ana_")) { XCTAssertEqual($0 as? Username.ValidationError, .invalidEdges) }
+    }
+
     func testInviteCodeParsing() {
         XCTAssertEqual(InviteCode("4k9 q2x")?.value, "4K9Q2X")
         XCTAssertEqual(InviteCode("4K9-Q2X")?.value, "4K9Q2X")

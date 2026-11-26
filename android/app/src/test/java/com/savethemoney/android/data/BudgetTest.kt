@@ -56,6 +56,18 @@ class BudgetTest {
     }
 
     @Test
+    fun reembolsoNetoNoSacaBandasDelNodo() {
+        val vivienda = BudgetCategory("v", h, "Vivienda", CategoryKind.Expense, BudgetGroup.Needs)
+        val flow = CashFlow(
+            BudgetReport(null, nov.period(), categorias + vivienda,
+                listOf(mov("2026-11-03", -80_000, "c"), mov("2026-11-04", 30_000, "v"))),
+        )
+        val group = flow.nodes.single { it.id == "grupo:Needs" }
+        assertEquals(80_000.0, group.value, 0.0)
+        assertEquals(group.value, flow.links.filter { it.from == "grupo:Needs" }.sumOf { it.value }, 0.0)
+    }
+
+    @Test
     fun withoutBudgetBaseIsRealIncome() {
         assertEquals(1_000, informe(null, mov("2026-11-02", 1_000, "n")).base)
     }
