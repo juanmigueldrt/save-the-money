@@ -94,6 +94,12 @@ final class SessionModel {
         try await refresh()
     }
 
+    /// La sesión de este dispositivo sigue abierta; el servidor cierra las de los demás.
+    func changePassword(_ form: ChangePasswordForm) async throws {
+        if let issue = form.firstIssue { throw AppError.invalidInput(issue.message) }
+        try await services.auth.changePassword(currentPassword: form.currentPassword, newPassword: form.newPassword)
+    }
+
     /// Si el cierre no llegó al servidor. Este dispositivo ya está desconectado; el aviso se ve en la pantalla de entrar.
     private(set) var signOutError: String?
 

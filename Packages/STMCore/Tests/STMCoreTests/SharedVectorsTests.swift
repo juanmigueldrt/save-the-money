@@ -396,6 +396,17 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testChangePasswordFormRules() throws {
+        struct File: Decodable { var vectors: [Caso] }
+        struct Caso: Decodable { var current: String; var new: String; var confirmation: String; var issue: String? }
+        let file: File = try load("change_password_form.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        for v in file.vectors {
+            let form = ChangePasswordForm(currentPassword: v.current, newPassword: v.new, newPasswordConfirmation: v.confirmation)
+            XCTAssertEqual(form.firstIssue?.message, v.issue, "«\(v.current)» «\(v.new)» «\(v.confirmation)»")
+        }
+    }
+
     func testMoneyOfSeveralCurrencies() throws {
         struct File: Decodable { var totals: [Total]; var conversions: [Conversion] }
         struct Amount: Decodable { var minor: Int; var currency: String }

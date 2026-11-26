@@ -325,6 +325,15 @@ class SharedVectorsTest {
     }
 
     @Test
+    fun changePasswordFormRules() {
+        for (v in load("change_password_form.json")) {
+            val form = ChangePasswordForm(v.str("current"), v.str("new"), v.str("confirmation"))
+            val issue = v["issue"]?.jsonPrimitive?.content
+            assertEquals("«${v.str("current")}» «${v.str("new")}» «${v.str("confirmation")}»", issue, form.firstIssue)
+        }
+    }
+
+    @Test
     fun moneyOfSeveralCurrencies() {
         fun JsonElement.amount() = Money.Amount(long("minor"), str("currency"))
         for (v in load("money_currencies.json", "totals")) {

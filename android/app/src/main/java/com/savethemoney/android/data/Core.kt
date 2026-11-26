@@ -8,6 +8,12 @@ import kotlinx.serialization.Serializable
 /** Errores con el mensaje en español que ve la persona (AppError de iOS). */
 sealed class AppError(override val message: String) : Exception(message) {
     data object InvalidCredentials : AppError("Usuario o contraseña incorrectos.")
+
+    /** Al cambiar la contraseña, la actual que se escribió no es la de la cuenta. */
+    data object WrongCurrentPassword : AppError("La contraseña actual no es correcta.")
+
+    /** El servidor limita los intentos seguidos (inicio de sesión, cambio de contraseña). */
+    data object TooManyAttempts : AppError("Demasiados intentos seguidos. Inténtalo de nuevo más tarde.")
     data object UsernameTaken : AppError("Ese nombre de usuario ya existe. Prueba con otro.")
     data object WeakPassword : AppError("La contraseña es demasiado débil. Usa al menos ${SignUpForm.MIN_PASSWORD} caracteres.")
     data object NotSignedIn : AppError("Tu sesión ha caducado. Vuelve a iniciar sesión.")
@@ -106,6 +112,25 @@ data class SignUpForm(
     val trimmedDisplayName: String? get() = displayName.trim().take(60).ifEmpty { null }
 
     companion object { const val MIN_PASSWORD = 10 }
+}
+
+/** Formulario de cambiar la contraseña (Ajustes). La nueva sigue la misma regla que al crear la cuenta. */
+data class ChangePasswordForm(
+    val currentPassword: String = "",
+    val newPassword: String = "",
+    val newPasswordConfirmation: String = "",
+) {
+    /** Primer problema que impide enviar el formulario, o null si está bien. */
+    val firstIssue: String?
+        get() = when {
+            currentPassword.isEmpty() -> "Escribe tu contraseña actual."
+            newPassword.length < SignUpForm.MIN_PASSWORD -> "La contraseña necesita al menos ${SignUpForm.MIN_PASSWORD} caracteres."
+            newPassword != newPasswordConfirmation -> "Las contraseñas no coinciden."
+            newPassword == currentPassword -> SAME_PASSWORD
+            else -> null
+        }
+
+    companion object { const val SAME_PASSWORD = "La nueva contraseña tiene que ser distinta de la actual." }
 }
 
 /** Nombre del hogar: entre 1 y 80 caracteres, sin espacios alrededor. */

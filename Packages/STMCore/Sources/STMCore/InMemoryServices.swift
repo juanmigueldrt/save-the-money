@@ -68,6 +68,18 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         return account.profile.id
     }
 
+    /// Como el servidor: la sesión sigue abierta; una actual que no es no cambia nada.
+    public func changePassword(currentPassword: String, newPassword: String) async throws {
+        try throwIfInjected(#function)
+        guard let user = currentUser, let record = users[user] else { throw AppError.notSignedIn }
+        guard record.password == currentPassword else { throw AppError.wrongCurrentPassword }
+        guard newPassword.count >= SignUpForm.minimumPasswordLength else { throw AppError.weakPassword }
+        guard newPassword != currentPassword else {
+            throw AppError.invalidInput(ChangePasswordForm.Issue.samePassword.message)
+        }
+        users[user]?.password = newPassword
+    }
+
     public func signOut() async throws {
         try throwIfInjected(#function)
         currentUser = nil
