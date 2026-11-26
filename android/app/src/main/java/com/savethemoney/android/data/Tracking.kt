@@ -210,10 +210,11 @@ class SpendingReport(
         val totals = linkedMapOf<String, Pair<Long, Int>>()
         val months = mutableMapOf<YearMonth, Long>()
         var sum = 0L
+        val transfers = uncategorizedTransferIds(movements.filter { !it.excluded && it.day in range }, byId.keys)
         for (m in movements) {
             if (m.excluded || m.day !in range) continue
             val category = byId[m.categoryId]
-            if (category?.kind == CategoryKind.Transfer) continue
+            if (category?.kind == CategoryKind.Transfer || m.id in transfers) continue
             val matches = when (kind) {
                 ReportKind.Expense -> category?.let { it.kind == CategoryKind.Expense } ?: (m.amountMinor < 0)
                 ReportKind.Income -> category?.let { it.kind == CategoryKind.Income } ?: (m.amountMinor >= 0)

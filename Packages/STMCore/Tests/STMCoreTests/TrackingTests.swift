@@ -128,6 +128,24 @@ final class TrackingTests: XCTestCase {
         XCTAssertEqual(ReportPeriod.thisYear.range(today: day(2026, 3, 15)).lowerBound, day(2026, 1, 1))
     }
 
+    /// ORC-80: un traspaso importado del CSV, sin categoría, no sale en gastos ni ingresos, aunque se mire una sola cuenta.
+    func testInformeSinTraspasoImportado() {
+        let common = Account(householdId: home, name: "Cuenta común")
+        let savings = Account(householdId: home, name: "Ahorro")
+        var salida = move(common, -50_000, on: day(2026, 10, 9), nil, "Traspaso a ahorro")
+        salida.importHash = "hash-salida"
+        var entrada = move(savings, 50_000, on: day(2026, 10, 9), nil, "Traspaso desde cuenta común")
+        entrada.importHash = "hash-entrada"
+        let movements = [salida, entrada, move(common, -1_000, on: day(2026, 10, 10))]
+        let range = day(2026, 10, 1)...day(2026, 10, 31)
+        XCTAssertEqual(SpendingReport(movements: movements, categories: [], range: range).total, Money(minor: 1_000))
+        XCTAssertEqual(SpendingReport(movements: movements, categories: [], range: range, kind: .income).total, .zero)
+        XCTAssertEqual(SpendingReport(movements: movements, categories: [], range: range, accountIds: [common.id]).total,
+                       Money(minor: 1_000), "la otra pata está en una cuenta que no se mira")
+        XCTAssertEqual(SpendingReport(movements: movements, categories: [], range: range, kind: .income,
+                                      accountIds: [savings.id]).total, .zero)
+    }
+
     func testInformesConInicioDeMesDia25() {
         let account = Account(householdId: home, name: "Cuenta común")
         let movements = [

@@ -58,6 +58,22 @@ final class BudgetTests: XCTestCase {
         XCTAssertEqual(report.incomeSources.map(\.title), ["Nómina"])
     }
 
+    /// ORC-80: un traspaso entre cuentas propias importado del CSV llega sin categoría en las dos cuentas.
+    func testTraspasoImportadoSinCategoriaNoEsIngresoNiGasto() {
+        let categories = BudgetCategory.defaults(for: home)
+        let savings = UUID()
+        var salida = movement(-50_000, nil, on: day(2026, 11, 9))
+        salida.importHash = "hash-salida"
+        let entrada = Movement(householdId: home, accountId: savings, bookedOn: day(2026, 11, 9), amount: Money(minor: 50_000),
+                           description: "Traspaso desde cuenta común", importHash: "hash-entrada")
+        let gasto = movement(-1_500, nil, on: day(2026, 11, 10))
+        let report = BudgetReport(budget: nil, month: MonthKey(year: 2026, month: 11), categories: categories,
+                                  movements: [salida, entrada, gasto])
+        XCTAssertEqual(report.income.minor, 0)
+        XCTAssertTrue(report.incomeSources.isEmpty)
+        XCTAssertEqual(report.uncategorized.minor, 1_500, "sólo el gasto suelto")
+    }
+
     func testWithoutBudgetUsesRealIncome() {
         let categories = BudgetCategory.defaults(for: home)
         let salary = categories.first { $0.name == "Nómina" }

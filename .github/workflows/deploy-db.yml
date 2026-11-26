@@ -16,7 +16,34 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # La aprobación del entorno produccion se pide antes de que empiece el job push, así que lo que
+  # este job lista es lo que quien aprueba puede ver antes de aprobar. No usa secretos ni se
+  # conecta al proyecto: sólo mira los ficheros del repositorio.
+  revisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Ficheros de migración de este cambio
+        env:
+          ANTES: ${{ github.event.before }}
+        run: |
+          echo '### Ficheros de supabase/migrations en este cambio' >> "$GITHUB_STEP_SUMMARY"
+          if [ -n "$ANTES" ] && git cat-file -e "$ANTES^{commit}" 2>/dev/null; then
+            git diff --name-status "$ANTES" HEAD -- supabase/migrations > cambios.txt
+            { echo '```'; cat cambios.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            cat cambios.txt
+            # Una migración ya aplicada no se vuelve a aplicar: cambiarla o borrarla no hace nada en producción.
+            if grep -v '^A' cambios.txt | grep -q .; then
+              echo '::warning::Este cambio modifica o borra migraciones existentes; no se aplicarán en producción.'
+            fi
+          else
+            echo 'Ejecución manual: la lista real sale en el job push, justo antes de db push.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
   push:
+    needs: revisar
     runs-on: ubuntu-latest
     environment: produccion
     env:
@@ -28,6 +55,29 @@ jobs:
         with:
           version: 3.0.0
       - run: supabase link --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+      # Sólo lectura, antes de tocar nada. El repositorio es público: aquí sólo salen fechas de
+      # copias y nombres de migraciones, nunca filas. Cómo comprobar la copia y cómo volver atrás:
+      # docs/operaciones/copias-y-vuelta-atras.md
+      #
+      # Si la lista de copias no se puede leer, avisa y sigue: el plan Free no tiene copias
+      # automáticas y todavía no se sabe qué responde ahí la CLI, y un fallo aquí dejaría el
+      # proyecto sin poder recibir migraciones. Quien aprueba comprueba la copia a mano.
+      - name: Copias de seguridad disponibles (sólo lectura)
+        run: |
+          if supabase backups list > copias.txt 2>&1; then
+            { echo '### Copias de seguridad del proyecto'; echo '```'; cat copias.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '::warning::No se ha podido leer la lista de copias de seguridad. Comprueba la copia a mano antes de seguir.'
+            echo '### No se ha podido leer la lista de copias de seguridad' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          cat copias.txt
+      # Si no se puede leer, el job falla y no se aplica nada.
+      - name: Migraciones pendientes (sólo lectura)
+        run: |
+          if ! supabase migration list --remote > migraciones.txt 2>&1; then cat migraciones.txt; exit 1; fi
+          test -s migraciones.txt
+          { echo '### Migraciones: las que sólo están en local se aplican ahora'; echo '```'; cat migraciones.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          cat migraciones.txt
       # Desde la CLI 3.x, db push va contra la base local salvo --remote, y pide
       # confirmación salvo --yes (la aprobación del entorno produccion ya la da Jean).
       - run: supabase db push --remote --yes
