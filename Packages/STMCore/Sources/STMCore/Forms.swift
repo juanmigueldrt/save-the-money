@@ -51,6 +51,45 @@ public struct SignUpForm: Equatable, Sendable {
     }
 }
 
+/// Validación del formulario de cambiar la contraseña (Ajustes), antes de llamar al servidor.
+/// La nueva sigue la misma regla que al crear la cuenta.
+public struct ChangePasswordForm: Equatable, Sendable {
+    public var currentPassword = ""
+    public var newPassword = ""
+    public var newPasswordConfirmation = ""
+
+    public init(currentPassword: String = "", newPassword: String = "", newPasswordConfirmation: String = "") {
+        self.currentPassword = currentPassword
+        self.newPassword = newPassword
+        self.newPasswordConfirmation = newPasswordConfirmation
+    }
+
+    public enum Issue: Equatable, Sendable {
+        case currentPasswordMissing
+        case passwordTooShort
+        case passwordsDoNotMatch
+        case samePassword
+
+        public var message: String {
+            switch self {
+            case .currentPasswordMissing: "Escribe tu contraseña actual."
+            case .passwordTooShort: SignUpForm.Issue.passwordTooShort.message
+            case .passwordsDoNotMatch: SignUpForm.Issue.passwordsDoNotMatch.message
+            case .samePassword: "La nueva contraseña tiene que ser distinta de la actual."
+            }
+        }
+    }
+
+    /// Primer problema que impide enviar el formulario, o nil si está bien.
+    public var firstIssue: Issue? {
+        if currentPassword.isEmpty { return .currentPasswordMissing }
+        if newPassword.count < SignUpForm.minimumPasswordLength { return .passwordTooShort }
+        if newPassword != newPasswordConfirmation { return .passwordsDoNotMatch }
+        if newPassword == currentPassword { return .samePassword }
+        return nil
+    }
+}
+
 /// Nombre del hogar: entre 1 y 80 caracteres, sin espacios alrededor.
 public enum HouseholdName {
     public static func validated(_ raw: String) -> String? {
