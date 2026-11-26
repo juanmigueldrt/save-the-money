@@ -40,10 +40,6 @@ class CreditCardModel(
     /** Qué lectura gana cuando dos se cruzan (ORC-144). */
     private val turns = ReadTurns()
 
-    // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
-    var selectedId by mutableStateOf<String?>(null)
-    var purchaseId: String? = null
-
     private var accounts by mutableStateOf(emptyList<Account>())
     private var movements by mutableStateOf(emptyMap<String, List<Movement>>())
     private var balances = emptyMap<String, Long>()
@@ -53,13 +49,13 @@ class CreditCardModel(
     private var truncatedAccounts = emptySet<String>()
 
     val cardAccounts: List<Account> get() = accounts.filter { it.kind == AccountKind.CreditCard && !it.isArchived }
-    val selected: Account? get() = cardAccounts.firstOrNull { it.id == selectedId } ?: cardAccounts.firstOrNull()
+    /** La tarjeta [id] (sin id, la primera). Nula si ya no está: nunca otra. */
+    fun card(id: String?): Account? = if (id == null) cardAccounts.firstOrNull() else cardAccounts.firstOrNull { it.id == id }
 
     fun summary(account: Account): CreditCardSummary? = summaries[account.id]
     fun movements(account: Account): List<Movement> = movements[account.id].orEmpty()
     fun installment(movement: Movement): CardInstallment? = installments.firstOrNull { it.movementId == movement.id }
     fun plans(account: Account): List<CardInstallment> = installments.filter { it.accountId == account.id }
-    fun takePurchase(): String? = purchaseId.also { purchaseId = null }
 
     /** Compras que se pueden aplazar: del extracto abierto, de 50 € o más y sin aplazar. */
     fun deferrable(account: Account): List<Movement> {

@@ -1,5 +1,6 @@
 package com.savethemoney.android
 
+import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.SCREEN_COUNT
 import kotlinx.coroutines.runBlocking
@@ -38,25 +39,29 @@ class CapturasTest {
             session.start()
             assertTrue(session.state is Session.State.Ready)
             val finance = session.finance!!
-            prepararPantalla(finance, pantalla)
-            when (pantalla) {
-                5 -> assertEquals("Café", finance.lastDeleted?.description)
-                6 -> assertEquals("Cuenta principal", finance.selectedAccount?.name)
-                8, 34 -> assertNotNull(finance.selectedMovement)
-                10, 11 -> assertNotNull(finance.cards.selected?.let(finance.cards::summary))
-                13 -> {
-                    val compra = finance.cards.movements(finance.cards.selected!!).first { it.id == finance.cards.purchaseId }
+            val ruta = prepararPantalla(finance, pantalla)
+            assertEquals(pantalla, ruta.screen)
+            when (ruta) {
+                Route.Movimientos -> assertEquals("Café", finance.lastDeleted?.description)
+                is Route.Cuenta -> assertEquals("Cuenta principal", finance.account(ruta.accountId)?.name)
+                is Route.AccionesMovimiento -> assertNotNull(finance.movement(ruta.movementId))
+                is Route.DetalleMovimiento -> assertNotNull(finance.movement(ruta.movementId))
+                Route.Tarjetas -> assertNotNull(finance.cards.card(null)?.let(finance.cards::summary))
+                is Route.Tarjeta -> assertNotNull(finance.cards.card(ruta.cardId)?.let(finance.cards::summary))
+                is Route.AplazarCompra -> {
+                    val compra = finance.cards.movements(finance.cards.card(ruta.cardId)!!).first { it.id == ruta.movementId }
                     assertNotNull(finance.cards.installment(compra))
                 }
-                19 -> {
+                Route.Score -> {
                     finance.tracking.loadScores()
                     assertEquals(742, finance.tracking.latestScore?.score)
                 }
-                21 -> assertEquals("Streaming", finance.planning.seriesToEdit?.name)
-                23 -> assertNotNull(finance.planning.selectedGoal)
-                24 -> assertEquals("Viaje a Lisboa", finance.planning.goalToEdit?.name)
-                25, 27 -> assertEquals(2, finance.investments.plans.size)
-                26 -> assertEquals("Fondo indexado mundial", finance.investments.selected?.name)
+                is Route.FormPagoFijo -> assertEquals("Streaming", finance.planning.series.firstOrNull { it.id == ruta.seriesId }?.name)
+                is Route.Meta -> assertNotNull(finance.planning.goal(ruta.goalId))
+                is Route.FormMeta -> assertEquals("Viaje a Lisboa", finance.planning.goal(ruta.goalId!!)?.name)
+                Route.Cartera, Route.InversionesRecurrentes -> assertEquals(2, finance.investments.plans.size)
+                is Route.Activo -> assertEquals("Fondo indexado mundial", finance.investments.holding(ruta.holdingId)?.name)
+                else -> Unit
             }
         }
     }

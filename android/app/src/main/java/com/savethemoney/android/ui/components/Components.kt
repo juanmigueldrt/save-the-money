@@ -85,6 +85,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
@@ -675,7 +676,7 @@ fun Progress(fraction: Float, modifier: Modifier = Modifier.fillMaxWidth(), colo
 
 // ───────────────────────── Navegación ─────────────────────────
 
-enum class Tab(val label: String, val screen: Int) { Inicio("Inicio", 4), Presupuesto("Presupuesto", 14), Flujo("Flujo", 16), Metas("Metas", 22), Mas("Más", 30) }
+enum class Tab(val label: String, val route: Route) { Inicio("Inicio", Route.Inicio), Presupuesto("Presupuesto", Route.Presupuesto), Flujo("Flujo", Route.Flujo), Metas("Metas", Route.Metas), Mas("Más", Route.Mas) }
 
 private val Tab.icon: ImageVector
     get() = when (this) {

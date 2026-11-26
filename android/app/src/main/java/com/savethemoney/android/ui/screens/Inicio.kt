@@ -18,6 +18,7 @@ import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.Vista
 import com.savethemoney.android.ui.rememberAction
 import androidx.compose.runtime.getValue
@@ -63,7 +64,7 @@ fun Pantalla04(nav: Nav) {
     val inicioMes = total - finance.netThisMonth
     val variacion = if (inicioMes > 0) finance.netThisMonth * 1000 / inicioMes else null
     val proximo = finance.planning.nextExpense
-    val anadir = { nav.go(if (cuentas.isEmpty()) 9 else 7) }
+    val anadir = { nav.go(if (cuentas.isEmpty()) Route.FormCuenta() else Route.FormMovimiento()) }
     val recarga = rememberAction()
     StmScreen(
         topBar = {
@@ -72,8 +73,8 @@ fun Pantalla04(nav: Nav) {
                     if (Vista.incognito) StmIcons.visibilityOff else StmIcons.visibility, { Vista.setIncognito(!Vista.incognito) },
                     contentDescription = if (Vista.incognito) "Mostrar importes" else "Ocultar importes",
                 )
-                IconBtn(StmIcons.search, { nav.go(5) }, contentDescription = "Buscar")
-                Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(28) }, contentAlignment = Alignment.Center) {
+                IconBtn(StmIcons.search, { nav.go(Route.Movimientos) }, contentDescription = "Buscar")
+                Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(Route.Hogar) }, contentAlignment = Alignment.Center) {
                     Avatar(name.take(1).uppercase(), c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
                 }
             }
@@ -82,7 +83,7 @@ fun Pantalla04(nav: Nav) {
         bottomBar = { NavBar(Tab.Inicio, nav::tab, badgeOnMore = true) },
         fab = { Fab("Añadir movimiento", onClick = anadir) },
     ) {
-        StmCard(onClick = { nav.go(17) }) {
+        StmCard(onClick = { nav.go(Route.Patrimonio) }) {
             Text("Patrimonio neto", style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(3.dp))
             Text(Money.format(total, decimals = false), style = StmType.displaySmall, color = c.onSurface)
@@ -103,7 +104,7 @@ fun Pantalla04(nav: Nav) {
                 "Próximo cargo", proximo?.let { Money.format(it.amount, decimals = false) } ?: "—",
                 proximo?.let { "${it.series.trimmedName} · ${Fechas.corto(it.due)}" } ?: "Sin cargos a la vista",
                 Modifier.weight(1f),
-            ) { nav.go(20) }
+            ) { nav.go(Route.PagosFijos) }
         }
         if (finance.planning.pending.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
@@ -123,21 +124,21 @@ fun Pantalla04(nav: Nav) {
                 "Calendario de pagos", "Lo que se cobra cada día",
                 leading = { LeadIcon(StmIcons.calendarMonth, c.secondaryContainer, c.onSecondaryContainer) },
                 trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) },
-                onClick = { nav.go(43) },
+                onClick = { nav.go(Route.Calendario) },
             )
         }
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Últimos movimientos", "Ver todo") { nav.go(5) }
+        SectionHeader("Últimos movimientos", "Ver todo") { nav.go(Route.Movimientos) }
         if (finance.recent.isEmpty()) {
             Vacio("Todavía no hay movimientos.")
         } else {
             ListaMovimientos(finance.recent.take(3), finance) { m ->
                 finance.tappedMovement = m
-                nav.go(34)
+                nav.go(Route.DetalleMovimiento(m.id))
             }
         }
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Cuentas", "Añadir") { nav.go(9) }
+        SectionHeader("Cuentas", "Añadir") { nav.go(Route.FormCuenta()) }
         if (cuentas.isEmpty()) {
             Vacio("Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
         } else {
@@ -150,8 +151,7 @@ fun Pantalla04(nav: Nav) {
                         trailingText = Money.format(finance.balance(cuenta)),
                         leading = { LeadIcon(iconoCuenta(cuenta.kind)) },
                         onClick = {
-                            finance.selectedAccountId = cuenta.id
-                            nav.go(6)
+                            nav.go(Route.Cuenta(cuenta.id))
                         },
                     )
                 }
@@ -176,8 +176,7 @@ fun Pantalla04(nav: Nav) {
                             trailingColor = c.onSurfaceVariant,
                             leading = { LeadIcon(iconoCuenta(cuenta.kind)) },
                             onClick = {
-                                finance.selectedAccountId = cuenta.id
-                                nav.go(6)
+                                nav.go(Route.Cuenta(cuenta.id))
                             },
                         )
                     }

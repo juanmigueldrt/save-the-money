@@ -289,8 +289,8 @@
         errorLine1="    var dia1 by remember { mutableStateOf(actual.day1) }"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/savethemoney/android/ui/screens/Periodos.kt"
-            line="123"
+            file="src/main/java/com/savethemoney/android/ui/screens/Pantalla44.kt"
+            line="49"
             column="28"/>
     </issue>
 
@@ -300,8 +300,8 @@
         errorLine1="    var dia2 by remember { mutableStateOf(actual.day2 ?: maxOf(15, actual.day1 + 1)) }"
         errorLine2="                           ~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/savethemoney/android/ui/screens/Periodos.kt"
-            line="124"
+            file="src/main/java/com/savethemoney/android/ui/screens/Pantalla44.kt"
+            line="50"
             column="28"/>
     </issue>
 
@@ -377,8 +377,8 @@
         errorLine1="        prefs(context).edit().putString(KEY, Json.encodeToString(CsvSavedFormat.remember(format, load(context)))).apply()"
         errorLine2="        ~~~~~~~~~~~~~~~~~~~~~">
         <location
-            file="src/main/java/com/savethemoney/android/ui/screens/Mas.kt"
-            line="874"
+            file="src/main/java/com/savethemoney/android/ui/screens/Pantalla32.kt"
+            line="417"
             column="9"/>
     </issue>
 
