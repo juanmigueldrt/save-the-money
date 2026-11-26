@@ -143,7 +143,7 @@ class StmApp : android.app.Application() {
         val finance: FinanceService
         if (demo) {
             backend = InMemoryBackend()
-            finance = InMemoryFinance()
+            finance = InMemoryFinance(backend)
         } else {
             val remote = SupabaseBackend(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY)
             backend = remote
