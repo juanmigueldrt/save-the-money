@@ -284,12 +284,7 @@ struct RecurringFormView: View {
             .formStyle(.grouped)
             .brandBackground()
             .navigationTitle(series == nil ? "Nuevo pago fijo" : "Editar pago fijo")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
-                }
-            }
+            .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
             .confirmationDialog("¿Qué quieres hacer con este pago fijo?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Dejar de pagarlo desde hoy") { Task { await endToday() } }
                 Button("Borrarlo con sus pendientes", role: .destructive) { Task { await delete() } }

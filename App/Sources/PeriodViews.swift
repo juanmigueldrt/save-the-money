@@ -130,12 +130,7 @@ struct PayScheduleView: View {
             .formStyle(.grouped)
             .brandBackground()
             .navigationTitle("Día de cobro")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
-                }
-            }
+            .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
         }
         .frame(minWidth: 360, minHeight: 360)
         .onAppear(perform: fill)
@@ -307,12 +302,7 @@ struct ExtraBudgetFormView: View {
             .formStyle(.grouped)
             .brandBackground()
             .navigationTitle(isNew ? "Nuevo presupuesto extra" : extra.name)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") { Task { await save() } }.disabled(isWorking)
-                }
-            }
+            .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
             .confirmationDialog("¿Borrar «\(extra.name)»?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Borrar", role: .destructive) {
                     Task { if await budgets.delete(extra) { dismiss() } else { error = budgets.error } }

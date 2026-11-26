@@ -91,12 +91,8 @@ class InvestmentModel(
             turns.store(::plans, newPlans, turn)
             turns.store(::error, null, turn)
             reschedule()
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         }
     }
 

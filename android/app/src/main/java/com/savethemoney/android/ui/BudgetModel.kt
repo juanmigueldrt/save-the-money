@@ -139,12 +139,8 @@ class BudgetModel(val household: Household, private val service: FinanceService,
                 turns.store(::extraBudgets, extraList, turn)
             }
             turns.store(::error, null, turn)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         }
     }
 

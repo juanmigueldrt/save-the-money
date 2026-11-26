@@ -106,12 +106,12 @@ internal object RpcEscrituras {
     private fun RecurringSeries.params() = buildJsonObject {
         put("series", id)
         put("label", trimmedName)
-        put("series_kind", RECURRING_KIND.getValue(kind))
+        put("series_kind", Json.encodeToJsonElement(kind))
         put("amount", amountMinor)
         put("account", accountId)
         put("category", categoryId)
         put("step", every)
-        put("step_unit", unit.name.lowercase())
+        put("step_unit", Json.encodeToJsonElement(unit))
         put("starts", startsOn)
         put("ends", endsOn)
         put("remind_days", remindDaysBefore)
@@ -132,7 +132,7 @@ internal object RpcEscrituras {
         buildJsonObject {
             put("charge", charge.id)
             put("seen", charge.updatedAt)
-            put("new_status", status.name.lowercase())
+            put("new_status", Json.encodeToJsonElement(status))
             put("movement", if (status == ChargeStatus.Pending) null else transactionId)
         },
     )
@@ -141,7 +141,7 @@ internal object RpcEscrituras {
     private fun Goal.params() = buildJsonObject {
         put("goal", id)
         put("label", trimmedName)
-        put("goal_kind", kind.name.lowercase())
+        put("goal_kind", Json.encodeToJsonElement(kind))
         put("target", targetMinor)
         put("starting", startingMinor)
         put("monthly_plan", monthlyPlanMinor)
@@ -175,7 +175,7 @@ internal object RpcEscrituras {
         put("statement", statementDay)
         put("payment", paymentDay)
         put("delay_months", paymentDelayMonths)
-        put("mode", paymentMode.name.lowercase())
+        put("mode", Json.encodeToJsonElement(paymentMode))
         put("fixed_payment", fixedPayment)
         put("min_percent", minPaymentPercent)
         put("min_payment", minPayment)

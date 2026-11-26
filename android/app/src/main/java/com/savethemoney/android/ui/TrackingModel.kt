@@ -12,7 +12,6 @@ import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.NetWorth
 import com.savethemoney.android.data.NetWorthPoint
-import kotlinx.coroutines.CancellationException
 import java.time.LocalDate
 import java.time.YearMonth
 
@@ -48,12 +47,8 @@ class TrackingModel(private val household: Household, private val service: Finan
         try {
             block(turn)
             turns.store(::error, null, turn)
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: AppError) {
-            turns.store(::error, e.message, turn)
         } catch (e: Exception) {
-            turns.store(::error, AppError.Unknown("app").message, turn)
+            turns.fallaCarga(::error, turn, e)
         }
     }
 
