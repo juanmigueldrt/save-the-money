@@ -77,7 +77,7 @@ struct SummaryView: View {
                                 .font(Typography.subheadlineEmphasis)
                         }
                         if finance.activeAccounts.isEmpty {
-                            EmptyHint(text: "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
+                            EmptyHint(text: finance.isLoading ? "Cargando…" : "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
                         }
                         ForEach(finance.activeAccounts) { account in
                             NavigationLink(value: account) {
@@ -111,7 +111,7 @@ struct SummaryView: View {
                                 .font(Typography.subheadlineEmphasis)
                         }
                         if finance.recent.isEmpty {
-                            EmptyHint(text: "Todavía no hay movimientos.")
+                            EmptyHint(text: finance.isLoading ? "Cargando…" : "Todavía no hay movimientos.")
                         }
                         ForEach(finance.recent.prefix(8)) { movement in
                             MovementRow(movement: movement, showsAccount: true)
@@ -315,7 +315,7 @@ struct MovementsView: View {
             }
             if source.isEmpty {
                 if accountLoadError == nil {
-                    EmptyHint(text: "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+                    EmptyHint(text: finance.isLoading ? "Cargando…" : "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
                 }
             } else if isFiltering {
                 Section {

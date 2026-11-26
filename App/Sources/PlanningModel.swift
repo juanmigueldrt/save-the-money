@@ -20,7 +20,7 @@ final class PlanningModel: ServerModel {
     private(set) var charges: [RecurringCharge] = []
     /// Los últimos movimientos que se han visto, para emparejar los pendientes al recargar.
     private var knownMovements: [Movement] = []
-    private(set) var isLoading = false
+    var isLoading = false
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
 
@@ -63,8 +63,8 @@ final class PlanningModel: ServerModel {
     func contributions(of goal: Goal) -> [GoalContribution] { contributions.filter { $0.goalId == goal.id } }
 
     func load() async {
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         let recurringService = recurringService, goalService = goalService, id = household.id, turn = nextTurn()
         let loaded = await perform(turn: turn) {
             async let series = recurringService.recurringSeries(in: id)

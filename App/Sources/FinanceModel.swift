@@ -14,7 +14,7 @@ final class FinanceModel: ServerModel {
     private(set) var balances: [UUID: Money] = [:]
     private(set) var categories: [BudgetCategory] = []
     private(set) var recent: [Movement] = []
-    private(set) var isLoading = false
+    var isLoading = false
     /// La primera carga ya ha terminado (bien o mal). Antes, RootView no carga lo que depende de ella.
     private(set) var hasLoaded = false
     var error: String?
@@ -47,8 +47,8 @@ final class FinanceModel: ServerModel {
     }
 
     func load() async {
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         let service = service, id = household.id, turn = nextTurn()
         await perform(turn: turn) {
             async let accounts = service.accounts(in: id)

@@ -95,7 +95,7 @@ struct InvestmentsView: View {
                         Text("Sin inversiones todavía")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker.")
+                        EmptyHint(text: investments.isLoading ? "Cargando…" : "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker.")
                         Button("Añadir un activo") { addingHolding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -380,7 +380,6 @@ struct HoldingDetailView: View {
                 Text("Esto no es asesoramiento de inversión. La compra se apunta en la app; tu bróker no recibe ninguna orden.")
                     .font(Typography.footnote)
                     .foregroundStyle(Palette.labelSecondary)
-                ErrorText(message: investments.error)
             }
             .pageLayout()
         }
@@ -462,7 +461,7 @@ struct HoldingDetailView: View {
                     }
                 }
             } else {
-                EmptyHint(text: "Todavía no tienes participaciones. Apunta tu primera compra.")
+                EmptyHint(text: investments.isLoading ? "Cargando…" : "Todavía no tienes participaciones. Apunta tu primera compra.")
             }
             if position.realized.minor != 0 {
                 Text("Ganancia ya hecha con ventas: \(InvestmentText.signed(position.realized))")

@@ -19,7 +19,7 @@ struct CreditCardsView: View {
                         Text("Aún no hay tarjetas")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: "Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes.")
+                        EmptyHint(text: cards.isLoading ? "Cargando…" : "Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes.")
                         Button("Añadir tarjeta") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -255,7 +255,6 @@ struct CreditCardDetailView: View {
                     }
                     .card()
                 }
-                ErrorText(message: cards.error)
             }
             .pageLayout()
         }
