@@ -19,12 +19,15 @@ import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Vista
+import com.savethemoney.android.ui.rememberAction
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.savethemoney.android.ui.iconoCuenta
 import com.savethemoney.android.ui.components.Avatar
+import com.savethemoney.android.ui.components.Btn
+import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.Divider
 import com.savethemoney.android.ui.components.Fab
 import com.savethemoney.android.ui.components.IconBtn
@@ -61,6 +64,7 @@ fun Pantalla04(nav: Nav) {
     val variacion = if (inicioMes > 0) finance.netThisMonth * 1000 / inicioMes else null
     val proximo = finance.planning.nextExpense
     val anadir = { nav.go(if (cuentas.isEmpty()) 9 else 7) }
+    val recarga = rememberAction()
     StmScreen(
         topBar = {
             TopBar(null, navIcon = StmIcons.menu, onNav = { nav.tab(Tab.Mas) }) {
@@ -199,6 +203,8 @@ fun Pantalla04(nav: Nav) {
         finance.error?.let {
             Spacer(Modifier.height(16.dp))
             Text(it, style = StmType.bodySmall, color = c.error)
+            // Es un problema de carga (también tras guardar algo): se reintenta cargando, nunca guardando otra vez.
+            Btn("Reintentar", { recarga.run { finance.load() } }, kind = BtnKind.Text, enabled = !recarga.busy)
         }
     }
 }
