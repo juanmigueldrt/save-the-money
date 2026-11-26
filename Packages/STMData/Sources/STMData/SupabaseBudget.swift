@@ -6,7 +6,7 @@ import Supabase
 /// presupuesto y límites en una sola transacción con los permisos de quien llama.
 extension SupabaseBackend: BudgetService {
     private static let budgetColumns = "id,household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
-    private static let extraColumns = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
+    private static let extraColumns = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite,updated_at"
     private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
 
     public func budget(startingOn day: CalendarDay, in householdId: UUID) async throws -> Budget? {
@@ -81,23 +81,25 @@ extension SupabaseBackend: BudgetService {
 
     public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
         if let issue = budget.issue { throw AppError.invalidInput(issue) }
-        let updated: [ExtraBudget] = try await mapped {
-            try await client.from("extra_budgets")
-                .update(ExtraBudgetChanges(budget))
-                .eq("id", value: budget.id.uuidString)
-                .select(Self.extraColumns)
-                .execute()
-                .value
+        return try await saved(Self.saveExtraBudgetCall(budget), columns: Self.extraColumns)
+    }
+
+    static func saveExtraBudgetCall(_ budget: ExtraBudget) -> RpcCall {
+        var params: [String: AnyJSON] = [
+            "budget": .uuid(budget.id), "label": .string(budget.trimmedName), "cap": .integer(budget.limit.minor),
+            "starts": .day(budget.startsOn), "ends": .day(budget.endsOn),
+            "category_list": .array(budget.categoryIds.map { .string($0.uuidString) }),
+            "account_list": .array(budget.accountIds.map { .string($0.uuidString) }),
+            "favorite": .bool(budget.isFavorite)
+        ]
+        // Sin versión es uno nuevo: `create_extra_budget` no lo repite si ya estaba guardado.
+        guard let seen = budget.updatedAt else {
+            params["household"] = .uuid(budget.householdId)
+            return RpcCall(function: "create_extra_budget", params: params)
         }
-        if let first = updated.first { return first }
-        return try await mapped {
-            try await client.from("extra_budgets")
-                .insert(budget)
-                .select(Self.extraColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `update_extra_budget` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        params["seen"] = .string(seen)
+        return RpcCall(function: "update_extra_budget", params: params)
     }
 
     public func deleteExtraBudget(_ id: UUID) async throws {
@@ -244,33 +246,5 @@ private struct PayScheduleRow: Codable, Sendable {
         try c.encode(day1, forKey: .day1)
         try c.encode(day2, forKey: .day2)
         try c.encode(anchorOn, forKey: .anchorOn)
-    }
-}
-
-/// Lo que se puede cambiar de un presupuesto extra (ni el id ni el hogar).
-private struct ExtraBudgetChanges: Encodable, Sendable {
-    var budget: ExtraBudget
-
-    init(_ budget: ExtraBudget) { self.budget = budget }
-
-    enum CodingKeys: String, CodingKey {
-        case name
-        case limitMinor = "limit_minor"
-        case startsOn = "starts_on"
-        case endsOn = "ends_on"
-        case categoryIds = "category_ids"
-        case accountIds = "account_ids"
-        case isFavorite = "is_favorite"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(budget.trimmedName, forKey: .name)
-        try c.encode(budget.limit.minor, forKey: .limitMinor)
-        try c.encode(budget.startsOn, forKey: .startsOn)
-        try c.encode(budget.endsOn, forKey: .endsOn)
-        try c.encode(budget.categoryIds, forKey: .categoryIds)
-        try c.encode(budget.accountIds, forKey: .accountIds)
-        try c.encode(budget.isFavorite, forKey: .isFavorite)
     }
 }

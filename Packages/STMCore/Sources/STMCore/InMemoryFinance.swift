@@ -28,25 +28,32 @@ extension InMemoryBackend: FinanceService {
         if let owner = draft.ownerId, !isMember(owner, of: householdId) {
             throw AppError.invalidInput("Esa persona no es del hogar.")
         }
-        let account = Account(householdId: householdId, name: draft.trimmedName, kind: draft.kind,
-                              openingBalance: draft.openingBalance, ownerId: draft.ownerId)
+        // Repetir el alta solo vale con el mismo hogar, nombre, tipo y saldo inicial.
+        if let saved = try replayed(financeAccounts.first(where: { $0.id == draft.id }), by: user, same: {
+            $0.householdId == householdId && $0.name == draft.trimmedName && $0.kind == draft.kind
+                && $0.openingBalance.minor == draft.openingBalance.minor
+        }) { return saved }
+        let account = Account(id: draft.id, householdId: householdId, name: draft.trimmedName, kind: draft.kind,
+                              openingBalance: draft.openingBalance, ownerId: draft.ownerId, updatedAt: nextVersion())
         financeAccounts.append(account)
         creators[account.id] = user
         return account
     }
 
     public func updateAccount(_ account: Account) async throws -> Account {
-        guard let index = financeAccounts.firstIndex(where: { $0.id == account.id }) else { throw AppError.unknown("cuenta") }
+        guard let index = financeAccounts.firstIndex(where: { $0.id == account.id }) else { throw AppError.movementChanged }
         let householdId = financeAccounts[index].householdId
-        let user = try requireMember(of: householdId)
-        guard isMine(account.id, in: householdId, user: user) else { throw AppError.unknown("cuenta") }
+        let user = try requireCurrent(account.id, seen: account.updatedAt, stored: financeAccounts[index].updatedAt, in: householdId)
         var updated = account
         updated.householdId = householdId
+        updated.updatedAt = nextVersion()
         if updated.isDefault && !updated.isArchived {
-            // Como en la base de datos: sólo una predeterminada por persona.
+            // Como en la base de datos: sólo una predeterminada por persona. La que deja de serlo cambia de versión.
             for other in financeAccounts.indices
-            where financeAccounts[other].id != account.id && creators[financeAccounts[other].id] == user {
+            where financeAccounts[other].id != account.id && creators[financeAccounts[other].id] == user
+                && financeAccounts[other].isDefault {
                 financeAccounts[other].isDefault = false
+                financeAccounts[other].updatedAt = nextVersion()
             }
         }
         financeAccounts[index] = updated
@@ -77,8 +84,13 @@ extension InMemoryBackend: FinanceService {
         // Como el índice único del servidor: el nombre no se repite entre las categorías propias.
         let own = financeCategories.filter { creators[$0.id] == user }
         if let issue = category.issue(among: own) { throw AppError.invalidInput(issue) }
-        var created = BudgetCategory(householdId: category.householdId, name: category.trimmedName, kind: category.kind,
-                                     budgetGroup: category.budgetGroup, icon: category.icon)
+        // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
+        if let stored = try replayed(financeCategories.first(where: { $0.id == category.id }), by: user, same: {
+            $0.householdId == category.householdId && $0.name == category.trimmedName && $0.kind == category.kind
+        }) { return stored }
+        var created = BudgetCategory(id: category.id, householdId: category.householdId, name: category.trimmedName,
+                                     kind: category.kind, budgetGroup: category.budgetGroup, icon: category.icon,
+                                     updatedAt: nextVersion())
         if created.kind != .expense { created.budgetGroup = nil }
         financeCategories.append(created)
         creators[created.id] = user
@@ -86,11 +98,11 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
-        guard let index = financeCategories.firstIndex(where: { $0.id == category.id }) else { throw AppError.unknown("categoría") }
+        guard let index = financeCategories.firstIndex(where: { $0.id == category.id }) else { throw AppError.movementChanged }
         let current = financeCategories[index]
-        let user = try requireMember(of: current.householdId)
-        guard isMine(current.id, in: current.householdId, user: user) else { throw AppError.unknown("categoría") }
+        let user = try requireCurrent(current.id, seen: category.updatedAt, stored: current.updatedAt, in: current.householdId)
         var updated = current
+        updated.updatedAt = nextVersion()
         updated.name = category.trimmedName
         updated.budgetGroup = current.kind == .expense ? category.budgetGroup : nil
         updated.icon = category.icon

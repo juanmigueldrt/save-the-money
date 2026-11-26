@@ -865,6 +865,8 @@ fun Pantalla09(nav: Nav) {
     var predeterminada by remember { mutableStateOf(editando?.isDefault ?: false) }
     var patrimonio by remember { mutableStateOf(editando?.includeInNetWorth ?: true) }
     val action = rememberAction()
+    // Identificador de la cuenta nueva, uno por formulario: reintentar el alta con el mismo no crea otra.
+    val idCuenta = remember { java.util.UUID.randomUUID().toString() }
     // Una tarjeta ya creada no puede cambiar de tipo (el servidor también lo rechaza).
     val tarjetaFija = editando?.kind == AccountKind.CreditCard
     val tipos = listOf(AccountKind.Checking, AccountKind.Savings, AccountKind.CreditCard, AccountKind.Cash, AccountKind.Investment)
@@ -874,7 +876,7 @@ fun Pantalla09(nav: Nav) {
     fun guardar() = action.run {
         val apertura = if (saldo.isBlank()) 0L else Money.entered(saldo) ?: throw AppError.InvalidInput("El saldo inicial no es un importe válido.")
         val dueno = if (compartir) null else editando?.ownerId ?: session.profile?.id
-        val draft = AccountDraft(nombre, tipo, apertura, dueno)
+        val draft = AccountDraft(nombre, tipo, apertura, dueno, idCuenta)
         draft.issue?.let { throw AppError.InvalidInput(it) }
         if (editando != null) {
             finance.updateAccount(

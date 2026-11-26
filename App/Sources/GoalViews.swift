@@ -244,6 +244,8 @@ struct GoalFormView: View {
     @State private var hasDate = false
     @State private var targetOn = CalendarDay.gregorian.date(byAdding: .year, value: 1, to: Date()) ?? Date()
     @State private var accountId: UUID?
+    /// Identificador de la meta nueva, uno por formulario: reintentar el alta con el mismo no crea otra.
+    @State private var newGoalId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -333,7 +335,7 @@ struct GoalFormView: View {
             error = "Algún importe no es válido."
             return
         }
-        var item = goal ?? Goal(householdId: planning.household.id, name: name, target: targetMoney)
+        var item = goal ?? Goal(id: newGoalId, householdId: planning.household.id, name: name, target: targetMoney)
         item.name = name
         item.kind = kind
         item.target = targetMoney
@@ -369,6 +371,8 @@ struct ContributionFormView: View {
     @State private var isWithdrawal = false
     @State private var madeOn = Date()
     @State private var note = ""
+    /// Identificador de la aportación, uno por formulario: reintentarla con el mismo no la apunta dos veces.
+    @State private var contributionId = UUID()
     @State private var error: String?
     @State private var isWorking = false
 
@@ -409,7 +413,7 @@ struct ContributionFormView: View {
         isWorking = true
         defer { isWorking = false }
         let signed = isWithdrawal ? -money : money
-        if await planning.contribute(signed, to: goal, on: CalendarDay(madeOn), note: note) {
+        if await planning.contribute(signed, to: goal, on: CalendarDay(madeOn), note: note, id: contributionId) {
             dismiss()
         } else {
             error = planning.error

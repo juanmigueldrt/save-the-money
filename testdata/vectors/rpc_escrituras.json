@@ -1,0 +1,85 @@
+{
+  "description": "ORC-142. Las 20 funciones de alta y de cambio de 20261126140000_orc142_escrituras_idempotentes.sql y los nombres exactos de sus parámetros, que son las claves JSON que mandan las apps a POST /rest/v1/rpc/<name>. Escritos a mano desde la migración, no copiados de lo que mandan las apps. Lo leen RpcEscriturasTests (STMData), RpcEscriturasTest (Android) y supabase/tests/api/escrituras_idempotentes.py, que hace las llamadas contra el PostgREST local: si una clave sobra o falta, PostgREST no encuentra la función (PGRST202).",
+  "functions": [
+    {
+      "name": "create_account",
+      "keys": ["account", "household", "label", "account_kind", "opening", "owner"]
+    },
+    {
+      "name": "update_account",
+      "keys": ["account", "seen", "label", "account_kind", "opening", "owner", "archived", "make_default", "in_net_worth"]
+    },
+    {
+      "name": "create_goal",
+      "keys": ["goal", "household", "label", "goal_kind", "target", "starting", "monthly_plan", "due", "account", "icon_name", "completed", "archived"]
+    },
+    {
+      "name": "update_goal",
+      "keys": ["goal", "seen", "label", "goal_kind", "target", "starting", "monthly_plan", "due", "account", "icon_name", "completed", "archived"]
+    },
+    {
+      "name": "create_goal_contribution",
+      "keys": ["contribution", "household", "goal", "amount", "made", "remark"]
+    },
+    {
+      "name": "create_recurring_series",
+      "keys": ["series", "household", "label", "series_kind", "amount", "account", "category", "step", "step_unit", "starts", "ends", "remind_days", "archived", "intro_amount", "intro_count", "pending", "pending_start"]
+    },
+    {
+      "name": "update_recurring_series",
+      "keys": ["series", "seen", "label", "series_kind", "amount", "account", "category", "step", "step_unit", "starts", "ends", "remind_days", "archived", "intro_amount", "intro_count", "pending", "pending_start"]
+    },
+    {
+      "name": "create_credit_card",
+      "keys": ["card", "household", "credit_limit", "statement", "payment", "delay_months", "mode", "fixed_payment", "min_percent", "min_payment", "revolving", "installments", "pay_from", "remind_days", "alert"]
+    },
+    {
+      "name": "update_credit_card",
+      "keys": ["card", "seen", "credit_limit", "statement", "payment", "delay_months", "mode", "fixed_payment", "min_percent", "min_payment", "revolving", "installments", "pay_from", "remind_days", "alert"]
+    },
+    {
+      "name": "create_card_installment",
+      "keys": ["installment", "household", "card", "movement", "plan_months", "plan_rate"]
+    },
+    {
+      "name": "update_card_installment",
+      "keys": ["installment", "seen", "plan_months", "plan_rate"]
+    },
+    {
+      "name": "create_holding",
+      "keys": ["holding", "household", "label", "ticker", "holding_kind", "asset", "account", "owner", "unit_price", "priced", "fee", "remark", "archived"]
+    },
+    {
+      "name": "update_holding",
+      "keys": ["holding", "seen", "label", "ticker", "holding_kind", "asset", "account", "owner", "unit_price", "priced", "fee", "remark", "archived"]
+    },
+    {
+      "name": "create_investment_plan",
+      "keys": ["plan", "household", "holding", "account", "amount", "step", "step_unit", "starts", "ends", "annual_return", "remind_days", "paused", "archived"]
+    },
+    {
+      "name": "update_investment_plan",
+      "keys": ["plan", "seen", "account", "amount", "step", "step_unit", "starts", "ends", "annual_return", "remind_days", "paused", "archived"]
+    },
+    {
+      "name": "create_category",
+      "keys": ["category", "household", "label", "category_kind", "budget", "icon_name"]
+    },
+    {
+      "name": "update_category",
+      "keys": ["category", "seen", "label", "budget", "icon_name"]
+    },
+    {
+      "name": "create_extra_budget",
+      "keys": ["budget", "household", "label", "cap", "starts", "ends", "category_list", "account_list", "favorite"]
+    },
+    {
+      "name": "update_extra_budget",
+      "keys": ["budget", "seen", "label", "cap", "starts", "ends", "category_list", "account_list", "favorite"]
+    },
+    {
+      "name": "update_recurring_charge",
+      "keys": ["charge", "seen", "new_status", "movement"]
+    }
+  ]
+}

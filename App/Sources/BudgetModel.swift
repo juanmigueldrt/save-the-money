@@ -163,9 +163,11 @@ final class BudgetModel: ServerModel {
         return ok
     }
 
+    /// Uno sin versión (`updatedAt`) aún no se ha leído del servidor: es un alta, con el id que le dio el
+    /// formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ extra: ExtraBudget) async -> Bool {
-        await perform {
+        let ok = await perform {
             let saved = try await self.service.saveExtraBudget(extra)
             // Se ve ya, aunque falle la recarga.
             markChanged(\.extraBudgets)
@@ -177,6 +179,15 @@ final class BudgetModel: ServerModel {
                 store(list, in: \.extraBudgets, turn: turn)
             }
         }
+        // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                let list = try await self.service.extraBudgets(in: self.household.id)
+                store(list, in: \.extraBudgets, turn: turn)
+            }
+        }
+        return ok
     }
 
     @discardableResult

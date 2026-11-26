@@ -61,6 +61,9 @@ jobs:
       # ORC-146: los filtros de búsqueda, el cursor y las páginas de 1000 contra el PostgREST local.
       - name: Filtros de PostgREST
         run: python3 supabase/tests/api/filtros_postgrest.py
+      # ORC-142: las 20 funciones de alta y de cambio, con las claves que mandan las apps, contra el PostgREST local.
+      - name: Escrituras idempotentes por PostgREST
+        run: python3 supabase/tests/api/escrituras_idempotentes.py
 
   apple:
     name: App (iOS y macOS)

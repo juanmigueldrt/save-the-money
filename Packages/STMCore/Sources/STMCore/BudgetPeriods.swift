@@ -306,10 +306,14 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
     public var categoryIds: [UUID]
     public var accountIds: [UUID]
     public var isFavorite: Bool
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Nil en uno que
+    /// aún no se ha guardado: guardarlo es un alta.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String = "", limit: Money = .zero,
                 startsOn: CalendarDay = CalendarDay(), endsOn: CalendarDay? = nil,
-                categoryIds: [UUID] = [], accountIds: [UUID] = [], isFavorite: Bool = false) {
+                categoryIds: [UUID] = [], accountIds: [UUID] = [], isFavorite: Bool = false, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -356,6 +360,7 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
         case categoryIds = "category_ids"
         case accountIds = "account_ids"
         case isFavorite = "is_favorite"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -369,6 +374,7 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
         categoryIds = try c.decodeIfPresent([UUID].self, forKey: .categoryIds) ?? []
         accountIds = try c.decodeIfPresent([UUID].self, forKey: .accountIds) ?? []
         isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     public func encode(to encoder: Encoder) throws {

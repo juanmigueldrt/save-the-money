@@ -325,6 +325,8 @@ struct CategoryFormView: View {
     @State private var kind: CategoryKind = .expense
     @State private var group: BudgetGroup? = .needs
     @State private var icon = "tag"
+    /// Identificador de la categoría nueva, uno por formulario: reintentar el alta con el mismo no crea otra.
+    @State private var newCategoryId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -414,7 +416,7 @@ struct CategoryFormView: View {
     }
 
     private func save() async {
-        var item = category ?? BudgetCategory(householdId: finance.household.id, name: name, kind: kind)
+        var item = category ?? BudgetCategory(id: newCategoryId, householdId: finance.household.id, name: name, kind: kind)
         item.name = name
         item.budgetGroup = kind == .expense ? group : nil
         item.icon = icon

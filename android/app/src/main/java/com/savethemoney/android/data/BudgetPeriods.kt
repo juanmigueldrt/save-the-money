@@ -250,6 +250,11 @@ data class ExtraBudget(
     val categoryIds: List<String> = emptyList(),
     val accountIds: List<String> = emptyList(),
     val isFavorite: Boolean = false,
+    /**
+     * Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Nulo en uno que aún no se
+     * ha guardado: guardarlo es un alta.
+     */
+    val updatedAt: String? = null,
 ) {
     val trimmedName: String get() = name.trim()
 

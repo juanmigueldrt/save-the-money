@@ -27,6 +27,13 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
 
+    /**
+     * Llama a una función `create_…` o `update_…` (ORC-142) y pide la fila guardada. Un alta repetida devuelve la que
+     * había; un cambio sobre una versión que ya no es la del servidor falla con STM05. Qué se manda: [RpcEscrituras].
+     */
+    private suspend fun io.github.jan.supabase.SupabaseClient.saved(call: RpcCall, columns: String) =
+        postgrest.rpc(call.function, call.params) { select(Columns.raw(columns)) }
+
     override suspend fun accounts(householdId: String): List<Account> = backend.mapped {
         allPages { from, to ->
             client.from("accounts").select(Columns.raw(ACCOUNT)) {
@@ -50,19 +57,11 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createAccount(draft: AccountDraft, householdId: String): Account = backend.mapped {
         draft.issue?.let(::fail)
-        client.from("accounts").insert(NewAccountRow(householdId, draft.trimmedName, draft.kind, draft.openingMinor, draft.ownerId)) {
-            select(Columns.raw(ACCOUNT))
-        }.decodeSingle()
+        client.saved(RpcEscrituras.createAccount(draft, householdId), ACCOUNT).decodeSingle()
     }
 
     override suspend fun updateAccount(account: Account): Account = backend.mapped {
-        client.from("accounts").update(AccountChanges(
-            account.name.trim(), account.kind, account.openingMinor, account.ownerId, account.archivedAt,
-            account.isDefault && !account.isArchived, account.includeInNetWorth,
-        )) {
-            select(Columns.raw(ACCOUNT))
-            filter { eq("id", account.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updateAccount(account), ACCOUNT).decodeSingle()
     }
 
     override suspend fun deleteAccount(accountId: String) = backend.mapped {
@@ -81,21 +80,15 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    private fun CategoryKind.groupOf(category: BudgetCategory) = if (this == CategoryKind.Expense) category.budgetGroup else null
-
     override suspend fun createCategory(category: BudgetCategory): BudgetCategory = backend.mapped {
         category.issue(emptyList())?.let(::fail)
-        val row = NewCategoryRow(category.householdId, category.kind, category.trimmedName, category.kind.groupOf(category), category.icon)
-        client.from("categories").insert(row) { select(Columns.raw(CATEGORY)) }.decodeSingle()
+        client.saved(RpcEscrituras.createCategory(category), CATEGORY).decodeSingle()
     }
 
     /** Solo nombre, grupo e icono: el tipo de una categoría no se cambia. */
     override suspend fun updateCategory(category: BudgetCategory): BudgetCategory = backend.mapped {
         category.issue(emptyList())?.let(::fail)
-        client.from("categories").update(CategoryChanges(category.trimmedName, category.kind.groupOf(category), category.icon)) {
-            select(Columns.raw(CATEGORY))
-            filter { eq("id", category.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updateCategory(category), CATEGORY).decodeSingle()
     }
 
     override suspend fun deleteCategory(categoryId: String) = backend.mapped {
@@ -317,22 +310,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     /** Se actualiza por id; si no había fila, se crea. */
     override suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget = backend.mapped {
         budget.issue?.let(::fail)
-        val changes = buildJsonObject {
-            put("name", budget.trimmedName)
-            put("limit_minor", budget.limit)
-            put("starts_on", budget.startsOn.toString())
-            put("ends_on", budget.endsOn?.toString())
-            putJsonArray("category_ids") { budget.categoryIds.forEach { add(JsonPrimitive(it)) } }
-            putJsonArray("account_ids") { budget.accountIds.forEach { add(JsonPrimitive(it)) } }
-            put("is_favorite", budget.isFavorite)
-        }
-        client.from("extra_budgets").update(changes) {
-            select(Columns.raw(EXTRA))
-            filter { eq("id", budget.id) }
-        }.decodeList<ExtraRow>().firstOrNull()?.extra
-            ?: client.from("extra_budgets").insert(JsonObject(changes + mapOf("id" to JsonPrimitive(budget.id), "household_id" to JsonPrimitive(budget.householdId)))) {
-                select(Columns.raw(EXTRA))
-            }.decodeSingle<ExtraRow>().extra
+        client.saved(RpcEscrituras.saveExtraBudget(budget), EXTRA).decodeSingle<ExtraRow>().extra
     }
 
     override suspend fun deleteExtraBudget(id: String) = backend.mapped {
@@ -361,8 +339,6 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     // MARK: pagos fijos y metas. household_id solo al insertar: el servidor no deja cambiarlo después.
 
-    private fun withHousehold(columns: JsonObject, householdId: String) = JsonObject(columns + ("household_id" to JsonPrimitive(householdId)))
-
     override suspend fun recurringSeries(householdId: String): List<RecurringSeries> = backend.mapped {
         allPages { from, to ->
             client.from("recurring_series").select(Columns.raw(SERIES)) {
@@ -376,15 +352,12 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
         series.issue?.let(::fail)
-        client.from("recurring_series").insert(withHousehold(series.columns(), series.householdId)) { select(Columns.raw(SERIES)) }.decodeSingle()
+        client.saved(RpcEscrituras.createRecurring(series), SERIES).decodeSingle()
     }
 
     override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
         series.issue?.let(::fail)
-        client.from("recurring_series").update(series.columns()) {
-            select(Columns.raw(SERIES))
-            filter { eq("id", series.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updateRecurring(series), SERIES).decodeSingle()
     }
 
     override suspend fun deleteRecurring(seriesId: String) = backend.mapped {
@@ -431,12 +404,8 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         client.from("transactions").select(Columns.raw(MOVEMENT)) { filter { eq("id", movementId) } }.decodeSingle()
     }
 
-    override suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?) = backend.mapped {
-        client.from("recurring_charges").update(buildJsonObject {
-            put("status", status.name.lowercase())
-            put("transaction_id", if (status == ChargeStatus.Pending) null else transactionId)
-        }) { filter { eq("id", chargeId) } }
-        Unit
+    override suspend fun updateCharge(charge: RecurringCharge, status: ChargeStatus, transactionId: String?): RecurringCharge = backend.mapped {
+        client.saved(RpcEscrituras.updateCharge(charge, status, transactionId), CHARGE).decodeSingle()
     }
 
     override suspend fun goals(householdId: String): List<Goal> = backend.mapped {
@@ -452,15 +421,12 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun createGoal(goal: Goal): Goal = backend.mapped {
         goal.issue?.let(::fail)
-        client.from("goals").insert(withHousehold(goal.columns(), goal.householdId)) { select(Columns.raw(GOAL)) }.decodeSingle()
+        client.saved(RpcEscrituras.createGoal(goal), GOAL).decodeSingle()
     }
 
     override suspend fun updateGoal(goal: Goal): Goal = backend.mapped {
         goal.issue?.let(::fail)
-        client.from("goals").update(goal.columns()) {
-            select(Columns.raw(GOAL))
-            filter { eq("id", goal.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updateGoal(goal), GOAL).decodeSingle()
     }
 
     override suspend fun deleteGoal(goalId: String) = backend.mapped {
@@ -481,14 +447,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun addContribution(contribution: GoalContribution): GoalContribution = backend.mapped {
         contribution.issue?.let(::fail)
-        val row = buildJsonObject {
-            put("household_id", contribution.householdId)
-            put("goal_id", contribution.goalId)
-            put("amount_minor", contribution.amountMinor)
-            put("made_on", contribution.madeOn)
-            put("note", contribution.note)
-        }
-        client.from("goal_contributions").insert(row) { select(Columns.raw(CONTRIBUTION)) }.decodeSingle()
+        client.saved(RpcEscrituras.addContribution(contribution), CONTRIBUTION).decodeSingle()
     }
 
     override suspend fun creditCards(householdId: String): List<CreditCardTerms> = backend.mapped {
@@ -504,13 +463,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     // No se usa upsert: haría UPDATE de la cuenta y el hogar, que no se pueden cambiar.
     override suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms = backend.mapped {
         terms.issue?.let(::fail)
-        client.from("credit_cards").update(terms.columns()) {
-            select(Columns.raw(CARD))
-            filter { eq("account_id", terms.accountId) }
-        }.decodeList<CreditCardTerms>().firstOrNull()
-            ?: client.from("credit_cards").insert(
-                JsonObject(terms.columns() + mapOf("account_id" to JsonPrimitive(terms.accountId), "household_id" to JsonPrimitive(terms.householdId))),
-            ) { select(Columns.raw(CARD)) }.decodeSingle()
+        client.saved(RpcEscrituras.saveCreditCard(terms), CARD).decodeSingle()
     }
 
     override suspend fun cardInstallments(householdId: String): List<CardInstallment> = backend.mapped {
@@ -525,23 +478,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun saveInstallment(installment: CardInstallment): CardInstallment = backend.mapped {
         installment.issue?.let(::fail)
-        val changes = buildJsonObject {
-            put("months", installment.months)
-            put("rate", installment.rate)
-        }
-        client.from("card_installments").update(changes) {
-            select(Columns.raw(INSTALLMENT))
-            filter { eq("transaction_id", installment.movementId) }
-        }.decodeList<CardInstallment>().firstOrNull()
-            ?: client.from("card_installments").insert(
-                JsonObject(
-                    changes + mapOf(
-                        "household_id" to JsonPrimitive(installment.householdId),
-                        "account_id" to JsonPrimitive(installment.accountId),
-                        "transaction_id" to JsonPrimitive(installment.movementId),
-                    ),
-                ),
-            ) { select(Columns.raw(INSTALLMENT)) }.decodeSingle()
+        client.saved(RpcEscrituras.saveInstallment(installment), INSTALLMENT).decodeSingle()
     }
 
     override suspend fun creditScores(): List<CreditScore> = backend.mapped {
@@ -593,32 +530,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    private fun Holding.columns() = buildJsonObject {
-        put("name", trimmedName)
-        put("symbol", trimmedSymbol)
-        put("kind", Json.encodeToJsonElement(kind))
-        put("asset_class", Json.encodeToJsonElement(assetClass))
-        put("account_id", accountId)
-        put("owner_id", ownerId)
-        put("price", price.toPlainString())
-        put("price_on", priceOn)
-        put("fee_rate", feeRate.toPlainString())
-        put("note", note)
-        put("archived_at", archivedAt)
-    }
-
     override suspend fun createHolding(holding: Holding): Holding = backend.mapped {
         holding.issue?.let(::fail)
-        val row = JsonObject(holding.columns() + ("household_id" to JsonPrimitive(holding.householdId)))
-        client.from("holdings").insert(row) { select(Columns.raw(HOLDING)) }.decodeSingle()
+        client.saved(RpcEscrituras.createHolding(holding), HOLDING).decodeSingle()
     }
 
     override suspend fun updateHolding(holding: Holding): Holding = backend.mapped {
         holding.issue?.let(::fail)
-        client.from("holdings").update(holding.columns()) {
-            select(Columns.raw(HOLDING))
-            filter { eq("id", holding.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updateHolding(holding), HOLDING).decodeSingle()
     }
 
     override suspend fun deleteHolding(holdingId: String) = backend.mapped<Unit> {
@@ -682,31 +601,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
-    private fun InvestmentPlan.columns() = buildJsonObject {
-        put("account_id", accountId)
-        put("amount_minor", amountMinor)
-        put("every", every)
-        put("unit", Json.encodeToJsonElement(unit))
-        put("starts_on", startsOn)
-        put("ends_on", endsOn)
-        put("expected_annual_return", expectedAnnualReturn.toPlainString())
-        put("remind_days_before", remindDaysBefore)
-        put("paused_at", pausedAt)
-        put("archived_at", archivedAt)
-    }
-
     override suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
         plan.issue?.let(::fail)
-        val row = JsonObject(plan.columns() + mapOf("household_id" to JsonPrimitive(plan.householdId), "holding_id" to JsonPrimitive(plan.holdingId)))
-        client.from("investment_plans").insert(row) { select(Columns.raw(PLAN)) }.decodeSingle()
+        client.saved(RpcEscrituras.createPlan(plan), PLAN).decodeSingle()
     }
 
     override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan = backend.mapped {
         plan.issue?.let(::fail)
-        client.from("investment_plans").update(plan.columns()) {
-            select(Columns.raw(PLAN))
-            filter { eq("id", plan.id) }
-        }.decodeSingle()
+        client.saved(RpcEscrituras.updatePlan(plan), PLAN).decodeSingle()
     }
 
     override suspend fun deletePlan(planId: String) = backend.mapped<Unit> {
@@ -726,14 +628,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     private companion object {
-        const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges,creates_pending,pending_from"
-        const val CHARGE = "id,household_id,series_id,due_on,amount_minor,status,transaction_id"
-        const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
+        const val SERIES = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges,creates_pending,pending_from,updated_at"
+        const val CHARGE = "id,household_id,series_id,due_on,amount_minor,status,transaction_id,updated_at"
+        const val GOAL = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at,updated_at"
         const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
         const val BUDGET = "household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
-        const val EXTRA = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
-        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
-        const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
+        const val EXTRA = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite,updated_at"
+        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at,updated_at"
+        const val CATEGORY = "id,household_id,name,kind,budget_group,icon,updated_at"
         const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"
 
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
@@ -742,63 +644,15 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 }
 
 private const val CARD = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode," +
-    "fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent"
-private const val HOLDING = "id,household_id,name,symbol,kind,asset_class,currency,account_id,owner_id,price,price_on,fee_rate,note,archived_at"
+    "fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent,updated_at"
+private const val HOLDING = "id,household_id,name,symbol,kind,asset_class,currency,account_id,owner_id,price,price_on,fee_rate,note,archived_at,updated_at"
 private const val PRICE = "id,household_id,holding_id,priced_on,price"
 private const val TRADE = "id,household_id,holding_id,traded_on,side,quantity,price,fee_minor,note"
-private const val PLAN = "id,household_id,holding_id,account_id,amount_minor,every,unit,starts_on,ends_on,expected_annual_return,remind_days_before,paused_at,archived_at"
+private const val PLAN = "id,household_id,holding_id,account_id,amount_minor,every,unit,starts_on,ends_on,expected_annual_return,remind_days_before,paused_at,archived_at,updated_at"
 private const val SCORE = "id,score,max_score,provider,recorded_on,note"
-private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate"
+private const val INSTALLMENT = "id,household_id,account_id,transaction_id,months,rate,updated_at"
 
-private fun CreditCardTerms.columns() = buildJsonObject {
-    put("credit_limit_minor", creditLimit)
-    put("statement_day", statementDay)
-    put("payment_day", paymentDay)
-    put("payment_delay_months", paymentDelayMonths)
-    put("payment_mode", paymentMode.name.lowercase())
-    put("fixed_payment_minor", fixedPayment)
-    put("min_payment_percent", minPaymentPercent)
-    put("min_payment_minor", minPayment)
-    put("revolving_rate", revolvingRate)
-    put("installment_rate", installmentRate)
-    put("pay_from_account_id", payFromAccountId)
-    put("remind_days_before", remindDaysBefore)
-    put("alert_percent", alertPercent)
-}
-
-/** Columnas editables, con los nulos explícitos para poder borrar un valor. */
-private fun RecurringSeries.columns() = buildJsonObject {
-    put("name", trimmedName)
-    put("kind", RECURRING_KIND.getValue(kind))
-    put("amount_minor", amountMinor)
-    put("account_id", accountId)
-    put("category_id", categoryId)
-    put("every", every)
-    put("unit", unit.name.lowercase())
-    put("starts_on", startsOn)
-    put("ends_on", endsOn)
-    put("remind_days_before", remindDaysBefore)
-    put("archived_at", archivedAt)
-    put("intro_amount_minor", introMinor)
-    put("intro_charges", introCharges)
-    put("creates_pending", createsPending)
-    pendingFrom?.let { put("pending_from", it) }
-}
-
-private val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
-
-private fun Goal.columns() = buildJsonObject {
-    put("name", trimmedName)
-    put("kind", kind.name.lowercase())
-    put("target_minor", targetMinor)
-    put("starting_minor", startingMinor)
-    put("monthly_plan_minor", monthlyPlanMinor)
-    put("target_on", targetOn)
-    put("account_id", accountId)
-    put("icon", icon)
-    put("completed_at", completedAt)
-    put("archived_at", archivedAt)
-}
+internal val RECURRING_KIND = mapOf(RecurringKind.Subscription to "subscription", RecurringKind.Essential to "essential", RecurringKind.Income to "income")
 
 // Filas que se envían. Nunca llevan id ni created_by: el servidor no deja escribirlos.
 // Los opcionales van como null explícito: todas las filas de un lote deben llevar las mismas claves.
@@ -851,10 +705,11 @@ private data class ExtraRow(
     @SerialName("category_ids") val categoryIds: List<String> = emptyList(),
     @SerialName("account_ids") val accountIds: List<String> = emptyList(),
     @SerialName("is_favorite") val isFavorite: Boolean = false,
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val extra: ExtraBudget get() = ExtraBudget(
         id, householdId, name, limit, LocalDate.parse(startsOn.take(10)), endsOn?.let { LocalDate.parse(it.take(10)) },
-        categoryIds, accountIds, isFavorite,
+        categoryIds, accountIds, isFavorite, updatedAt,
     )
 }
 
@@ -863,42 +718,6 @@ private data class BalanceRow(@SerialName("account_id") val accountId: String, @
 
 @Serializable
 private data class IdRow(val id: String)
-
-@Serializable
-private data class NewAccountRow(
-    @SerialName("household_id") val householdId: String,
-    val name: String,
-    val kind: AccountKind,
-    @SerialName("opening_balance_minor") val openingMinor: Long,
-    @SerialName("owner_id") val ownerId: String?,
-)
-
-@Serializable
-private data class AccountChanges(
-    val name: String,
-    val kind: AccountKind,
-    @SerialName("opening_balance_minor") val openingMinor: Long,
-    @SerialName("owner_id") val ownerId: String?,
-    @SerialName("archived_at") val archivedAt: String?,
-    @SerialName("is_default") val isDefault: Boolean,
-    @SerialName("include_in_net_worth") val includeInNetWorth: Boolean,
-)
-
-@Serializable
-private data class NewCategoryRow(
-    @SerialName("household_id") val householdId: String,
-    val kind: CategoryKind,
-    val name: String,
-    @SerialName("budget_group") val budgetGroup: BudgetGroup?,
-    val icon: String?,
-)
-
-@Serializable
-private data class CategoryChanges(
-    val name: String,
-    @SerialName("budget_group") val budgetGroup: BudgetGroup?,
-    val icon: String?,
-)
 
 @Serializable
 private data class NewMovementRow(

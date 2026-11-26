@@ -629,7 +629,8 @@ struct BuyCard: View {
         done = "Compra apuntada: \(InvestmentText.quantity(quote.quantity)) participaciones."
         // El plan va aparte: la compra ya está guardada entera, y si el plan falla se dice solo eso.
         if monthly {
-            let plan = InvestmentPlan(householdId: holding.householdId, holdingId: holding.id, accountId: accountId,
+            // Con el id de la compra (uno por cada vez que se pulsa «Comprar»): el plan no se crea dos veces.
+            let plan = InvestmentPlan(id: trade.id, householdId: holding.householdId, holdingId: holding.id, accountId: accountId,
                                       amount: quote.amount, startsOn: day.adding(months: 1))
             if !(await investments.save(plan)) {
                 error = "La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas."
@@ -692,6 +693,8 @@ struct HoldingFormView: View {
     @State private var price = ""
     @State private var feeRate = ""
     @State private var note = ""
+    /// Identificador del activo nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    @State private var newHoldingId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -786,7 +789,7 @@ struct HoldingFormView: View {
             return
         }
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        var item = holding ?? Holding(householdId: investments.household.id, name: name)
+        var item = holding ?? Holding(id: newHoldingId, householdId: investments.household.id, name: name)
         let priceChanged = holding.map { $0.price != priceValue } ?? (priceValue > 0)
         item.name = name
         item.symbol = symbol
@@ -1148,13 +1151,15 @@ struct PlanFormView: View {
     @State private var startsOn = Date()
     @State private var expectedReturn = "5"
     @State private var remindDaysBefore: Int? = 1
+    /// Identificador del plan nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    @State private var newPlanId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
 
     private var draft: InvestmentPlan? {
         guard let holdingId, let money = Money(entered: amount), let rate = Decimal(parsing: expectedReturn, maxFractionDigits: 2) else { return nil }
-        var item = plan ?? InvestmentPlan(householdId: investments.household.id, holdingId: holdingId, amount: money,
+        var item = plan ?? InvestmentPlan(id: newPlanId, householdId: investments.household.id, holdingId: holdingId, amount: money,
                                           startsOn: CalendarDay(startsOn))
         item.amount = money
         item.recurrence = recurrence

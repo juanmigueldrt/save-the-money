@@ -245,6 +245,18 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    // MARK: Altas y cambios con función (ORC-142)
+
+    /// Llama a una función `create_…` o `update_…` y devuelve la fila guardada. Los parámetros van todos, también
+    /// los nulos: las funciones de cambio no tienen valores por defecto.
+    func saved<Row: Decodable & Sendable>(_ call: RpcCall, columns: String) async throws -> Row {
+        let rows: [Row] = try await mapped {
+            try await client.rpc(call.function, params: call.params).select(columns).execute().value
+        }
+        guard let row = rows.first else { throw AppError.unknown(call.function) }
+        return row
+    }
+
     // MARK: Paginación
 
     /// Filas por petición: el servidor devuelve como mucho 1000 (`max_rows` en supabase/config.toml).
@@ -338,4 +350,24 @@ private struct ProfileChanges: Encodable, Sendable {
         try container.encode(displayName, forKey: .displayName)
         try container.encode(theme, forKey: .theme)
     }
+}
+
+/// Una llamada a una función `create_…` o `update_…` del servidor: su nombre y sus parámetros. Las claves tienen que
+/// ser exactamente los nombres de los parámetros de la función: PostgREST no encuentra la función si sobra o falta
+/// alguno sin valor por defecto. `RpcEscriturasTests` las compara con `testdata/vectors/rpc_escrituras.json`, el
+/// mismo fichero que usa `supabase/tests/api/escrituras_idempotentes.py` contra el PostgREST local.
+struct RpcCall: Sendable {
+    let function: String
+    let params: [String: AnyJSON]
+}
+
+/// Valores para los parámetros de las funciones del servidor, con los nulos explícitos.
+extension AnyJSON {
+    static func uuid(_ value: UUID?) -> AnyJSON { value.map { .string($0.uuidString) } ?? .null }
+    static func text(_ value: String?) -> AnyJSON { value.map { .string($0) } ?? .null }
+    static func int(_ value: Int?) -> AnyJSON { value.map { .integer($0) } ?? .null }
+    static func day(_ value: CalendarDay?) -> AnyJSON { value.map { .string($0.iso) } ?? .null }
+    static func timestamp(_ value: Date?) -> AnyJSON { value.map { .string(ISO8601DateFormatter().string(from: $0)) } ?? .null }
+    /// Como texto, para no pasar por `Double`: Postgres lo convierte a `numeric` sin perder decimales.
+    static func decimal(_ value: Decimal?) -> AnyJSON { value.map { .string(NSDecimalNumber(decimal: $0).stringValue) } ?? .null }
 }

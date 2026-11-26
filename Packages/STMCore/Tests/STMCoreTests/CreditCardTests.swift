@@ -267,7 +267,8 @@ final class CreditCardTests: XCTestCase {
 
         var good = CreditCardTerms(accountId: cardAccount.id, householdId: household.id, creditLimit: Money(minor: 300_000),
                                    payFromAccountId: checking.id)
-        _ = try await backend.saveCreditCard(good)
+        // Se cambian las guardadas (con su versión), como hace el formulario.
+        good = try await backend.saveCreditCard(good)
         good.creditLimit = Money(minor: 250_000)
         _ = try await backend.saveCreditCard(good)
         let cards = try await backend.creditCards(in: household.id)

@@ -41,26 +41,31 @@ extension InMemoryBackend: InvestmentService {
         let user = try requireInvestmentMember(of: holding.householdId)
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
         try checkHoldingReferences(holding, in: holding.householdId, by: user)
+        // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
+        if let stored = try replayed(holdingList.first(where: { $0.id == holding.id }), by: user, same: {
+            $0.householdId == holding.householdId && $0.name == holding.trimmedName && $0.kind == holding.kind
+        }) { return stored }
         var saved = holding
         saved.name = holding.trimmedName
         saved.symbol = holding.trimmedSymbol
+        saved.updatedAt = nextVersion()
         holdingList.append(saved)
         creators[saved.id] = user
         return saved
     }
 
     public func updateHolding(_ holding: Holding) async throws -> Holding {
-        guard let index = holdingList.firstIndex(where: { $0.id == holding.id }) else { throw AppError.unknown("no existe") }
-        let householdId = holdingList[index].householdId
-        let user = try requireInvestmentMember(of: householdId)
-        guard isMine(holding.id, in: householdId, user: user) else { throw AppError.unknown("no existe") }
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
+        guard let index = holdingList.firstIndex(where: { $0.id == holding.id }) else { throw AppError.movementChanged }
+        let householdId = holdingList[index].householdId
+        let user = try requireCurrent(holding.id, seen: holding.updatedAt, stored: holdingList[index].updatedAt, in: householdId)
         try checkHoldingReferences(holding, in: householdId, by: user)
         var saved = holding
         saved.householdId = householdId
         saved.currency = holdingList[index].currency
         saved.name = holding.trimmedName
         saved.symbol = holding.trimmedSymbol
+        saved.updatedAt = nextVersion()
         holdingList[index] = saved
         return saved
     }
@@ -99,6 +104,8 @@ extension InMemoryBackend: InvestmentService {
         if holding.priceOn.map({ day >= $0 }) ?? true {
             holdingList[index].price = price
             holdingList[index].priceOn = day
+            // Como el servidor: cambiar el precio del activo cambia su versión.
+            holdingList[index].updatedAt = nextVersion()
         }
         return holdingList[index]
     }
@@ -166,17 +173,22 @@ extension InMemoryBackend: InvestmentService {
             || !isMine(account, in: plan.householdId, user: user) {
             throw AppError.unknown("cuenta de otro hogar")
         }
-        planList.append(plan)
-        creators[plan.id] = user
-        return plan
+        // Repetir el alta solo vale con el mismo activo, importe y primer día.
+        if let stored = try replayed(planList.first(where: { $0.id == plan.id }), by: user, same: {
+            $0.holdingId == plan.holdingId && $0.amount.minor == plan.amount.minor && $0.startsOn == plan.startsOn
+        }) { return stored }
+        var saved = plan
+        saved.updatedAt = nextVersion()
+        planList.append(saved)
+        creators[saved.id] = user
+        return saved
     }
 
     public func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
-        guard let index = planList.firstIndex(where: { $0.id == plan.id }) else { throw AppError.unknown("no existe") }
-        let original = planList[index]
-        let user = try requireInvestmentMember(of: original.householdId)
-        guard isMine(plan.id, in: original.householdId, user: user) else { throw AppError.unknown("no existe") }
         if let issue = plan.issue { throw AppError.invalidInput(issue) }
+        guard let index = planList.firstIndex(where: { $0.id == plan.id }) else { throw AppError.movementChanged }
+        let original = planList[index]
+        let user = try requireCurrent(plan.id, seen: plan.updatedAt, stored: original.updatedAt, in: original.householdId)
         if let account = plan.accountId,
            !financeAccounts.contains(where: { $0.id == account && $0.householdId == original.householdId })
             || !isMine(account, in: original.householdId, user: user) {
@@ -185,6 +197,7 @@ extension InMemoryBackend: InvestmentService {
         var saved = plan
         saved.householdId = original.householdId
         saved.holdingId = original.holdingId
+        saved.updatedAt = nextVersion()
         planList[index] = saved
         return saved
     }

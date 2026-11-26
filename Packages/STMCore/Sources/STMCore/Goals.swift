@@ -36,10 +36,14 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
     public var icon: String?
     public var completedAt: Date?
     public var archivedAt: Date?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarla.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: GoalKind = .savings,
                 target: Money, starting: Money = .zero, monthlyPlan: Money? = nil, targetOn: CalendarDay? = nil,
-                accountId: UUID? = nil, icon: String? = nil, completedAt: Date? = nil, archivedAt: Date? = nil) {
+                accountId: UUID? = nil, icon: String? = nil, completedAt: Date? = nil, archivedAt: Date? = nil,
+                updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -73,6 +77,7 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
         case accountId = "account_id"
         case completedAt = "completed_at"
         case archivedAt = "archived_at"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -89,6 +94,7 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
         icon = try c.decodeIfPresent(String.self, forKey: .icon)
         completedAt = try c.decodeIfPresent(ServerDate.self, forKey: .completedAt)?.date
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).

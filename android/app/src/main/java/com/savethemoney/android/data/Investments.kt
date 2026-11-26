@@ -97,6 +97,8 @@ data class Holding(
     @SerialName("fee_rate") val feeRate: Numeric = BigDecimal.ZERO,
     val note: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val trimmedName: String get() = name.trim()
@@ -380,6 +382,8 @@ data class InvestmentPlan(
     @SerialName("remind_days_before") val remindDaysBefore: Int? = 1,
     @SerialName("paused_at") val pausedAt: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val isPaused: Boolean get() = pausedAt != null
     val isArchived: Boolean get() = archivedAt != null

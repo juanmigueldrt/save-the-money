@@ -47,6 +47,11 @@ data class CreditCardTerms(
     @SerialName("pay_from_account_id") val payFromAccountId: String? = null,
     @SerialName("remind_days_before") val remindDaysBefore: Int? = 2,
     @SerialName("alert_percent") val alertPercent: Int? = 80,
+    /**
+     * Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Nulo en unas condiciones
+     * que aún no se han guardado: guardarlas es un alta.
+     */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     /** Problema que impide guardarla, en español, o nulo si es válida. */
     val issue: String? get() = when {
@@ -86,6 +91,11 @@ data class CardInstallment(
     @SerialName("transaction_id") val movementId: String,
     val months: Int,
     val rate: Double = 14.0,
+    /**
+     * Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Nulo en un aplazado que
+     * aún no se ha guardado: guardarlo es un alta.
+     */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val issue: String? get() = when {
         months !in 2..48 -> "Se puede aplazar de 2 a 48 meses."
@@ -405,16 +415,17 @@ sealed interface CardPurchase {
             return Quote(monthly, total, maxOf(0, total - principal))
         }
 
-        /** El aplazado del gasto recién guardado. */
+        /** El aplazado del gasto recién guardado. Lleva el id de su movimiento (hay uno por compra): repetirlo no crea otro. */
         fun installment(movement: Movement, months: Int, rate: Double) =
-            CardInstallment("", movement.householdId, movement.accountId, movement.id, months, rate)
+            CardInstallment(movement.id, movement.householdId, movement.accountId, movement.id, months, rate)
 
         /**
          * El pago fijo del gasto recién guardado: empieza ese día y crea pendientes desde el día
-         * siguiente, para que el cargo que ya está apuntado no salga además como pendiente.
+         * siguiente, para que el cargo que ya está apuntado no salga además como pendiente. Lleva el id del
+         * movimiento (que el formulario elige una vez): guardar otra vez el mismo formulario no crea otro pago fijo.
          */
         fun series(movement: Movement, recurrence: Recurrence) = RecurringSeries(
-            "", movement.householdId, movement.description.trim(), RecurringKind.Subscription, -movement.amountMinor,
+            movement.id, movement.householdId, movement.description.trim(), RecurringKind.Subscription, -movement.amountMinor,
             movement.accountId, movement.categoryId, recurrence.every, recurrence.unit, movement.day.toString(),
             createsPending = true, pendingFrom = movement.day.plusDays(1).toString(),
         )

@@ -26,6 +26,8 @@ data class RecurringCharge(
     val status: ChargeStatus = ChargeStatus.Pending,
     /** El movimiento que lo confirma. */
     @SerialName("transaction_id") val transactionId: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarlo. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val due: LocalDate get() = LocalDate.parse(dueOn.take(10))
     val isPending: Boolean get() = status == ChargeStatus.Pending

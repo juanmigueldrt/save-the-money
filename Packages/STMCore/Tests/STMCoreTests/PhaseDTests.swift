@@ -84,7 +84,7 @@ final class PhaseDTests: XCTestCase {
 
         let movement = try await backend.confirmCharge(created[0].id, with: MovementDraft(
             accountId: checking.id, bookedOn: created[0].dueOn, amount: Money(minor: -3200), description: "Gimnasio"))
-        try await backend.updateCharge(created[1].id, status: .skipped, transactionId: nil)
+        _ = try await backend.updateCharge(created[1], status: .skipped, transactionId: nil)
         let charges = try await backend.recurringCharges(in: household.id)
         XCTAssertEqual(charges.first { $0.id == created[0].id }?.transactionId, movement.id)
         XCTAssertEqual(charges.first { $0.id == created[0].id }?.amount.minor, -3200)

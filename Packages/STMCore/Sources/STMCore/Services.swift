@@ -16,7 +16,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case alreadyMember
     case network
     case invalidInput(String)
-    /// El movimiento que se quería cambiar ya no es el que se leyó: otro dispositivo lo cambió o lo borró antes.
+    /// Lo que se quería cambiar (un movimiento o cualquier otra fila con versión, ORC-142) ya no es lo que se leyó:
+    /// otro dispositivo lo cambió o lo borró antes.
     case movementChanged
     case unknown(String)
 
@@ -35,7 +36,7 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
         case .network: "No hay conexión. Inténtalo de nuevo en un momento."
         case .invalidInput(let message): message
         case .movementChanged:
-            "Este movimiento ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta."
+            "Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta."
         case .unknown: "Algo ha fallado. Inténtalo de nuevo."
         }
     }
@@ -79,6 +80,11 @@ public protocol FinanceService: Sendable {
     func accounts(in householdId: UUID) async throws -> [Account]
     /// Saldo actual de cada cuenta: el inicial más todos sus movimientos.
     func balances(in householdId: UUID) async throws -> [UUID: Money]
+    // Altas y cambios del resto de tablas (ORC-142), como los movimientos:
+    // - Alta: la app elige el id, uno por formulario. Repetirla con ese id devuelve lo guardado y no crea nada; con
+    //   otros datos falla con `TransferDraft.storedWithOtherData`.
+    // - Cambio: solo entra si la fila sigue en la versión leída (`updatedAt`). Si otro dispositivo la cambió o la
+    //   borró antes, no guarda nada y falla con `AppError.movementChanged`.
     func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account
     func updateAccount(_ account: Account) async throws -> Account
     func deleteAccount(_ accountId: UUID) async throws
@@ -153,8 +159,9 @@ public struct TransferDraft: Hashable, Sendable {
         self.toDescription = toDescription
     }
 
-    /// Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día.
-    public static let storedWithOtherData = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+    /// Lo que ve quien repite un alta ya guardada (una transferencia, una cuenta, una meta…) después de cambiar
+    /// sus datos en el formulario.
+    public static let storedWithOtherData = "Esto ya se guardó con otros datos. Cierra el formulario y revisa lo guardado antes de repetirlo."
     /// Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella.
     public static let otherLegLocked = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
     /// Lo que se avisa antes de borrar una pata: se borran las dos.
@@ -190,6 +197,9 @@ public protocol BudgetService: Sendable {
     func savePaySchedule(_ schedule: PaySchedule) async throws -> PaySchedule
     /// Presupuestos extra propios del hogar.
     func extraBudgets(in householdId: UUID) async throws -> [ExtraBudget]
+    /// Sin versión (`updatedAt` nil) es un alta con el `id` que trae: repetirla devuelve el guardado y, con otros
+    /// datos, falla con `TransferDraft.storedWithOtherData`. Con versión es un cambio: solo entra si sigue en esa
+    /// versión; si no, `AppError.movementChanged`.
     func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget
     func deleteExtraBudget(_ id: UUID) async throws
     /// Todos los movimientos del hogar entre dos días, ambos incluidos.
@@ -220,8 +230,10 @@ public protocol RecurringService: Sendable {
     func createCharges(_ charges: [RecurringCharge]) async throws -> [RecurringCharge]
     /// Crea el movimiento del cargo y lo marca como confirmado. Devuelve el movimiento.
     func confirmCharge(_ chargeId: UUID, with draft: MovementDraft) async throws -> Movement
-    /// Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta.
-    func updateCharge(_ chargeId: UUID, status: ChargeStatus, transactionId: UUID?) async throws
+    /// Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta. `charge` es el cargo tal como se
+    /// leyó: solo se cambia si sigue en esa versión (`updatedAt`); si no, `AppError.movementChanged`. Devuelve el
+    /// cargo con su versión nueva.
+    func updateCharge(_ charge: RecurringCharge, status: ChargeStatus, transactionId: UUID?) async throws -> RecurringCharge
     func deleteCharge(_ chargeId: UUID) async throws
 }
 

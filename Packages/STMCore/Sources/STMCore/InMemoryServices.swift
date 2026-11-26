@@ -18,7 +18,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var financeAccounts: [Account] = []
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
-    /// Contador para la versión (`updatedAt`) de cada movimiento: cambia en cada escritura, como en el servidor.
+    /// Contador para la versión (`updatedAt`) de cada fila: cambia en cada escritura, como en el servidor.
     var movementVersion = 0
     /// Las patas de cada transferencia guardada, por su id: repetirla no la duplica.
     var transferLegs: [UUID: [UUID]] = [:]
@@ -129,10 +129,39 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         creators[rowId] == user && isMember(user, of: household)
     }
 
+    /// Versión nueva de una fila: cambia en cada escritura, como el `updated_at` del servidor.
+    func nextVersion() -> String {
+        movementVersion += 1
+        return "v\(movementVersion)"
+    }
+
+    /// Un alta con un id que ya está guardado, como las funciones `create_…` del servidor (ORC-142): si es de otra
+    /// persona no vale (23505); si es propia y `same` dice que trae los mismos datos, devuelve la guardada y no se
+    /// crea nada; con otros datos falla (STM01). Nil si ese id aún no está guardado.
+    func replayed<Row: Identifiable>(_ stored: Row?, by user: UUID, same: (Row) -> Bool) throws -> Row? where Row.ID == UUID {
+        guard let stored else { return nil }
+        guard creators[stored.id] == user else { throw AppError.idUsedBySomeoneElse }
+        guard same(stored) else { throw AppError.invalidInput(TransferDraft.storedWithOtherData) }
+        return stored
+    }
+
+    /// Como las funciones `update_…` del servidor (ORC-142): una fila ajena o en otra versión que la leída no se
+    /// cambia (STM05). `creator` es el id de la fila que dice de quién es. Devuelve quién llama.
+    func requireCurrent(_ creator: UUID, seen: String?, stored: String?, in household: UUID,
+                        _ operation: String = #function) throws -> UUID {
+        let user = try requireUser(operation)
+        guard isMine(creator, in: household, user: user), seen == stored else { throw AppError.movementChanged }
+        return user
+    }
+
     /// Cada miembro nuevo (también quien crea el hogar) recibe sus categorías de partida.
     func seedCategories(in household: UUID, for user: UUID) {
-        let seeded = BudgetCategory.defaults(for: household)
-        for category in seeded { creators[category.id] = user }
+        var seeded = BudgetCategory.defaults(for: household)
+        for index in seeded.indices {
+            creators[seeded[index].id] = user
+            // Como cualquier fila del servidor, nacen con versión.
+            seeded[index].updatedAt = nextVersion()
+        }
         financeCategories += seeded
     }
 

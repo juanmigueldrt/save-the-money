@@ -150,11 +150,15 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
     public var feeRate: Decimal
     public var note: String?
     public var archivedAt: Date?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual
+    /// al cambiarla. Apuntar un precio también la cambia.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, symbol: String? = nil, kind: InvestmentKind = .fund,
                 assetClass: AssetClass? = nil, currency: String = "EUR", accountId: UUID? = nil, ownerId: UUID? = nil,
                 price: Decimal = 0, priceOn: CalendarDay? = nil, feeRate: Decimal = 0, note: String? = nil,
-                archivedAt: Date? = nil) {
+                archivedAt: Date? = nil, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -204,6 +208,7 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         case priceOn = "price_on"
         case feeRate = "fee_rate"
         case archivedAt = "archived_at"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -222,6 +227,7 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         feeRate = try decodeNumeric(c, .feeRate)
         note = try c.decodeIfPresent(String.self, forKey: .note)
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (sin id, hogar ni moneda, que se fijan al crear).
@@ -642,11 +648,14 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archiva
     public var remindDaysBefore: Int?
     public var pausedAt: Date?
     public var archivedAt: Date?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarla.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, holdingId: UUID, accountId: UUID? = nil, amount: Money,
                 recurrence: Recurrence = .monthly, startsOn: CalendarDay, endsOn: CalendarDay? = nil,
                 expectedAnnualReturn: Decimal = 5, remindDaysBefore: Int? = 1, pausedAt: Date? = nil,
-                archivedAt: Date? = nil) {
+                archivedAt: Date? = nil, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.holdingId = holdingId
@@ -732,6 +741,7 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archiva
         case remindDaysBefore = "remind_days_before"
         case pausedAt = "paused_at"
         case archivedAt = "archived_at"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -748,6 +758,7 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archiva
         remindDaysBefore = try c.decodeIfPresent(Int.self, forKey: .remindDaysBefore)
         pausedAt = try c.decodeIfPresent(ServerDate.self, forKey: .pausedAt)?.date
         archivedAt = try c.decodeIfPresent(ServerDate.self, forKey: .archivedAt)?.date
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (sin id, hogar ni activo, que se fijan al crear).

@@ -56,6 +56,9 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
     public var remindDaysBefore: Int?
     /// Aviso al pasar de este % del límite; nil = sin aviso.
     public var alertPercent: Int?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Nil en unas
+    /// condiciones que aún no se han guardado: guardarlas es un alta.
+    public var updatedAt: String?
 
     public var id: UUID { accountId }
 
@@ -63,7 +66,8 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
                 paymentDelayMonths: Int = 1, paymentMode: CardPaymentMode = .full, fixedPayment: Money? = nil,
                 minPaymentPercent: Decimal = 3, minPayment: Money = Money(minor: 1500), revolvingRate: Decimal = 20,
                 installmentRate: Decimal = 14, payFromAccountId: UUID? = nil, remindDaysBefore: Int? = 2,
-                alertPercent: Int? = 80) {
+                alertPercent: Int? = 80, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.accountId = accountId
         self.householdId = householdId
         self.creditLimit = creditLimit
@@ -133,6 +137,7 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
         case payFromAccountId = "pay_from_account_id"
         case remindDaysBefore = "remind_days_before"
         case alertPercent = "alert_percent"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -152,6 +157,7 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
         payFromAccountId = try c.decodeIfPresent(UUID.self, forKey: .payFromAccountId)
         remindDaysBefore = try c.decodeIfPresent(Int.self, forKey: .remindDaysBefore)
         alertPercent = try c.decodeIfPresent(Int.self, forKey: .alertPercent)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (sin cuenta ni hogar, que se fijan al crear).
@@ -183,8 +189,13 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
     public var months: Int
     /// TIN anual en %.
     public var rate: Decimal
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Nil en un
+    /// aplazado que aún no se ha guardado: guardarlo es un alta.
+    public var updatedAt: String?
 
-    public init(id: UUID = UUID(), householdId: UUID, accountId: UUID, movementId: UUID, months: Int, rate: Decimal = 14) {
+    public init(id: UUID = UUID(), householdId: UUID, accountId: UUID, movementId: UUID, months: Int, rate: Decimal = 14,
+                updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.accountId = accountId
@@ -222,6 +233,7 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
         case householdId = "household_id"
         case accountId = "account_id"
         case movementId = "transaction_id"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -232,6 +244,7 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
         movementId = try c.decode(UUID.self, forKey: .movementId)
         months = try c.decode(Int.self, forKey: .months)
         rate = try decodeNumeric(c, .rate)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (plazo e interés); el resto se fija al crear.
@@ -245,10 +258,13 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
 /// Condiciones de tarjeta y compras aplazadas del hogar.
 public protocol CreditCardService: Sendable {
     func creditCards(in householdId: UUID) async throws -> [CreditCardTerms]
-    /// Crea o cambia las condiciones de una tarjeta (una por cuenta).
+    /// Crea o cambia las condiciones de una tarjeta (una por cuenta). Sin versión (`updatedAt` nil) es un alta:
+    /// repetirla devuelve las guardadas y, si ya había otras distintas, falla con `TransferDraft.storedWithOtherData`.
+    /// Con versión es un cambio: solo entra si siguen en esa versión; si no, `AppError.movementChanged`.
     func saveCreditCard(_ terms: CreditCardTerms) async throws -> CreditCardTerms
     func cardInstallments(in householdId: UUID) async throws -> [CardInstallment]
-    /// Crea o cambia el aplazado de un movimiento (uno por movimiento).
+    /// Crea o cambia el aplazado de un movimiento (uno por movimiento), con las mismas reglas que `saveCreditCard`:
+    /// sin versión es un alta con el `id` que trae; con versión, un cambio de plazo e interés sobre esa versión.
     func saveInstallment(_ installment: CardInstallment) async throws -> CardInstallment
     func deleteInstallment(_ installmentId: UUID) async throws
 }
@@ -561,9 +577,10 @@ extension CardInstallment {
 extension RecurringSeries {
     /// El pago fijo que nace de un gasto apuntado con tarjeta: mismo nombre, importe, cuenta y
     /// categoría, empezando ese día. Ese primer cargo ya es el movimiento, así que los pendientes
-    /// empiezan al día siguiente.
+    /// empiezan al día siguiente. Lleva el id del movimiento (que el formulario elige una vez): guardar otra vez
+    /// el mismo formulario no crea otro pago fijo.
     public static func fromPurchase(_ movement: Movement, recurrence: Recurrence = .monthly) -> RecurringSeries {
-        RecurringSeries(householdId: movement.householdId, name: movement.description,
+        RecurringSeries(id: movement.id, householdId: movement.householdId, name: movement.description,
                         kind: movement.amount.isNegative ? .subscription : .income,
                         amount: Money(minor: abs(movement.amount.minor), currency: movement.amount.currency),
                         accountId: movement.accountId, categoryId: movement.categoryId, recurrence: recurrence,

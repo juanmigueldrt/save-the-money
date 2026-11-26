@@ -5,9 +5,9 @@ import Supabase
 /// Pagos recurrentes y metas sobre Supabase. El RLS decide qué se ve; las
 /// claves foráneas compuestas impiden mezclar filas de hogares distintos.
 extension SupabaseBackend: RecurringService, GoalService {
-    private static let seriesColumns = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges,creates_pending,pending_from"
-    private static let chargeColumns = "id,household_id,series_id,due_on,amount_minor,status,transaction_id"
-    private static let goalColumns = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at"
+    private static let seriesColumns = "id,household_id,name,kind,amount_minor,account_id,category_id,every,unit,starts_on,ends_on,remind_days_before,archived_at,intro_amount_minor,intro_charges,creates_pending,pending_from,updated_at"
+    private static let chargeColumns = "id,household_id,series_id,due_on,amount_minor,status,transaction_id,updated_at"
+    private static let goalColumns = "id,household_id,name,kind,target_minor,starting_minor,monthly_plan_minor,target_on,account_id,icon,completed_at,archived_at,updated_at"
     private static let contributionColumns = "id,household_id,goal_id,amount_minor,made_on,note"
 
     // MARK: RecurringService
@@ -24,28 +24,36 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
         if let issue = series.issue { throw AppError.invalidInput(issue) }
-        let row = NewRow(householdId: series.householdId, fields: series)
-        return try await mapped {
-            try await client.from("recurring_series")
-                .insert(row)
-                .select(Self.seriesColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved(Self.createRecurringCall(series), columns: Self.seriesColumns)
     }
 
     public func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
         if let issue = series.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("recurring_series")
-                .update(series)
-                .eq("id", value: series.id.uuidString)
-                .select(Self.seriesColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved(Self.updateRecurringCall(series), columns: Self.seriesColumns)
+    }
+
+    static func createRecurringCall(_ series: RecurringSeries) -> RpcCall {
+        var params = seriesParams(series)
+        params["household"] = .uuid(series.householdId)
+        return RpcCall(function: "create_recurring_series", params: params)
+    }
+
+    static func updateRecurringCall(_ series: RecurringSeries) -> RpcCall {
+        var params = seriesParams(series)
+        params["seen"] = .text(series.updatedAt)
+        return RpcCall(function: "update_recurring_series", params: params)
+    }
+
+    /// Lo que comparten `create_recurring_series` y `update_recurring_series`. Sin `pendingFrom`, el servidor pone
+    /// hoy al crear y deja el que había al cambiar.
+    private static func seriesParams(_ series: RecurringSeries) -> [String: AnyJSON] {
+        ["series": .uuid(series.id), "label": .string(series.trimmedName), "series_kind": .string(series.kind.rawValue),
+         "amount": .integer(series.amount.minor), "account": .uuid(series.accountId), "category": .uuid(series.categoryId),
+         "step": .integer(series.recurrence.every), "step_unit": .string(series.recurrence.unit.rawValue),
+         "starts": .day(series.startsOn), "ends": .day(series.endsOn), "remind_days": .int(series.remindDaysBefore),
+         "archived": .timestamp(series.archivedAt), "intro_amount": .int(series.introAmount?.minor),
+         "intro_count": .int(series.introCharges), "pending": .bool(series.createsPending),
+         "pending_start": .day(series.pendingFrom)]
     }
 
     public func deleteRecurring(_ seriesId: UUID) async throws {
@@ -94,11 +102,17 @@ extension SupabaseBackend: RecurringService, GoalService {
         }
     }
 
-    public func updateCharge(_ chargeId: UUID, status: ChargeStatus, transactionId: UUID?) async throws {
-        let changes = ChargeChanges(status: status, transactionId: status == .pending ? nil : transactionId)
-        try await mapped {
-            try await client.from("recurring_charges").update(changes).eq("id", value: chargeId.uuidString).execute()
-        }
+    public func updateCharge(_ charge: RecurringCharge, status: ChargeStatus,
+                             transactionId: UUID?) async throws -> RecurringCharge {
+        // `update_recurring_charge` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        try await saved(Self.updateChargeCall(charge, status: status, transactionId: transactionId), columns: Self.chargeColumns)
+    }
+
+    static func updateChargeCall(_ charge: RecurringCharge, status: ChargeStatus, transactionId: UUID?) -> RpcCall {
+        RpcCall(function: "update_recurring_charge", params: [
+            "charge": .uuid(charge.id), "seen": .text(charge.updatedAt), "new_status": .string(status.rawValue),
+            "movement": .uuid(status == .pending ? nil : transactionId)
+        ])
     }
 
     public func deleteCharge(_ chargeId: UUID) async throws {
@@ -121,28 +135,32 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func createGoal(_ goal: Goal) async throws -> Goal {
         if let issue = goal.issue { throw AppError.invalidInput(issue) }
-        let row = NewRow(householdId: goal.householdId, fields: goal)
-        return try await mapped {
-            try await client.from("goals")
-                .insert(row)
-                .select(Self.goalColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved(Self.createGoalCall(goal), columns: Self.goalColumns)
     }
 
     public func updateGoal(_ goal: Goal) async throws -> Goal {
         if let issue = goal.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("goals")
-                .update(goal)
-                .eq("id", value: goal.id.uuidString)
-                .select(Self.goalColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved(Self.updateGoalCall(goal), columns: Self.goalColumns)
+    }
+
+    static func createGoalCall(_ goal: Goal) -> RpcCall {
+        var params = goalParams(goal)
+        params["household"] = .uuid(goal.householdId)
+        return RpcCall(function: "create_goal", params: params)
+    }
+
+    static func updateGoalCall(_ goal: Goal) -> RpcCall {
+        var params = goalParams(goal)
+        params["seen"] = .text(goal.updatedAt)
+        return RpcCall(function: "update_goal", params: params)
+    }
+
+    /// Lo que comparten `create_goal` y `update_goal`.
+    private static func goalParams(_ goal: Goal) -> [String: AnyJSON] {
+        ["goal": .uuid(goal.id), "label": .string(goal.trimmedName), "goal_kind": .string(goal.kind.rawValue),
+         "target": .integer(goal.target.minor), "starting": .integer(goal.starting.minor),
+         "monthly_plan": .int(goal.monthlyPlan?.minor), "due": .day(goal.targetOn), "account": .uuid(goal.accountId),
+         "icon_name": .text(goal.icon), "completed": .timestamp(goal.completedAt), "archived": .timestamp(goal.archivedAt)]
     }
 
     public func deleteGoal(_ goalId: UUID) async throws {
@@ -163,34 +181,21 @@ extension SupabaseBackend: RecurringService, GoalService {
 
     public func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution {
         if let issue = contribution.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("goal_contributions")
-                .insert(contribution)
-                .select(Self.contributionColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved(Self.addContributionCall(contribution), columns: Self.contributionColumns)
+    }
+
+    static func addContributionCall(_ contribution: GoalContribution) -> RpcCall {
+        RpcCall(function: "create_goal_contribution", params: [
+            "contribution": .uuid(contribution.id), "household": .uuid(contribution.householdId),
+            "goal": .uuid(contribution.goalId), "amount": .integer(contribution.amount.minor),
+            "made": .day(contribution.madeOn), "remark": .text(contribution.note)
+        ])
     }
 
     public func deleteContribution(_ contributionId: UUID) async throws {
         try await mapped {
             try await client.from("goal_contributions").delete().eq("id", value: contributionId.uuidString).execute()
         }
-    }
-}
-
-/// Las columnas editables de una fila más su hogar, para insertarla.
-struct NewRow<Fields: Encodable & Sendable>: Encodable, Sendable {
-    var householdId: UUID
-    var fields: Fields
-
-    private enum CodingKeys: String, CodingKey { case householdId = "household_id" }
-
-    func encode(to encoder: Encoder) throws {
-        try fields.encode(to: encoder)
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(householdId, forKey: .householdId)
     }
 }
 
@@ -213,21 +218,4 @@ private struct ConfirmChargeParams: Encodable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey { case charge, account, booked, amount, category, label }
-}
-
-/// Estado y movimiento de un cargo, con los nulos explícitos.
-private struct ChargeChanges: Encodable, Sendable {
-    var status: ChargeStatus
-    var transactionId: UUID?
-
-    private enum CodingKeys: String, CodingKey {
-        case status
-        case transactionId = "transaction_id"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(status, forKey: .status)
-        try c.encode(transactionId, forKey: .transactionId)
-    }
 }

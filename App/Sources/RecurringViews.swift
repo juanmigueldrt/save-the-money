@@ -205,6 +205,8 @@ struct RecurringFormView: View {
     @State private var reminds = true
     @State private var remindDays = 1
     @State private var createsPending = true
+    /// Identificador del pago fijo nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    @State private var newSeriesId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -344,7 +346,7 @@ struct RecurringFormView: View {
             error = "El importe no es válido."
             return nil
         }
-        var item = series ?? RecurringSeries(householdId: planning.household.id, name: name, amount: money,
+        var item = series ?? RecurringSeries(id: newSeriesId, householdId: planning.household.id, name: name, amount: money,
                                               startsOn: CalendarDay(startsOn))
         item.name = name
         item.kind = kind

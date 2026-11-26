@@ -37,6 +37,8 @@ data class Account(
     @SerialName("is_default") val isDefault: Boolean = false,
     /** Si suma en el patrimonio neto. */
     @SerialName("include_in_net_worth") val includeInNetWorth: Boolean = true,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val isShared: Boolean get() = ownerId == null
@@ -64,6 +66,8 @@ data class BudgetCategory(
     val kind: CategoryKind = CategoryKind.Expense,
     @SerialName("budget_group") val budgetGroup: BudgetGroup? = null,
     val icon: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val trimmedName: String get() = name.trim()
 
@@ -215,7 +219,7 @@ data class TransferDraft(
 
     companion object {
         /** Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día. */
-        const val STORED_WITH_OTHER_DATA = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+        const val STORED_WITH_OTHER_DATA = "Esto ya se guardó con otros datos. Cierra el formulario y revisa lo guardado antes de repetirlo."
 
         /** Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella. */
         const val OTHER_LEG_LOCKED = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
@@ -233,6 +237,8 @@ data class AccountDraft(
     val kind: AccountKind = AccountKind.Checking,
     val openingMinor: Long = 0,
     val ownerId: String? = null,
+    /** Lo genera la app una vez por formulario: reintentar el alta con el mismo no crea otra cuenta. */
+    val id: String = UUID.randomUUID().toString(),
 ) {
     val trimmedName: String get() = name.trim()
 
@@ -363,8 +369,12 @@ interface FinanceService {
     /** Crea el movimiento del cargo y lo marca como confirmado. Devuelve el movimiento. */
     suspend fun confirmCharge(chargeId: String, draft: MovementDraft): Movement
 
-    /** Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta. */
-    suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?)
+    /**
+     * Enlaza el cargo con un movimiento que ya existe (confirmado) o lo salta. [charge] es el cargo tal como se leyó: solo se
+     * cambia si sigue en esa versión ([RecurringCharge.updatedAt]); si no, [AppError.MovementChanged]. Devuelve el cargo con
+     * su versión nueva.
+     */
+    suspend fun updateCharge(charge: RecurringCharge, status: ChargeStatus, transactionId: String?): RecurringCharge
     suspend fun goals(householdId: String): List<Goal>
     suspend fun createGoal(goal: Goal): Goal
     suspend fun updateGoal(goal: Goal): Goal
@@ -375,11 +385,18 @@ interface FinanceService {
 
     suspend fun creditCards(householdId: String): List<CreditCardTerms>
 
-    /** Crea o cambia las condiciones de una tarjeta (una por cuenta). */
+    /**
+     * Crea o cambia las condiciones de una tarjeta (una por cuenta). Sin versión ([CreditCardTerms.updatedAt] nulo) es un alta:
+     * repetirla devuelve las guardadas y, si ya había otras distintas, falla con [TransferDraft.STORED_WITH_OTHER_DATA]. Con
+     * versión es un cambio: solo entra si siguen en esa versión; si no, [AppError.MovementChanged].
+     */
     suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms
     suspend fun cardInstallments(householdId: String): List<CardInstallment>
 
-    /** Crea o cambia el aplazado de un movimiento (uno por movimiento). */
+    /**
+     * Crea o cambia el aplazado de un movimiento (uno por movimiento), con las mismas reglas que [saveCreditCard]: sin versión
+     * es un alta con el `id` que trae; con versión, un cambio de plazo e interés sobre esa versión.
+     */
     suspend fun saveInstallment(installment: CardInstallment): CardInstallment
     suspend fun deleteInstallment(installmentId: String)
 
@@ -458,10 +475,31 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
     /** Lo que ve quien usa un id que ya es de otra persona (el 23505 del servidor). */
     private fun idUsed(): Nothing = fail("Ya hay un registro igual guardado. Revisa el formulario.")
 
-    /** Contador para la versión de cada movimiento: cambia en cada escritura, como `updated_at` en el servidor. */
+    /** Contador para la versión de cada fila: cambia en cada escritura, como `updated_at` en el servidor. */
     private var movementVersion = 0
 
     private fun nextVersion() = "v${++movementVersion}"
+
+    /**
+     * Un alta con un id que ya está guardado, como las funciones `create_…` del servidor (ORC-142): si es de otra persona no
+     * vale (23505); si es propia y [same] dice que trae los mismos datos, devuelve la guardada y no se crea nada; con otros
+     * datos falla (STM01). Nulo si ese id aún no está guardado.
+     */
+    private fun <T> replayed(stored: T?, id: String, mine: (String) -> Boolean, same: (T) -> Boolean): T? {
+        if (stored == null) return null
+        if (!mine(id)) idUsed()
+        if (!same(stored)) fail(TransferDraft.STORED_WITH_OTHER_DATA)
+        return stored
+    }
+
+    /**
+     * Como las funciones `update_…` del servidor (ORC-142): una fila borrada ([stored] nulo), ajena o en otra versión que la
+     * leída no se cambia (STM05). [creator] es el id de la fila que dice de quién es.
+     */
+    private suspend fun <T> requireCurrent(stored: T?, creator: String, household: (T) -> String, version: (T) -> String?, seen: String?): T {
+        if (stored == null || !mine(household(stored))(creator) || version(stored) != seen) throw AppError.MovementChanged
+        return stored
+    }
 
     /** La cuenta y la categoría tienen que ser propias, como pide el RLS al apuntar. */
     private fun build(draft: MovementDraft, householdId: String, mine: (String) -> Boolean): Movement {
@@ -510,24 +548,31 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
     override suspend fun createAccount(draft: AccountDraft, householdId: String): Account {
         val user = creator(householdId)
         draft.issue?.let(::fail)
-        return Account(id(), householdId, draft.trimmedName, draft.kind, openingMinor = draft.openingMinor, ownerId = draft.ownerId)
-            .also {
-                accounts += it
-                creators[it.id] = user
-            }
+        // Repetir el alta solo vale con el mismo hogar, nombre, tipo y saldo inicial.
+        replayed(accounts.firstOrNull { it.id == draft.id }, draft.id, mine(householdId)) {
+            it.householdId == householdId && it.name == draft.trimmedName && it.kind == draft.kind && it.openingMinor == draft.openingMinor
+        }?.let { return it }
+        return Account(
+            draft.id, householdId, draft.trimmedName, draft.kind, openingMinor = draft.openingMinor, ownerId = draft.ownerId,
+            updatedAt = nextVersion(),
+        ).also {
+            accounts += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updateAccount(account: Account): Account {
-        val i = accounts.indexOfFirst { it.id == account.id }
-        if (i < 0) throw AppError.Unknown("cuenta")
-        val mine = mine(accounts[i].householdId)
-        if (!mine(account.id)) throw AppError.Unknown("cuenta")
+        val stored = requireCurrent(accounts.firstOrNull { it.id == account.id }, account.id, { it.householdId }, { it.updatedAt }, account.updatedAt)
+        val mine = mine(stored.householdId)
         if (account.isDefault && !account.isArchived) {
-            // Como en la base de datos: sólo una predeterminada por persona.
-            accounts.replaceAll { if (it.id != account.id && mine(it.id)) it.copy(isDefault = false) else it }
+            // Como en la base de datos: sólo una predeterminada por persona. La que deja de serlo cambia de versión.
+            accounts.replaceAll {
+                if (it.id != account.id && mine(it.id) && it.isDefault) it.copy(isDefault = false, updatedAt = nextVersion()) else it
+            }
         }
-        accounts[i] = account.copy(name = account.name.trim())
-        return accounts[i]
+        val saved = account.copy(name = account.name.trim(), updatedAt = nextVersion())
+        accounts[accounts.indexOfFirst { it.id == account.id }] = saved
+        return saved
     }
 
     override suspend fun deleteAccount(accountId: String) {
@@ -544,7 +589,8 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         if (isMember(householdId) && seeded.add(householdId to me())) {
             val user = me()
             BudgetCategory.defaults(householdId).forEach {
-                categories += it
+                // Como cualquier fila del servidor, nacen con versión.
+                categories += it.copy(updatedAt = nextVersion())
                 creators[it.id] = user
             }
         }
@@ -557,20 +603,23 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         // Como el índice único del servidor: el nombre no se repite entre las categorías propias.
         val mine = mine(category.householdId)
         category.issue(categories.filter { mine(it.id) })?.let(::fail)
-        return category.copy(id = id(), name = category.trimmedName).also {
+        // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
+        replayed(categories.firstOrNull { it.id == category.id }, category.id, mine) {
+            it.householdId == category.householdId && it.name == category.trimmedName && it.kind == category.kind
+        }?.let { return it }
+        return category.copy(id = category.id.ifEmpty(::id), name = category.trimmedName, updatedAt = nextVersion()).also {
             categories += it
             creators[it.id] = user
         }
     }
 
     override suspend fun updateCategory(category: BudgetCategory): BudgetCategory {
-        val i = categories.indexOfFirst { it.id == category.id }
-        if (i < 0) throw AppError.Unknown("categoría")
-        val mine = mine(categories[i].householdId)
-        if (!mine(category.id)) throw AppError.Unknown("categoría")
+        val stored = requireCurrent(categories.firstOrNull { it.id == category.id }, category.id, { it.householdId }, { it.updatedAt }, category.updatedAt)
+        val mine = mine(stored.householdId)
         category.issue(categories.filter { mine(it.id) })?.let(::fail)
-        categories[i] = category.copy(name = category.trimmedName, kind = categories[i].kind)
-        return categories[i]
+        val saved = category.copy(name = category.trimmedName, kind = stored.kind, updatedAt = nextVersion())
+        categories.replaceAll { if (it.id == saved.id) saved else it }
+        return saved
     }
 
     override suspend fun deleteCategory(categoryId: String) {
@@ -761,11 +810,21 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(budget.householdId)
         val mine = mine(budget.householdId)
         budget.issue?.let(::fail)
-        // Uno ajeno no se ve: no se cambia.
-        if (extras.any { it.id == budget.id } && !mine(budget.id)) throw AppError.Unknown("no existe")
-        val saved = budget.copy(name = budget.trimmedName)
-        // Un favorito por persona, como el disparador del servidor.
-        if (saved.isFavorite) extras.replaceAll { if (it.isFavorite && mine(it.id)) it.copy(isFavorite = false) else it }
+        val stored = extras.firstOrNull { it.id == budget.id }
+        if (budget.updatedAt == null) {
+            // Alta: repetirla solo vale con el mismo hogar, nombre, límite y primer día.
+            replayed(stored, budget.id, mine) {
+                it.householdId == budget.householdId && it.name == budget.trimmedName && it.limit == budget.limit && it.startsOn == budget.startsOn
+            }?.let { return it }
+        } else if (stored == null || !mine(budget.id) || stored.updatedAt != budget.updatedAt) {
+            // Cambio: solo de uno propio y sobre la versión leída (el STM05 del servidor).
+            throw AppError.MovementChanged
+        }
+        val saved = budget.copy(name = budget.trimmedName, updatedAt = nextVersion())
+        // Un favorito por persona, como el disparador del servidor. El que deja de serlo cambia de versión.
+        if (saved.isFavorite) {
+            extras.replaceAll { if (it.isFavorite && mine(it.id) && it.id != saved.id) it.copy(isFavorite = false, updatedAt = nextVersion()) else it }
+        }
         val index = extras.indexOfFirst { it.id == saved.id }
         if (index >= 0) extras[index] = saved else extras += saved
         creators[saved.id] = user
@@ -801,7 +860,12 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(series.householdId)
         series.issue?.let(::fail)
         checkReferences(mine(series.householdId), series.accountId, series.categoryId)
-        return series.copy(id = id(), name = series.trimmedName).also {
+        // Repetir el alta solo vale con el mismo hogar, nombre, tipo, importe y primer día.
+        replayed(this.series.firstOrNull { it.id == series.id }, series.id, mine(series.householdId)) {
+            it.householdId == series.householdId && it.name == series.trimmedName && it.kind == series.kind &&
+                it.amountMinor == series.amountMinor && it.startsOn == series.startsOn
+        }?.let { return it }
+        return series.copy(id = series.id.ifEmpty(::id), name = series.trimmedName, updatedAt = nextVersion()).also {
             this.series += it
             creators[it.id] = user
         }
@@ -809,11 +873,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
 
     override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries {
         series.issue?.let(::fail)
-        val mine = mine(series.householdId)
-        if (this.series.any { it.id == series.id } && !mine(series.id)) throw AppError.Unknown("no existe")
-        checkReferences(mine, series.accountId, series.categoryId)
-        this.series.replaceAll { if (it.id == series.id) series else it }
-        return series
+        val stored = requireCurrent(this.series.firstOrNull { it.id == series.id }, series.id, { it.householdId }, { it.updatedAt }, series.updatedAt)
+        checkReferences(mine(stored.householdId), series.accountId, series.categoryId)
+        val saved = series.copy(name = series.trimmedName, updatedAt = nextVersion())
+        this.series.replaceAll { if (it.id == series.id) saved else it }
+        return saved
     }
 
     override suspend fun deleteRecurring(seriesId: String) {
@@ -838,7 +902,7 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         }
         return charges.distinctBy { it.seriesId to it.dueOn }
             .filter { new -> this.charges.none { it.seriesId == new.seriesId && it.dueOn == new.dueOn } }
-            .map { it.copy(id = id(), status = ChargeStatus.Pending, transactionId = null) }
+            .map { it.copy(id = id(), status = ChargeStatus.Pending, transactionId = null, updatedAt = nextVersion()) }
             .onEach { creators[it.id] = users.getValue(it.householdId) }
             .also { this.charges += it }
     }
@@ -854,16 +918,18 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
             movements += it
             creators[it.id] = user
         }
-        charges[i] = charges[i].copy(status = ChargeStatus.Confirmed, transactionId = movement.id, amountMinor = movement.amountMinor)
+        // Como el servidor: confirmarlo cambia la fila, y con ella su versión.
+        charges[i] = charges[i].copy(
+            status = ChargeStatus.Confirmed, transactionId = movement.id, amountMinor = movement.amountMinor, updatedAt = nextVersion(),
+        )
         return movement
     }
 
-    override suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?) {
-        val charge = charges.firstOrNull { it.id == chargeId } ?: return
-        if (!mine(charge.householdId)(chargeId)) return
-        charges.replaceAll {
-            if (it.id == chargeId) it.copy(status = status, transactionId = if (status == ChargeStatus.Pending) null else transactionId) else it
-        }
+    override suspend fun updateCharge(charge: RecurringCharge, status: ChargeStatus, transactionId: String?): RecurringCharge {
+        val stored = requireCurrent(charges.firstOrNull { it.id == charge.id }, charge.id, { it.householdId }, { it.updatedAt }, charge.updatedAt)
+        val saved = stored.copy(status = status, transactionId = if (status == ChargeStatus.Pending) null else transactionId, updatedAt = nextVersion())
+        charges.replaceAll { if (it.id == saved.id) saved else it }
+        return saved
     }
 
     override suspend fun goals(householdId: String): List<Goal> {
@@ -875,7 +941,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(goal.householdId)
         goal.issue?.let(::fail)
         checkReferences(mine(goal.householdId), goal.accountId)
-        return goal.copy(id = id(), name = goal.trimmedName).also {
+        // Repetir el alta solo vale con el mismo hogar, nombre, tipo y objetivo.
+        replayed(goals.firstOrNull { it.id == goal.id }, goal.id, mine(goal.householdId)) {
+            it.householdId == goal.householdId && it.name == goal.trimmedName && it.kind == goal.kind && it.targetMinor == goal.targetMinor
+        }?.let { return it }
+        return goal.copy(id = goal.id.ifEmpty(::id), name = goal.trimmedName, updatedAt = nextVersion()).also {
             goals += it
             creators[it.id] = user
         }
@@ -883,11 +953,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
 
     override suspend fun updateGoal(goal: Goal): Goal {
         goal.issue?.let(::fail)
-        val mine = mine(goal.householdId)
-        if (goals.any { it.id == goal.id } && !mine(goal.id)) throw AppError.Unknown("no existe")
-        checkReferences(mine, goal.accountId)
-        goals.replaceAll { if (it.id == goal.id) goal else it }
-        return goal
+        val stored = requireCurrent(goals.firstOrNull { it.id == goal.id }, goal.id, { it.householdId }, { it.updatedAt }, goal.updatedAt)
+        checkReferences(mine(stored.householdId), goal.accountId)
+        val saved = goal.copy(name = goal.trimmedName, updatedAt = nextVersion())
+        goals.replaceAll { if (it.id == goal.id) saved else it }
+        return saved
     }
 
     override suspend fun deleteGoal(goalId: String) {
@@ -905,7 +975,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(contribution.householdId)
         contribution.issue?.let(::fail)
         if (!mine(contribution.householdId)(contribution.goalId)) throw AppError.Unknown("meta de otra persona")
-        return contribution.copy(id = id()).also {
+        // Repetir la aportación solo vale con la misma meta, importe y día.
+        replayed(contributions.firstOrNull { it.id == contribution.id }, contribution.id, mine(contribution.householdId)) {
+            it.goalId == contribution.goalId && it.amountMinor == contribution.amountMinor && it.madeOn == contribution.madeOn
+        }?.let { return it }
+        return contribution.copy(id = contribution.id.ifEmpty(::id)).also {
             contributions += it
             creators[it.id] = user
         }
@@ -929,13 +1003,24 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         creator(terms.householdId)
         val mine = mine(terms.householdId)
         terms.issue?.let(::fail)
+        val stored = cards.firstOrNull { it.accountId == terms.accountId }
+        // Cambio: solo de unas condiciones propias y sobre la versión leída (el STM05 del servidor).
+        if (terms.updatedAt != null && (!mine(terms.accountId) || stored?.updatedAt != terms.updatedAt)) throw AppError.MovementChanged
         if (accounts.none { it.id == terms.accountId && it.kind == AccountKind.CreditCard } || !mine(terms.accountId)) {
             fail("Esa cuenta no es una tarjeta de crédito.")
         }
         checkReferences(mine, terms.payFromAccountId)
+        if (terms.updatedAt == null) {
+            // Alta: repetirla solo vale con el mismo límite, días y forma de pago.
+            replayed(stored, terms.accountId, mine) {
+                it.householdId == terms.householdId && it.creditLimit == terms.creditLimit && it.statementDay == terms.statementDay &&
+                    it.paymentDay == terms.paymentDay && it.paymentMode == terms.paymentMode
+            }?.let { return it }
+        }
+        val saved = terms.copy(updatedAt = nextVersion())
         cards.removeAll { it.accountId == terms.accountId }
-        cards += terms
-        return terms
+        cards += saved
+        return saved
     }
 
     override suspend fun cardInstallments(householdId: String): List<CardInstallment> {
@@ -947,14 +1032,26 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(installment.householdId)
         val mine = mine(installment.householdId)
         installment.issue?.let(::fail)
+        if (installment.updatedAt != null) {
+            // Cambio: solo plazo e interés, de un aplazado propio y sobre la versión leída (el STM05 del servidor).
+            val stored = requireCurrent(installments.firstOrNull { it.id == installment.id }, installment.id, { it.householdId }, { it.updatedAt }, installment.updatedAt)
+            val saved = stored.copy(months = installment.months, rate = installment.rate, updatedAt = nextVersion())
+            installments.replaceAll { if (it.id == saved.id) saved else it }
+            return saved
+        }
         if (movements.none { it.id == installment.movementId && it.accountId == installment.accountId } || !mine(installment.accountId)) {
             fail("Solo se aplazan compras de la tarjeta.")
         }
-        val saved = installment.copy(id = installments.firstOrNull { it.movementId == installment.movementId }?.id ?: id())
-        installments.removeAll { it.id == saved.id }
-        installments += saved
-        creators[saved.id] = user
-        return saved
+        // Alta: repetirla solo vale con la misma compra, plazo e interés.
+        replayed(installments.firstOrNull { it.id == installment.id }, installment.id, mine) {
+            it.movementId == installment.movementId && it.months == installment.months && it.rate == installment.rate
+        }?.let { return it }
+        // Como el índice único del servidor: un aplazado por compra.
+        if (installments.any { it.movementId == installment.movementId }) idUsed()
+        return installment.copy(id = installment.id.ifEmpty(::id), updatedAt = nextVersion()).also {
+            installments += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun deleteInstallment(installmentId: String) {
@@ -979,7 +1076,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = creator(holding.householdId)
         holding.issue?.let(::fail)
         checkReferences(mine(holding.householdId), holding.accountId)
-        return holding.copy(id = id(), name = holding.trimmedName, symbol = holding.trimmedSymbol).also {
+        // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
+        replayed(holdings.firstOrNull { it.id == holding.id }, holding.id, mine(holding.householdId)) {
+            it.householdId == holding.householdId && it.name == holding.trimmedName && it.kind == holding.kind
+        }?.let { return it }
+        return holding.copy(id = holding.id.ifEmpty(::id), name = holding.trimmedName, symbol = holding.trimmedSymbol, updatedAt = nextVersion()).also {
             holdings += it
             creators[it.id] = user
         }
@@ -987,13 +1088,10 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
 
     override suspend fun updateHolding(holding: Holding): Holding {
         holding.issue?.let(::fail)
-        val index = holdings.indexOfFirst { it.id == holding.id }
-        if (index < 0) throw AppError.Unknown("no existe")
-        val mine = mine(holdings[index].householdId)
-        if (!mine(holding.id)) throw AppError.Unknown("no existe")
-        checkReferences(mine, holding.accountId)
-        val saved = holding.copy(name = holding.trimmedName, symbol = holding.trimmedSymbol)
-        holdings[index] = saved
+        val stored = requireCurrent(holdings.firstOrNull { it.id == holding.id }, holding.id, { it.householdId }, { it.updatedAt }, holding.updatedAt)
+        checkReferences(mine(stored.householdId), holding.accountId)
+        val saved = holding.copy(name = holding.trimmedName, symbol = holding.trimmedSymbol, updatedAt = nextVersion())
+        holdings.replaceAll { if (it.id == saved.id) saved else it }
         return saved
     }
 
@@ -1019,7 +1117,8 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         prices.removeAll { it.holdingId == holdingId && it.day == day }
         prices += HoldingPrice(id(), holding.householdId, holdingId, day.toString(), price).also { creators[it.id] = me() }
         if (holding.priceDay?.isAfter(day) == true) return holding
-        return holding.copy(price = price, priceOn = day.toString()).also { holdings[index] = it }
+        // Como el servidor: cambiar el precio del activo cambia su versión.
+        return holding.copy(price = price, priceOn = day.toString(), updatedAt = nextVersion()).also { holdings[index] = it }
     }
 
     override suspend fun trades(householdId: String): List<InvestmentTrade> {
@@ -1074,7 +1173,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         plan.issue?.let(::fail)
         if (!mine(plan.holdingId)) throw AppError.Unknown("activo de otra persona")
         checkReferences(mine, plan.accountId)
-        return plan.copy(id = id()).also {
+        // Repetir el alta solo vale con el mismo activo, importe y primer día.
+        replayed(plans.firstOrNull { it.id == plan.id }, plan.id, mine) {
+            it.holdingId == plan.holdingId && it.amountMinor == plan.amountMinor && it.startsOn == plan.startsOn
+        }?.let { return it }
+        return plan.copy(id = plan.id.ifEmpty(::id), updatedAt = nextVersion()).also {
             plans += it
             creators[it.id] = user
         }
@@ -1082,13 +1185,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
 
     override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan {
         plan.issue?.let(::fail)
-        val index = plans.indexOfFirst { it.id == plan.id }
-        if (index < 0) throw AppError.Unknown("no existe")
-        val mine = mine(plans[index].householdId)
-        if (!mine(plan.id)) throw AppError.Unknown("no existe")
-        checkReferences(mine, plan.accountId)
-        plans[index] = plan
-        return plan
+        val stored = requireCurrent(plans.firstOrNull { it.id == plan.id }, plan.id, { it.householdId }, { it.updatedAt }, plan.updatedAt)
+        checkReferences(mine(stored.householdId), plan.accountId)
+        val saved = plan.copy(updatedAt = nextVersion())
+        plans.replaceAll { if (it.id == saved.id) saved else it }
+        return saved
     }
 
     override suspend fun deletePlan(planId: String) {
