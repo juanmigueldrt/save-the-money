@@ -297,6 +297,9 @@ public struct CreditCardSummary: Hashable, Sendable {
     /// devolución. Hasta que se clasifiquen cuentan como un pago: bajan la deuda, pero no los cargos.
     /// Si no está vacío, hay que pedir que se les ponga categoría.
     public var uncategorizedCredits: [UUID] = []
+    /// Los movimientos de los extractos sin cobrar no se han podido cargar todos (hay más que el tope de una
+    /// petición): los cargos, lo gastado en el ciclo y la deuda con intereses pueden salir más bajos de lo que son.
+    public var movementsTruncated = false
 
     public var next: CardPayment? { payments.first }
     public var isOverAlert: Bool {
@@ -309,6 +312,7 @@ public struct CreditCardSummary: Hashable, Sendable {
             && lhs.payoff?.months == rhs.payoff?.months && lhs.payoff?.interest == rhs.payoff?.interest
             && lhs.unresolvedInstallments == rhs.unresolvedInstallments
             && lhs.uncategorizedCredits == rhs.uncategorizedCredits
+            && lhs.movementsTruncated == rhs.movementsTruncated
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -320,6 +324,14 @@ public struct CreditCardSummary: Hashable, Sendable {
 }
 
 public enum CreditCardCalculator {
+    /// Extracto (día en que se cierra) más antiguo cuyo cargo aún no ha pasado. Para calcular la tarjeta hacen
+    /// falta todos sus movimientos desde `terms.cycleStart(forStatement:)` de este extracto.
+    public static func firstUnpaidStatement(terms: CreditCardTerms, today: CalendarDay) -> CalendarDay {
+        var closing = terms.statementClosing(for: today).adding(months: -1)
+        while terms.paymentDate(forStatement: closing) >= today { closing = closing.adding(months: -1) }
+        return closing.adding(months: 1)
+    }
+
     /// - Parameters:
     ///   - balance: saldo actual de la cuenta de la tarjeta (negativo = se debe).
     ///   - movements: movimientos de la tarjeta (los de otras cuentas se ignoran). Tienen que estar los de
@@ -349,7 +361,6 @@ public enum CreditCardCalculator {
 
         let used = Money(minor: max(0, -balance.minor))
         let openStatement = terms.statementClosing(for: today)
-        let lastClosed = openStatement.adding(months: -1)
         func chargesIn(statement closing: CalendarDay) -> Money {
             let start = terms.cycleStart(forStatement: closing)
             return Money(minor: -charges.filter { $0.bookedOn >= start && $0.bookedOn < closing }.map(\.amount.minor).reduce(0, +))
@@ -371,9 +382,7 @@ public enum CreditCardCalculator {
         }
         // Extractos cuyo cargo aún no ha pasado, del más antiguo al más nuevo.
         var statements: [CalendarDay] = []
-        var closing = lastClosed
-        while terms.paymentDate(forStatement: closing) >= today { closing = closing.adding(months: -1) }
-        closing = closing.adding(months: 1)
+        var closing = firstUnpaidStatement(terms: terms, today: today)
         while statements.count < count {
             statements.append(closing)
             closing = closing.adding(months: 1)
