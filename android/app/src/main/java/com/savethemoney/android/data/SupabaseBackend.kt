@@ -324,6 +324,20 @@ internal suspend fun <T> allPages(page: suspend (from: Long, to: Long) -> List<T
 }
 
 /**
+ * Como [allPages], pero cada página se pide a partir de la última fila de la anterior (cursor) y no con `range`:
+ * el servidor no vuelve a recorrer las páginas ya leídas, y un alta o un borrado a mitad de la carga no hace saltar
+ * ni repetir filas. [page] debe ordenar por una clave única y devolver como mucho [PAGE_SIZE] filas.
+ */
+internal suspend fun <T> allPagesByCursor(page: suspend (last: T?) -> List<T>): List<T> {
+    val all = mutableListOf<T>()
+    while (true) {
+        val rows = page(all.lastOrNull())
+        all += rows
+        if (rows.size < PAGE_SIZE) return all
+    }
+}
+
+/**
  * Usuario de la sesión guardada; nulo si no hay o el servidor la rechazó.
  * Lo comprobado en supabase-kt 3.2.6 (AuthImpl): con el token caducado y sin red, la sesión sigue guardada
  * pero el estado queda en RefreshFailure (o en Initializing mientras aún no ha caducado) y se reintenta cada

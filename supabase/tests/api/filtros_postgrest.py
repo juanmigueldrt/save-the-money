@@ -8,6 +8,7 @@ un PostgREST de verdad.
 Comprueba:
   - qué movimientos devuelve cada búsqueda (comodines, comillas, barras, comas, paréntesis, puntos, emoji);
   - que el cursor recorre la lista entera, página a página, sin repetir ni saltarse filas;
+  - que el cursor de la descarga completa (ORC-70), en el orden de cada app, también la recorre entera;
   - que dos or=(…) en la misma petición se juntan con AND (búsqueda y cursor);
   - que una lista de más de 1000 filas (aportaciones a una meta, ORC-65) se pide entera con order + offset/limit.
 
@@ -154,6 +155,37 @@ while pages < len(order) + 2:
     after = page[-1]
 check(f"el cursor recorre las {len(order)} filas en orden, de {PAGE} en {PAGE}, sin repetir ni saltar",
       f"order=booked_on.desc,id.desc&limit={PAGE}&or=(cursor de la última fila)", order, walked)
+
+# 2b. ORC-70: la descarga completa también va por cursor, con el orden de cada app. El día de la última fila va
+# aparte (gte / lte) y el or=(…) sólo desempata: son los filtros de downloadAfterFilter (iOS, día e id ascendentes)
+# y movementDownloadAfterFilter (Android, día descendente e id ascendente). El orden esperado se calcula aquí,
+# ordenando los movimientos de los vectores: Postgres compara los uuid como su texto en minúsculas.
+ascending = sorted(movements, key=lambda m: (m["bookedOn"], m["id"].lower()))
+DOWNLOADS = [
+    ("iOS", "booked_on.asc,id.asc", [m["key"] for m in ascending],
+     lambda m: [("booked_on", f"gte.{m['bookedOn']}"), ("or", f"(booked_on.gt.{m['bookedOn']},id.gt.{m['id'].lower()})")]),
+    ("Android", "booked_on.desc,id.asc",
+     [m["key"] for m in sorted(ascending, key=lambda m: m["bookedOn"], reverse=True)],  # sorted es estable: el id sigue ascendente
+     lambda m: [("booked_on", "gte.1900-01-01"), ("booked_on", f"lte.{m['bookedOn']}"),
+                ("or", f"(booked_on.lt.{m['bookedOn']},id.gt.{m['id'].lower()})")]),
+]
+for app, sort_order, expected, cursor in DOWNLOADS:
+    base = [("select", "id"), ("household_id", f"eq.{household_id}"), ("order", sort_order), ("limit", str(PAGE))]
+    walked, after, pages = [], None, 0
+    while pages < len(expected) + 2:
+        query = base + (cursor(by_key[after]) if after else [])
+        page = movement_keys(query)
+        pages += 1
+        if isinstance(page, str):
+            check(f"descarga completa ({app}), página {pages}", shown("/rest/v1/transactions", query), "HTTP 200", page)
+            break
+        print(f"      página {pages}: {shown('/rest/v1/transactions', query)} -> {page}", flush=True)
+        walked += page
+        if len(page) < PAGE or page[-1] not in by_key:
+            break
+        after = page[-1]
+    check(f"descarga completa ({app}): el cursor recorre las {len(expected)} filas, de {PAGE} en {PAGE}, sin repetir ni saltar",
+          f"order={sort_order}&limit={PAGE}&(día de la última fila)&or=(desempate)", expected, walked)
 
 # 3. Búsqueda y cursor en dos or=(…): PostgREST los junta con AND.
 filters = {v["input"]: v["filter"] for v in VECTORS["search"]}

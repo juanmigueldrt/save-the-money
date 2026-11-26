@@ -3,7 +3,8 @@
 
 Para cada tamaño N (por defecto 10000 y 50000) el hogar de prueba llega a N movimientos repartidos en seis años y cuatro
 cuentas, y a N/10 precios y N/10 operaciones de inversión en cinco activos. Después cronometra, tres veces cada una, las
-mismas peticiones que hacen las apps, página a página (offset/limit de 1000, el `max_rows` de supabase/config.toml):
+mismas peticiones que hacen las apps, página a página (de 1000 filas, el `max_rows` de supabase/config.toml). Los
+movimientos se piden por cursor (cada página, detrás de la última fila de la anterior) y lo demás con offset/limit:
 
   - movimientos, iOS: `allMovements` (STMData/SupabaseFinance.swift), orden booked_on.asc,id.asc;
   - movimientos, Android: `movements(householdId, from, through)` (data/SupabaseFinance.kt) que llama TrackingModel,
@@ -21,9 +22,12 @@ y por las mismas restricciones que los de la app, y se leen igual que se leería
 cronometra. Comprueba además que llegan todas las filas y que la suma de los movimientos y los saldos coinciden con lo
 cargado; si algo no cuadra sale con código 1 (después de escribir la tabla).
 
+Después de medir cada tamaño lanza `medicion_planes.psql` con psql contra la base de datos local (la URL de
+`supabase status`) e imprime los EXPLAIN (ANALYZE, BUFFERS) de las mismas peticiones, con el RLS del usuario y sin él.
+
 Uso, con el Supabase local arrancado (`supabase start`):
   python3 supabase/tests/api/medicion_movimientos.py [tamaños separados por comas, p. ej. 10000,50000]
-Sólo usa la URL y la clave anónima que imprime `supabase status`. Datos inventados, en un hogar nuevo en cada ejecución.
+Sólo usa las URL y la clave anónima que imprime `supabase status`. Datos inventados, en un hogar nuevo en cada ejecución.
 Si existe la variable GITHUB_STEP_SUMMARY, añade la tabla al resumen del job.
 """
 
@@ -33,6 +37,7 @@ import os
 import pathlib
 import random
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +46,8 @@ import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
+# Extensión .psql y no .sql: `supabase test db` ejecuta como prueba pgTAP todo .sql que haya bajo supabase/tests.
+PLANS_SQL = pathlib.Path(__file__).with_name("medicion_planes.psql")
 PAGE = 1000  # max_rows de supabase/config.toml, el mismo tamaño de página que usan las apps
 BATCH = 1000  # filas por petición al cargar los datos de prueba
 RUNS = 3
@@ -81,10 +88,10 @@ def local_status():
     key = status.get("ANON_KEY") or status.get("PUBLISHABLE_KEY")
     if not status.get("API_URL") or not key:
         sys.exit(f"`supabase status` no trae API_URL y ANON_KEY/PUBLISHABLE_KEY; claves que trae: {sorted(status)}")
-    return status["API_URL"].rstrip("/"), key
+    return status["API_URL"].rstrip("/"), key, status.get("DB_URL")
 
 
-API, APIKEY = local_status()
+API, APIKEY, DB_URL = local_status()
 
 
 def raw_call(method, path, query=(), body=None, token=None, prefer=None, timeout=60):
@@ -128,6 +135,7 @@ _, session = call("POST", "/auth/v1/signup", body={
 token = (session or {}).get("access_token") if isinstance(session, dict) else None
 if not token:
     sys.exit(f"El alta del usuario de prueba no devolvió sesión: {session}")
+user_id = session["user"]["id"]
 
 household = must("crear el hogar", *call("POST", "/rest/v1/rpc/create_household", body={"household_name": "Hogar de medición"},
                                           token=token))
@@ -184,11 +192,14 @@ def fill(table, target, row):
         loaded[table] += count
 
 
-def measure(table, query):
-    """Pide todas las páginas como allRows / allPages. Devuelve (filas, peticiones, segundos, bytes, filas leídas)."""
+def measure(table, query, cursor=None):
+    """Pide todas las páginas como allRows / allPages o, con `cursor`, como allPagesByCursor: `cursor` recibe la última
+    fila leída (None en la primera página) y devuelve los filtros de la página siguiente.
+    Devuelve (filas, peticiones, segundos, bytes, filas leídas)."""
     rows, pages, seconds, size = [], 0, 0.0, 0
     while True:
-        page_query = query + [("offset", str(len(rows))), ("limit", str(PAGE))]
+        page_query = query + (cursor(rows[-1] if rows else None) if cursor else [("offset", str(len(rows)))])
+        page_query += [("limit", str(PAGE))]
         start = time.perf_counter()
         code, raw = raw_call("GET", f"/rest/v1/{table}", page_query, token=token)
         seconds += time.perf_counter() - start
@@ -202,25 +213,50 @@ def measure(table, query):
             return len(rows), pages, seconds, size, rows
 
 
+def plans(n):
+    """Lanza medicion_planes.psql con psql y devuelve lo que imprime: los EXPLAIN (ANALYZE, BUFFERS) de las peticiones."""
+    variables = {"hogar": household_id, "claims": json.dumps({"sub": user_id, "role": "authenticated"}),
+                 "mitad": n // 2 // PAGE * PAGE, "mitad_inv": n // 10 // 2 // PAGE * PAGE}
+    if shutil.which("psql") and DB_URL:
+        command = ["psql", DB_URL]
+    else:
+        # Sin psql en la máquina: el del contenedor de la base de datos del Supabase local.
+        names = subprocess.run(["docker", "ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"],
+                               capture_output=True, text=True).stdout.split()
+        if not names:
+            return 1, "No hay psql ni contenedor supabase_db_*: no se pueden sacar los planes"
+        command = ["docker", "exec", "-i", "-e", "PGPASSWORD=postgres", names[0], "psql", "-h", "127.0.0.1", "-U", "postgres",
+                   "-d", "postgres"]
+    command += ["-X"] + [part for name, value in variables.items() for part in ("-v", f"{name}={value}")]
+    result = subprocess.run(command, input=PLANS_SQL.read_text(encoding="utf-8"), capture_output=True, text=True)
+    return result.returncode, result.stdout + result.stderr
+
+
 def check(name, expected, received):
     if expected != received:
         failures.append(f"{name}: esperado {expected}, recibido {received}")
 
 
 REQUESTS = [
+    # Los cursores son los de downloadAfterFilter (iOS) y movementDownloadAfterFilter (Android).
     ("movimientos (iOS, allMovements)", "transactions",
-     [("select", MOVEMENT), HOUSEHOLD, ("order", "booked_on.asc,id.asc")]),
+     [("select", MOVEMENT), HOUSEHOLD, ("order", "booked_on.asc,id.asc")],
+     lambda last: [("booked_on", f"gte.{last['booked_on']}"),
+                   ("or", f"(booked_on.gt.{last['booked_on']},id.gt.{last['id']})")] if last else []),
     ("movimientos (Android, TrackingModel)", "transactions",
-     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", "gte.1900-01-01"), ("booked_on", "lte.2999-12-31"),
-      ("order", "booked_on.desc,id.asc")]),
-    ("precios (holdingPrices)", "holding_prices", [("select", PRICE), HOUSEHOLD, ("order", "priced_on.asc,id.asc")]),
-    ("operaciones (trades)", "investment_trades", [("select", TRADE), HOUSEHOLD, ("order", "traded_on.asc,id.asc")]),
+     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", "gte.1900-01-01"), ("order", "booked_on.desc,id.asc")],
+     lambda last: [("booked_on", f"lte.{last['booked_on']}"),
+                   ("or", f"(booked_on.lt.{last['booked_on']},id.gt.{last['id']})")] if last
+     else [("booked_on", "lte.2999-12-31")]),
+    ("precios (holdingPrices)", "holding_prices", [("select", PRICE), HOUSEHOLD, ("order", "priced_on.asc,id.asc")], None),
+    ("operaciones (trades)", "investment_trades", [("select", TRADE), HOUSEHOLD, ("order", "traded_on.asc,id.asc")], None),
     ("saldos (account_balances)", "account_balances",
-     [("select", "account_id,balance_minor"), HOUSEHOLD, ("order", "account_id.asc")]),
+     [("select", "account_id,balance_minor"), HOUSEHOLD, ("order", "account_id.asc")], None),
 ]
 EXPECTED_ROWS = {"transactions": lambda: loaded["transactions"], "holding_prices": lambda: loaded["holding_prices"],
                  "investment_trades": lambda: loaded["investment_trades"], "account_balances": lambda: ACCOUNTS}
 
+plan_texts = []
 lines = ["| N | Petición | Ejecución | Filas | Peticiones | Tiempo total (ms) | ms por página | Bytes de respuesta |",
          "|---:|---|---:|---:|---:|---:|---:|---:|"]
 for n in SIZES:
@@ -228,9 +264,9 @@ for n in SIZES:
     fill("transactions", n, movement)
     fill("holding_prices", n // 10, price)
     fill("investment_trades", n // 10, trade)
-    for name, table, query in REQUESTS:
+    for name, table, query, cursor in REQUESTS:
         for run in range(1, RUNS + 1):
-            count, pages, seconds, size, rows = measure(table, query)
+            count, pages, seconds, size, rows = measure(table, query, cursor)
             ms = seconds * 1000
             line = f"| {n} | {name} | {run} | {count} | {pages} | {ms:.1f} | {ms / pages:.1f} | {size} |"
             print(line, flush=True)
@@ -244,6 +280,11 @@ for n in SIZES:
                 check(f"N={n}, {name}, ejecución {run}: saldos",
                       {a: openings[k] + sum_by_account[a] for k, a in enumerate(accounts)},
                       {r["account_id"]: r["balance_minor"] for r in rows})
+    # Los planes de las mismas peticiones, con los datos de este tamaño ya cargados. No se cronometran.
+    code, text = plans(n)
+    print(f"\nPlanes con {n} movimientos\n{text}", flush=True)
+    plan_texts.append(f"<details><summary>Planes con {n} movimientos</summary>\n\n```\n{text}\n```\n\n</details>\n")
+    check(f"N={n}, planes: código de salida de psql", 0, code)
 
 markdown = "\n".join(lines)
 summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -251,7 +292,7 @@ if summary:
     with open(summary, "a", encoding="utf-8") as out:
         out.write("### ORC-70: carga de los resúmenes contra el Supabase local\n\n"
                   "Tiempos de las peticiones en el runner, sin red móvil. Bytes del cuerpo sin comprimir.\n\n"
-                  f"{markdown}\n")
+                  f"{markdown}\n\n" + "\n".join(plan_texts))
 print("\n" + markdown, flush=True)
 
 for failure in failures:

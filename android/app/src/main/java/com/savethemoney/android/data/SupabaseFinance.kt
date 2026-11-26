@@ -322,17 +322,23 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         client.postgrest.rpc("reset_household", buildJsonObject { put("target_household", householdId) })
     }
 
+    /**
+     * Por cursor y no por `range` (ORC-70): con `range` cada página obligaba al servidor a recorrer las anteriores.
+     * El día de la última fila sustituye a [through] para que el servidor empiece a leer el índice en ese día.
+     */
+    @OptIn(SupabaseExperimental::class)
     override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement> = backend.mapped {
-        allPages { first, last ->
+        allPagesByCursor<Movement> { last ->
             client.from("transactions").select(Columns.raw(MOVEMENT)) {
                 filter {
                     eq("household_id", householdId)
                     gte("booked_on", from.toString())
-                    lte("booked_on", through.toString())
+                    lte("booked_on", last?.bookedOn ?: through.toString())
                 }
+                if (last != null) params["or"] = listOf("(${movementDownloadAfterFilter(last)})")
                 order("booked_on", Order.DESCENDING)
                 order("id", Order.ASCENDING)
-                range(first, last)
+                limit(PAGE_SIZE.toLong())
             }.decodeList<Movement>()
         }
     }
@@ -778,6 +784,13 @@ internal fun movementSearchFilter(search: MovementSearch): String {
     }
     return parts.joinToString(",")
 }
+
+/**
+ * Junto a `booked_on <= día`, las filas que van detrás de [after] en la descarga por fechas (día descendente, id
+ * ascendente): un día anterior, o (ya dentro del mismo día) un id mayor.
+ */
+internal fun movementDownloadAfterFilter(after: Movement): String =
+    "booked_on.lt.${after.bookedOn},id.gt.${after.id.lowercase()}"
 
 /** Las filas que van detrás de [after] en el orden de la lista: un día anterior, o el mismo día y un id menor. */
 internal fun movementAfterFilter(after: Movement): String =

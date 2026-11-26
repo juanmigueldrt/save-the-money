@@ -25,6 +25,8 @@ jobs:
       # Lo mismo que el job de Supabase de ci.yml: base de datos, auth, PostgREST y Kong.
       - run: supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
       # El valor va por variable de entorno, no pegado en el script: el propio script lo valida.
+      # Después de cada tamaño imprime los planes (medicion_planes.psql, con el psql del runner): salen en el log
+      # y, plegados, en el resumen del job.
       - name: Medir
         env:
           SIZES: ${{ inputs.sizes }}

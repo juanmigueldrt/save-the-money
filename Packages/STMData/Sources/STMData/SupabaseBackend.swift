@@ -290,6 +290,18 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    /// Como `allPages`, pero cada página se pide a partir de la última fila de la anterior (cursor) y no con `range`:
+    /// el servidor no vuelve a recorrer las páginas ya leídas, y un alta o un borrado a mitad de la carga no hace
+    /// saltar ni repetir filas. `page` debe ordenar por una clave única y devolver como mucho `pageSize` filas.
+    static func allPagesByCursor<Row>(_ page: (_ last: Row?) async throws -> [Row]) async throws -> [Row] {
+        var all: [Row] = []
+        while true {
+            let rows = try await page(all.last)
+            all += rows
+            if rows.count < pageSize { return all }
+        }
+    }
+
     static func appError(postgresCode: String?, message: String) -> AppError {
         switch postgresCode {
         case "P0002": .invalidOrExpiredInvite

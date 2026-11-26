@@ -233,14 +233,31 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    /// Por cursor y no por `range` (ORC-70): con `range` cada página obligaba al servidor a recorrer las anteriores.
+    /// `booked_on >= día` va aparte del `or` para que el servidor empiece a leer el índice en ese día.
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
-        try await allRows {
-            client.from("transactions")
-                .select(Self.movementColumns)
-                .eq("household_id", value: householdId.uuidString)
-                .order("booked_on")
-                .order("id")
+        try await Self.allPagesByCursor { (last: Movement?) -> [Movement] in
+            try await mapped {
+                var query = client.from("transactions")
+                    .select(Self.movementColumns)
+                    .eq("household_id", value: householdId.uuidString)
+                if let last {
+                    query = query.gte("booked_on", value: last.bookedOn.iso).or(Self.downloadAfterFilter(last))
+                }
+                return try await query
+                    .order("booked_on")
+                    .order("id")
+                    .limit(Self.pageSize)
+                    .execute()
+                    .value
+            }
         }
+    }
+
+    /// Junto a `booked_on >= día`, las filas que van detrás de `after` en la descarga completa (día e id ascendentes):
+    /// un día posterior, o (ya dentro del mismo día) un id mayor.
+    static func downloadAfterFilter(_ after: Movement) -> String {
+        "booked_on.gt.\(after.bookedOn.iso),id.gt.\(after.id.uuidString.lowercased())"
     }
 
     /// `create_movement` no repite un movimiento ya guardado con ese id: devuelve el que había.

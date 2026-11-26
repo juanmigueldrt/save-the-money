@@ -101,6 +101,13 @@ class BusquedaEnServidorTest {
         )
     }
 
+    /** ORC-70: la descarga por fechas va con el día descendente y el id ascendente; el día máximo viaja aparte, como `booked_on=lte.`. */
+    @Test
+    fun cursorDeLaDescargaPorFechasEsDiaAnteriorOMayorId() {
+        val ultimo = Movement("ABCDEF00-0000-0000-0000-000000000001", "h1", "a1", null, "2021-03-05", -1, "x")
+        assertEquals("booked_on.lt.2021-03-05,id.gt.abcdef00-0000-0000-0000-000000000001", movementDownloadAfterFilter(ultimo))
+    }
+
     @Test
     fun busquedaQuitaEspaciosYControlesYSeRecortaA100() {
         assertNull(MovementSearch.of("   \n\t ", emptyList()))
