@@ -294,7 +294,7 @@ public struct CreditCardSummary: Hashable, Sendable {
     public var interestInPayments: Money
     /// Con la forma de pago actual y sin compras nuevas: meses hasta pagar la deuda y sus intereses.
     /// nil si no hay deuda con intereses o si la cuota no llega a cubrir los intereses.
-    public var payoff: (months: Int, interest: Money)?
+    public var payoff: Payoff?
     /// Aplazados cuya compra no está entre los movimientos recibidos. Sin la compra no se sabe ni la
     /// cuota ni el capital: no salen en `payments` y su deuda queda dentro de `revolvingBalance`.
     /// Si no está vacío, las cifras de la tarjeta no son de fiar.
@@ -307,25 +307,16 @@ public struct CreditCardSummary: Hashable, Sendable {
     /// petición): los cargos, lo gastado en el ciclo y la deuda con intereses pueden salir más bajos de lo que son.
     public var movementsTruncated = false
 
+    /// Cuánto tarda en pagarse la deuda con la forma de pago actual y lo que costarán los intereses.
+    public struct Payoff: Hashable, Sendable {
+        public var months: Int
+        public var interest: Money
+    }
+
     public var next: CardPayment? { payments.first }
     public var isOverAlert: Bool {
         guard let alert = terms.alertPercent else { return false }
         return usedFraction * 100 >= Double(alert)
-    }
-
-    public static func == (lhs: CreditCardSummary, rhs: CreditCardSummary) -> Bool {
-        lhs.terms == rhs.terms && lhs.today == rhs.today && lhs.used == rhs.used && lhs.payments == rhs.payments
-            && lhs.payoff?.months == rhs.payoff?.months && lhs.payoff?.interest == rhs.payoff?.interest
-            && lhs.unresolvedInstallments == rhs.unresolvedInstallments
-            && lhs.uncategorizedCredits == rhs.uncategorizedCredits
-            && lhs.movementsTruncated == rhs.movementsTruncated
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(terms)
-        hasher.combine(today)
-        hasher.combine(used)
-        hasher.combine(payments)
     }
 }
 
@@ -436,7 +427,7 @@ public enum CreditCardCalculator {
             }
         }
 
-        var payoff: (months: Int, interest: Money)?
+        var payoff: CreditCardSummary.Payoff?
         if terms.paymentMode.isRevolving, revolvingAtStart + spentThisCycle.minor > 0 {
             var capital = revolvingAtStart + max(0, spentThisCycle.minor)
             var interest = 0
@@ -448,7 +439,7 @@ public enum CreditCardCalculator {
                 capital = step.remaining
                 months += 1
             }
-            if months < 600 { payoff = (months, Money(minor: interest)) }
+            if months < 600 { payoff = CreditCardSummary.Payoff(months: months, interest: Money(minor: interest)) }
         }
 
         let limit = max(terms.creditLimit.minor, 1)

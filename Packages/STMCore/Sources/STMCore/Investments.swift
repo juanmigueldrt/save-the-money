@@ -131,7 +131,7 @@ public enum TradeSide: String, Codable, CaseIterable, Sendable {
 // MARK: - Activo
 
 /// Un fondo, ETF, acción... del hogar. El precio se apunta a mano.
-public struct Holding: Identifiable, Hashable, Codable, Sendable {
+public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archivable {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -170,9 +170,6 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable {
         self.note = note
         self.archivedAt = archivedAt
     }
-
-    public var isArchived: Bool { archivedAt != nil }
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     public var trimmedSymbol: String? {
         let text = symbol?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -631,7 +628,7 @@ public enum PriceHistory {
 
 /// Un plan para invertir una cantidad fija cada cierto tiempo. No compra solo:
 /// avisa el día que toca y la compra se confirma en la app.
-public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable {
+public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archivable {
     public let id: UUID
     public var householdId: UUID
     public var holdingId: UUID
@@ -665,7 +662,6 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable {
     }
 
     public var isPaused: Bool { pausedAt != nil }
-    public var isArchived: Bool { archivedAt != nil }
 
     /// Cuenta en el total mensual y avisa: ni en pausa, ni archivado, ni terminado.
     public func isActive(on day: CalendarDay) -> Bool {

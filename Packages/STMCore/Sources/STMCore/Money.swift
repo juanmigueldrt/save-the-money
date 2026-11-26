@@ -10,10 +10,6 @@ public struct Money: Hashable, Codable, Sendable {
         self.currency = currency
     }
 
-    public static func zero(_ currency: String = "EUR") -> Money {
-        Money(minor: 0, currency: currency)
-    }
-
     /// Valor decimal exacto, p. ej. 1234 céntimos -> 12.34.
     public var decimal: Decimal { Decimal(minor) / 100 }
 
