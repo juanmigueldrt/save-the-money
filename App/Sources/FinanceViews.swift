@@ -341,7 +341,7 @@ struct MovementsView: View {
                         .swipeActions(edge: .leading) {
                             Button(movement.isReviewed ? "Sin revisar" : "Revisado",
                                    systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
-                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])); await reloadAccount() }
                             }
                             .tint(Palette.positive)
                         }
@@ -357,11 +357,11 @@ struct MovementsView: View {
                             Button("Editar", systemImage: "pencil") { editing = movement }
                             Button(movement.isReviewed ? "Marcar sin revisar" : "Marcar revisado",
                                    systemImage: movement.isReviewed ? "circle" : "checkmark.circle") {
-                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])) }
+                                Task { await finance.update(MovementBulkEdit(reviewed: !movement.isReviewed).changes(for: [movement])); await reloadAccount() }
                             }
                             Button(movement.excluded ? "Volver a contar en el presupuesto" : "Excluir del presupuesto",
                                    systemImage: movement.excluded ? "eye" : "eye.slash") {
-                                Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])) }
+                                Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])); await reloadAccount() }
                             }
                             Button("Duplicar", systemImage: "plus.square.on.square") {
                                 Task { await duplicate(movement) }
@@ -825,6 +825,8 @@ struct MovementFormView: View {
     @Environment(CreditCardModel.self) private var cards
     @Environment(PlanningModel.self) private var planning
     @Environment(\.dismiss) private var dismiss
+    /// Uno por formulario: si «Guardar» se repite tras un fallo de red, el movimiento no se apunta dos veces.
+    @State private var newMovementId = UUID()
     @State private var isExpense = true
     @State private var amount = ""
     @State private var concept = ""
@@ -1064,7 +1066,7 @@ struct MovementFormView: View {
         guard let accountId = selectedAccount else { error = "Elige una cuenta."; return }
         let signed = Money(minor: isExpense ? -abs(parsed.minor) : abs(parsed.minor))
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let draft = MovementDraft(accountId: accountId, categoryId: selectedCategory, bookedOn: CalendarDay(date),
+        let draft = MovementDraft(id: newMovementId, accountId: accountId, categoryId: selectedCategory, bookedOn: CalendarDay(date),
                                   amount: signed, description: concept,
                                   notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
                                   excluded: excluded, payee: Payee.clean(payee), tags: MovementTags.normalize(tagsText))

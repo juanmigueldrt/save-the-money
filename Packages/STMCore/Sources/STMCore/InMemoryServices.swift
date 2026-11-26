@@ -16,6 +16,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var financeAccounts: [Account] = []
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
+    /// Contador para la versión (`updatedAt`) de cada movimiento: cambia en cada escritura, como en el servidor.
+    var movementVersion = 0
     /// Las patas de cada transferencia guardada, por su id: repetirla no la duplica.
     var transferLegs: [UUID: [UUID]] = [:]
     var budgets: [Budget] = []

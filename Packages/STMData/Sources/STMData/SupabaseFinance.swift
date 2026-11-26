@@ -7,7 +7,7 @@ import Supabase
 extension SupabaseBackend: FinanceService {
     private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
     private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
-    static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
+    static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
     private static let importBatchSize = 500
 
@@ -171,16 +171,17 @@ extension SupabaseBackend: FinanceService {
         }
     }
 
+    /// `create_movement` no repite un movimiento ya guardado con ese id: devuelve el que había.
     public func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement {
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("transactions")
-                .insert(NewMovementRow(draft, householdId: householdId))
+        let rows: [Movement] = try await mapped {
+            try await client.rpc("create_movement", params: MovementParams(draft, householdId: householdId))
                 .select(Self.movementColumns)
-                .single()
                 .execute()
                 .value
         }
+        guard let saved = rows.first else { throw AppError.unknown("create_movement") }
+        return saved
     }
 
     /// `create_transfer` guarda las dos patas en una sola transacción y no repite una ya guardada.
@@ -199,15 +200,15 @@ extension SupabaseBackend: FinanceService {
                                   amount: movement.amount, description: movement.description, notes: movement.notes,
                                   excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("transactions")
-                .update(MovementChanges(movement))
-                .eq("id", value: movement.id.uuidString)
+        // `update_movement` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        let rows: [Movement] = try await mapped {
+            try await client.rpc("update_movement", params: MovementChanges(movement))
                 .select(Self.movementColumns)
-                .single()
                 .execute()
                 .value
         }
+        guard let saved = rows.first else { throw AppError.movementChanged }
+        return saved
     }
 
     public func deleteMovement(_ movementId: UUID) async throws {
@@ -387,6 +388,39 @@ private struct TransferParams: Encodable, Sendable {
     }
 }
 
+/// Parámetros de `create_movement`. La categoría se manda aunque sea nula: la función no tiene valor por defecto.
+private struct MovementParams: Encodable, Sendable {
+    var draft: MovementDraft
+    var householdId: UUID
+
+    init(_ draft: MovementDraft, householdId: UUID) {
+        self.draft = draft
+        self.householdId = householdId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(draft.id, forKey: .movement)
+        try c.encode(householdId, forKey: .household)
+        try c.encode(draft.accountId, forKey: .account)
+        try c.encode(draft.categoryId, forKey: .category)
+        try c.encode(draft.bookedOn, forKey: .booked)
+        try c.encode(draft.amount.minor, forKey: .amount)
+        try c.encode(draft.description.trimmingCharacters(in: .whitespacesAndNewlines), forKey: .label)
+        try c.encode(draft.notes, forKey: .note)
+        try c.encode(draft.excluded, forKey: .isExcluded)
+        try c.encode(Payee.clean(draft.payee), forKey: .payeeName)
+        try c.encode(draft.tags, forKey: .tagList)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case movement, household, account, category, booked, amount, label, note
+        case isExcluded = "is_excluded"
+        case payeeName = "payee_name"
+        case tagList = "tag_list"
+    }
+}
+
 private struct NewMovementRow: Encodable, Sendable {
     var householdId: UUID
     var accountId: UUID
@@ -443,31 +477,33 @@ private struct NewMovementRow: Encodable, Sendable {
     }
 }
 
+/// Parámetros de `update_movement`. Todos van siempre, también los nulos: la función no tiene valores por defecto.
 private struct MovementChanges: Encodable, Sendable {
     var movement: Movement
 
     init(_ movement: Movement) { self.movement = movement }
 
     enum CodingKeys: String, CodingKey {
-        case description, notes, excluded, payee, tags
-        case accountId = "account_id"
-        case categoryId = "category_id"
-        case bookedOn = "booked_on"
-        case amountMinor = "amount_minor"
-        case reviewedAt = "reviewed_at"
+        case movement, seen, account, category, booked, amount, label, note, reviewed
+        case isExcluded = "is_excluded"
+        case payeeName = "payee_name"
+        case tagList = "tag_list"
     }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(movement.accountId, forKey: .accountId)
-        try c.encode(movement.categoryId, forKey: .categoryId)
-        try c.encode(movement.bookedOn, forKey: .bookedOn)
-        try c.encode(movement.amount.minor, forKey: .amountMinor)
-        try c.encode(movement.description.trimmingCharacters(in: .whitespacesAndNewlines), forKey: .description)
-        try c.encode(movement.notes, forKey: .notes)
-        try c.encode(movement.excluded, forKey: .excluded)
-        try c.encode(movement.reviewedAt.map { ISO8601DateFormatter().string(from: $0) }, forKey: .reviewedAt)
-        try c.encode(Payee.clean(movement.payee), forKey: .payee)
-        try c.encode(movement.tags, forKey: .tags)
+        try c.encode(movement.id, forKey: .movement)
+        // El `updated_at` tal cual llegó del servidor: es la versión que se leyó.
+        try c.encode(movement.updatedAt, forKey: .seen)
+        try c.encode(movement.accountId, forKey: .account)
+        try c.encode(movement.categoryId, forKey: .category)
+        try c.encode(movement.bookedOn, forKey: .booked)
+        try c.encode(movement.amount.minor, forKey: .amount)
+        try c.encode(movement.description.trimmingCharacters(in: .whitespacesAndNewlines), forKey: .label)
+        try c.encode(movement.notes, forKey: .note)
+        try c.encode(movement.excluded, forKey: .isExcluded)
+        try c.encode(movement.reviewedAt.map { ISO8601DateFormatter().string(from: $0) }, forKey: .reviewed)
+        try c.encode(Payee.clean(movement.payee), forKey: .payeeName)
+        try c.encode(movement.tags, forKey: .tagList)
     }
 }

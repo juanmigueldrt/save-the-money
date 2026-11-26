@@ -232,6 +232,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "STM02": .invalidInput(InvestmentTrade.notEnoughShares)
         case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
         // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
+        // update_movement: el movimiento cambió (o se borró) después de leerlo.
+        case "STM05": .movementChanged
         case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
         default: .unknown(postgresCode ?? "postgrest")
         }

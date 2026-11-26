@@ -538,6 +538,8 @@ fun Pantalla07(nav: Nav) {
     val action = rememberAction()
     // Uno por formulario: si «Guardar» se repite tras un fallo de red, la transferencia no se guarda dos veces.
     val idTransferencia = remember { java.util.UUID.randomUUID().toString() }
+    // Lo mismo para un movimiento nuevo: el reintento lleva el mismo identificador y no se apunta dos veces.
+    val idMovimiento = remember { java.util.UUID.randomUUID().toString() }
     val cuentas = finance.activeAccounts.map { it.name to it.id }
     val enTarjeta = form.movement == null && tipo == 0 && finance.account(cuenta)?.kind == AccountKind.CreditCard
     val tipoCategoria = if (tipo == 1) CategoryKind.Income else CategoryKind.Expense
@@ -563,7 +565,7 @@ fun Pantalla07(nav: Nav) {
         } else {
             val draft = MovementDraft(
                 origen, categoria, fecha, if (tipo == 0) -valor else valor, concepto, nota,
-                excluded = excluido, payee = quien, tags = marcas,
+                excluded = excluido, payee = quien, tags = marcas, id = idMovimiento,
             )
             draft.issue?.let(::falla)
             val editando = form.movement

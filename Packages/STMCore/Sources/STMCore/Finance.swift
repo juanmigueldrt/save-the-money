@@ -211,11 +211,14 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
     public var payee: String?
     /// Etiquetas en minúsculas, sin «#».
     public var tags: [String]
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó, sin convertirlo a fecha (una `Date`
+    /// pierde los microsegundos). Se devuelve igual al cambiar el movimiento; nil = no leído del servidor.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, accountId: UUID, categoryId: UUID? = nil,
                 bookedOn: CalendarDay, amount: Money, description: String, notes: String? = nil,
                 importHash: String? = nil, excluded: Bool = false, reviewedAt: Date? = nil,
-                payee: String? = nil, tags: [String] = []) {
+                payee: String? = nil, tags: [String] = [], updatedAt: String? = nil) {
         self.id = id
         self.householdId = householdId
         self.accountId = accountId
@@ -229,6 +232,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         self.reviewedAt = reviewedAt
         self.payee = payee
         self.tags = tags
+        self.updatedAt = updatedAt
     }
 
     public var isExpense: Bool { amount.isNegative }
@@ -244,6 +248,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         case importHash = "import_hash"
         case excluded, payee, tags
         case reviewedAt = "reviewed_at"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -261,6 +266,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         description = try c.decode(String.self, forKey: .description)
         notes = try c.decodeIfPresent(String.self, forKey: .notes)
         importHash = try c.decodeIfPresent(String.self, forKey: .importHash)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -278,11 +284,14 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         try c.encodeIfPresent(reviewedAt.map(ServerDate.init), forKey: .reviewedAt)
         try c.encode(payee, forKey: .payee)
         try c.encode(tags, forKey: .tags)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
-/// Lo que se apunta o se importa, antes de tener id en el servidor.
+/// Lo que se apunta o se importa, antes de guardarlo. `id` lo genera la app una vez por formulario,
+/// para que reintentar tras un fallo de red no apunte el movimiento dos veces.
 public struct MovementDraft: Hashable, Sendable {
+    public var id: UUID
     public var accountId: UUID
     public var categoryId: UUID?
     public var bookedOn: CalendarDay
@@ -294,9 +303,10 @@ public struct MovementDraft: Hashable, Sendable {
     public var payee: String?
     public var tags: [String]
 
-    public init(accountId: UUID, categoryId: UUID? = nil, bookedOn: CalendarDay, amount: Money,
+    public init(id: UUID = UUID(), accountId: UUID, categoryId: UUID? = nil, bookedOn: CalendarDay, amount: Money,
                 description: String, notes: String? = nil, importHash: String? = nil,
                 excluded: Bool = false, payee: String? = nil, tags: [String] = []) {
+        self.id = id
         self.accountId = accountId
         self.categoryId = categoryId
         self.bookedOn = bookedOn

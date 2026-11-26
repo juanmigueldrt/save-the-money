@@ -135,6 +135,8 @@ data class Movement(
     val payee: String? = null,
     /** Etiquetas en minúsculas, sin «#». */
     val tags: List<String> = emptyList(),
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó, sin convertirlo a fecha. Se devuelve igual al cambiar el movimiento. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val day: LocalDate get() = LocalDate.parse(bookedOn.take(10))
     val isExpense: Boolean get() = amountMinor < 0
@@ -143,7 +145,10 @@ data class Movement(
     fun toDraft() = MovementDraft(accountId, categoryId, day, amountMinor, description, notes, importHash, excluded, payee, tags)
 }
 
-/** Lo que se apunta o se importa, antes de tener id en el servidor. */
+/**
+ * Lo que se apunta o se importa, antes de guardarlo. [id] lo genera la app una vez por formulario: reintentar tras un
+ * fallo de red no apunta el movimiento dos veces.
+ */
 data class MovementDraft(
     val accountId: String,
     val categoryId: String? = null,
@@ -155,6 +160,7 @@ data class MovementDraft(
     val excluded: Boolean = false,
     val payee: String? = null,
     val tags: List<String> = emptyList(),
+    val id: String = UUID.randomUUID().toString(),
 ) {
     /** Problema que impide guardarlo, en español, o nulo si es válido. */
     val issue: String? get() {
@@ -271,6 +277,11 @@ interface FinanceService {
 
     /** Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen. */
     suspend fun movements(householdId: String, ids: List<String>): List<Movement>
+
+    /**
+     * Repetir la llamada con el mismo [MovementDraft.id] devuelve el movimiento ya guardado y no apunta nada nuevo (RPC
+     * `create_movement`); si se repite con otra cuenta, otro importe u otro día falla con [TransferDraft.STORED_WITH_OTHER_DATA].
+     */
     suspend fun addMovement(draft: MovementDraft, householdId: String): Movement
 
     /**
@@ -279,6 +290,11 @@ interface FinanceService {
      * otro importe u otro día falla con [TransferDraft.STORED_WITH_OTHER_DATA].
      */
     suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement>
+
+    /**
+     * Solo cambia el movimiento si sigue en la versión leída ([Movement.updatedAt], RPC `update_movement`). Si otro
+     * dispositivo lo cambió o lo borró antes, no guarda nada y falla con [AppError.MovementChanged]. Devuelve la versión nueva.
+     */
     suspend fun updateMovement(movement: Movement): Movement
     suspend fun deleteMovement(movementId: String)
 
@@ -383,11 +399,17 @@ class InMemoryFinance : FinanceService {
     private fun id() = UUID.randomUUID().toString()
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
 
+    /** Contador para la versión de cada movimiento: cambia en cada escritura, como `updated_at` en el servidor. */
+    private var movementVersion = 0
+
+    private fun nextVersion() = "v${++movementVersion}"
+
     private fun build(draft: MovementDraft, householdId: String): Movement {
         draft.issue?.let(::fail)
         return Movement(
-            id(), householdId, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor,
+            draft.id, householdId, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor,
             draft.description.trim(), draft.notes, draft.importHash, draft.excluded, null, Payee.clean(draft.payee), draft.tags,
+            nextVersion(),
         )
     }
 
@@ -471,8 +493,18 @@ class InMemoryFinance : FinanceService {
     override suspend fun movements(householdId: String, ids: List<String>) =
         movements.filter { it.householdId == householdId && it.id in ids }
 
-    override suspend fun addMovement(draft: MovementDraft, householdId: String) =
-        build(draft, householdId).also { movements += it }
+    override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement {
+        val movement = build(draft, householdId)
+        movements.firstOrNull { it.id == draft.id }?.let { stored ->
+            // Como el servidor: repetirlo solo vale con la misma cuenta, importe y día.
+            val same = stored.householdId == householdId && stored.accountId == movement.accountId &&
+                stored.amountMinor == movement.amountMinor && stored.bookedOn == movement.bookedOn
+            if (!same) fail(TransferDraft.STORED_WITH_OTHER_DATA)
+            return stored
+        }
+        movements += movement
+        return movement
+    }
 
     override suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement> {
         draft.issue?.let(::fail)
@@ -495,8 +527,9 @@ class InMemoryFinance : FinanceService {
     override suspend fun updateMovement(movement: Movement): Movement {
         movement.toDraft().issue?.let(::fail)
         val i = movements.indexOfFirst { it.id == movement.id }
-        if (i < 0) throw AppError.Unknown("movimiento")
-        movements[i] = movement.copy(description = movement.description.trim(), payee = Payee.clean(movement.payee))
+        // Como el servidor: un movimiento borrado o en otra versión que la leída no se cambia.
+        if (i < 0 || movements[i].updatedAt != movement.updatedAt) throw AppError.MovementChanged
+        movements[i] = movement.copy(description = movement.description.trim(), payee = Payee.clean(movement.payee), updatedAt = nextVersion())
         return movements[i]
     }
 

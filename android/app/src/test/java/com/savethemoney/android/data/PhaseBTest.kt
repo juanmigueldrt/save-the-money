@@ -174,8 +174,8 @@ class PhaseBTest {
         assertFalse(updated.excluded)
         // El excluido sigue contando en el saldo.
         assertEquals(-1_000L, f.balances(home)[second.id])
-        // Y se copia al deshacer un borrado.
-        assertEquals(draft.copy(payee = "Tienda", excluded = false), updated.toDraft().copy(importHash = null))
+        // Y se copia al deshacer un borrado (con otro identificador: es un movimiento nuevo).
+        assertEquals(draft.copy(payee = "Tienda", excluded = false), updated.toDraft().copy(importHash = null, id = draft.id))
     }
 
     @Test

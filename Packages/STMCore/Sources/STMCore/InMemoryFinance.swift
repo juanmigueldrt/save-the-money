@@ -156,16 +156,25 @@ extension InMemoryBackend: FinanceService {
            !financeCategories.contains(where: { $0.id == category && $0.householdId == householdId }) {
             throw AppError.unknown("categoría de otro hogar")
         }
-        return Movement(householdId: householdId, accountId: draft.accountId, categoryId: draft.categoryId,
+        movementVersion += 1
+        return Movement(id: draft.id, householdId: householdId, accountId: draft.accountId, categoryId: draft.categoryId,
                         bookedOn: draft.bookedOn, amount: draft.amount,
                         description: draft.description.trimmingCharacters(in: .whitespacesAndNewlines),
                         notes: draft.notes, importHash: draft.importHash, excluded: draft.excluded,
-                        payee: Payee.clean(draft.payee), tags: draft.tags)
+                        payee: Payee.clean(draft.payee), tags: draft.tags, updatedAt: "v\(movementVersion)")
     }
 
     public func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement {
         _ = try requireMember(of: householdId)
         let movement = try validated(draft, in: householdId)
+        if let stored = financeMovements.first(where: { $0.id == draft.id }) {
+            // Como el servidor: repetirlo solo vale con la misma cuenta, importe y día.
+            guard stored.householdId == householdId, stored.accountId == movement.accountId,
+                  stored.amount == movement.amount, stored.bookedOn == movement.bookedOn else {
+                throw AppError.invalidInput(TransferDraft.storedWithOtherData)
+            }
+            return stored
+        }
         financeMovements.append(movement)
         return movement
     }
@@ -201,9 +210,11 @@ extension InMemoryBackend: FinanceService {
     }
 
     public func updateMovement(_ movement: Movement) async throws -> Movement {
-        guard let index = financeMovements.firstIndex(where: { $0.id == movement.id }) else { throw AppError.unknown("movimiento") }
+        // Como el servidor: un movimiento borrado o en otra versión que la leída no se cambia.
+        guard let index = financeMovements.firstIndex(where: { $0.id == movement.id }) else { throw AppError.movementChanged }
         let householdId = financeMovements[index].householdId
         _ = try requireMember(of: householdId)
+        guard movement.updatedAt == financeMovements[index].updatedAt else { throw AppError.movementChanged }
         let draft = MovementDraft(accountId: movement.accountId, categoryId: movement.categoryId, bookedOn: movement.bookedOn,
                                   amount: movement.amount, description: movement.description, notes: movement.notes,
                                   excluded: movement.excluded, payee: movement.payee, tags: movement.tags)
@@ -212,7 +223,8 @@ extension InMemoryBackend: FinanceService {
                            categoryId: updated.categoryId, bookedOn: updated.bookedOn, amount: updated.amount,
                            description: updated.description, notes: updated.notes,
                            importHash: financeMovements[index].importHash, excluded: updated.excluded,
-                           reviewedAt: movement.reviewedAt, payee: updated.payee, tags: updated.tags)
+                           reviewedAt: movement.reviewedAt, payee: updated.payee, tags: updated.tags,
+                           updatedAt: updated.updatedAt)
         financeMovements[index] = updated
         return updated
     }
