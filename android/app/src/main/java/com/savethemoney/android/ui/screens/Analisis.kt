@@ -65,6 +65,7 @@ import com.savethemoney.android.data.ReportPeriod
 import com.savethemoney.android.data.SpendingReport
 import com.savethemoney.android.data.GroupedSpending
 import com.savethemoney.android.data.biggestRise
+import com.savethemoney.android.data.monthContaining
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BudgetPeriod
 import com.savethemoney.android.data.BudgetTemplate
@@ -113,7 +114,6 @@ import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
 import kotlinx.coroutines.launch
 import java.time.LocalDate
-import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import kotlin.math.roundToLong
 
@@ -557,7 +557,7 @@ fun Pantalla18(nav: Nav) {
     val tope = (ingresos.byMonth.map { it.amount } + gastos.byMonth.map { it.amount }).max().coerceAtLeast(1)
     val informe = SpendingReport(movimientos, finance.categories, period.range(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
     val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
-    val sube = biggestRise(movimientos, finance.categories, YearMonth.from(hoy))
+    val sube = biggestRise(movimientos, finance.categories, monthContaining(hoy, inicioMes), inicioMes)
     val agrupacion = when (filter) {
         2 -> GroupedSpending.Grouping.Tag
         3 -> GroupedSpending.Grouping.Payee
