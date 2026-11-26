@@ -234,6 +234,34 @@ class SharedVectorsTest {
         }
     }
 
+    /** ORC-80: los traspasos sin categoría no cuentan en el presupuesto ni en los informes. */
+    @Test
+    fun uncategorizedTransfers() {
+        val categorias = listOf(
+            BudgetCategory("comida", "hogar", "comida", CategoryKind.Expense, BudgetGroup.Needs),
+            BudgetCategory("nomina", "hogar", "nomina", CategoryKind.Income),
+            BudgetCategory("traspaso", "hogar", "traspaso", CategoryKind.Transfer),
+        )
+        val range = LocalDate.parse("2026-11-01")..LocalDate.parse("2026-11-30")
+        for (v in load("uncategorized_transfers.json")) {
+            val name = v.str("name")
+            val movimientos = v["movements"]!!.jsonArray.map { m ->
+                Movement(
+                    m.str("key"), m["household"]?.jsonPrimitive?.content ?: "hogar", m.str("account"),
+                    m["category"]?.jsonPrimitive?.content, m.str("day"), m.long("amount"), m.str("key"),
+                    excluded = m["excluded"]?.jsonPrimitive?.boolean ?: false, transferId = m["transfer"]?.jsonPrimitive?.content,
+                )
+            }
+            val found = uncategorizedTransferIds(movimientos.filter { !it.excluded }, categorias.map { it.id }.toSet())
+            assertEquals(name, v["transfers"]!!.jsonArray.map { it.jsonPrimitive.content }, movimientos.map { it.id }.filter { it in found })
+            val budget = BudgetReport(null, range, categorias, movimientos)
+            assertEquals(name, v.long("budgetIncome"), budget.income)
+            assertEquals(name, v.long("budgetSpent"), budget.totalSpent)
+            assertEquals(name, v.long("reportExpense"), SpendingReport(movimientos, categorias, range, ReportKind.Expense).total)
+            assertEquals(name, v.long("reportIncome"), SpendingReport(movimientos, categorias, range, ReportKind.Income).total)
+        }
+    }
+
     @Test
     fun householdMonth() = runBlocking {
         val file = Json.parseToJsonElement(File("../../testdata/vectors/household_month.json").readText())

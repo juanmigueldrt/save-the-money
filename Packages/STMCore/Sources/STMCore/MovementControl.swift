@@ -184,8 +184,11 @@ public struct GroupedSpending: Hashable, Sendable, Identifiable {
     public static func report(_ grouping: Grouping, movements: [Movement], categories: [BudgetCategory],
                               range: ClosedRange<CalendarDay>) -> [GroupedSpending] {
         let transfers = Set(categories.filter { $0.kind == .transfer }.map(\.id))
+        let inRange = movements.filter { !$0.excluded && range.contains($0.bookedOn) }
+        // Los traspasos sin categoría tampoco cuentan, igual que en el presupuesto y en el informe de gastos.
+        let loose = Movement.uncategorizedTransferIds(in: inRange, categoryIds: Set(categories.map(\.id)))
         var rows: [String: GroupedSpending] = [:]
-        for movement in movements where !movement.excluded && range.contains(movement.bookedOn) {
+        for movement in inRange where !loose.contains(movement.id) {
             if let category = movement.categoryId, transfers.contains(category) { continue }
             let keys: [String]
             switch grouping {

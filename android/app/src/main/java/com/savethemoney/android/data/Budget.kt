@@ -104,6 +104,32 @@ data class CategoryLine(
 }
 
 /**
+ * Ids de los movimientos sin categoría (o con una que no está en [categoryIds]) que son traspasos entre cuentas propias,
+ * para que no cuenten como ingreso ni como gasto. Lo son las patas con `transferId` y, entre los demás, cada salida
+ * emparejada con una entrada del mismo hogar, día e importe opuesto en otra cuenta, de una en una: si sobra una, cuenta
+ * como siempre. Sólo cambia los totales; siguen en las listas de movimientos. Un ingreso y un gasto reales sin categoría
+ * así también se ocultan hasta que se categorice uno. Mismo criterio que `Movement.uncategorizedTransferIds` en STMCore.
+ */
+fun uncategorizedTransferIds(movements: List<Movement>, categoryIds: Set<String>): Set<String> {
+    val loose = movements.filter { m -> m.categoryId?.let { it in categoryIds } != true }
+    val ids = loose.filter { it.transferId != null }.mapTo(mutableSetOf()) { it.id }
+    val candidates = loose.filter { it.transferId == null && it.amountMinor != 0L }
+    for (group in candidates.groupBy { Triple(it.householdId, it.day, Math.abs(it.amountMinor)) }.values) {
+        val incoming = group.filter { it.amountMinor > 0 }.toMutableList()
+        // shortcut: la primera entrada de otra cuenta, no el emparejamiento máximo; con 4+ del mismo importe y día
+        // en 3+ cuentas puede quedar un par sin emparejar (cuenta como antes). Cambiar si aparece en la práctica.
+        for (outgoing in group) {
+            if (outgoing.amountMinor >= 0) continue
+            val index = incoming.indexOfFirst { it.accountId != outgoing.accountId }
+            if (index < 0) continue
+            ids += outgoing.id
+            ids += incoming.removeAt(index).id
+        }
+    }
+    return ids
+}
+
+/**
  * Lo gastado frente a lo previsto en [period]. Se calcula siempre a partir de los movimientos.
  * [carried] es el arrastre por categoría ([BudgetCarryOver.amounts]); sólo cuenta si el presupuesto arrastra.
  */
@@ -144,8 +170,9 @@ class BudgetReport(
         val incomeByTitle = mutableMapOf<String, Long>()
         val spentByCategory = mutableMapOf<String, Long>()
         var loose = 0L
+        val transfers = uncategorizedTransferIds(movements.filter { !it.excluded && it.day in period }, byId.keys)
         for (m in movements) {
-            if (m.excluded || m.day !in period) continue
+            if (m.excluded || m.day !in period || m.id in transfers) continue
             val category = m.categoryId?.let(byId::get)
             when (category?.kind) {
                 CategoryKind.Transfer -> Unit

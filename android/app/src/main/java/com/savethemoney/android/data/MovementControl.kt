@@ -146,9 +146,11 @@ data class GroupedSpending(
         /** En el periodo, sin transferencias ni excluidos. Un movimiento con dos etiquetas cuenta en las dos. */
         fun report(grouping: Grouping, movements: List<Movement>, categories: List<BudgetCategory>, range: ClosedRange<LocalDate>): List<GroupedSpending> {
             val transfers = categories.filter { it.kind == CategoryKind.Transfer }.map { it.id }.toSet()
+            // Los traspasos sin categoría tampoco cuentan, igual que en el presupuesto y en el informe de gastos.
+            val loose = uncategorizedTransferIds(movements.filter { !it.excluded && it.day in range }, categories.map { it.id }.toSet())
             val rows = mutableMapOf<String, GroupedSpending>()
             for (m in movements) {
-                if (m.excluded || m.day !in range || m.categoryId in transfers) continue
+                if (m.excluded || m.day !in range || m.categoryId in transfers || m.id in loose) continue
                 val keys = when (grouping) {
                     Grouping.Tag -> m.tags
                     Grouping.Payee -> listOfNotNull(com.savethemoney.android.data.Payee.clean(m.payee))
