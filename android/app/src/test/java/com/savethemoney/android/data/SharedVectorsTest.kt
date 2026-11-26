@@ -303,6 +303,28 @@ class SharedVectorsTest {
     }
 
     @Test
+    fun usernameRules() {
+        val issues = mapOf(
+            "tooShort" to Username.Issue.TooShort, "tooLong" to Username.Issue.TooLong,
+            "invalidCharacters" to Username.Issue.InvalidCharacters, "invalidEdges" to Username.Issue.InvalidEdges,
+        )
+        for (v in load("username.json")) {
+            // "both" aplica a las dos validaciones; "signUp" y "signIn" solo a la suya.
+            for (forSignIn in listOf(false, true)) {
+                if (v.str("validation") != "both" && v.str("validation") != (if (forSignIn) "signIn" else "signUp")) continue
+                val result = Username.parse(v.str("input"), forSignIn)
+                val error = v["error"]?.jsonPrimitive?.content
+                val caso = "${v.str("validation")} «${v.str("input")}»"
+                if (error == null) {
+                    assertEquals(caso, v.str("normalized"), result.getOrThrow().value)
+                } else {
+                    assertEquals(caso, issues[error]!!.message, result.exceptionOrNull()?.message)
+                }
+            }
+        }
+    }
+
+    @Test
     fun moneyOfSeveralCurrencies() {
         fun JsonElement.amount() = Money.Amount(long("minor"), str("currency"))
         for (v in load("money_currencies.json", "totals")) {

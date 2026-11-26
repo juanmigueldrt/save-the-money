@@ -40,19 +40,26 @@ value class Username private constructor(val value: String) {
         TooShort("El usuario necesita al menos 3 caracteres."),
         TooLong("El usuario puede tener como mucho 30 caracteres."),
         InvalidCharacters("Usa solo letras sin tilde, números, punto, guion o guion bajo."),
+        InvalidEdges("El usuario empieza y termina con una letra o un número."),
     }
 
     companion object {
         const val AUTH_EMAIL_DOMAIN = "savethemoney.invalid"
-        private val allowed = ('a'..'z').toSet() + ('0'..'9') + setOf('.', '_', '-')
+        private val alphanumeric = ('a'..'z').toSet() + ('0'..'9')
+        private val allowed = alphanumeric + setOf('.', '_', '-')
 
-        /** Normaliza (minúsculas, sin espacios alrededor) y valida; devuelve el problema si lo hay. */
-        fun parse(raw: String): Result<Username> {
+        /**
+         * Normaliza (minúsculas, sin espacios alrededor) y valida; devuelve el problema si lo hay.
+         * Al crear cuenta exige letra o número al principio y al final; al iniciar sesión ([forSignIn]) no,
+         * porque hay cuentas creadas antes de esa regla y el servidor las acepta.
+         */
+        fun parse(raw: String, forSignIn: Boolean = false): Result<Username> {
             val v = raw.trim().lowercase()
             val issue = when {
                 v.length < 3 -> Issue.TooShort
                 v.length > 30 -> Issue.TooLong
                 !v.all { it in allowed } -> Issue.InvalidCharacters
+                !forSignIn && (v.first() !in alphanumeric || v.last() !in alphanumeric) -> Issue.InvalidEdges
                 else -> return Result.success(Username(v))
             }
             return Result.failure(AppError.InvalidInput(issue.message))

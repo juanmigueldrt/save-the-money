@@ -1,7 +1,7 @@
 import Foundation
 
 /// Servicios en memoria para el modo demo, las previews y las pruebas.
-/// Imitan las reglas del servidor (códigos de 48 horas, un solo uso, etc.).
+/// Imitan las reglas del servidor (códigos de 48 horas, un solo uso, cada miembro ve solo lo suyo, etc.).
 public actor InMemoryBackend: AuthService, HouseholdService {
     private struct UserRecord { var profile: Profile; var password: String }
 
@@ -9,10 +9,12 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     private var householdsById: [UUID: Household] = [:]
     private var memberships: [Membership] = []
     private var invites: [HouseholdInvite] = []
-    private var currentUser: UUID?
+    private(set) var currentUser: UUID?
     let now: @Sendable () -> Date
 
     // Finanzas (InMemoryFinance.swift).
+    /// Quién creó cada fila, por su id (el `created_by` del servidor). Cada miembro ve y toca solo lo suyo.
+    var creators: [UUID: UUID] = [:]
     var financeAccounts: [Account] = []
     var financeCategories: [BudgetCategory] = []
     var financeMovements: [Movement] = []
@@ -20,7 +22,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var movementVersion = 0
     /// Las patas de cada transferencia guardada, por su id: repetirla no la duplica.
     var transferLegs: [UUID: [UUID]] = [:]
-    var budgets: [Budget] = []
+    /// Presupuestos de cada persona, por quien los guardó: uno por persona, hogar y periodo.
+    var budgets: [UUID: [Budget]] = [:]
     var paySchedules: [UUID: PaySchedule] = [:]
     var extraBudgetList: [ExtraBudget] = []
     var recurring: [RecurringSeries] = []
@@ -109,6 +112,18 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         memberships.contains { $0.userId == user && $0.householdId == household }
     }
 
+    /// Como `private.is_mine` del servidor: la fila es de quien la creó mientras siga en ese hogar.
+    func isMine(_ rowId: UUID, in household: UUID, user: UUID) -> Bool {
+        creators[rowId] == user && isMember(user, of: household)
+    }
+
+    /// Cada miembro nuevo (también quien crea el hogar) recibe sus categorías de partida.
+    func seedCategories(in household: UUID, for user: UUID) {
+        let seeded = BudgetCategory.defaults(for: household)
+        for category in seeded { creators[category.id] = user }
+        financeCategories += seeded
+    }
+
     public func myProfile() async throws -> Profile {
         let user = try requireUser()
         guard let account = users[user] else { throw AppError.notSignedIn }
@@ -133,7 +148,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         let household = Household(name: valid)
         householdsById[household.id] = household
         memberships.append(Membership(householdId: household.id, userId: user, role: .owner))
-        financeCategories += BudgetCategory.defaults(for: household.id)
+        seedCategories(in: household.id, for: user)
         if users[user]?.profile.defaultHouseholdId == nil {
             users[user]?.profile.defaultHouseholdId = household.id
         }
@@ -184,6 +199,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         }
         guard !isMember(user, of: household.id) else { throw AppError.alreadyMember }
         memberships.append(Membership(householdId: household.id, userId: user, role: .member))
+        seedCategories(in: household.id, for: user)
         invites[index].status = .accepted
         if users[user]?.profile.defaultHouseholdId == nil {
             users[user]?.profile.defaultHouseholdId = household.id

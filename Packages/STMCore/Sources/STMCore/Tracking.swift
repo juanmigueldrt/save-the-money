@@ -469,7 +469,8 @@ public enum BudgetAlertPlanner {
         let percent = spent.minor * 100 / limit.minor
         guard let reached = thresholds.last(where: { percent >= $0 }) else { return nil }
         if reached >= 100 {
-            return BudgetAlert(id: "\(id).\(reached)", title: "Te has pasado en \(name)",
+            let title = spent.minor > limit.minor ? "Te has pasado en \(name)" : "Has llegado al límite en \(name)"
+            return BudgetAlert(id: "\(id).\(reached)", title: title,
                                body: "Llevas \(spent.formatted()) de \(limit.formatted()) en este periodo.")
         }
         return BudgetAlert(id: "\(id).\(reached)", title: "\(name): ya llevas el \(percent) %",
@@ -536,14 +537,20 @@ public enum MonthSummary {
                        kind: .expense, monthStartDay: monthStartDay).total
     }
 
-    /// Cuánto ha cambiado el patrimonio este mes: la suma de los movimientos del mes en cuentas no archivadas.
+    /// Cuánto ha cambiado el patrimonio en el mes del hogar de `today` hasta hoy: la suma de los movimientos
+    /// de las cuentas que cuentan. Una cuenta archivada cuenta hasta el día en que se archivó (como `NetWorth.history`).
     /// Los traspasos entre cuentas propias se anulan solos.
     public static func netWorthChange(accounts: [Account], movements: [Movement],
-                                      today: CalendarDay = CalendarDay()) -> Money {
-        let ids = Set(accounts.filter { !$0.isArchived && $0.includeInNetWorth }.map(\.id))
-        let start = MonthKey(today).firstDay
+                                      today: CalendarDay = CalendarDay(), monthStartDay: Int = 1) -> Money {
+        let counted = Dictionary(accounts.filter(\.includeInNetWorth).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let start = MonthKey.containing(today, startDay: monthStartDay).period(startDay: monthStartDay).lowerBound
         return Money(minor: movements
-            .filter { ids.contains($0.accountId) && $0.bookedOn >= start && $0.bookedOn <= today }
+            .filter { movement in
+                guard let account = counted[movement.accountId], movement.bookedOn >= start, movement.bookedOn <= today else {
+                    return false
+                }
+                return account.archivedAt.map { movement.bookedOn < CalendarDay($0) } ?? true
+            }
             .reduce(0) { $0 + $1.amount.minor })
     }
 }

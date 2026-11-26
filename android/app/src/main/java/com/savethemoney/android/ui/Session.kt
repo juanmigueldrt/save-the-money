@@ -122,7 +122,7 @@ class Session(
     }
 
     suspend fun signIn(username: String, password: String) {
-        backend.signIn(Username.parse(username).getOrThrow(), password)
+        backend.signIn(Username.parse(username, forSignIn = true).getOrThrow(), password)
         refresh()
     }
 

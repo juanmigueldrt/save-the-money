@@ -61,8 +61,10 @@ class TrackingModel(private val household: Household, private val service: Finan
 
     suspend fun add(score: CreditScore) {
         score.issue?.let { throw AppError.InvalidInput(it) }
-        service.addCreditScore(score)
-        scores = service.creditScores()
+        val saved = service.addCreditScore(score)
+        // Se ve ya, aunque falle la recarga: así no se vuelve a apuntar.
+        scores = (scores + saved).sortedByDescending { it.recordedOn }
+        reloadAfterSave { scores = service.creditScores() }?.let { error = it }
     }
 
     suspend fun delete(score: CreditScore) {

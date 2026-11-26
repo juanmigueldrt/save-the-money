@@ -125,7 +125,7 @@ class InvestmentModel(
     suspend fun recordPrice(price: BigDecimal, day: LocalDate, holding: Holding) {
         val saved = service.recordPrice(price, day, holding.id)
         holdings = holdings.map { if (it.id == saved.id) saved else it }
-        prices = service.holdingPrices(household.id)
+        reloadAfterSave { prices = service.holdingPrices(household.id) }?.let { error = it }
     }
 
     /**
