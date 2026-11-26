@@ -192,9 +192,18 @@ struct MovementRow: View {
         var parts = showsDate ? [movement.bookedOn.shortText] : []
         if let category = finance.category(movement.categoryId) { parts.append(category.name) }
         if showsAccount, let account = finance.account(movement.accountId) { parts.append(account.name) }
+        if let counterpart = transferCounterpart { parts.append(counterpart) }
         if let payee = movement.payee { parts.append(payee) }
         if !movement.tags.isEmpty { parts.append(movement.tags.map { "#" + $0 }.joined(separator: " ")) }
         return parts.joined(separator: " · ")
+    }
+
+    /// En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina».
+    private var transferCounterpart: String? {
+        guard let transferId = movement.transferId,
+              let other = finance.recent.first(where: { $0.transferId == transferId && $0.id != movement.id }),
+              let account = finance.account(other.accountId) else { return nil }
+        return (movement.isExpense ? "Hacia " : "Desde ") + account.name
     }
 
     @AppStorage(DisplayPreferences.plusSignKey) private var showsPlusSign = false
@@ -270,6 +279,8 @@ struct MovementsView: View {
     @State private var customFrom = CalendarDay.gregorian.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var customThrough = Date()
     @State private var editing: Movement?
+    /// Pata de transferencia que se va a borrar: antes se avisa de que se borran las dos.
+    @State private var deletingTransfer: Movement?
     @State private var adding = false
     @State private var transferring = false
     /// Modo «Seleccionar»: tocar marca en vez de abrir, y abajo salen las acciones para todos.
@@ -351,8 +362,11 @@ struct MovementsView: View {
                             Button("Borrar", systemImage: "trash", role: .destructive) {
                                 Task { await delete(movement) }
                             }
-                            Button("Duplicar", systemImage: "plus.square.on.square") {
-                                Task { await duplicate(movement) }
+                            // Duplicar una pata apuntaría solo un lado de la transferencia.
+                            if movement.transferId == nil {
+                                Button("Duplicar", systemImage: "plus.square.on.square") {
+                                    Task { await duplicate(movement) }
+                                }
                             }
                         }
                         .contextMenu {
@@ -365,8 +379,11 @@ struct MovementsView: View {
                                    systemImage: movement.excluded ? "eye" : "eye.slash") {
                                 Task { await finance.update(MovementBulkEdit(excluded: !movement.excluded).changes(for: [movement])); await reloadAccount() }
                             }
-                            Button("Duplicar", systemImage: "plus.square.on.square") {
-                                Task { await duplicate(movement) }
+                            // Duplicar una pata apuntaría solo un lado de la transferencia.
+                            if movement.transferId == nil {
+                                Button("Duplicar", systemImage: "plus.square.on.square") {
+                                    Task { await duplicate(movement) }
+                                }
                             }
                             Divider()
                             Button("Borrar", systemImage: "trash", role: .destructive) {
@@ -430,7 +447,18 @@ struct MovementsView: View {
                 }
             }
         } message: {
-            Text("No se puede deshacer.")
+            Text(selectedMovements.contains { $0.transferId != nil }
+                 ? "Las transferencias se borran con sus dos movimientos, el de cada cuenta. No se puede deshacer."
+                 : "No se puede deshacer.")
+        }
+        .confirmationDialog("¿Borrar la transferencia?",
+                            isPresented: Binding(get: { deletingTransfer != nil }, set: { if !$0 { deletingTransfer = nil } }),
+                            titleVisibility: .visible, presenting: deletingTransfer) { movement in
+            Button("Borrar los dos movimientos", role: .destructive) {
+                Task { if await finance.delete(movement) { await reloadAccount() } }
+            }
+        } message: { _ in
+            Text(TransferDraft.deleteWarning)
         }
         .task(id: finance.recent) { await reloadAccount() }
         .refreshable { await finance.load() }
@@ -578,7 +606,11 @@ struct MovementsView: View {
     }
 
     private func delete(_ movement: Movement) async {
-        await finance.delete(movement)
+        if movement.transferId != nil {
+            deletingTransfer = movement
+        } else {
+            await finance.delete(movement)
+        }
     }
 
     /// Copia el movimiento tal cual (sin la huella del CSV, para que no cuente como importado), como en Android.
@@ -859,6 +891,7 @@ struct MovementFormView: View {
     @State private var isWorking = false
     /// Tras cambiar la categoría: otros con el mismo concepto a los que ofrecer el mismo cambio.
     @State private var similar: [Movement] = []
+    @State private var confirmingTransferDelete = false
 
     private var kind: CategoryKind { isExpense ? .expense : .income }
 
@@ -889,11 +922,15 @@ struct MovementFormView: View {
                         Text("Ingreso").tag(false)
                     }
                     .pickerStyle(.segmented)
+                    // En una transferencia la salida es siempre un gasto y la entrada un ingreso.
+                    .disabled(movement?.transferId != nil)
                     AmountField("Importe, p. ej. 12,50 o 25+7,40", text: $amount)
                     TextField("Concepto", text: $concept)
                         .conceptInput()
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
                         .environment(\.locale, Locale(identifier: "es_ES"))
+                } footer: {
+                    if movement?.transferId != nil { Text(TransferDraft.editNote) }
                 }
                 Section {
                     Picker("Cuenta", selection: $selectedAccount) {
@@ -946,7 +983,11 @@ struct MovementFormView: View {
                 }
                 if movement != nil {
                     Section {
-                        Button("Borrar movimiento", role: .destructive) { Task { await delete() } }
+                        if movement?.transferId != nil {
+                            Button("Borrar transferencia", role: .destructive) { confirmingTransferDelete = true }
+                        } else {
+                            Button("Borrar movimiento", role: .destructive) { Task { await delete() } }
+                        }
                     }
                 }
                 if let error {
@@ -963,6 +1004,11 @@ struct MovementFormView: View {
                 }
             }
             .onChange(of: concept) { _, newValue in suggestCategory(for: newValue) }
+            .confirmationDialog("¿Borrar la transferencia?", isPresented: $confirmingTransferDelete, titleVisibility: .visible) {
+                Button("Borrar los dos movimientos", role: .destructive) { Task { await delete() } }
+            } message: {
+                Text(TransferDraft.deleteWarning)
+            }
             .confirmationDialog(similar.count == 1 ? "Hay 1 movimiento con el mismo concepto"
                                                    : "Hay \(similar.count) movimientos con el mismo concepto",
                                 isPresented: Binding(get: { !similar.isEmpty }, set: { if !$0 { similar = []; dismiss() } }),

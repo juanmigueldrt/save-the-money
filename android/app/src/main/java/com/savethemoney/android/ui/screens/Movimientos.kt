@@ -211,7 +211,11 @@ fun Pantalla05(nav: Nav) {
                 {
                     StmDialog(
                         if (marcados.size == 1) "¿Borrar 1 movimiento?" else "¿Borrar ${marcados.size} movimientos?",
-                        "No se puede deshacer.",
+                        if (marcados.any { it.transferId != null }) {
+                            "Las transferencias se borran con sus dos movimientos, el de cada cuenta. No se puede deshacer."
+                        } else {
+                            "No se puede deshacer."
+                        },
                         icon = StmIcons.deleteForever,
                         onDismiss = { hoja = null },
                         actions = {
@@ -635,12 +639,18 @@ fun Pantalla07(nav: Nav) {
             if (form.movement != null) listOf("Gasto", "Ingreso") else listOf("Gasto", "Ingreso", "Transferencia"),
             tipo,
             { nuevo ->
+                // En una transferencia la salida es siempre un gasto y la entrada un ingreso.
+                if (base?.transferId != null) return@Segmented
                 tipo = nuevo
                 // Una categoría de ingreso no vale para un gasto; las de transferencia sirven para los dos.
                 val kind = elegida?.kind
                 if (kind != null && kind != CategoryKind.Transfer && kind != (if (nuevo == 1) CategoryKind.Income else CategoryKind.Expense)) categoria = null
             },
         )
+        if (base?.transferId != null) {
+            Spacer(Modifier.height(8.dp))
+            Text(com.savethemoney.android.data.TransferDraft.EDIT_NOTE, style = StmType.bodySmall, color = c.onSurfaceVariant)
+        }
         Spacer(Modifier.height(16.dp))
         var enfocado by remember { mutableStateOf(false) }
         Column(
@@ -771,6 +781,7 @@ fun Pantalla08(nav: Nav) {
     val finance = session.finance ?: return
     val m = finance.selectedMovement ?: return
     val action = rememberAction()
+    var confirmaTransferencia by remember { mutableStateOf(false) }
     val editar = {
         finance.movementForm = MovementForm(movement = m)
         nav.go(7)
@@ -778,30 +789,38 @@ fun Pantalla08(nav: Nav) {
     StmScreen(
         topBar = { MovimientosTopBar(nav) },
         bottomBar = { NavBar(Tab.Inicio, nav::tab) },
-        overlay = {
-            BottomSheet(MovementText.display(m.description), "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
-                SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
-                SheetItem(StmIcons.check, if (m.isReviewed) "Marcar sin revisar" else "Marcar revisado") {
-                    action.run {
-                        finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m)))
-                        nav.back()
+        overlay = if (confirmaTransferencia) {
+            { DialogoBorrarTransferencia(m, finance, action, { confirmaTransferencia = false }) { nav.back() } }
+        } else {
+            {
+                BottomSheet(MovementText.display(m.description), "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
+                    SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
+                    SheetItem(StmIcons.check, if (m.isReviewed) "Marcar sin revisar" else "Marcar revisado") {
+                        action.run {
+                            finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m)))
+                            nav.back()
+                        }
                     }
-                }
-                SheetItem(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar en el presupuesto" else "Excluir del presupuesto") {
-                    action.run {
-                        finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m)))
-                        nav.back()
+                    SheetItem(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar en el presupuesto" else "Excluir del presupuesto") {
+                        action.run {
+                            finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m)))
+                            nav.back()
+                        }
                     }
-                }
-                SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
-                    finance.cards.selectedId = m.accountId
-                    finance.cards.purchaseId = m.id
-                    nav.go(13)
-                }
-                SheetItem(StmIcons.delete, "Eliminar") {
-                    action.run {
-                        finance.delete(m)
-                        nav.back()
+                    SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
+                        finance.cards.selectedId = m.accountId
+                        finance.cards.purchaseId = m.id
+                        nav.go(13)
+                    }
+                    SheetItem(StmIcons.delete, "Eliminar") {
+                        if (m.transferId != null) {
+                            confirmaTransferencia = true
+                        } else {
+                            action.run {
+                                finance.delete(m)
+                                nav.back()
+                            }
+                        }
                     }
                 }
             }
@@ -909,6 +928,7 @@ fun Pantalla34(nav: Nav) {
     val finance = session.finance ?: return
     val m = finance.selectedMovement ?: return
     var menu by remember { mutableStateOf(true) }
+    var confirmaTransferencia by remember { mutableStateOf(false) }
     val action = rememberAction()
     val cat = finance.category(m.categoryId)
     val editar = {
@@ -923,7 +943,9 @@ fun Pantalla34(nav: Nav) {
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
-        overlay = if (menu) {
+        overlay = if (confirmaTransferencia) {
+            { DialogoBorrarTransferencia(m, finance, action, { confirmaTransferencia = false }) { nav.back() } }
+        } else if (menu) {
             {
                 Box(
                     Modifier.matchParentSize()
@@ -932,10 +954,13 @@ fun Pantalla34(nav: Nav) {
                 // Barra superior (64) + 96 del diseño, a 12 dp del borde derecho.
                 MenuDesplegable(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 160.dp, end = 12.dp)) {
                     ElementoMenu(StmIcons.edit, "Editar", onClick = editar)
-                    ElementoMenu(StmIcons.contentCopy, "Duplicar") {
-                        action.run {
-                            finance.add(m.toDraft().copy(importHash = null))
-                            nav.back()
+                    // Duplicar una pata apuntaría solo un lado de la transferencia.
+                    if (m.transferId == null) {
+                        ElementoMenu(StmIcons.contentCopy, "Duplicar") {
+                            action.run {
+                                finance.add(m.toDraft().copy(importHash = null))
+                                nav.back()
+                            }
                         }
                     }
                     ElementoMenu(StmIcons.check, if (m.isReviewed) "Sin revisar" else "Marcar revisado") {
@@ -955,10 +980,15 @@ fun Pantalla34(nav: Nav) {
                     Divider(inset = 0.dp, endInset = 0.dp)
                     Spacer(Modifier.height(8.dp))
                     ElementoMenu(StmIcons.delete, "Eliminar", Stm.colors.error, Stm.colors.error) {
-                        action.run {
-                            finance.delete(m)
-                            finance.lastDeleted = null
-                            nav.back()
+                        if (m.transferId != null) {
+                            menu = false
+                            confirmaTransferencia = true
+                        } else {
+                            action.run {
+                                finance.delete(m)
+                                finance.lastDeleted = null
+                                nav.back()
+                            }
                         }
                     }
                 }
@@ -1081,6 +1111,9 @@ private fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String? 
     val partes = listOfNotNull(
         detalle ?: cat?.name ?: "Sin categoría",
         if (detalle == null) finance.account(m.accountId)?.name else null,
+        // En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina».
+        m.transferId?.let { t -> finance.recent.firstOrNull { it.transferId == t && it.id != m.id } }
+            ?.let { otra -> finance.account(otra.accountId)?.name }?.let { (if (m.isExpense) "Hacia " else "Desde ") + it },
         m.payee,
         m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
     )
@@ -1133,6 +1166,33 @@ internal fun FilaInterruptor(label: String, nota: String?, checked: Boolean, onC
             Box(Modifier.width(40.dp).wrapContentWidth(Alignment.Start, unbounded = true)) { StmSwitch(checked, onChange) }
         },
         onClick = { onChange(!checked) },
+    )
+}
+
+/** Antes de borrar una pata de transferencia: avisa de que se borran las dos. */
+@Composable
+private fun BoxScope.DialogoBorrarTransferencia(
+    m: Movement,
+    finance: FinanceModel,
+    action: com.savethemoney.android.ui.Action,
+    onDismiss: () -> Unit,
+    onDeleted: () -> Unit,
+) {
+    StmDialog(
+        "¿Borrar la transferencia?",
+        com.savethemoney.android.data.TransferDraft.DELETE_WARNING,
+        icon = StmIcons.deleteForever,
+        onDismiss = onDismiss,
+        actions = {
+            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
+            Btn("Borrar los dos movimientos", {
+                onDismiss()
+                action.run {
+                    finance.delete(m)
+                    onDeleted()
+                }
+            }, kind = BtnKind.Error)
+        },
     )
 }
 

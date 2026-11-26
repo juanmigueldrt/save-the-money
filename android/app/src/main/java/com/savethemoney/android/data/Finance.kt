@@ -137,6 +137,11 @@ data class Movement(
     val tags: List<String> = emptyList(),
     /** Versión de la fila: el `updated_at` del servidor tal cual llegó, sin convertirlo a fecha. Se devuelve igual al cambiar el movimiento. */
     @SerialName("updated_at") val updatedAt: String? = null,
+    /**
+     * El mismo en las dos patas de una transferencia (la salida es la negativa); nulo en el resto de movimientos y en las
+     * transferencias apuntadas antes de que existiera. Lo pone el servidor al crearla; no se cambia.
+     */
+    @SerialName("transfer_id") val transferId: String? = null,
 ) {
     /** Se analiza una vez al crear el movimiento: los informes la leen miles de veces. */
     @kotlinx.serialization.Transient val day: LocalDate = LocalDate.parse(bookedOn.take(10))
@@ -211,6 +216,15 @@ data class TransferDraft(
     companion object {
         /** Lo que ve quien repite una transferencia ya guardada después de cambiar cuenta, importe o día. */
         const val STORED_WITH_OTHER_DATA = "Este pago ya se guardó con otros datos. Revísalo en los movimientos."
+
+        /** Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella. */
+        const val OTHER_LEG_LOCKED = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
+
+        /** Lo que se avisa antes de borrar una pata: se borran las dos. */
+        const val DELETE_WARNING = "Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer."
+
+        /** Lo que se avisa al editar una pata. */
+        const val EDIT_NOTE = "Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta."
     }
 }
 
@@ -301,6 +315,12 @@ interface FinanceService {
      */
     suspend fun updateMovement(movement: Movement): Movement
     suspend fun deleteMovement(movementId: String)
+
+    /**
+     * Borra las dos patas de una transferencia ([Movement.transferId]) en una sola llamada, o ninguna (RPC `delete_transfer`).
+     * Si la otra pata ya no existe borra la que queda; si ya no queda ninguna no hace nada.
+     */
+    suspend fun deleteTransfer(transferId: String)
 
     /** Guarda varios de golpe. Los que ya estaban (misma huella en la cuenta) se ignoran. */
     suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult
@@ -609,7 +629,7 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
             return stored
         }
         // Se validan las dos patas antes de guardar ninguna.
-        val legs = draft.legs.map { build(it, householdId, mine) }
+        val legs = draft.legs.map { build(it, householdId, mine).copy(transferId = draft.id) }
         movements += legs
         legs.forEach { creators[it.id] = user }
         transferLegs[draft.id] = legs.map { it.id }
@@ -624,14 +644,41 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val mine = mine(movements[i].householdId)
         if (!mine(movement.id) || movements[i].updatedAt != movement.updatedAt) throw AppError.MovementChanged
         if (!mine(movement.accountId) || movement.categoryId?.let(mine) == false) throw AppError.Unknown("cuenta o categoría de otra persona")
-        movements[i] = movement.copy(description = movement.description.trim(), payee = Payee.clean(movement.payee), updatedAt = nextVersion())
+        val transferId = movements[i].transferId
+        if (transferId != null) keepTransferLegsTogether(movement, movements[i], transferId, mine)
+        movements[i] = movement.copy(
+            description = movement.description.trim(), payee = Payee.clean(movement.payee), updatedAt = nextVersion(), transferId = transferId,
+        )
         return movements[i]
+    }
+
+    /** Como el trigger del servidor: el importe y el día de una pata cambian también en la otra. */
+    private fun keepTransferLegsTogether(updated: Movement, before: Movement, transferId: String, mine: (String) -> Boolean) {
+        val invalid = "Algún dato no es válido. Revisa el formulario."
+        // La salida sigue siendo negativa y la entrada positiva.
+        if (updated.isExpense != before.isExpense) fail(invalid)
+        // Si la otra pata ya no existe, la que queda es un movimiento normal.
+        val pair = movements.indexOfFirst { it.transferId == transferId && it.id != updated.id }
+        if (pair < 0) return
+        if (movements[pair].accountId == updated.accountId) fail(invalid)
+        if (movements[pair].amountMinor == -updated.amountMinor && movements[pair].bookedOn == updated.bookedOn) return
+        if (!mine(movements[pair].id)) fail(TransferDraft.OTHER_LEG_LOCKED)
+        movements[pair] = movements[pair].copy(amountMinor = -updated.amountMinor, bookedOn = updated.bookedOn, updatedAt = nextVersion())
     }
 
     override suspend fun deleteMovement(movementId: String) {
         movements.firstOrNull { it.id == movementId }?.let { if (!mine(it.householdId)(movementId)) return }
         movements.removeAll { it.id == movementId }
         installments.removeAll { it.movementId == movementId }
+    }
+
+    override suspend fun deleteTransfer(transferId: String) {
+        val legs = movements.filter { it.transferId == transferId }
+        // Como el servidor: o se borran todas las patas o ninguna.
+        if (legs.any { !mine(it.householdId)(it.id) }) fail(TransferDraft.OTHER_LEG_LOCKED)
+        val ids = legs.map { it.id }.toSet()
+        movements.removeAll { it.id in ids }
+        installments.removeAll { it.movementId in ids }
     }
 
     override suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult {

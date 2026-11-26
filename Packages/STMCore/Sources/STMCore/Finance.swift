@@ -214,11 +214,14 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
     /// Versión de la fila: el `updated_at` del servidor tal cual llegó, sin convertirlo a fecha (una `Date`
     /// pierde los microsegundos). Se devuelve igual al cambiar el movimiento; nil = no leído del servidor.
     public var updatedAt: String?
+    /// El mismo en las dos patas de una transferencia (la salida es la negativa); nil en el resto de movimientos
+    /// y en las transferencias apuntadas antes de que existiera. Lo pone el servidor al crearla; cambiarlo aquí no lo guarda.
+    public var transferId: UUID?
 
     public init(id: UUID = UUID(), householdId: UUID, accountId: UUID, categoryId: UUID? = nil,
                 bookedOn: CalendarDay, amount: Money, description: String, notes: String? = nil,
                 importHash: String? = nil, excluded: Bool = false, reviewedAt: Date? = nil,
-                payee: String? = nil, tags: [String] = [], updatedAt: String? = nil) {
+                payee: String? = nil, tags: [String] = [], updatedAt: String? = nil, transferId: UUID? = nil) {
         self.id = id
         self.householdId = householdId
         self.accountId = accountId
@@ -233,6 +236,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         self.payee = payee
         self.tags = tags
         self.updatedAt = updatedAt
+        self.transferId = transferId
     }
 
     public var isExpense: Bool { amount.isNegative }
@@ -249,6 +253,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         case excluded, payee, tags
         case reviewedAt = "reviewed_at"
         case updatedAt = "updated_at"
+        case transferId = "transfer_id"
     }
 
     public init(from decoder: Decoder) throws {
@@ -267,6 +272,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         notes = try c.decodeIfPresent(String.self, forKey: .notes)
         importHash = try c.decodeIfPresent(String.self, forKey: .importHash)
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
+        transferId = try c.decodeIfPresent(UUID.self, forKey: .transferId)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -285,6 +291,7 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
         try c.encode(payee, forKey: .payee)
         try c.encode(tags, forKey: .tags)
         try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
+        try c.encodeIfPresent(transferId, forKey: .transferId)
     }
 }
 

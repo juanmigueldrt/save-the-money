@@ -199,7 +199,15 @@ class FinanceModel(
     suspend fun update(movements: List<Movement>) {
         if (movements.isEmpty()) return
         try {
-            movements.forEach { m -> service.updateMovement(m).also { if (it.id == tappedMovement?.id) tappedMovement = it } }
+            // Guardar una pata de transferencia cambia también la otra (importe y día): si la otra también está en la lista,
+            // se guarda sobre su versión nueva, que ya trae lo mismo, en vez de fallar como si la hubiera cambiado otro dispositivo.
+            val versions = mutableMapOf<String, String?>()
+            movements.forEach { m ->
+                val saved = service.updateMovement(if (m.id in versions) m.copy(updatedAt = versions[m.id]) else m)
+                if (saved.id == tappedMovement?.id) tappedMovement = saved
+                val pairs = movements.filter { it.transferId != null && it.transferId == saved.transferId && it.id != saved.id }
+                if (pairs.isNotEmpty()) service.movements(household.id, pairs.map { it.id }).forEach { versions[it.id] = it.updatedAt }
+            }
         } catch (e: AppError.MovementChanged) {
             // Otro dispositivo lo cambió antes: se recarga (también el que está abierto) para que se vea lo nuevo detrás del aviso.
             reloadAll()
@@ -212,10 +220,16 @@ class FinanceModel(
         reloadAll()
     }
 
-    /** Borra varios a la vez (sin «Deshacer»: la pantalla pide confirmación antes). */
+    /** Borra varios a la vez (sin «Deshacer»: la pantalla pide confirmación antes). Una pata de transferencia se lleva la otra. */
     suspend fun delete(movements: List<Movement>) {
-        movements.forEach { service.deleteMovement(it.id) }
-        if (movements.any { it.id == tappedMovement?.id }) tappedMovement = null
+        val transfers = mutableSetOf<String>()
+        movements.forEach { m ->
+            val transferId = m.transferId
+            if (transferId == null) service.deleteMovement(m.id) else if (transfers.add(transferId)) service.deleteTransfer(transferId)
+        }
+        if (movements.any { it.id == tappedMovement?.id || (it.transferId != null && it.transferId == tappedMovement?.transferId) }) {
+            tappedMovement = null
+        }
         reloadAll()
     }
 
@@ -226,11 +240,13 @@ class FinanceModel(
     val knownTags: List<String> get() = MovementTags.all(recent)
     val knownPayees: List<String> get() = Payee.all(recent)
 
+    /** Una pata de transferencia se borra con la otra y sin «Deshacer», que solo volvería a apuntar una. */
     suspend fun delete(movement: Movement) {
-        service.deleteMovement(movement.id)
+        val transferId = movement.transferId
+        if (transferId == null) service.deleteMovement(movement.id) else service.deleteTransfer(transferId)
         if (movement.id == tappedMovement?.id) tappedMovement = null
         reloadAll()
-        lastDeleted = movement
+        lastDeleted = movement.takeIf { transferId == null }
     }
 
     suspend fun undoDelete() {

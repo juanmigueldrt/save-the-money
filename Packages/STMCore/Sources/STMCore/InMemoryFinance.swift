@@ -223,7 +223,11 @@ extension InMemoryBackend: FinanceService {
             }
             return legs
         }
-        let legs = try transfer.legs.map { try validated($0, in: householdId, by: user) }
+        let legs = try transfer.legs.map {
+            var leg = try validated($0, in: householdId, by: user)
+            leg.transferId = transfer.id
+            return leg
+        }
         // Cada pata pasa por el mismo punto de fallo que `addMovement`: si falla la segunda,
         // se deshace la primera, como la transacción del servidor.
         let before = financeMovements
@@ -257,9 +261,30 @@ extension InMemoryBackend: FinanceService {
                            description: updated.description, notes: updated.notes,
                            importHash: financeMovements[index].importHash, excluded: updated.excluded,
                            reviewedAt: movement.reviewedAt, payee: updated.payee, tags: updated.tags,
-                           updatedAt: updated.updatedAt)
+                           updatedAt: updated.updatedAt, transferId: financeMovements[index].transferId)
+        if let transferId = updated.transferId {
+            try keepTransferLegsTogether(updated, transferId: transferId, before: financeMovements[index], user: user)
+        }
         financeMovements[index] = updated
         return updated
+    }
+
+    /// Como el trigger del servidor: el importe y el día de una pata cambian también en la otra.
+    private func keepTransferLegsTogether(_ updated: Movement, transferId: UUID, before: Movement, user: UUID) throws {
+        let invalid = AppError.invalidInput("Algún dato no es válido. Revisa el formulario.")
+        // La salida sigue siendo negativa y la entrada positiva.
+        guard updated.amount.isNegative == before.amount.isNegative else { throw invalid }
+        // Si la otra pata ya no existe, la que queda es un movimiento normal.
+        guard let pair = financeMovements.firstIndex(where: { $0.transferId == transferId && $0.id != updated.id }) else { return }
+        guard financeMovements[pair].accountId != updated.accountId else { throw invalid }
+        guard financeMovements[pair].amount != -updated.amount || financeMovements[pair].bookedOn != updated.bookedOn else { return }
+        guard isMine(financeMovements[pair].id, in: updated.householdId, user: user) else {
+            throw AppError.invalidInput(TransferDraft.otherLegLocked)
+        }
+        movementVersion += 1
+        financeMovements[pair].amount = -updated.amount
+        financeMovements[pair].bookedOn = updated.bookedOn
+        financeMovements[pair].updatedAt = "v\(movementVersion)"
     }
 
     public func deleteMovement(_ movementId: UUID) async throws {
@@ -269,6 +294,20 @@ extension InMemoryBackend: FinanceService {
         financeMovements.removeAll { $0.id == movementId }
         installmentList.removeAll { $0.movementId == movementId }
         for index in chargeList.indices where chargeList[index].transactionId == movementId {
+            chargeList[index].transactionId = nil
+        }
+    }
+
+    public func deleteTransfer(_ transferId: UUID) async throws {
+        let user = try requireUser()
+        let legs = Set(financeMovements.filter { $0.transferId == transferId }.map(\.id))
+        // Como el servidor: o se borran todas las patas o ninguna.
+        for leg in financeMovements where legs.contains(leg.id) {
+            guard isMine(leg.id, in: leg.householdId, user: user) else { throw AppError.invalidInput(TransferDraft.otherLegLocked) }
+        }
+        financeMovements.removeAll { legs.contains($0.id) }
+        installmentList.removeAll { legs.contains($0.movementId) }
+        for index in chargeList.indices where chargeList[index].transactionId.map(legs.contains) == true {
             chargeList[index].transactionId = nil
         }
     }
