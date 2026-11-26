@@ -95,6 +95,8 @@ struct MoreView: View {
 
             DisplayOptionsSection()
 
+            AppLockSection()
+
             Section {
                 Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
                     .onChange(of: remindersEnabled) { _, _ in

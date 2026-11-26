@@ -42,6 +42,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: Para escanear el QR con el que tu pareja te invita a su hogar.
+        NSFaceIDUsageDescription: Para desbloquear la app si activas el bloqueo en Más opciones.
         CFBundleURLTypes:
           - CFBundleURLName: savethemoney
             CFBundleURLSchemes: [savethemoney]

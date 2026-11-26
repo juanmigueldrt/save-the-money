@@ -1,14 +1,21 @@
 package com.savethemoney.android
 
 import android.Manifest
+import android.app.KeyguardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.hardware.biometrics.BiometricManager.Authenticators
+import android.hardware.biometrics.BiometricPrompt
 import android.os.Build
 import android.os.Bundle
+import android.os.CancellationSignal
+import android.os.SystemClock
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
 import androidx.core.view.WindowCompat
@@ -18,6 +25,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +39,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
@@ -56,9 +67,11 @@ import com.savethemoney.android.data.RecurringSeries
 import com.savethemoney.android.data.SupabaseBackend
 import com.savethemoney.android.data.SupabaseFinance
 import com.savethemoney.android.data.Username
+import com.savethemoney.android.ui.Bloqueo
 import com.savethemoney.android.ui.LocalNotifier
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.PantallaBloqueo
 import com.savethemoney.android.ui.borrarExportados
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.SCREEN_COUNT
@@ -73,6 +86,13 @@ import java.time.YearMonth
 
 class MainActivity : ComponentActivity() {
     private lateinit var session: Session
+    private var capture: Int? = null
+    private var cancelaDesbloqueo: CancellationSignal? = null
+
+    /** Android 9: no hay diálogo con huella y código, se pide el código con la pantalla del sistema. */
+    private val confirmaCodigo = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        Bloqueo.app.terminaAutenticar(it.resultCode == RESULT_OK)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
@@ -82,6 +102,10 @@ class MainActivity : ComponentActivity() {
         session = (application as StmApp).session(requested != null)
         // La actividad es exportada: si el proceso ya tenía una sesión real, el extra no abre pantallas ni siembra datos.
         val capture = requested.takeIf { session.capture }
+        this.capture = capture
+        // Antes de pintar nada y de abrir el enlace: si el bloqueo está activado, la app sale ya bloqueada.
+        // Ni bloqueo ni FLAG_SECURE en capturas: el diseño las necesita.
+        if (capture == null) Bloqueo.app.load(getSharedPreferences("ajustes", MODE_PRIVATE), Bloqueo.seguro(this))
         handleLink(intent)
         // Las capturas comparan con el diseño: siempre con la vista normal.
         if (capture == null) com.savethemoney.android.ui.Vista.load(getSharedPreferences("ajustes", MODE_PRIVATE))
@@ -101,8 +125,24 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightNavigationBars = !dark
                 }
             }
+            // Tapa la app en recientes y no deja hacer capturas, sólo con el bloqueo activado.
+            val pantallaSegura = capture == null && Bloqueo.app.activo
+            SideEffect {
+                if (pantallaSegura) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE) else window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            }
             StmTheme(dark) {
-                CompositionLocalProvider(LocalSession provides session) { App(capture) }
+                val bloqueada = capture == null && Bloqueo.app.bloqueada
+                val foco = LocalFocusManager.current
+                // Que el teclado no siga escribiendo en el formulario de debajo (lo escrito se conserva).
+                LaunchedEffect(bloqueada) { if (bloqueada) foco.clearFocus(force = true) }
+                Box(Modifier.fillMaxSize()) {
+                    // Bloqueada, lo de debajo no se lee con TalkBack ni se alcanza con el teclado.
+                    val tapada = Modifier.clearAndSetSemantics {}.focusProperties { onEnter = { cancelFocusChange() } }.focusGroup()
+                    Box(if (bloqueada) tapada else Modifier) {
+                        CompositionLocalProvider(LocalSession provides session) { App(capture) }
+                    }
+                    if (bloqueada) PantallaBloqueo(::pedirDesbloqueo)
+                }
             }
         }
     }
@@ -113,6 +153,55 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch { session.resume() }
     }
 
+    override fun onStart() {
+        super.onStart()
+        if (capture == null && Bloqueo.app.alVolver(SystemClock.elapsedRealtime(), Bloqueo.seguro(this))) {
+            window.decorView.post { pedirDesbloqueo() }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        Bloqueo.app.alSalir(SystemClock.elapsedRealtime())
+    }
+
+    /** Si la actividad se recrea con el diálogo abierto, que el botón «Desbloquear» vuelva a funcionar. */
+    override fun onDestroy() {
+        cancelaDesbloqueo?.cancel()
+        Bloqueo.app.terminaAutenticar(false)
+        super.onDestroy()
+    }
+
+    /** Huella o cara y, si no hay o falla, el PIN, patrón o contraseña del dispositivo. */
+    private fun pedirDesbloqueo() {
+        if (!Bloqueo.app.empiezaAutenticar(Bloqueo.seguro(this))) return
+        val titulo = "Desbloquea Save the Money"
+        if (Build.VERSION.SDK_INT >= 29) {
+            val prompt = BiometricPrompt.Builder(this).setTitle(titulo)
+            if (Build.VERSION.SDK_INT >= 30) {
+                prompt.setAllowedAuthenticators(Authenticators.BIOMETRIC_WEAK or Authenticators.DEVICE_CREDENTIAL)
+            } else {
+                @Suppress("DEPRECATION")
+                prompt.setDeviceCredentialAllowed(true)
+            }
+            val cancela = CancellationSignal().also { cancelaDesbloqueo = it }
+            prompt.build().authenticate(
+                cancela,
+                mainExecutor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult?) = Bloqueo.app.terminaAutenticar(true)
+
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence?) = Bloqueo.app.terminaAutenticar(false)
+                },
+            )
+        } else {
+            @Suppress("DEPRECATION")
+            val intent = getSystemService(KeyguardManager::class.java).createConfirmDeviceCredentialIntent(titulo, null)
+            // Sin código no hay nada que pedir: nunca deja fuera.
+            if (intent == null) Bloqueo.app.terminaAutenticar(true) else confirmaCodigo.launch(intent)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         handleLink(intent)
@@ -120,7 +209,9 @@ class MainActivity : ComponentActivity() {
 
     /** Enlace de invitación savethemoney://unirse/4K9Q2X: queda pendiente para la pantalla «Tu hogar». */
     private fun handleLink(intent: Intent) {
-        intent.dataString?.let(InviteCode::parse)?.let { session.pendingInvite = it }
+        val code = intent.dataString?.let(InviteCode::parse) ?: return
+        // Con la app bloqueada, el enlace espera a que se desbloquee.
+        Bloqueo.app.cuandoAbierta(SystemClock.elapsedRealtime(), Bloqueo.seguro(this)) { session.pendingInvite = code }
     }
 }
 

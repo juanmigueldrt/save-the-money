@@ -51,6 +51,7 @@ import com.savethemoney.android.data.CreditCardSummary
 import com.savethemoney.android.data.CreditCardTerms
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.parseDecimal
+import com.savethemoney.android.ui.Bloqueo
 import com.savethemoney.android.ui.CreditCardModel
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
@@ -733,7 +734,8 @@ private fun DetalleBar(nav: Nav, nombre: String) {
         IconBtn(StmIcons.edit, { nav.go(12) }, contentDescription = "Editar condiciones")
         Box {
             IconBtn(StmIcons.moreVert, if (session.capture || cuenta == null) null else ({ menu = true }), contentDescription = "Más opciones")
-            DropdownMenu(menu, { menu = false }, containerColor = c.surfaceContainer) {
+            // Bloqueada, el menú (otra ventana) no se pinta; vuelve al desbloquear.
+            DropdownMenu(menu && !Bloqueo.app.bloqueada, { menu = false }, containerColor = c.surfaceContainer) {
                 DropdownMenuItem({ Text("Editar condiciones", color = c.onSurface) }, {
                     menu = false
                     nav.go(12)
@@ -753,7 +755,8 @@ private fun DetalleBar(nav: Nav, nombre: String) {
             }
         }
     }
-    if (borrar && cuenta != null) {
+    // Bloqueada, el diálogo (otra ventana) no se pinta; vuelve al desbloquear.
+    if (borrar && cuenta != null && !Bloqueo.app.bloqueada) {
         AlertDialog(
             onDismissRequest = { borrar = false },
             icon = { StmIcon(StmIcons.deleteForever, c.error) },
