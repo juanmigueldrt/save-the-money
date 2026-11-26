@@ -116,6 +116,25 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    /// ORC-132: desde qué día hay que cargar los movimientos de la tarjeta.
+    func testCardUnpaidStatements() throws {
+        struct File: Decodable { var unpaidStatements: [Unpaid] }
+        struct Unpaid: Decodable {
+            var statementDay: Int; var paymentDay: Int; var paymentDelayMonths: Int
+            var today: String; var firstUnpaid: String; var since: String
+        }
+        let file: File = try load("card_installments.json")
+        XCTAssertFalse(file.unpaidStatements.isEmpty)
+        for v in file.unpaidStatements {
+            let terms = CreditCardTerms(accountId: UUID(), householdId: UUID(), creditLimit: Money(minor: 100_000),
+                                        statementDay: v.statementDay, paymentDay: v.paymentDay,
+                                        paymentDelayMonths: v.paymentDelayMonths)
+            let first = CreditCardCalculator.firstUnpaidStatement(terms: terms, today: day(v.today))
+            XCTAssertEqual(first.iso, v.firstUnpaid, "hoy \(v.today)")
+            XCTAssertEqual(terms.cycleStart(forStatement: first).iso, v.since, "hoy \(v.today)")
+        }
+    }
+
     func testCardSummaries() throws {
         struct File: Decodable { var summaries: [Case] }
         struct Case: Decodable {
