@@ -13,13 +13,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     // MARK: RecurringService
 
     public func recurringSeries(in householdId: UUID) async throws -> [RecurringSeries] {
-        try await mapped {
-            try await client.from("recurring_series")
+        try await allRows {
+            client.from("recurring_series")
                 .select(Self.seriesColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("name")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -113,13 +112,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     // MARK: GoalService
 
     public func goals(in householdId: UUID) async throws -> [Goal] {
-        try await mapped {
-            try await client.from("goals")
+        try await allRows {
+            client.from("goals")
                 .select(Self.goalColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("created_at")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -156,13 +154,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     }
 
     public func contributions(in householdId: UUID) async throws -> [GoalContribution] {
-        try await mapped {
-            try await client.from("goal_contributions")
+        try await allRows {
+            client.from("goal_contributions")
                 .select(Self.contributionColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("made_on", ascending: false)
-                .execute()
-                .value
+                .order("id")
         }
     }
 

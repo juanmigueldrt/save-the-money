@@ -12,23 +12,21 @@ extension SupabaseBackend: FinanceService {
     private static let importBatchSize = 500
 
     public func accounts(in householdId: UUID) async throws -> [Account] {
-        try await mapped {
-            try await client.from("accounts")
+        try await allRows {
+            client.from("accounts")
                 .select(Self.accountColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("created_at")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
     public func balances(in householdId: UUID) async throws -> [UUID: Money] {
-        let rows: [BalanceRow] = try await mapped {
-            try await client.from("account_balances")
+        let rows: [BalanceRow] = try await allRows {
+            client.from("account_balances")
                 .select("account_id,balance_minor")
                 .eq("household_id", value: householdId.uuidString)
-                .execute()
-                .value
+                .order("account_id")
         }
         return Dictionary(uniqueKeysWithValues: rows.map { ($0.accountId, Money(minor: $0.balanceMinor)) })
     }
@@ -70,13 +68,12 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func categories(in householdId: UUID) async throws -> [BudgetCategory] {
-        try await mapped {
-            try await client.from("categories")
+        try await allRows {
+            client.from("categories")
                 .select(Self.categoryColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("name")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -140,13 +137,12 @@ extension SupabaseBackend: FinanceService {
 
     public func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement] {
         guard !ids.isEmpty else { return [] }
-        return try await mapped {
-            try await client.from("transactions")
+        return try await allRows {
+            client.from("transactions")
                 .select(Self.movementColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .in("id", values: ids.map(\.uuidString))
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -166,23 +162,12 @@ extension SupabaseBackend: FinanceService {
     }
 
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
-        // El servidor devuelve como mucho 1000 filas por petición (max_rows).
-        let pageSize = 1000
-        var all: [Movement] = []
-        while true {
-            let start = all.count
-            let page: [Movement] = try await mapped {
-                try await client.from("transactions")
-                    .select(Self.movementColumns)
-                    .eq("household_id", value: householdId.uuidString)
-                    .order("booked_on")
-                    .order("id")
-                    .range(from: start, to: start + pageSize - 1)
-                    .execute()
-                    .value
-            }
-            all += page
-            if page.count < pageSize { return all }
+        try await allRows {
+            client.from("transactions")
+                .select(Self.movementColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .order("booked_on")
+                .order("id")
         }
     }
 

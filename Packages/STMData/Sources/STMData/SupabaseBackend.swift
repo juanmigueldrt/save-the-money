@@ -97,12 +97,11 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     }
 
     public func households() async throws -> [Household] {
-        try await mapped {
-            try await client.from("households")
+        try await allRows {
+            client.from("households")
                 .select(Self.householdColumns)
                 .order("created_at")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -115,36 +114,35 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     }
 
     public func members(of householdId: UUID) async throws -> [HouseholdMember] {
-        try await mapped {
-            let memberships: [Membership] = try await client.from("household_members")
+        let memberships: [Membership] = try await allRows {
+            client.from("household_members")
                 .select("id,household_id,user_id,role")
                 .eq("household_id", value: householdId.uuidString)
-                .execute()
-                .value
-            guard !memberships.isEmpty else { return [] }
-            let profiles: [Profile] = try await client.from("profiles")
+                .order("id")
+        }
+        guard !memberships.isEmpty else { return [] }
+        let profiles: [Profile] = try await allRows {
+            client.from("profiles")
                 .select(Self.profileColumns)
                 .in("id", values: memberships.map(\.userId.uuidString))
-                .execute()
-                .value
-            let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
-            return memberships.compactMap { membership in
-                byId[membership.userId].map { HouseholdMember(profile: $0, role: membership.role) }
-            }
+                .order("id")
+        }
+        let byId = Dictionary(uniqueKeysWithValues: profiles.map { ($0.id, $0) })
+        return memberships.compactMap { membership in
+            byId[membership.userId].map { HouseholdMember(profile: $0, role: membership.role) }
         }
     }
 
     public func pendingInvites(for householdId: UUID) async throws -> [HouseholdInvite] {
         let now = ISO8601DateFormatter().string(from: Date())
-        return try await mapped {
-            try await client.from("household_invites")
+        return try await allRows {
+            client.from("household_invites")
                 .select(Self.inviteColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .eq("status", value: InviteStatus.pending.rawValue)
                 .gt("expires_at", value: now)
                 .order("created_at", ascending: false)
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -229,6 +227,30 @@ public struct SupabaseBackend: AuthService, HouseholdService {
             throw AppError.network
         } catch {
             throw Self.appError(authMessage: String(describing: error))
+        }
+    }
+
+    // MARK: Paginación
+
+    /// Filas por petición: el servidor devuelve como mucho 1000 (`max_rows` en supabase/config.toml).
+    static let pageSize = 1000
+
+    /// Todas las filas de una consulta, pedidas por páginas. `query` crea la consulta de cada página
+    /// y debe ordenar por una clave única (`id` al final) para que las páginas no salten ni repitan filas.
+    /// Un error en cualquier página hace fallar la carga entera: nunca se devuelve una lista a medias.
+    func allRows<Row: Decodable & Sendable>(_ query: () -> PostgrestTransformBuilder) async throws -> [Row] {
+        try await Self.allPages { from, to in
+            try await mapped { try await query().range(from: from, to: to).execute().value }
+        }
+    }
+
+    /// El bucle de `allRows`, aparte para probarlo sin servidor: pide páginas hasta que una llega incompleta.
+    static func allPages<Row>(_ page: (_ from: Int, _ to: Int) async throws -> [Row]) async throws -> [Row] {
+        var all: [Row] = []
+        while true {
+            let rows = try await page(all.count, all.count + pageSize - 1)
+            all += rows
+            if rows.count < pageSize { return all }
         }
     }
 

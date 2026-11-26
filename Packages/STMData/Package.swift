@@ -18,5 +18,6 @@ let package = Package(
             "STMCore",
             .product(name: "Supabase", package: "supabase-swift"),
         ]),
+        .testTarget(name: "STMDataTests", dependencies: ["STMData"])
     ]
 )
