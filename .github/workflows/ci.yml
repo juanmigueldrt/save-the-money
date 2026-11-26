@@ -70,6 +70,9 @@ jobs:
           xcodegen generate
       # El runner macos-15 no trae simuladores de iPhone instalados: se compila
       # para el simulador genérico y las pruebas corren en el Mac (mismo código).
+      # El paginador de las listas (ORC-65): las pruebas del paquete no entran en el esquema de la app.
+      - name: Pruebas de STMData
+        run: swift test --package-path Packages/STMData
       - name: Compilar para iPhone (simulador)
         run: |
           set -o pipefail

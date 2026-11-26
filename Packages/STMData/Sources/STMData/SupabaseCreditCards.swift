@@ -10,12 +10,11 @@ extension SupabaseBackend: CreditCardService {
     private static let installmentColumns = "id,household_id,account_id,transaction_id,months,rate"
 
     public func creditCards(in householdId: UUID) async throws -> [CreditCardTerms] {
-        try await mapped {
-            try await client.from("credit_cards")
+        try await allRows {
+            client.from("credit_cards")
                 .select(Self.cardColumns)
                 .eq("household_id", value: householdId.uuidString)
-                .execute()
-                .value
+                .order("account_id")
         }
     }
 
@@ -43,12 +42,11 @@ extension SupabaseBackend: CreditCardService {
     }
 
     public func cardInstallments(in householdId: UUID) async throws -> [CardInstallment] {
-        try await mapped {
-            try await client.from("card_installments")
+        try await allRows {
+            client.from("card_installments")
                 .select(Self.installmentColumns)
                 .eq("household_id", value: householdId.uuidString)
-                .execute()
-                .value
+                .order("id")
         }
     }
 

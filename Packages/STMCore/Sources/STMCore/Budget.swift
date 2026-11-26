@@ -113,6 +113,35 @@ public struct MonthKey: Hashable, Comparable, Sendable, Codable {
     public static func < (lhs: MonthKey, rhs: MonthKey) -> Bool { (lhs.year, lhs.month) < (rhs.year, rhs.month) }
 }
 
+extension Movement {
+    /// Ids de los movimientos sin categoría (o con una que no está en `categoryIds`) que son traspasos entre
+    /// cuentas propias, para que no cuenten como ingreso ni como gasto. Lo son las patas con `transferId` y, entre
+    /// los demás, cada salida emparejada con una entrada del mismo hogar, día e importe opuesto en otra cuenta,
+    /// de una en una: si sobra una, cuenta como siempre. Sólo cambia los totales; siguen en las listas de movimientos.
+    /// Un ingreso y un gasto reales sin categoría así también se ocultan hasta que se categorice uno.
+    /// Mismo criterio que `uncategorizedTransferIds` en Android (Budget.kt).
+    public static func uncategorizedTransferIds(in movements: [Movement], categoryIds: Set<UUID>) -> Set<UUID> {
+        struct PairKey: Hashable { var householdId: UUID; var bookedOn: CalendarDay; var magnitude: Int }
+        let loose = movements.filter { movement in movement.categoryId.map { !categoryIds.contains($0) } ?? true }
+        var ids = Set(loose.filter { $0.transferId != nil }.map(\.id))
+        let candidates = loose.filter { $0.transferId == nil && $0.amount.minor != 0 }
+        let groups = Dictionary(grouping: candidates) {
+            PairKey(householdId: $0.householdId, bookedOn: $0.bookedOn, magnitude: abs($0.amount.minor))
+        }
+        for group in groups.values {
+            var incoming = group.filter { $0.amount.minor > 0 }
+            // shortcut: la primera entrada de otra cuenta, no el emparejamiento máximo; con 4+ del mismo importe y día
+            // en 3+ cuentas puede quedar un par sin emparejar (cuenta como antes). Cambiar si aparece en la práctica.
+            for outgoing in group where outgoing.amount.minor < 0 {
+                guard let index = incoming.firstIndex(where: { $0.accountId != outgoing.accountId }) else { continue }
+                ids.insert(outgoing.id)
+                ids.insert(incoming.remove(at: index).id)
+            }
+        }
+        return ids
+    }
+}
+
 /// Lo que se ha gastado frente a lo previsto en un mes. Se calcula siempre a partir
 /// de los movimientos; no se guarda en el servidor.
 public struct BudgetReport: Hashable, Sendable {
@@ -201,10 +230,13 @@ public struct BudgetReport: Hashable, Sendable {
         var incomeByTitle: [String: Int] = [:]
         var spentByCategory: [UUID: Int] = [:]
         var uncategorized = 0
+        let transfers = Movement.uncategorizedTransferIds(in: inPeriod, categoryIds: Set(byId.keys))
         for movement in inPeriod {
             let category = movement.categoryId.flatMap { byId[$0] }
             switch category?.kind {
             case .transfer:
+                continue
+            case nil where transfers.contains(movement.id):
                 continue
             case .income:
                 income += movement.amount.minor
