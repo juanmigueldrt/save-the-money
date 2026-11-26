@@ -11,6 +11,6 @@ probado en un dispositivo ni se ha generado un APK por paso.
 5. Hecho: pagos fijos y suscripciones (recurring_series), metas con aportaciones y proyección (goals, goal_contributions), avisos locales (`ui/Avisos.kt`).
 6. Hecho: exportar CSV (`data/Export.kt`), PDF de pagos del mes (`ui/Exportar.kt`), tema claro/oscuro, borrar datos y empezar de cero (RPC `reset_household`), cerrar sesión, escanear QR (`ui/EscanerQr.kt`). También están tarjetas de crédito (`ui/screens/Tarjetas.kt`), patrimonio (`ui/TrackingModel.kt`), score (credit_scores) e inversiones (`ui/screens/Inversiones.kt`).
 
-Pendiente: probar en dispositivo los pasos 3 a 6 y decidir si se archiva este plan.
+Pendiente: solo probar en dispositivo los pasos 3 a 6 (su código ya está, ver arriba) y decidir si se archiva este plan.
 
 Reglas: replicar los cálculos de `Packages/STMCore` y el comportamiento de `App/`. No cambiar `supabase/migrations`. Un commit y un APK por paso, sin parar entre pasos, con resumen al acabar cada uno. Las claves solo en `android/local.properties`; nada de datos reales en git.

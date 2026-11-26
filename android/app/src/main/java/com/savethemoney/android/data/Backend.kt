@@ -40,8 +40,11 @@ interface Backend {
 
 const val HOUSEHOLD_NAME_ISSUE = "El nombre del hogar tiene que tener entre 1 y 80 letras."
 
+// OffsetDateTime y no Instant.parse: el servidor manda «+00:00», que Instant.parse solo entiende desde Android 14.
+// Si la fecha no se entiende, la invitación no vale.
 fun HouseholdInvite.isUsable(now: Instant = Instant.now()): Boolean =
-    status == InviteStatus.Pending && Instant.parse(expiresAt).isAfter(now)
+    status == InviteStatus.Pending &&
+        runCatching { java.time.OffsetDateTime.parse(expiresAt).toInstant().isAfter(now) }.getOrDefault(false)
 
 /**
  * Modo demo (sin clave de Supabase), capturas y pruebas: todo en memoria, se pierde al cerrar.
