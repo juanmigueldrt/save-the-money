@@ -21,9 +21,12 @@ y por las mismas restricciones que los de la app, y se leen igual que se leería
 cronometra. Comprueba además que llegan todas las filas y que la suma de los movimientos y los saldos coinciden con lo
 cargado; si algo no cuadra sale con código 1 (después de escribir la tabla).
 
+Después de medir cada tamaño lanza `medicion_planes.sql` con psql contra la base de datos local (la URL de
+`supabase status`) e imprime los EXPLAIN (ANALYZE, BUFFERS) de las mismas peticiones, con el RLS del usuario y sin él.
+
 Uso, con el Supabase local arrancado (`supabase start`):
   python3 supabase/tests/api/medicion_movimientos.py [tamaños separados por comas, p. ej. 10000,50000]
-Sólo usa la URL y la clave anónima que imprime `supabase status`. Datos inventados, en un hogar nuevo en cada ejecución.
+Sólo usa las URL y la clave anónima que imprime `supabase status`. Datos inventados, en un hogar nuevo en cada ejecución.
 Si existe la variable GITHUB_STEP_SUMMARY, añade la tabla al resumen del job.
 """
 
@@ -33,6 +36,7 @@ import os
 import pathlib
 import random
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -41,6 +45,7 @@ import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
+PLANS_SQL = pathlib.Path(__file__).with_name("medicion_planes.sql")
 PAGE = 1000  # max_rows de supabase/config.toml, el mismo tamaño de página que usan las apps
 BATCH = 1000  # filas por petición al cargar los datos de prueba
 RUNS = 3
@@ -81,10 +86,10 @@ def local_status():
     key = status.get("ANON_KEY") or status.get("PUBLISHABLE_KEY")
     if not status.get("API_URL") or not key:
         sys.exit(f"`supabase status` no trae API_URL y ANON_KEY/PUBLISHABLE_KEY; claves que trae: {sorted(status)}")
-    return status["API_URL"].rstrip("/"), key
+    return status["API_URL"].rstrip("/"), key, status.get("DB_URL")
 
 
-API, APIKEY = local_status()
+API, APIKEY, DB_URL = local_status()
 
 
 def raw_call(method, path, query=(), body=None, token=None, prefer=None, timeout=60):
@@ -128,6 +133,7 @@ _, session = call("POST", "/auth/v1/signup", body={
 token = (session or {}).get("access_token") if isinstance(session, dict) else None
 if not token:
     sys.exit(f"El alta del usuario de prueba no devolvió sesión: {session}")
+user_id = session["user"]["id"]
 
 household = must("crear el hogar", *call("POST", "/rest/v1/rpc/create_household", body={"household_name": "Hogar de medición"},
                                           token=token))
@@ -202,6 +208,25 @@ def measure(table, query):
             return len(rows), pages, seconds, size, rows
 
 
+def plans(n):
+    """Lanza medicion_planes.sql con psql y devuelve lo que imprime: los EXPLAIN (ANALYZE, BUFFERS) de las peticiones."""
+    variables = {"hogar": household_id, "claims": json.dumps({"sub": user_id, "role": "authenticated"}),
+                 "mitad": n // 2 // PAGE * PAGE, "mitad_inv": n // 10 // 2 // PAGE * PAGE}
+    if shutil.which("psql") and DB_URL:
+        command = ["psql", DB_URL]
+    else:
+        # Sin psql en la máquina: el del contenedor de la base de datos del Supabase local.
+        names = subprocess.run(["docker", "ps", "--filter", "name=supabase_db_", "--format", "{{.Names}}"],
+                               capture_output=True, text=True).stdout.split()
+        if not names:
+            return 1, "No hay psql ni contenedor supabase_db_*: no se pueden sacar los planes"
+        command = ["docker", "exec", "-i", "-e", "PGPASSWORD=postgres", names[0], "psql", "-h", "127.0.0.1", "-U", "postgres",
+                   "-d", "postgres"]
+    command += ["-X"] + [part for name, value in variables.items() for part in ("-v", f"{name}={value}")]
+    result = subprocess.run(command, input=PLANS_SQL.read_text(encoding="utf-8"), capture_output=True, text=True)
+    return result.returncode, result.stdout + result.stderr
+
+
 def check(name, expected, received):
     if expected != received:
         failures.append(f"{name}: esperado {expected}, recibido {received}")
@@ -221,6 +246,7 @@ REQUESTS = [
 EXPECTED_ROWS = {"transactions": lambda: loaded["transactions"], "holding_prices": lambda: loaded["holding_prices"],
                  "investment_trades": lambda: loaded["investment_trades"], "account_balances": lambda: ACCOUNTS}
 
+plan_texts = []
 lines = ["| N | Petición | Ejecución | Filas | Peticiones | Tiempo total (ms) | ms por página | Bytes de respuesta |",
          "|---:|---|---:|---:|---:|---:|---:|---:|"]
 for n in SIZES:
@@ -244,6 +270,11 @@ for n in SIZES:
                 check(f"N={n}, {name}, ejecución {run}: saldos",
                       {a: openings[k] + sum_by_account[a] for k, a in enumerate(accounts)},
                       {r["account_id"]: r["balance_minor"] for r in rows})
+    # Los planes de las mismas peticiones, con los datos de este tamaño ya cargados. No se cronometran.
+    code, text = plans(n)
+    print(f"\nPlanes con {n} movimientos\n{text}", flush=True)
+    plan_texts.append(f"<details><summary>Planes con {n} movimientos</summary>\n\n```\n{text}\n```\n\n</details>\n")
+    check(f"N={n}, planes: código de salida de psql", 0, code)
 
 markdown = "\n".join(lines)
 summary = os.environ.get("GITHUB_STEP_SUMMARY")
@@ -251,7 +282,7 @@ if summary:
     with open(summary, "a", encoding="utf-8") as out:
         out.write("### ORC-70: carga de los resúmenes contra el Supabase local\n\n"
                   "Tiempos de las peticiones en el runner, sin red móvil. Bytes del cuerpo sin comprimir.\n\n"
-                  f"{markdown}\n")
+                  f"{markdown}\n\n" + "\n".join(plan_texts))
 print("\n" + markdown, flush=True)
 
 for failure in failures:
