@@ -126,8 +126,10 @@ class InvestmentModel(
     /**
      * Un activo sin versión ([Holding.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio el
      * formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
+     * Con [price] apunta también el precio del día [priceDay] en la misma escritura: salir de la pantalla entre las dos
+     * no deja el precio sin apuntar (ORC-145).
      */
-    suspend fun save(holding: Holding): Holding = escritura(::sinPantalla) {
+    suspend fun save(holding: Holding, price: BigDecimal? = null, priceDay: LocalDate? = null): Holding = escritura(::sinPantalla) {
         val saved = try {
             if (holding.updatedAt == null) service.createHolding(holding) else service.updateHolding(holding)
         } catch (e: AppError) {
@@ -139,6 +141,7 @@ class InvestmentModel(
             throw e
         }
         turns.changed(::holdings, (holdings.filter { it.id != saved.id } + saved).sortedBy { it.trimmedName.lowercase() })
+        if (price != null && priceDay != null) apuntarPrecio(price, priceDay, saved)
         saved
     }
 
@@ -152,6 +155,11 @@ class InvestmentModel(
     }
 
     suspend fun recordPrice(price: BigDecimal, day: LocalDate, holding: Holding): Unit = escritura(::sinPantalla) {
+        apuntarPrecio(price, day, holding)
+    }
+
+    /** Lo que hace [recordPrice], dentro de la escritura que lo llame. */
+    private suspend fun apuntarPrecio(price: BigDecimal, day: LocalDate, holding: Holding) {
         val saved = service.recordPrice(price, day, holding.id)
         turns.changed(::holdings, holdings.map { if (it.id == saved.id) saved else it })
         reloadAfterSave {

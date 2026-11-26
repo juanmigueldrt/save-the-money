@@ -259,7 +259,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func renameHousehold(_ householdId: UUID, to name: String) async throws -> Household {
         let user = try requireUser()
         guard memberships.contains(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
-            throw AppError.invalidInput("Solo quien creó el hogar puede cambiarle el nombre.")
+            throw AppError.invalidInput(Household.renameOwnerOnly)
         }
         guard let valid = HouseholdName.validated(name) else {
             throw AppError.invalidInput("El nombre del hogar tiene que tener entre 1 y 80 letras.")

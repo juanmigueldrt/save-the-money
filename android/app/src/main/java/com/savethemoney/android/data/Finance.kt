@@ -581,7 +581,13 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         movements.removeAll { it.accountId == accountId }
         cards.removeAll { it.accountId == accountId }
         installments.removeAll { it.accountId == accountId }
-        cards.replaceAll { if (it.payFromAccountId == accountId) it.copy(payFromAccountId = null) else it }
+        // Como `on delete set null` del servidor: lo que la usaba se queda sin cuenta y con versión nueva
+        // (el disparador `touch_updated_at` también salta en ese cambio).
+        cards.replaceAll { if (it.payFromAccountId == accountId) it.copy(payFromAccountId = null, updatedAt = nextVersion()) else it }
+        series.replaceAll { if (it.accountId == accountId) it.copy(accountId = null, updatedAt = nextVersion()) else it }
+        goals.replaceAll { if (it.accountId == accountId) it.copy(accountId = null, updatedAt = nextVersion()) else it }
+        holdings.replaceAll { if (it.accountId == accountId) it.copy(accountId = null, updatedAt = nextVersion()) else it }
+        plans.replaceAll { if (it.accountId == accountId) it.copy(accountId = null, updatedAt = nextVersion()) else it }
     }
 
     override suspend fun categories(householdId: String): List<BudgetCategory> {
@@ -625,7 +631,9 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
     override suspend fun deleteCategory(categoryId: String) {
         categories.firstOrNull { it.id == categoryId }?.let { if (!mine(it.householdId)(categoryId)) return }
         categories.removeAll { it.id == categoryId }
-        movements.replaceAll { if (it.categoryId == categoryId) it.copy(categoryId = null) else it }
+        // Como `on delete set null` del servidor: sin categoría y con versión nueva.
+        movements.replaceAll { if (it.categoryId == categoryId) it.copy(categoryId = null, updatedAt = nextVersion()) else it }
+        series.replaceAll { if (it.categoryId == categoryId) it.copy(categoryId = null, updatedAt = nextVersion()) else it }
     }
 
     override suspend fun movements(householdId: String, accountId: String?, limit: Int): List<Movement> {

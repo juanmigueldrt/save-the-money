@@ -280,7 +280,11 @@ class FinanceModel(
 
     suspend fun createAccount(draft: AccountDraft): Account = escritura(::sinPantalla) { guardarYRecargar(::reloadAccounts) { service.createAccount(draft, household.id) } }
     suspend fun updateAccount(account: Account): Unit = escritura(::sinPantalla) { guardarYRecargar(::reloadAccounts) { service.updateAccount(account) } }
-    suspend fun deleteAccount(account: Account): Unit = escritura(::sinPantalla) { service.deleteAccount(account.id); reloadAll() }
+    suspend fun deleteAccount(account: Account): Unit = escritura(::sinPantalla) {
+        service.deleteAccount(account.id)
+        reloadAll()
+        reloadReferences()
+    }
 
     /** «Actualizar saldo»: apunta hoy un ajuste para que el saldo de la cuenta sea [actual]. */
     suspend fun adjustBalance(account: Account, actual: Long) {
@@ -399,6 +403,7 @@ class FinanceModel(
         turns.changed(::categories, categories.filter { it.id != category.id })
         reloadAfterSave { reloadCategories() }?.let { turns.changed(::error, it) }
         reloadAll()
+        reloadReferences()
     }
 
     /** El CSV con todos los movimientos del hogar, listo para Excel. */
@@ -427,6 +432,18 @@ class FinanceModel(
         }?.let { turns.changed(::error, it) }
         // Lo cambiado puede estar en una página de la lista que no entra en [recent].
         reloadList()
+    }
+
+    /**
+     * Tras borrar una cuenta o una categoría. El servidor deja sin ella (`on delete set null`, con versión nueva) los pagos
+     * fijos, las metas, las inversiones, sus aportaciones y las tarjetas que la usaban, y el presupuesto pierde su límite.
+     * Se recargan para que la siguiente edición no dé un falso «ha cambiado en otro dispositivo». Cada carga guarda su error.
+     */
+    private suspend fun reloadReferences() {
+        planning.load()
+        budgets.load()
+        cards.load(accounts, balances, categories)
+        investments.load()
     }
 
     private suspend fun fetchAccounts() {
