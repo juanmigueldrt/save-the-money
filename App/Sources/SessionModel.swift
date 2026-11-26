@@ -15,7 +15,12 @@ final class SessionModel {
         case ready(Profile, Household)
     }
 
-    private(set) var state: State = .loading
+    private(set) var state: State = .loading {
+        didSet { updateModels() }
+    }
+    /// Los modelos del hogar abierto. Se crean una vez al entrar en él y siguen mientras esté abierto
+    /// (refrescar, cambiar el tema o el nombre no los rehace); fuera de `.ready` no hay ninguno.
+    private(set) var models: HouseholdModels?
     /// Código recibido por enlace o QR, pendiente de usar.
     var pendingInvite: InviteCode?
 
@@ -29,6 +34,14 @@ final class SessionModel {
     }
 
     var isDemo: Bool { services.isDemo }
+
+    private func updateModels() {
+        guard case .ready(_, let household) = state else {
+            models = nil
+            return
+        }
+        if models?.householdId != household.id { models = HouseholdModels(household: household, services: services) }
+    }
 
     /// Tema elegido en el perfil; antes de entrar, el último que se usó en este dispositivo.
     var theme: AppTheme {
@@ -125,11 +138,6 @@ final class SessionModel {
         if case .ready(let profile, let current) = state, current.id == renamed.id {
             state = .ready(profile, renamed)
         }
-    }
-
-    func leaveHousehold(_ household: Household) async throws {
-        try await services.households.leave(householdId: household.id)
-        try await refresh()
     }
 
     func handle(url: URL) {
