@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.double
 import kotlinx.serialization.json.int
 import kotlinx.serialization.json.intOrNull
@@ -142,6 +143,17 @@ class SharedVectorsTest {
             val mapping = CsvMapping.detect(table)!!
             val got = CsvImporter.rows(table, mapping, "account").map { it.draft?.importHash }
             assertEquals(v.str("name"), v["rows"]!!.jsonArray.map { it["importHash"]?.jsonPrimitive?.content }, got)
+        }
+    }
+
+    @Test
+    fun tradeTimeline() {
+        for (v in load("trade_timeline.json")) {
+            val trades = v["trades"]!!.jsonArray.mapIndexed { i, t ->
+                val side = if (t.str("side") == "buy") TradeSide.Buy else TradeSide.Sell
+                InvestmentTrade("t$i", "home", "h", t.str("day"), side, t.str("quantity").toBigDecimal(), 10.toBigDecimal())
+            }
+            assertEquals(v.str("name"), v["oversold"]!!.jsonPrimitive.boolean, Position.isOversold("h", trades))
         }
     }
 
