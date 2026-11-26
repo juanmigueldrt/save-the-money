@@ -81,6 +81,7 @@ import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.AjusteBloqueo
+import com.savethemoney.android.ui.LocalNotifier
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.iconoCategoria
@@ -397,6 +398,13 @@ fun Pantalla30(nav: Nav) {
                 },
             )
             MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(33) }
+        }
+        // Sin permiso, Android descarta los avisos sin decir nada: que se vea aquí.
+        if (!session.capture && !LocalNotifier(context).canShow) {
+            Text(
+                "Android no deja mostrar notificaciones de Save the Money: los avisos no se verán hasta que las actives en Ajustes.",
+                Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.error,
+            )
         }
         // Fase D, como en iOS: recordatorio para apuntar gastos y resumen semanal. Sólo en este dispositivo.
         if (!session.capture && finance != null) {
