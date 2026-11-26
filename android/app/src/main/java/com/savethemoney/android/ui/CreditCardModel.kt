@@ -72,6 +72,7 @@ class CreditCardModel(
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load(accounts: List<Account>, balances: Map<String, Long>, categories: List<BudgetCategory>) {
+        var loaded = false
         this.accounts = accounts
         this.balances = balances
         transferCategories = categories.filter { it.kind == CategoryKind.Transfer }.map { it.id }.toSet()
@@ -79,10 +80,11 @@ class CreditCardModel(
             terms = service.creditCards(household.id).associateBy { it.accountId }
             installments = service.cardInstallments(household.id)
             // Sin condiciones no hay cálculo: no hace falta ningún movimiento (se cargan al guardarlas).
-            val loaded = cardAccounts.mapNotNull { account -> terms[account.id]?.let { account.id to cardMovements(account.id, it) } }
-            movements = loaded.associate { (id, result) -> id to result.first }
-            truncatedAccounts = loaded.filter { (_, result) -> result.second }.map { it.first }.toSet()
+            val fetched = cardAccounts.mapNotNull { account -> terms[account.id]?.let { account.id to cardMovements(account.id, it) } }
+            movements = fetched.associate { (id, result) -> id to result.first }
+            truncatedAccounts = fetched.filter { (_, result) -> result.second }.map { it.first }.toSet()
             error = null
+            loaded = true
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
@@ -90,7 +92,8 @@ class CreditCardModel(
         } catch (e: Exception) {
             error = AppError.Unknown("app").message
         }
-        recompute()
+        // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
+        recompute(rescheduling = loaded)
     }
 
     /**
@@ -115,13 +118,14 @@ class CreditCardModel(
         movements = movements.mapValues { (id, list) -> withPurchases(list, id) }
     }
 
-    private fun recompute() {
+    private fun recompute(rescheduling: Boolean = true) {
         summaries = cardAccounts.mapNotNull { account ->
             val t = terms[account.id] ?: return@mapNotNull null
             account.id to CreditCardCalculator.summary(
                 t, balances[account.id] ?: account.openingMinor, movements(account), installments, transferCategories, today(),
             ).copy(movementsTruncated = account.id in truncatedAccounts)
         }.toMap()
+        if (!rescheduling) return
         val cards = cardAccounts.mapNotNull { account ->
             summaries[account.id]?.let { CardReminder(it, account.name, it.terms.payFromAccountId?.let(balances::get)) }
         }

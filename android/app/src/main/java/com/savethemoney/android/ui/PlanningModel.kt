@@ -76,6 +76,7 @@ class PlanningModel(
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {
+        var loaded = false
         try {
             coroutineScope {
                 val s = async { service.recurringSeries(household.id) }
@@ -86,6 +87,7 @@ class PlanningModel(
                 contributions = c.await()
             }
             error = null
+            loaded = true
         } catch (e: CancellationException) {
             throw e
         } catch (e: AppError) {
@@ -95,7 +97,8 @@ class PlanningModel(
         }
         // Aparte: si los cargos fallan, los pagos fijos y las metas se ven igual.
         quietly { charges = service.recurringCharges(household.id) }
-        reschedule()
+        // Si la carga falla, los avisos ya programados se quedan como estaban.
+        if (loaded) reschedule()
     }
 
     // MARK: cargos pendientes

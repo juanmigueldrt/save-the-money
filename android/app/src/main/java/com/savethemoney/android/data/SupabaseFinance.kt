@@ -643,7 +643,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val BUDGET = "household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
         const val EXTRA = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
         const val PAGE = 1000
-        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
+        const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
         const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
 

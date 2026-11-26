@@ -39,6 +39,41 @@ class SessionTest {
         assertEquals(Session.State.SignedOut, session.state)
     }
 
+    @Test
+    fun signOutSinRedAvisaEnLaPantallaDeEntrar() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        val offline = object : Backend by memory {
+            override suspend fun signOut() {
+                try {
+                    throw AppError.Network
+                } finally {
+                    memory.signOut()
+                }
+            }
+        }
+        val session = Session(offline, InMemoryFinance(), isDemo = true)
+        session.refresh()
+
+        session.signOut()
+
+        assertEquals(Session.State.SignedOut, session.state)
+        assertEquals("No se ha podido cerrar la sesión en el servidor. " + AppError.Network.message, session.signOutNotice)
+    }
+
+    @Test
+    fun signOutCorrectoNoAvisa() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        val session = Session(memory, InMemoryFinance(), isDemo = true)
+        session.refresh()
+
+        session.signOut()
+
+        assertEquals(Session.State.SignedOut, session.state)
+        assertNull(session.signOutNotice)
+    }
+
     /** Como SupabaseBackend sin red: la sesión sigue guardada pero las llamadas de datos fallan. */
     private class SinRed(val memory: InMemoryBackend) : Backend by memory {
         var offline = false

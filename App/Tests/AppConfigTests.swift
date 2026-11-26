@@ -14,6 +14,16 @@ final class AppConfigTests: XCTestCase {
         XCTAssertTrue(AppConfig(supabaseURL: url, supabaseAnonKey: "pega-aqui-la-clave-anon").isMissingSupabaseKey)
         XCTAssertFalse(AppConfig(supabaseURL: url, supabaseAnonKey: "clave-real").isMissingSupabaseKey)
     }
+
+    func testReleaseExigeClaveYUrlHttps() {
+        let https = "https://proyecto.supabase.co"
+        XCTAssertNil(AppConfig.releaseProblem(rawURL: https, key: "clave-real"))
+        XCTAssertNotNil(AppConfig.releaseProblem(rawURL: https, key: ""), "sin clave no arranca")
+        XCTAssertNotNil(AppConfig.releaseProblem(rawURL: https, key: "pega-aqui-la-clave-anon"), "la clave de plantilla cuenta como falta")
+        XCTAssertNotNil(AppConfig.releaseProblem(rawURL: "http://127.0.0.1:54321", key: "clave-real"), "http local no vale en Release")
+        XCTAssertNotNil(AppConfig.releaseProblem(rawURL: "", key: "clave-real"), "una URL vacía no cae al local")
+        XCTAssertNotNil(AppConfig.releaseProblem(rawURL: "no es una url", key: "clave-real"))
+    }
 }
 
 @MainActor
@@ -222,6 +232,7 @@ final class PlanningModelTests: XCTestCase {
         let saved = await planning.save(music)
         XCTAssertTrue(saved)
         XCTAssertEqual(planning.upcoming.count, 1)
+        // Empieza el 5 de este mes y hoy es el 2: ya cuenta en el total mensual.
         XCTAssertEqual(planning.monthlyTotal(of: .subscription).minor, 999)
         let planned = await reminders.last
         XCTAssertEqual(planned.first?.fireOn, CalendarDay(year: 2026, month: 11, day: 3))

@@ -320,9 +320,13 @@ extension Array where Element == RecurringSeries {
         return Money(minor: total)
     }
 
-    /// Lo que suman al mes las series activas de ese tipo.
+    /// Lo que suman al mes las series activas de ese tipo. Cuenta una serie si empezó en el mes de `day`
+    /// o antes (aunque sea después de `day`) y no terminó antes de `day`.
     public func monthlyTotal(of kind: RecurringKind, on day: CalendarDay) -> Money {
-        filter { !$0.isArchived && $0.kind == kind && ($0.endsOn.map { $0 >= day } ?? true) }
+        filter {
+            !$0.isArchived && $0.kind == kind && MonthKey($0.startsOn) <= MonthKey(day)
+                && ($0.endsOn.map { $0 >= day } ?? true)
+        }
             .reduce(Money.zero) { $0 + $1.monthlyAmount(on: day) }
     }
 }

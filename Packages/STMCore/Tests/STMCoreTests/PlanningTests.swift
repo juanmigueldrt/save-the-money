@@ -167,6 +167,20 @@ final class PlanningTests: XCTestCase {
         XCTAssertTrue(mine.isEmpty)
     }
 
+    func testSerieQueEmpiezaDespuesDelPeriodoNoCuenta() {
+        // Alquiler de 900 € desde el 1 de febrero de 2027, apuntado en noviembre de 2026. Datos inventados.
+        let rent = RecurringSeries(householdId: UUID(), name: "Alquiler", kind: .essential,
+                                   amount: Money(minor: 90_000), startsOn: day(2027, 2, 1))
+        XCTAssertEqual([rent].monthlyTotal(of: .essential, on: day(2026, 11, 1)), Money.zero)
+        XCTAssertEqual([rent].monthlyTotal(of: .essential, on: day(2026, 12, 1)), Money.zero)
+        XCTAssertEqual([rent].monthlyTotal(of: .essential, on: day(2027, 1, 1)), Money.zero)
+        XCTAssertEqual([rent].monthlyTotal(of: .essential, on: day(2027, 2, 1)), Money(minor: 90_000))
+        // Una serie que terminó antes del periodo tampoco cuenta.
+        let ended = RecurringSeries(householdId: UUID(), name: "Gimnasio", kind: .essential, amount: Money(minor: 3_000),
+                                    startsOn: day(2026, 1, 1), endsOn: day(2026, 10, 31))
+        XCTAssertEqual([ended].monthlyTotal(of: .essential, on: day(2026, 11, 1)), Money.zero)
+    }
+
     func testIntroPrice() throws {
         // 3 meses a 6,99 € y luego 11,99 €. Datos inventados.
         var video = RecurringSeries(householdId: UUID(), name: "Plataforma de vídeo", amount: Money(minor: 1199),

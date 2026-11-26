@@ -56,8 +56,9 @@ final class FinanceModel {
         }
     }
 
-    func movements(of account: Account) async -> [Movement] {
-        (try? await service.movements(in: household.id, accountId: account.id, limit: Self.recentLimit)) ?? []
+    /// Lanza el error: la pantalla distingue «sin movimientos» de «no se han podido cargar».
+    func movements(of account: Account) async throws -> [Movement] {
+        try await service.movements(in: household.id, accountId: account.id, limit: Self.recentLimit)
     }
 
     @discardableResult

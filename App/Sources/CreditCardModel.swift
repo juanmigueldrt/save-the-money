@@ -72,7 +72,7 @@ final class CreditCardModel {
         transferCategories = Set(categories.filter { $0.kind == .transfer }.map(\.id))
         isLoading = true
         defer { isLoading = false }
-        await perform {
+        let succeeded = await perform {
             let service = service, id = household.id
             async let terms = service.creditCards(in: id)
             async let installments = service.cardInstallments(in: id)
@@ -91,7 +91,8 @@ final class CreditCardModel {
             movements = loaded
             truncatedAccounts = truncated
         }
-        await recompute()
+        // Si la carga falla, el resumen se ve igual, pero los avisos ya programados no se tocan.
+        await recompute(rescheduling: succeeded)
     }
 
     /// Tope de movimientos de los extractos sin cobrar de una tarjeta: el servidor da como mucho 1000 filas por
@@ -122,7 +123,7 @@ final class CreditCardModel {
         }
     }
 
-    private func recompute() async {
+    private func recompute(rescheduling: Bool = true) async {
         var result: [UUID: CreditCardSummary] = [:]
         for account in cardAccounts {
             guard let terms = terms[account.id] else { continue }
@@ -132,6 +133,7 @@ final class CreditCardModel {
             result[account.id]?.movementsTruncated = truncatedAccounts.contains(account.id)
         }
         summaries = result
+        guard rescheduling else { return }
 
         let cards = cardAccounts.compactMap { account -> (summary: CreditCardSummary, name: String, payFromBalance: Money?)? in
             guard let summary = result[account.id] else { return nil }
@@ -140,6 +142,9 @@ final class CreditCardModel {
         await reminders.replace(with: ReminderPlanner.plan(cards: cards, today: today()), prefix: ReminderPlanner.cardPrefix)
         await alerts.notify(cards.compactMap { BudgetAlertPlanner.cardAlert(for: $0.summary, name: $0.name) })
     }
+
+    /// Al tocar el interruptor de avisos en Más opciones: los vuelve a programar (o los quita) con lo último cargado.
+    func reschedule() async { await recompute() }
 
     // MARK: Cambiar
 

@@ -103,7 +103,8 @@ class InvestmentModel(
         members = runCatching { backend.members(household.id) }.getOrElse { if (it is CancellationException) throw it else members }
     }
 
-    private fun reschedule() = notifier.replaceReminders(InvestmentReminders.plan(plans, holdings, today()), InvestmentReminders.PREFIX)
+    /** También al volver a encender los avisos en Más opciones. */
+    fun reschedule() = notifier.replaceReminders(InvestmentReminders.plan(plans, holdings, today()), InvestmentReminders.PREFIX)
 
     suspend fun save(holding: Holding): Holding {
         val isNew = holdings.none { it.id == holding.id }

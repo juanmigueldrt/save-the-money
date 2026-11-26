@@ -184,9 +184,15 @@ fun List<RecurringSeries>.yearlyTotal(kinds: Set<RecurringKind>, from: LocalDate
     return filter { !it.isArchived && it.kind in kinds }.sumOf { s -> s.occurrences(from, end).sumOf(s::amountOn) }
 }
 
-/** Lo que suman al mes las series activas de ese tipo. */
-fun List<RecurringSeries>.monthlyTotal(kind: RecurringKind, day: LocalDate): Long =
-    filter { !it.isArchived && it.kind == kind && it.endDay?.isBefore(day) != true }.sumOf { it.monthlyAmount(day) }
+/**
+ * Lo que suman al mes las series activas de ese tipo. Cuenta una serie si empezó en el mes de [day]
+ * o antes (aunque sea después de [day]) y no terminó antes de [day].
+ */
+fun List<RecurringSeries>.monthlyTotal(kind: RecurringKind, day: LocalDate): Long {
+    val monthEnd = day.withDayOfMonth(day.lengthOfMonth())
+    return filter { !it.isArchived && it.kind == kind && !it.startDay.isAfter(monthEnd) && it.endDay?.isBefore(day) != true }
+        .sumOf { it.monthlyAmount(day) }
+}
 
 @Serializable
 enum class GoalKind { @SerialName("savings") Savings, @SerialName("debt") Debt }
@@ -341,7 +347,8 @@ data class PlannedReminder(val id: String, val fireOn: String, val hour: Int, va
 object ReminderPlanner {
     const val PREFIX = "stm.recurring."
 
-    fun plan(series: List<RecurringSeries>, today: LocalDate, horizonDays: Long = 45, limit: Int = 50, hour: Int = 9): List<PlannedReminder> {
+    /** Como en iOS, que guarda 64 avisos: 20 de pagos fijos, 10 de tarjetas, 10 de aportaciones y hasta 24 de hábito. */
+    fun plan(series: List<RecurringSeries>, today: LocalDate, horizonDays: Long = 45, limit: Int = 20, hour: Int = 9): List<PlannedReminder> {
         val end = today.plusDays(horizonDays)
         val result = mutableListOf<PlannedReminder>()
         for (item in series) {

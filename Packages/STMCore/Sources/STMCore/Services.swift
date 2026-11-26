@@ -7,6 +7,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case weakPassword
     case notSignedIn
     case invalidOrExpiredInvite
+    /// Demasiados códigos fallidos seguidos: el servidor no deja probar más hasta que pasen estos minutos.
+    case tooManyInviteAttempts(minutes: Int)
     case alreadyMember
     case network
     case invalidInput(String)
@@ -19,6 +21,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
         case .weakPassword: "La contraseña es demasiado débil. Usa al menos \(SignUpForm.minimumPasswordLength) caracteres."
         case .notSignedIn: "Tu sesión ha caducado. Vuelve a iniciar sesión."
         case .invalidOrExpiredInvite: "Ese código no es válido o ha caducado. Pide uno nuevo."
+        case .tooManyInviteAttempts(let minutes):
+            "Has probado demasiados códigos. Vuelve a intentarlo dentro de \(minutes == 1 ? "1 minuto" : "\(minutes) minutos")."
         case .alreadyMember: "Ya formas parte de ese hogar."
         case .network: "No hay conexión. Inténtalo de nuevo en un momento."
         case .invalidInput(let message): message
