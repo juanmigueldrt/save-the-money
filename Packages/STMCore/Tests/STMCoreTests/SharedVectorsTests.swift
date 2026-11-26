@@ -377,6 +377,25 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testUsernameRules() throws {
+        struct File: Decodable { var vectors: [Caso] }
+        struct Caso: Decodable { var validation: String; var input: String; var normalized: String?; var error: String? }
+        let file: File = try load("username.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        for v in file.vectors {
+            // "both" aplica a las dos validaciones; "signUp" y "signIn" solo a la suya.
+            for forSignIn in [false, true] where v.validation == "both" || v.validation == (forSignIn ? "signIn" : "signUp") {
+                do {
+                    let user = try Username(v.input, forSignIn: forSignIn)
+                    XCTAssertNil(v.error, "\(v.validation) «\(v.input)»")
+                    XCTAssertEqual(user.value, v.normalized, "\(v.validation) «\(v.input)»")
+                } catch {
+                    XCTAssertEqual("\(error)", v.error, "\(v.validation) «\(v.input)»")
+                }
+            }
+        }
+    }
+
     func testMoneyOfSeveralCurrencies() throws {
         struct File: Decodable { var totals: [Total]; var conversions: [Conversion] }
         struct Amount: Decodable { var minor: Int; var currency: String }

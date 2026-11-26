@@ -192,6 +192,7 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable {
         if trimmedName.count > 60 { return "El nombre es demasiado largo." }
         if let symbol = trimmedSymbol, symbol.count > 20 { return "El código es demasiado largo." }
         if price < 0 { return "El precio no puede ser negativo." }
+        if price.rounded(scale: 6) != price { return "Como mucho 6 decimales en el precio." }
         if feeRate < 0 || feeRate > 10 { return "La comisión tiene que estar entre 0 y 10 %." }
         if let note, note.count > 200 { return "La nota es demasiado larga." }
         return nil
@@ -322,6 +323,7 @@ public struct InvestmentTrade: Identifiable, Hashable, Codable, Sendable {
         if quantity <= 0 { return "Indica cuántas participaciones." }
         if quantity.rounded(scale: 8) != quantity { return "Como mucho 8 decimales en las participaciones." }
         if price < 0 { return "El precio no puede ser negativo." }
+        if price.rounded(scale: 6) != price { return "Como mucho 6 decimales en el precio." }
         if fee.isNegative { return "La comisión no puede ser negativa." }
         if let note, note.count > 200 { return "La nota es demasiado larga." }
         return nil
@@ -602,7 +604,8 @@ public enum PriceHistory {
                                  range: ChartRange, today: CalendarDay) -> [PortfolioPoint] {
         let active = holdings.filter { !$0.isArchived }
         let earliest = trades.filter { t in active.contains { $0.id == t.holdingId } }.map(\.tradedOn).min()
-        let series = Dictionary(uniqueKeysWithValues: active.map { ($0.id, points(for: $0, prices: prices, trades: trades)) })
+        let series = Dictionary(active.map { ($0.id, points(for: $0, prices: prices, trades: trades)) },
+                                uniquingKeysWith: { first, _ in first })
         return range.days(today: today, earliest: earliest).map { day in
             let minor = active.reduce(0) { sum, holding in
                 let held = Position.quantity(of: holding.id, in: trades, through: day)
@@ -832,7 +835,7 @@ extension ReminderPlanner {
     public static func plan(_ plans: [InvestmentPlan], holdings: [Holding], today: CalendarDay, horizonDays: Int = 45,
                             limit: Int = 10, hour: Int = 9) -> [PlannedReminder] {
         let end = today.adding(days: horizonDays)
-        let names = Dictionary(uniqueKeysWithValues: holdings.map { ($0.id, $0.trimmedName) })
+        let names = Dictionary(holdings.map { ($0.id, $0.trimmedName) }, uniquingKeysWith: { first, _ in first })
         var result: [PlannedReminder] = []
         for plan in plans where plan.isActive(on: today) {
             guard let before = plan.remindDaysBefore, let name = names[plan.holdingId] else { continue }

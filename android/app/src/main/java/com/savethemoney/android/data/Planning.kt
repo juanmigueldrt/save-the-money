@@ -417,7 +417,8 @@ object BudgetAlertPlanner {
         val s = Money.format(spent)
         val l = Money.format(limit)
         return if (reached >= 100) {
-            BudgetAlert("$id.$reached", "Te has pasado en $name", "Llevas $s de $l en este periodo.")
+            val title = if (spent > limit) "Te has pasado en $name" else "Has llegado al límite en $name"
+            BudgetAlert("$id.$reached", title, "Llevas $s de $l en este periodo.")
         } else {
             BudgetAlert("$id.$reached", "$name: ya llevas el $percent %", "Has gastado $s de $l. Quedan ${Money.format(limit - spent)}.")
         }

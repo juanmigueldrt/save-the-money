@@ -389,13 +389,19 @@ interface FinanceService {
 
 /**
  * Modo demo y capturas: todo en memoria, con las reglas de borrado del servidor.
- * shortcut: no comprueba que seas del hogar; en la demo solo hay un hogar abierto cada vez.
+ * Con `backend` (la demo), cada miembro ve y toca solo lo que ha creado, como el RLS del servidor.
+ * shortcut: sin `backend` (pruebas de una sola persona) no comprueba quién eres ni que seas del hogar.
  */
-class InMemoryFinance : FinanceService {
+class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
     private val accounts = mutableListOf<Account>()
     private val categories = mutableListOf<BudgetCategory>()
-    private val seeded = mutableSetOf<String>()
+
+    /** Hogar y persona que ya tienen sus categorías de partida. */
+    private val seeded = mutableSetOf<Pair<String, String?>>()
     private val movements = mutableListOf<Movement>()
+
+    /** Quién creó cada fila, por su id (el `created_by` del servidor). */
+    private val creators = mutableMapOf<String, String?>()
 
     /** Las patas de cada transferencia guardada, por su id: repetirla no la duplica. */
     private val transferLegs = mutableMapOf<String, List<String>>()
@@ -403,13 +409,38 @@ class InMemoryFinance : FinanceService {
     private fun id() = UUID.randomUUID().toString()
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
 
+    private suspend fun me() = backend?.currentUserId()
+
+    private suspend fun isMember(householdId: String) =
+        backend == null || (backend.currentUserId() != null && backend.households().any { it.id == householdId })
+
+    /** Como `private.is_mine` del servidor: la fila es de quien la creó mientras siga en ese hogar. */
+    private suspend fun mine(householdId: String): (String) -> Boolean {
+        if (backend == null) return { true }
+        val user = backend.currentUserId()
+        val member = isMember(householdId)
+        return { id -> member && creators[id] == user }
+    }
+
+    /** Quien crea una fila tiene que ser del hogar; devuelve quién es, para apuntarlo. */
+    private suspend fun creator(householdId: String): String? {
+        if (!isMember(householdId)) throw AppError.Unknown("no es miembro")
+        return me()
+    }
+
+    /** Lo que ve quien usa un id que ya es de otra persona (el 23505 del servidor). */
+    private fun idUsed(): Nothing = fail("Ya hay un registro igual guardado. Revisa el formulario.")
+
     /** Contador para la versión de cada movimiento: cambia en cada escritura, como `updated_at` en el servidor. */
     private var movementVersion = 0
 
     private fun nextVersion() = "v${++movementVersion}"
 
-    private fun build(draft: MovementDraft, householdId: String): Movement {
+    /** La cuenta y la categoría tienen que ser propias, como pide el RLS al apuntar. */
+    private fun build(draft: MovementDraft, householdId: String, mine: (String) -> Boolean): Movement {
         draft.issue?.let(::fail)
+        if (!mine(draft.accountId)) throw AppError.Unknown("cuenta de otra persona")
+        if (draft.categoryId?.let(mine) == false) throw AppError.Unknown("categoría de otra persona")
         return Movement(
             draft.id, householdId, draft.accountId, draft.categoryId, draft.bookedOn.toString(), draft.amountMinor,
             draft.description.trim(), draft.notes, draft.importHash, draft.excluded, null, Payee.clean(draft.payee), draft.tags,
@@ -417,47 +448,63 @@ class InMemoryFinance : FinanceService {
         )
     }
 
+    /** Como el servidor: borra solo lo tuyo de ese hogar y te repone tus categorías de partida. */
     override suspend fun resetHousehold(householdId: String) {
-        accounts.removeAll { it.householdId == householdId }
-        categories.removeAll { it.householdId == householdId }
-        seeded -= householdId
-        movements.removeAll { it.householdId == householdId }
-        budgets.removeAll { it.householdId == householdId }
-        series.removeAll { it.householdId == householdId }
-        goals.removeAll { it.householdId == householdId }
-        contributions.removeAll { it.householdId == householdId }
-        cards.removeAll { it.householdId == householdId }
-        installments.removeAll { it.householdId == householdId }
-        holdings.removeAll { it.householdId == householdId }
-        prices.removeAll { it.householdId == householdId }
-        trades.removeAll { it.householdId == householdId }
-        plans.removeAll { it.householdId == householdId }
+        val mine = mine(householdId)
+        fun <T> MutableList<T>.dropMine(household: (T) -> String, id: (T) -> String) = removeAll { household(it) == householdId && mine(id(it)) }
+        accounts.dropMine({ it.householdId }, { it.id })
+        categories.dropMine({ it.householdId }, { it.id })
+        seeded -= householdId to me()
+        movements.dropMine({ it.householdId }, { it.id })
+        myBudgets().removeAll { it.householdId == householdId }
+        extras.dropMine({ it.householdId }, { it.id })
+        series.dropMine({ it.householdId }, { it.id })
+        charges.dropMine({ it.householdId }, { it.id })
+        goals.dropMine({ it.householdId }, { it.id })
+        contributions.dropMine({ it.householdId }, { it.id })
+        // Las condiciones de una tarjeta son de quien creó su cuenta.
+        cards.dropMine({ it.householdId }, { it.accountId })
+        installments.dropMine({ it.householdId }, { it.id })
+        holdings.dropMine({ it.householdId }, { it.id })
+        prices.dropMine({ it.householdId }, { it.id })
+        trades.dropMine({ it.householdId }, { it.id })
+        plans.dropMine({ it.householdId }, { it.id })
     }
 
-    override suspend fun accounts(householdId: String) = accounts.filter { it.householdId == householdId }
+    override suspend fun accounts(householdId: String): List<Account> {
+        val mine = mine(householdId)
+        return accounts.filter { it.householdId == householdId && mine(it.id) }
+    }
 
     override suspend fun balances(householdId: String) = accounts(householdId).associate { a ->
         a.id to a.openingMinor + movements.filter { it.accountId == a.id }.sumOf { it.amountMinor }
     }
 
     override suspend fun createAccount(draft: AccountDraft, householdId: String): Account {
+        val user = creator(householdId)
         draft.issue?.let(::fail)
         return Account(id(), householdId, draft.trimmedName, draft.kind, openingMinor = draft.openingMinor, ownerId = draft.ownerId)
-            .also { accounts += it }
+            .also {
+                accounts += it
+                creators[it.id] = user
+            }
     }
 
     override suspend fun updateAccount(account: Account): Account {
         val i = accounts.indexOfFirst { it.id == account.id }
         if (i < 0) throw AppError.Unknown("cuenta")
+        val mine = mine(accounts[i].householdId)
+        if (!mine(account.id)) throw AppError.Unknown("cuenta")
         if (account.isDefault && !account.isArchived) {
-            // Como en la base de datos: sólo una predeterminada.
-            accounts.replaceAll { if (it.id != account.id) it.copy(isDefault = false) else it }
+            // Como en la base de datos: sólo una predeterminada por persona.
+            accounts.replaceAll { if (it.id != account.id && mine(it.id)) it.copy(isDefault = false) else it }
         }
         accounts[i] = account.copy(name = account.name.trim())
         return accounts[i]
     }
 
     override suspend fun deleteAccount(accountId: String) {
+        accounts.firstOrNull { it.id == accountId }?.let { if (!mine(it.householdId)(accountId)) return }
         accounts.removeAll { it.id == accountId }
         movements.removeAll { it.accountId == accountId }
         cards.removeAll { it.accountId == accountId }
@@ -466,61 +513,95 @@ class InMemoryFinance : FinanceService {
     }
 
     override suspend fun categories(householdId: String): List<BudgetCategory> {
-        if (seeded.add(householdId)) categories += BudgetCategory.defaults(householdId)
-        return categories.filter { it.householdId == householdId }.sortedBy { it.name }
+        // Cada miembro recibe sus categorías de partida, como el disparador del servidor.
+        if (isMember(householdId) && seeded.add(householdId to me())) {
+            val user = me()
+            BudgetCategory.defaults(householdId).forEach {
+                categories += it
+                creators[it.id] = user
+            }
+        }
+        val mine = mine(householdId)
+        return categories.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.name }
     }
 
     override suspend fun createCategory(category: BudgetCategory): BudgetCategory {
-        category.issue(categories)?.let(::fail)
-        return category.copy(id = id(), name = category.trimmedName).also { categories += it }
+        val user = creator(category.householdId)
+        // Como el índice único del servidor: el nombre no se repite entre las categorías propias.
+        val mine = mine(category.householdId)
+        category.issue(categories.filter { mine(it.id) })?.let(::fail)
+        return category.copy(id = id(), name = category.trimmedName).also {
+            categories += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updateCategory(category: BudgetCategory): BudgetCategory {
-        category.issue(categories)?.let(::fail)
         val i = categories.indexOfFirst { it.id == category.id }
         if (i < 0) throw AppError.Unknown("categoría")
+        val mine = mine(categories[i].householdId)
+        if (!mine(category.id)) throw AppError.Unknown("categoría")
+        category.issue(categories.filter { mine(it.id) })?.let(::fail)
         categories[i] = category.copy(name = category.trimmedName, kind = categories[i].kind)
         return categories[i]
     }
 
     override suspend fun deleteCategory(categoryId: String) {
+        categories.firstOrNull { it.id == categoryId }?.let { if (!mine(it.householdId)(categoryId)) return }
         categories.removeAll { it.id == categoryId }
         movements.replaceAll { if (it.categoryId == categoryId) it.copy(categoryId = null) else it }
     }
 
-    override suspend fun movements(householdId: String, accountId: String?, limit: Int) = movements
-        .filter { it.householdId == householdId && (accountId == null || it.accountId == accountId) }
-        .asReversed()
-        .sortedByDescending { it.bookedOn }
-        .take(limit)
+    override suspend fun movements(householdId: String, accountId: String?, limit: Int): List<Movement> {
+        val mine = mine(householdId)
+        return movements
+            .filter { it.householdId == householdId && (accountId == null || it.accountId == accountId) && mine(it.id) }
+            .asReversed()
+            .sortedByDescending { it.bookedOn }
+            .take(limit)
+    }
 
-    override suspend fun movements(householdId: String, ids: List<String>) =
-        movements.filter { it.householdId == householdId && it.id in ids }
+    override suspend fun movements(householdId: String, ids: List<String>): List<Movement> {
+        val mine = mine(householdId)
+        return movements.filter { it.householdId == householdId && it.id in ids && mine(it.id) }
+    }
 
-    override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int) = movements
-        .filter { it.householdId == householdId && it.accountId == accountId && !it.day.isBefore(since) }
-        .asReversed()
-        .sortedByDescending { it.bookedOn }
-        .take(limit)
+    override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int): List<Movement> {
+        val mine = mine(householdId)
+        return movements
+            .filter { it.householdId == householdId && it.accountId == accountId && !it.day.isBefore(since) && mine(it.id) }
+            .asReversed()
+            .sortedByDescending { it.bookedOn }
+            .take(limit)
+    }
 
     override suspend fun addMovement(draft: MovementDraft, householdId: String): Movement {
-        val movement = build(draft, householdId)
+        val user = creator(householdId)
+        val mine = mine(householdId)
+        val movement = build(draft, householdId, mine)
         movements.firstOrNull { it.id == draft.id }?.let { stored ->
-            // Como el servidor: repetirlo solo vale con la misma cuenta, importe y día.
+            // Como el servidor: un id que ya usó otra persona no se ve, así que no vale.
+            if (!mine(stored.id)) idUsed()
+            // Repetirlo solo vale con la misma cuenta, importe y día.
             val same = stored.householdId == householdId && stored.accountId == movement.accountId &&
                 stored.amountMinor == movement.amountMinor && stored.bookedOn == movement.bookedOn
             if (!same) fail(TransferDraft.STORED_WITH_OTHER_DATA)
             return stored
         }
         movements += movement
+        creators[movement.id] = user
         return movement
     }
 
     override suspend fun addTransfer(draft: TransferDraft, householdId: String): List<Movement> {
+        val user = creator(householdId)
+        val mine = mine(householdId)
         draft.issue?.let(::fail)
         transferLegs[draft.id]?.let { ids ->
+            // Como el servidor: si las patas son de otra persona, ese id ya está usado.
+            if (!ids.all(mine)) idUsed()
             val stored = movements.filter { it.id in ids }
-            // Como el servidor: repetirla solo vale con las mismas cuentas, importe y día.
+            // Repetirla solo vale con las mismas cuentas, importe y día.
             val same = stored.map { it.accountId } == listOf(draft.fromAccountId, draft.toAccountId) &&
                 stored.map { it.amountMinor } == listOf(-draft.amountMinor, draft.amountMinor) &&
                 stored.all { it.bookedOn == draft.bookedOn.toString() }
@@ -528,8 +609,9 @@ class InMemoryFinance : FinanceService {
             return stored
         }
         // Se validan las dos patas antes de guardar ninguna.
-        val legs = draft.legs.map { build(it, householdId) }
+        val legs = draft.legs.map { build(it, householdId, mine) }
         movements += legs
+        legs.forEach { creators[it.id] = user }
         transferLegs[draft.id] = legs.map { it.id }
         return legs
     }
@@ -537,181 +619,281 @@ class InMemoryFinance : FinanceService {
     override suspend fun updateMovement(movement: Movement): Movement {
         movement.toDraft().issue?.let(::fail)
         val i = movements.indexOfFirst { it.id == movement.id }
-        // Como el servidor: un movimiento borrado o en otra versión que la leída no se cambia.
-        if (i < 0 || movements[i].updatedAt != movement.updatedAt) throw AppError.MovementChanged
+        // Como el servidor: un movimiento borrado, ajeno o en otra versión que la leída no se cambia.
+        if (i < 0) throw AppError.MovementChanged
+        val mine = mine(movements[i].householdId)
+        if (!mine(movement.id) || movements[i].updatedAt != movement.updatedAt) throw AppError.MovementChanged
+        if (!mine(movement.accountId) || movement.categoryId?.let(mine) == false) throw AppError.Unknown("cuenta o categoría de otra persona")
         movements[i] = movement.copy(description = movement.description.trim(), payee = Payee.clean(movement.payee), updatedAt = nextVersion())
         return movements[i]
     }
 
     override suspend fun deleteMovement(movementId: String) {
+        movements.firstOrNull { it.id == movementId }?.let { if (!mine(it.householdId)(movementId)) return }
         movements.removeAll { it.id == movementId }
         installments.removeAll { it.movementId == movementId }
     }
 
     override suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult {
+        val user = creator(householdId)
+        val mine = mine(householdId)
         var inserted = 0
         var duplicates = 0
         for (draft in drafts) {
-            val movement = build(draft, householdId)
+            val movement = build(draft, householdId, mine)
             if (movement.importHash != null && movements.any { it.accountId == movement.accountId && it.importHash == movement.importHash }) {
                 duplicates++
             } else {
                 movements += movement
+                creators[movement.id] = user
                 inserted++
             }
         }
         return ImportResult(inserted, duplicates)
     }
 
-    private val budgets = mutableListOf<Budget>()
+    /** Presupuestos de cada persona, por quien los guardó: uno por persona, hogar y periodo. */
+    private val budgets = mutableMapOf<String?, MutableList<Budget>>()
+
+    private suspend fun myBudgets() = budgets.getOrPut(me()) { mutableListOf() }
 
     override suspend fun budget(householdId: String, startingOn: LocalDate) =
-        budgets.firstOrNull { it.householdId == householdId && it.period.start == startingOn }
+        myBudgets().firstOrNull { it.householdId == householdId && it.period.start == startingOn && isMember(householdId) }
 
     override suspend fun latestBudget(householdId: String, before: LocalDate) =
-        budgets.filter { it.householdId == householdId && it.period.start < before }.maxByOrNull { it.period.start }
+        myBudgets().filter { it.householdId == householdId && it.period.start < before && isMember(householdId) }
+            .maxByOrNull { it.period.start }
 
     override suspend fun saveBudget(budget: Budget): Budget {
+        creator(budget.householdId)
         budget.issue?.let(::fail)
-        budgets.removeAll { it.householdId == budget.householdId && it.period.start == budget.period.start }
-        budgets += budget
+        if (!budget.limits.keys.all(mine(budget.householdId))) throw AppError.Unknown("categoría de otra persona")
+        myBudgets().removeAll { it.householdId == budget.householdId && it.period.start == budget.period.start }
+        myBudgets() += budget
         return budget
     }
 
-    private var schedule: PaySchedule? = null
+    /** El calendario de cobros es de cada persona. */
+    private val schedules = mutableMapOf<String?, PaySchedule>()
     private val extras = mutableListOf<ExtraBudget>()
 
-    override suspend fun paySchedule() = schedule
+    override suspend fun paySchedule() = schedules[me()]
 
     override suspend fun savePaySchedule(schedule: PaySchedule): PaySchedule {
         schedule.issue?.let(::fail)
-        this.schedule = schedule
+        schedules[me()] = schedule
         return schedule
     }
 
-    override suspend fun extraBudgets(householdId: String) =
-        extras.filter { it.householdId == householdId }.sortedWith(compareBy<ExtraBudget> { !it.isFavorite }.thenByDescending { it.startsOn })
+    override suspend fun extraBudgets(householdId: String): List<ExtraBudget> {
+        val mine = mine(householdId)
+        return extras.filter { it.householdId == householdId && mine(it.id) }
+            .sortedWith(compareBy<ExtraBudget> { !it.isFavorite }.thenByDescending { it.startsOn })
+    }
 
     override suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget {
+        val user = creator(budget.householdId)
+        val mine = mine(budget.householdId)
         budget.issue?.let(::fail)
+        // Uno ajeno no se ve: no se cambia.
+        if (extras.any { it.id == budget.id } && !mine(budget.id)) throw AppError.Unknown("no existe")
         val saved = budget.copy(name = budget.trimmedName)
         // Un favorito por persona, como el disparador del servidor.
-        if (saved.isFavorite) extras.replaceAll { if (it.isFavorite) it.copy(isFavorite = false) else it }
+        if (saved.isFavorite) extras.replaceAll { if (it.isFavorite && mine(it.id)) it.copy(isFavorite = false) else it }
         val index = extras.indexOfFirst { it.id == saved.id }
         if (index >= 0) extras[index] = saved else extras += saved
+        creators[saved.id] = user
         return saved
     }
 
     override suspend fun deleteExtraBudget(id: String) {
-        extras.removeAll { it.id == id }
+        val budget = extras.firstOrNull { it.id == id } ?: return
+        if (mine(budget.householdId)(id)) extras.removeAll { it.id == id }
     }
 
-    override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate) =
-        movements.filter { it.householdId == householdId && it.day in from..through }
+    override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement> {
+        val mine = mine(householdId)
+        return movements.filter { it.householdId == householdId && it.day in from..through && mine(it.id) }
+    }
 
     private val series = mutableListOf<RecurringSeries>()
     private val goals = mutableListOf<Goal>()
     private val contributions = mutableListOf<GoalContribution>()
 
-    override suspend fun recurringSeries(householdId: String) = series.filter { it.householdId == householdId }.sortedBy { it.name }
+    /** Como el RLS: la cuenta y la categoría que se enlazan tienen que ser propias. */
+    private fun checkReferences(mine: (String) -> Boolean, accountId: String?, categoryId: String? = null) {
+        if (accountId?.let(mine) == false) throw AppError.Unknown("cuenta de otra persona")
+        if (categoryId?.let(mine) == false) throw AppError.Unknown("categoría de otra persona")
+    }
+
+    override suspend fun recurringSeries(householdId: String): List<RecurringSeries> {
+        val mine = mine(householdId)
+        return series.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.name }
+    }
 
     override suspend fun createRecurring(series: RecurringSeries): RecurringSeries {
+        val user = creator(series.householdId)
         series.issue?.let(::fail)
-        return series.copy(id = id(), name = series.trimmedName).also { this.series += it }
+        checkReferences(mine(series.householdId), series.accountId, series.categoryId)
+        return series.copy(id = id(), name = series.trimmedName).also {
+            this.series += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updateRecurring(series: RecurringSeries): RecurringSeries {
         series.issue?.let(::fail)
+        val mine = mine(series.householdId)
+        if (this.series.any { it.id == series.id } && !mine(series.id)) throw AppError.Unknown("no existe")
+        checkReferences(mine, series.accountId, series.categoryId)
         this.series.replaceAll { if (it.id == series.id) series else it }
         return series
     }
 
     override suspend fun deleteRecurring(seriesId: String) {
+        series.firstOrNull { it.id == seriesId }?.let { if (!mine(it.householdId)(seriesId)) return }
         series.removeAll { it.id == seriesId }
         charges.removeAll { it.seriesId == seriesId }
     }
 
     private val charges = mutableListOf<RecurringCharge>()
 
-    override suspend fun recurringCharges(householdId: String) = charges.filter { it.householdId == householdId }.sortedByDescending { it.dueOn }
+    override suspend fun recurringCharges(householdId: String): List<RecurringCharge> {
+        val mine = mine(householdId)
+        return charges.filter { it.householdId == householdId && mine(it.id) }.sortedByDescending { it.dueOn }
+    }
 
-    override suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge> =
-        charges.distinctBy { it.seriesId to it.dueOn }
+    override suspend fun createCharges(charges: List<RecurringCharge>): List<RecurringCharge> {
+        val users = charges.map { it.householdId }.distinct().associateWith { creator(it) }
+        // Como el servidor: solo se crean cargos de series propias.
+        for ((householdId, items) in charges.groupBy { it.householdId }) {
+            val mine = mine(householdId)
+            if (items.any { !mine(it.seriesId) }) throw AppError.Unknown("serie de otra persona")
+        }
+        return charges.distinctBy { it.seriesId to it.dueOn }
             .filter { new -> this.charges.none { it.seriesId == new.seriesId && it.dueOn == new.dueOn } }
             .map { it.copy(id = id(), status = ChargeStatus.Pending, transactionId = null) }
+            .onEach { creators[it.id] = users.getValue(it.householdId) }
             .also { this.charges += it }
+    }
 
     override suspend fun confirmCharge(chargeId: String, draft: MovementDraft): Movement {
         val i = charges.indexOfFirst { it.id == chargeId }
-        if (i < 0) fail("El cargo no existe.")
+        // Como el servidor: un cargo ajeno no se ve.
+        if (i < 0 || !mine(charges[i].householdId)(chargeId)) fail("El cargo no existe.")
         if (!charges[i].isPending) fail("El cargo ya no está pendiente.")
-        val movement = build(draft, charges[i].householdId).also { movements += it }
+        val householdId = charges[i].householdId
+        val user = creator(householdId)
+        val movement = build(draft, householdId, mine(householdId)).also {
+            movements += it
+            creators[it.id] = user
+        }
         charges[i] = charges[i].copy(status = ChargeStatus.Confirmed, transactionId = movement.id, amountMinor = movement.amountMinor)
         return movement
     }
 
     override suspend fun updateCharge(chargeId: String, status: ChargeStatus, transactionId: String?) {
+        val charge = charges.firstOrNull { it.id == chargeId } ?: return
+        if (!mine(charge.householdId)(chargeId)) return
         charges.replaceAll {
             if (it.id == chargeId) it.copy(status = status, transactionId = if (status == ChargeStatus.Pending) null else transactionId) else it
         }
     }
 
-    override suspend fun goals(householdId: String) = goals.filter { it.householdId == householdId }
+    override suspend fun goals(householdId: String): List<Goal> {
+        val mine = mine(householdId)
+        return goals.filter { it.householdId == householdId && mine(it.id) }
+    }
 
     override suspend fun createGoal(goal: Goal): Goal {
+        val user = creator(goal.householdId)
         goal.issue?.let(::fail)
-        return goal.copy(id = id(), name = goal.trimmedName).also { goals += it }
+        checkReferences(mine(goal.householdId), goal.accountId)
+        return goal.copy(id = id(), name = goal.trimmedName).also {
+            goals += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updateGoal(goal: Goal): Goal {
         goal.issue?.let(::fail)
+        val mine = mine(goal.householdId)
+        if (goals.any { it.id == goal.id } && !mine(goal.id)) throw AppError.Unknown("no existe")
+        checkReferences(mine, goal.accountId)
         goals.replaceAll { if (it.id == goal.id) goal else it }
         return goal
     }
 
     override suspend fun deleteGoal(goalId: String) {
+        goals.firstOrNull { it.id == goalId }?.let { if (!mine(it.householdId)(goalId)) return }
         goals.removeAll { it.id == goalId }
         contributions.removeAll { it.goalId == goalId }
     }
 
-    override suspend fun contributions(householdId: String) =
-        contributions.filter { it.householdId == householdId }.sortedByDescending { it.madeOn }
+    override suspend fun contributions(householdId: String): List<GoalContribution> {
+        val mine = mine(householdId)
+        return contributions.filter { it.householdId == householdId && mine(it.id) }.sortedByDescending { it.madeOn }
+    }
 
     override suspend fun addContribution(contribution: GoalContribution): GoalContribution {
+        val user = creator(contribution.householdId)
         contribution.issue?.let(::fail)
-        return contribution.copy(id = id()).also { contributions += it }
+        if (!mine(contribution.householdId)(contribution.goalId)) throw AppError.Unknown("meta de otra persona")
+        return contribution.copy(id = id()).also {
+            contributions += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun deleteContribution(contributionId: String) {
-        contributions.removeAll { it.id == contributionId }
+        val item = contributions.firstOrNull { it.id == contributionId } ?: return
+        if (mine(item.householdId)(contributionId)) contributions.removeAll { it.id == contributionId }
     }
 
+    /** Las condiciones de una tarjeta son de quien creó su cuenta (solo se guardan sobre una cuenta propia). */
     private val cards = mutableListOf<CreditCardTerms>()
     private val installments = mutableListOf<CardInstallment>()
 
-    override suspend fun creditCards(householdId: String) = cards.filter { it.householdId == householdId }
+    override suspend fun creditCards(householdId: String): List<CreditCardTerms> {
+        val mine = mine(householdId)
+        return cards.filter { it.householdId == householdId && mine(it.accountId) }
+    }
 
     override suspend fun saveCreditCard(terms: CreditCardTerms): CreditCardTerms {
+        creator(terms.householdId)
+        val mine = mine(terms.householdId)
         terms.issue?.let(::fail)
-        if (accounts.none { it.id == terms.accountId && it.kind == AccountKind.CreditCard }) fail("Esa cuenta no es una tarjeta de crédito.")
+        if (accounts.none { it.id == terms.accountId && it.kind == AccountKind.CreditCard } || !mine(terms.accountId)) {
+            fail("Esa cuenta no es una tarjeta de crédito.")
+        }
+        checkReferences(mine, terms.payFromAccountId)
         cards.removeAll { it.accountId == terms.accountId }
         cards += terms
         return terms
     }
 
-    override suspend fun cardInstallments(householdId: String) = installments.filter { it.householdId == householdId }
+    override suspend fun cardInstallments(householdId: String): List<CardInstallment> {
+        val mine = mine(householdId)
+        return installments.filter { it.householdId == householdId && mine(it.id) }
+    }
 
     override suspend fun saveInstallment(installment: CardInstallment): CardInstallment {
+        val user = creator(installment.householdId)
+        val mine = mine(installment.householdId)
         installment.issue?.let(::fail)
-        if (movements.none { it.id == installment.movementId && it.accountId == installment.accountId }) fail("Solo se aplazan compras de la tarjeta.")
+        if (movements.none { it.id == installment.movementId && it.accountId == installment.accountId } || !mine(installment.accountId)) {
+            fail("Solo se aplazan compras de la tarjeta.")
+        }
         val saved = installment.copy(id = installments.firstOrNull { it.movementId == installment.movementId }?.id ?: id())
         installments.removeAll { it.id == saved.id }
         installments += saved
+        creators[saved.id] = user
         return saved
     }
 
     override suspend fun deleteInstallment(installmentId: String) {
-        installments.removeAll { it.id == installmentId }
+        val item = installments.firstOrNull { it.id == installmentId } ?: return
+        if (mine(item.householdId)(installmentId)) installments.removeAll { it.id == installmentId }
     }
 
     private val holdings = mutableListOf<Holding>()
@@ -722,44 +904,71 @@ class InMemoryFinance : FinanceService {
     private val tradeMovements = mutableMapOf<String, String>()
     private val plans = mutableListOf<InvestmentPlan>()
 
-    override suspend fun holdings(householdId: String) = holdings.filter { it.householdId == householdId }.sortedBy { it.trimmedName }
+    override suspend fun holdings(householdId: String): List<Holding> {
+        val mine = mine(householdId)
+        return holdings.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.trimmedName }
+    }
 
     override suspend fun createHolding(holding: Holding): Holding {
+        val user = creator(holding.householdId)
         holding.issue?.let(::fail)
-        return holding.copy(id = id(), name = holding.trimmedName, symbol = holding.trimmedSymbol).also { holdings += it }
+        checkReferences(mine(holding.householdId), holding.accountId)
+        return holding.copy(id = id(), name = holding.trimmedName, symbol = holding.trimmedSymbol).also {
+            holdings += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updateHolding(holding: Holding): Holding {
         holding.issue?.let(::fail)
+        val index = holdings.indexOfFirst { it.id == holding.id }
+        if (index < 0) throw AppError.Unknown("no existe")
+        val mine = mine(holdings[index].householdId)
+        if (!mine(holding.id)) throw AppError.Unknown("no existe")
+        checkReferences(mine, holding.accountId)
         val saved = holding.copy(name = holding.trimmedName, symbol = holding.trimmedSymbol)
-        holdings[holdings.indexOfFirst { it.id == holding.id }] = saved
+        holdings[index] = saved
         return saved
     }
 
     override suspend fun deleteHolding(holdingId: String) {
+        holdings.firstOrNull { it.id == holdingId }?.let { if (!mine(it.householdId)(holdingId)) return }
         holdings.removeAll { it.id == holdingId }
         prices.removeAll { it.holdingId == holdingId }
         trades.removeAll { it.holdingId == holdingId }
         plans.removeAll { it.holdingId == holdingId }
     }
 
-    override suspend fun holdingPrices(householdId: String) = prices.filter { it.householdId == householdId }.sortedBy { it.pricedOn }
+    override suspend fun holdingPrices(householdId: String): List<HoldingPrice> {
+        val mine = mine(householdId)
+        return prices.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.pricedOn }
+    }
 
     override suspend fun recordPrice(price: java.math.BigDecimal, day: LocalDate, holdingId: String): Holding {
         if (price.signum() < 0) fail("El precio no puede ser negativo.")
         val index = holdings.indexOfFirst { it.id == holdingId }
+        // Como el servidor: un activo ajeno no se ve.
+        if (index < 0 || !mine(holdings[index].householdId)(holdingId)) throw AppError.Unknown("no existe")
         val holding = holdings[index]
         prices.removeAll { it.holdingId == holdingId && it.day == day }
-        prices += HoldingPrice(id(), holding.householdId, holdingId, day.toString(), price)
+        prices += HoldingPrice(id(), holding.householdId, holdingId, day.toString(), price).also { creators[it.id] = me() }
         if (holding.priceDay?.isAfter(day) == true) return holding
         return holding.copy(price = price, priceOn = day.toString()).also { holdings[index] = it }
     }
 
-    override suspend fun trades(householdId: String) = trades.filter { it.householdId == householdId }.sortedBy { it.tradedOn }
+    override suspend fun trades(householdId: String): List<InvestmentTrade> {
+        val mine = mine(householdId)
+        return trades.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.tradedOn }
+    }
 
     override suspend fun addTrade(trade: InvestmentTrade, cash: TradeCash?): InvestmentTrade {
+        val user = creator(trade.householdId)
+        val mine = mine(trade.householdId)
+        if (!mine(trade.holdingId)) throw AppError.Unknown("activo de otra persona")
         trades.firstOrNull { trade.id.isNotEmpty() && it.id == trade.id }?.let { stored ->
-            // Como el servidor: repetirla solo vale con los mismos datos, también los del movimiento.
+            // Como el servidor: una operación ajena no se ve, así que ese id ya está usado.
+            if (!mine(stored.id)) idUsed()
+            // Repetirla solo vale con los mismos datos, también los del movimiento.
             val movement = movements.firstOrNull { it.id == tradeMovements[trade.id] }
             val same = stored.holdingId == trade.holdingId && stored.tradedOn == trade.tradedOn && stored.side == trade.side &&
                 stored.quantity.compareTo(trade.quantity) == 0 && stored.price.compareTo(trade.price) == 0 &&
@@ -771,44 +980,74 @@ class InMemoryFinance : FinanceService {
         val saved = trade.copy(id = trade.id.ifEmpty { id() })
         // El movimiento se valida antes de guardar nada: o quedan los dos o ninguno.
         cash?.let {
-            val movement = build(MovementDraft(it.accountId, it.categoryId, trade.day, it.amountMinor, it.description), trade.householdId)
+            val movement = build(MovementDraft(it.accountId, it.categoryId, trade.day, it.amountMinor, it.description), trade.householdId, mine)
             movements += movement
+            creators[movement.id] = user
             tradeMovements[saved.id] = movement.id
         }
         trades += saved
+        creators[saved.id] = user
         return saved
     }
 
     override suspend fun deleteTrade(tradeId: String) {
-        trades.firstOrNull { it.id == tradeId }?.deletionIssue(trades)?.let(::fail)
+        val trade = trades.firstOrNull { it.id == tradeId }
+        if (trade != null && !mine(trade.householdId)(tradeId)) return
+        trade?.deletionIssue(trades)?.let(::fail)
         trades.removeAll { it.id == tradeId }
     }
 
-    override suspend fun investmentPlans(householdId: String) = plans.filter { it.householdId == householdId }.sortedBy { it.startsOn }
+    override suspend fun investmentPlans(householdId: String): List<InvestmentPlan> {
+        val mine = mine(householdId)
+        return plans.filter { it.householdId == householdId && mine(it.id) }.sortedBy { it.startsOn }
+    }
 
     override suspend fun createPlan(plan: InvestmentPlan): InvestmentPlan {
+        val user = creator(plan.householdId)
+        val mine = mine(plan.householdId)
         plan.issue?.let(::fail)
-        return plan.copy(id = id()).also { plans += it }
+        if (!mine(plan.holdingId)) throw AppError.Unknown("activo de otra persona")
+        checkReferences(mine, plan.accountId)
+        return plan.copy(id = id()).also {
+            plans += it
+            creators[it.id] = user
+        }
     }
 
     override suspend fun updatePlan(plan: InvestmentPlan): InvestmentPlan {
         plan.issue?.let(::fail)
-        plans[plans.indexOfFirst { it.id == plan.id }] = plan
+        val index = plans.indexOfFirst { it.id == plan.id }
+        if (index < 0) throw AppError.Unknown("no existe")
+        val mine = mine(plans[index].householdId)
+        if (!mine(plan.id)) throw AppError.Unknown("no existe")
+        checkReferences(mine, plan.accountId)
+        plans[index] = plan
         return plan
     }
 
-    override suspend fun deletePlan(planId: String) { plans.removeAll { it.id == planId } }
+    override suspend fun deletePlan(planId: String) {
+        val plan = plans.firstOrNull { it.id == planId } ?: return
+        if (mine(plan.householdId)(planId)) plans.removeAll { it.id == planId }
+    }
 
+    /** Los scores son de cada persona, como con el RLS del servidor. */
     private val scores = mutableListOf<CreditScore>()
 
-    override suspend fun creditScores() = scores.sortedByDescending { it.recordedOn }
+    override suspend fun creditScores(): List<CreditScore> {
+        val user = me()
+        return scores.filter { creators[it.id] == user }.sortedByDescending { it.recordedOn }
+    }
 
     override suspend fun addCreditScore(score: CreditScore): CreditScore {
         score.issue?.let(::fail)
-        return score.copy(id = id()).also { scores += it }
+        return score.copy(id = id()).also {
+            scores += it
+            creators[it.id] = me()
+        }
     }
 
     override suspend fun deleteCreditScore(scoreId: String) {
-        scores.removeAll { it.id == scoreId }
+        val user = me()
+        scores.removeAll { it.id == scoreId && creators[it.id] == user }
     }
 }

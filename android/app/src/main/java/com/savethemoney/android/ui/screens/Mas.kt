@@ -497,7 +497,7 @@ fun Pantalla32(nav: Nav) {
                     when {
                         action.busy -> "Importando…"
                         validas.isEmpty() -> "Importar"
-                        else -> "Importar ${validas.size} movimientos"
+                        else -> tituloImportar(validas.size)
                     },
                     {
                         action.run {
@@ -759,6 +759,8 @@ private fun leerCsv(context: Context, uri: Uri): Result<Pair<String, String>> = 
 private const val MAX_CSV_BYTES = 10L * 1024 * 1024
 /** Mismos separadores y orden que en iOS (`CSVTable.delimiters`). */
 private val SEPARADORES = listOf(';', '\t', ',')
+
+internal fun tituloImportar(validas: Int) = if (validas == 1) "Importar 1 movimiento" else "Importar $validas movimientos"
 
 private fun etiquetaSeparador(c: Char) = when (c) {
     ';' -> "Punto y coma (;)"
