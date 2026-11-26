@@ -25,7 +25,10 @@ Supabase en el momento: borrarlo del historial no basta.
 - Las funciones `security definer` fijan `search_path = ''` y comprueban
   `auth.uid()`.
 - Las migraciones se aplican al proyecto real sólo desde GitHub Actions y con
-  aprobación manual en el entorno `produccion`.
+  aprobación manual en el entorno `produccion`. Antes de aplicarlas, el despliegue
+  lista las copias de seguridad y las migraciones pendientes, y se para si no puede
+  leer las migraciones. Cómo comprobar la copia y cómo volver atrás:
+  [docs/operaciones/copias-y-vuelta-atras.md](docs/operaciones/copias-y-vuelta-atras.md).
 
 ## En la app
 
