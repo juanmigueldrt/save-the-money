@@ -4,6 +4,7 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.temporal.ChronoUnit
 import kotlin.math.max
 
 // Tracking.swift de STMCore: patrimonio neto, score crediticio e informes.
@@ -104,18 +105,28 @@ enum class ReportPeriod(val title: String) {
      * El mismo tramo justo antes, para comparar: este mes hasta hoy frente al mes pasado hasta el mismo día,
      * los últimos 3 meses frente a los 3 anteriores, este año hasta hoy frente al año pasado hasta el mismo día.
      */
-    fun previousRange(today: LocalDate): ClosedRange<LocalDate> {
-        val current = range(today)
+    fun previousRange(today: LocalDate, monthStartDay: Int = 1): ClosedRange<LocalDate> {
+        val current = range(today, monthStartDay)
         val shift = when (this) {
             ThisMonth, LastMonth -> 1L
             Last3Months -> 3L
             Last6Months -> 6L
             ThisYear, Last12Months -> 12L
         }
-        val start = current.start.minusMonths(shift)
-        // Un mes completo se compara con el mes anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
-        val end = if (this == LastMonth) YearMonth.from(start).atEndOfMonth() else current.endInclusive.minusMonths(shift)
+        // Mismo día dentro de su periodo, sin pasarse del final del periodo anterior.
+        val start = shiftedDay(current.start, shift, monthStartDay)
+        // Un mes completo se compara con el periodo anterior completo (31 de marzo → 28 de febrero, no 3 de marzo).
+        val end = if (this == LastMonth) monthContaining(start, monthStartDay).period(monthStartDay).endInclusive
+        else shiftedDay(current.endInclusive, shift, monthStartDay)
         return start..maxOf(start, end)
+    }
+
+    /** Mismo día del periodo del hogar, [months] periodos antes; acotado al último día de ese periodo. */
+    private fun shiftedDay(day: LocalDate, months: Long, monthStartDay: Int): LocalDate {
+        val key = monthContaining(day, monthStartDay)
+        val offset = ChronoUnit.DAYS.between(key.period(monthStartDay).start, day)
+        val target = key.minusMonths(months).period(monthStartDay)
+        return minOf(target.endInclusive, target.start.plusDays(offset))
     }
 
     /** "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación. */
@@ -128,15 +139,16 @@ enum class ReportPeriod(val title: String) {
         Last12Months -> "los 12 meses anteriores"
     }
 
-    fun range(today: LocalDate): ClosedRange<LocalDate> {
-        val month = YearMonth.from(today)
+    /** Periodos del hogar: empiezan el [monthStartDay] (como el presupuesto). "Este año" = los periodos del año del mes en curso. */
+    fun range(today: LocalDate, monthStartDay: Int = 1): ClosedRange<LocalDate> {
+        val month = monthContaining(today, monthStartDay)
         return when (this) {
-            ThisMonth -> month.atDay(1)..today
-            LastMonth -> month.minusMonths(1).atDay(1)..month.minusMonths(1).atEndOfMonth()
-            Last3Months -> month.minusMonths(2).atDay(1)..today
-            Last6Months -> month.minusMonths(5).atDay(1)..today
-            ThisYear -> LocalDate.of(today.year, 1, 1)..today
-            Last12Months -> month.minusMonths(11).atDay(1)..today
+            ThisMonth -> month.period(monthStartDay).start..today
+            LastMonth -> month.minusMonths(1).period(monthStartDay)
+            Last3Months -> month.minusMonths(2).period(monthStartDay).start..today
+            Last6Months -> month.minusMonths(5).period(monthStartDay).start..today
+            ThisYear -> YearMonth.of(month.year, 1).period(monthStartDay).start..today
+            Last12Months -> month.minusMonths(11).period(monthStartDay).start..today
         }
     }
 }
@@ -144,7 +156,7 @@ enum class ReportPeriod(val title: String) {
 /** Informe de gastos o ingresos de un periodo, por categoría y por mes. */
 class SpendingReport(
     movements: List<Movement>, categories: List<BudgetCategory>, range: ClosedRange<LocalDate>,
-    val kind: ReportKind = ReportKind.Expense, categoryIds: Set<String> = emptySet(),
+    val kind: ReportKind = ReportKind.Expense, categoryIds: Set<String> = emptySet(), monthStartDay: Int = 1,
 ) {
     data class Row(val id: String, val category: BudgetCategory?, val title: String, val amount: Long, val count: Int, val share: Double)
     data class MonthTotal(val month: YearMonth, val amount: Long)
@@ -190,7 +202,7 @@ class SpendingReport(
             val key = category?.id ?: NO_CATEGORY
             val (amount, count) = totals[key] ?: (0L to 0)
             totals[key] = amount + value to count + 1
-            val month = YearMonth.from(m.day)
+            val month = monthContaining(m.day, monthStartDay)
             months[month] = (months[month] ?: 0) + value
             sum += value
         }
@@ -198,8 +210,8 @@ class SpendingReport(
         byCategory = totals.map { (key, entry) ->
             Row(key, byId[key], byId[key]?.name ?: "Sin categoría", entry.first, entry.second, if (sum > 0) max(0.0, entry.first.toDouble() / sum) else 0.0)
         }.sortedWith(compareBy({ -it.amount }, { it.title }))
-        val last = YearMonth.from(range.endInclusive)
-        byMonth = generateSequence(YearMonth.from(range.start)) { it.plusMonths(1) }.takeWhile { it <= last }
+        val last = monthContaining(range.endInclusive, monthStartDay)
+        byMonth = generateSequence(monthContaining(range.start, monthStartDay)) { it.plusMonths(1) }.takeWhile { it <= last }
             .map { MonthTotal(it, months[it] ?: 0) }.toList()
     }
 

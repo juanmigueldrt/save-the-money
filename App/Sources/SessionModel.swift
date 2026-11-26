@@ -9,6 +9,8 @@ final class SessionModel {
     enum State: Equatable {
         case loading
         case signedOut
+        /// Hay sesión guardada pero no se ha podido cargar (sin red o fallo del servidor); el texto es el aviso.
+        case offline(String)
         case needsHousehold(Profile)
         case ready(Profile, Household)
     }
@@ -29,7 +31,7 @@ final class SessionModel {
     var theme: AppTheme {
         switch state {
         case .ready(let profile, _), .needsHousehold(let profile): profile.theme
-        case .loading, .signedOut: AppTheme(rawValue: UserDefaults.standard.string(forKey: Self.themeKey) ?? "") ?? .system
+        case .loading, .signedOut, .offline: AppTheme(rawValue: UserDefaults.standard.string(forKey: Self.themeKey) ?? "") ?? .system
         }
     }
 
@@ -43,11 +45,15 @@ final class SessionModel {
         state = .ready(updated, household)
     }
 
+    /// Al abrir la app y en «Reintentar».
     func start() async {
-        await refresh()
+        try? await refresh()
     }
 
-    func refresh() async {
+    /// Sólo `AppError.notSignedIn` (no hay sesión o el servidor la rechaza) lleva al login.
+    /// Cualquier otro fallo no descarta la sesión guardada: se lanza para avisar y, si aún no
+    /// había un hogar abierto, se pasa a «sin conexión» con reintento.
+    func refresh() async throws {
         guard await services.auth.currentUserId() != nil else {
             state = .signedOut
             return
@@ -62,22 +68,26 @@ final class SessionModel {
             }
         } catch AppError.notSignedIn {
             state = .signedOut
+        } catch let cancelled as CancellationError {
+            throw cancelled
         } catch {
-            // Sin conexión con sesión abierta: se queda donde estaba si ya había cargado.
-            if state == .loading { state = .signedOut }
+            // Con un hogar ya abierto se queda donde estaba; quien llamó enseña el aviso.
+            if case .ready = state { throw error }
+            state = .offline(((error as? AppError) ?? .unknown("")).errorDescription ?? "")
+            throw error
         }
     }
 
     func signIn(username: String, password: String) async throws {
         let user = try Username(username)
         _ = try await services.auth.signIn(username: user, password: password)
-        await refresh()
+        try await refresh()
     }
 
     func signUp(_ form: SignUpForm) async throws {
         let user = try Username(form.username)
         _ = try await services.auth.signUp(username: user, password: form.password, displayName: form.trimmedDisplayName)
-        await refresh()
+        try await refresh()
     }
 
     func signOut() async {
@@ -87,13 +97,13 @@ final class SessionModel {
 
     func createHousehold(name: String) async throws {
         _ = try await services.households.createHousehold(name: name)
-        await refresh()
+        try await refresh()
     }
 
     func join(_ code: InviteCode) async throws {
         _ = try await services.households.acceptInvite(code)
         pendingInvite = nil
-        await refresh()
+        try await refresh()
     }
 
     func renameHousehold(_ household: Household, to name: String) async throws {
@@ -105,7 +115,7 @@ final class SessionModel {
 
     func leaveHousehold(_ household: Household) async throws {
         try await services.households.leave(householdId: household.id)
-        await refresh()
+        try await refresh()
     }
 
     func handle(url: URL) {

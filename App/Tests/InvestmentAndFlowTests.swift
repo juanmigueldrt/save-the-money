@@ -117,7 +117,7 @@ final class InvestmentModelTests: XCTestCase {
 
         // Cancelada: tampoco guarda nada.
         await backend.clearFailures()
-        await backend.failCalls("addTrade(_:)", with: CancellationError())
+        await backend.failCalls("addTrade(_:cash:)", with: CancellationError())
         let cancelled = await investments.add(second)
         XCTAssertFalse(cancelled)
         XCTAssertEqual(investments.trades.map(\.id), [buy.id])
@@ -128,8 +128,8 @@ final class InvestmentModelTests: XCTestCase {
     }
 }
 
-/// Los flujos con dos escrituras. Viven en las vistas (`CardPaymentFormView.save`, `BuyCard.buy`,
-/// `SellView.save`), así que cada prueba repite sus llamadas a los modelos en el mismo orden.
+/// Los flujos con dos escrituras: el pago de la tarjeta (`FinanceModel.transfer`) y la compra y la venta
+/// con su movimiento en la cuenta (`InvestmentModel.buy` y `sell`). Las vistas solo llaman a esos métodos.
 @MainActor
 final class MultiStepFlowTests: XCTestCase {
     private struct Setup {
@@ -242,16 +242,6 @@ final class MultiStepFlowTests: XCTestCase {
 
     // MARK: Compra
 
-    /// Igual que `BuyCard.buy` sin «Repetir cada mes»: la operación y luego el cargo en la cuenta.
-    private func buy(_ quote: BuyQuote, of holding: Holding, from account: Account, on date: CalendarDay,
-                     investments: InvestmentModel, finance: FinanceModel) async -> Bool {
-        guard await investments.add(quote.trade(for: holding, price: holding.price, on: date)) else { return false }
-        let savings = finance.categories.first { $0.kind == .expense && $0.budgetGroup == .savings }
-        let draft = MovementDraft(accountId: account.id, categoryId: savings?.id, bookedOn: date,
-                                  amount: -quote.total, description: "Compra de \(holding.trimmedName)")
-        return await finance.add(draft)
-    }
-
     private func investmentSetup() async throws -> (Setup, InvestmentModel, Holding) {
         let s = try await setup()
         let investments = InvestmentModel(household: s.home, service: s.services.investments, households: s.services.households)
@@ -266,48 +256,79 @@ final class MultiStepFlowTests: XCTestCase {
         XCTAssertEqual(quote.quantity, 50)
         XCTAssertEqual(quote.total, Money(minor: 50_100))
 
-        let bought = await buy(quote, of: fund, from: s.checking, on: day(2026, 11, 4), investments: investments, finance: s.finance)
+        let bought = await investments.buy(quote.trade(for: fund, price: fund.price, on: day(2026, 11, 4), id: UUID()), of: fund,
+                                           paying: quote.total, from: s.checking.id, finance: s.finance)
         XCTAssertTrue(bought)
         XCTAssertEqual(investments.position(of: fund).quantity, 50)
         XCTAssertEqual(investments.position(of: fund).cost, Money(minor: 50_100))
         XCTAssertEqual(s.finance.balances[s.checking.id], Money(minor: 49_900))
+        let charge = try XCTUnwrap(s.finance.recent.first { $0.description == "Compra de Fondo de prueba" })
+        XCTAssertEqual(charge.amount, Money(minor: -50_100))
+        XCTAssertEqual(charge.bookedOn, day(2026, 11, 4))
+        XCTAssertEqual(s.finance.category(charge.categoryId)?.budgetGroup, .savings)
         let storedTrades = try await s.backend.trades(in: s.home.id)
         XCTAssertEqual(storedTrades.count, 1)
         let stored = try await storedBalances(s)
         XCTAssertEqual(stored[s.checking.id], Money(minor: 49_900))
     }
 
+    func testBuyWithoutAccountOnlyStoresTheTrade() async throws {
+        let (s, investments, fund) = try await investmentSetup()
+        let quote = try XCTUnwrap(BuyQuote.byQuantity(5, price: fund.price, feeRate: fund.feeRate))
+        let bought = await investments.buy(quote.trade(for: fund, price: fund.price, on: day(2026, 11, 4), id: UUID()), of: fund,
+                                           paying: quote.total, from: nil, finance: s.finance)
+        XCTAssertTrue(bought)
+        XCTAssertEqual(investments.position(of: fund).quantity, 5)
+        let stored = try await storedBalances(s)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000))
+    }
+
     func testBuyWhenTheCashMovementFails() async throws {
         let (s, investments, fund) = try await investmentSetup()
         let quote = try XCTUnwrap(BuyQuote.byAmount(Money(minor: 50_000), price: fund.price, feeRate: fund.feeRate))
+        let id = UUID()
         await s.backend.failCalls("addMovement(_:in:)")
 
-        let bought = await buy(quote, of: fund, from: s.checking, on: day(2026, 11, 4), investments: investments, finance: s.finance)
+        let bought = await investments.buy(quote.trade(for: fund, price: fund.price, on: day(2026, 11, 4), id: id), of: fund,
+                                           paying: quote.total, from: s.checking.id, finance: s.finance)
         XCTAssertFalse(bought)
-        XCTAssertEqual(s.finance.error, networkMessage)
+        XCTAssertEqual(investments.error, networkMessage)
         XCTAssertEqual(s.finance.balances[s.checking.id], Money(minor: 100_000), "la cuenta no se movió")
-        let stored = try await storedBalances(s)
+        var stored = try await storedBalances(s)
         XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000))
-        let storedTrades = try await s.backend.trades(in: s.home.id)
-        // El modelo enseña lo mismo que hay guardado.
-        XCTAssertEqual(investments.trades.map(\.id), storedTrades.map(\.id))
+        var storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertEqual(storedTrades.count, 0, "una compra a medias no debe quedar guardada")
+        XCTAssertEqual(investments.trades.count, 0)
+        XCTAssertEqual(investments.position(of: fund).quantity, 0)
 
-        XCTExpectFailure("ORC-107: la compra no se deshace si falla el cargo en la cuenta; quedan participaciones sin pagar") {
-            XCTAssertEqual(storedTrades.count, 0, "una compra a medias no debe quedar guardada")
-            XCTAssertEqual(investments.position(of: fund).quantity, 0)
+        // Al reintentar desde el mismo formulario la compra entra entera, una sola vez.
+        await s.backend.clearFailures()
+        for _ in 1...2 {
+            let retried = await investments.buy(quote.trade(for: fund, price: fund.price, on: day(2026, 11, 4), id: id), of: fund,
+                                           paying: quote.total, from: s.checking.id, finance: s.finance)
+            XCTAssertTrue(retried, "repetir la petición no es un error")
         }
+        storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertEqual(storedTrades.map(\.id), [id])
+        XCTAssertEqual(investments.trades.map(\.id), [id])
+        XCTAssertEqual(investments.position(of: fund).quantity, 50)
+        stored = try await storedBalances(s)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 49_900), "un solo cargo")
+        XCTAssertEqual(s.finance.balances, stored)
+        XCTAssertEqual(s.finance.recent.filter { $0.description == "Compra de Fondo de prueba" }.count, 1)
+
+        // Desde el mismo formulario pero con otro importe: no se da por guardada.
+        let other = try XCTUnwrap(BuyQuote.byAmount(Money(minor: 10_000), price: fund.price, feeRate: fund.feeRate))
+        let changed = await investments.buy(other.trade(for: fund, price: fund.price, on: day(2026, 11, 4), id: id), of: fund,
+                                           paying: other.total, from: s.checking.id, finance: s.finance)
+        XCTAssertFalse(changed)
+        XCTAssertEqual(investments.error, TransferDraft.storedWithOtherData)
+        XCTAssertEqual(investments.position(of: fund).quantity, 50)
+        let after = try await storedBalances(s)
+        XCTAssertEqual(after, stored, "no se apunta nada")
     }
 
     // MARK: Venta
-
-    /// Igual que `SellView.save`: la operación y luego el ingreso en la cuenta.
-    private func sell(_ trade: InvestmentTrade, of holding: Holding, into account: Account,
-                      investments: InvestmentModel, finance: FinanceModel) async -> Bool {
-        guard await investments.add(trade) else { return false }
-        let draft = MovementDraft(accountId: account.id, bookedOn: trade.tradedOn, amount: trade.cashImpact,
-                                  description: "Venta de \(holding.trimmedName)")
-        return await finance.add(draft)
-    }
 
     private func sellSetup() async throws -> (Setup, InvestmentModel, Holding, InvestmentTrade) {
         let (s, investments, fund) = try await investmentSetup()
@@ -322,12 +343,13 @@ final class MultiStepFlowTests: XCTestCase {
 
     func testSell() async throws {
         let (s, investments, fund, sale) = try await sellSetup()
-        let sold = await sell(sale, of: fund, into: s.checking, investments: investments, finance: s.finance)
+        let sold = await investments.sell(sale, of: fund, into: s.checking.id, finance: s.finance)
         XCTAssertTrue(sold)
         XCTAssertEqual(investments.position(of: fund).quantity, 6)
         // 48 € − 0,50 € − 40 € de coste = 7,50 €.
         XCTAssertEqual(investments.position(of: fund).realized, Money(minor: 750))
         XCTAssertEqual(s.finance.balances[s.checking.id], Money(minor: 104_750))
+        XCTAssertEqual(s.finance.recent.first { $0.description == "Venta de Fondo de prueba" }?.amount, Money(minor: 4_750))
         let stored = try await storedBalances(s)
         XCTAssertEqual(stored[s.checking.id], Money(minor: 104_750))
         let storedTrades = try await s.backend.trades(in: s.home.id)
@@ -338,19 +360,58 @@ final class MultiStepFlowTests: XCTestCase {
         let (s, investments, fund, sale) = try await sellSetup()
         await s.backend.failCalls("addMovement(_:in:)")
 
-        let sold = await sell(sale, of: fund, into: s.checking, investments: investments, finance: s.finance)
+        let sold = await investments.sell(sale, of: fund, into: s.checking.id, finance: s.finance)
         XCTAssertFalse(sold)
-        XCTAssertEqual(s.finance.error, networkMessage)
+        XCTAssertEqual(investments.error, networkMessage)
         XCTAssertEqual(s.finance.balances[s.checking.id], Money(minor: 100_000), "no entró el dinero")
+        var stored = try await storedBalances(s)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000))
+        var storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertEqual(storedTrades.count, 1, "una venta a medias no debe quedar guardada")
+        XCTAssertEqual(investments.trades.map(\.id), storedTrades.map(\.id))
+        XCTAssertEqual(investments.position(of: fund).quantity, 10)
+
+        // «Guardar» otra vez en la misma hoja (misma venta, mismo id): una sola venta y un solo ingreso.
+        await s.backend.clearFailures()
+        for _ in 1...2 {
+            let retried = await investments.sell(sale, of: fund, into: s.checking.id, finance: s.finance)
+            XCTAssertTrue(retried, "repetir la petición no es un error")
+        }
+        storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertEqual(storedTrades.filter { $0.side == .sell }.map(\.id), [sale.id])
+        XCTAssertEqual(investments.position(of: fund).quantity, 6)
+        stored = try await storedBalances(s)
+        XCTAssertEqual(stored[s.checking.id], Money(minor: 104_750), "un solo ingreso")
+        XCTAssertEqual(s.finance.balances, stored)
+    }
+
+    func testSellCannotLeaveALaterSaleWithoutShares() async throws {
+        let (s, investments, fund, sale) = try await sellSetup()
+        let sold = await investments.sell(sale, of: fund, into: nil, finance: s.finance)
+        XCTAssertTrue(sold)
+
+        // Compró 10 el día 2 y vendió 4 el día 4. Vender 7 el día 3 dejaría el día 4 en 10 − 7 − 4 = −1.
+        let earlier = InvestmentTrade(householdId: s.home.id, holdingId: fund.id, tradedOn: day(2026, 11, 3), side: .sell,
+                                      quantity: 7, price: 12)
+        let oversold = await investments.sell(earlier, of: fund, into: s.checking.id, finance: s.finance)
+        XCTAssertFalse(oversold)
+        XCTAssertEqual(investments.error, InvestmentTrade.notEnoughShares)
+
+        // Y la compra de la que depende la venta no se puede borrar; la venta sí, y después la compra.
+        let buy = try XCTUnwrap(investments.trades.first { $0.side == .buy })
+        let deleted = await investments.delete(buy)
+        XCTAssertFalse(deleted)
+        XCTAssertEqual(investments.error, InvestmentTrade.neededByLaterSale)
+        var storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertEqual(storedTrades.count, 2)
         let stored = try await storedBalances(s)
         XCTAssertEqual(stored[s.checking.id], Money(minor: 100_000))
-        let storedTrades = try await s.backend.trades(in: s.home.id)
-        XCTAssertEqual(investments.trades.map(\.id).sorted { $0.uuidString < $1.uuidString },
-                       storedTrades.map(\.id).sorted { $0.uuidString < $1.uuidString })
 
-        XCTExpectFailure("ORC-107: la venta no se deshace si falla el ingreso en la cuenta; salen participaciones sin cobrar") {
-            XCTAssertEqual(storedTrades.count, 1, "una venta a medias no debe quedar guardada")
-            XCTAssertEqual(investments.position(of: fund).quantity, 10)
-        }
+        let saleDeleted = await investments.delete(sale)
+        XCTAssertTrue(saleDeleted)
+        let buyDeleted = await investments.delete(buy)
+        XCTAssertTrue(buyDeleted)
+        storedTrades = try await s.backend.trades(in: s.home.id)
+        XCTAssertTrue(storedTrades.isEmpty)
     }
 }
