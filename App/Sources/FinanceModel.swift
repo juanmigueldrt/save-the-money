@@ -6,7 +6,7 @@ import STMCore
 /// Las pantallas leen de aquí y llaman a sus métodos para cambiar datos.
 @Observable
 @MainActor
-final class FinanceModel {
+final class FinanceModel: ServerModel {
     let household: Household
     private let service: any FinanceService
 
@@ -15,7 +15,10 @@ final class FinanceModel {
     private(set) var categories: [BudgetCategory] = []
     private(set) var recent: [Movement] = []
     private(set) var isLoading = false
+    /// La primera carga ya ha terminado (bien o mal). Antes, RootView no carga lo que depende de ella.
+    private(set) var hasLoaded = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
 
     /// Movimientos que se cargan para la lista general.
     nonisolated static let recentLimit = 500
@@ -46,14 +49,19 @@ final class FinanceModel {
     func load() async {
         isLoading = true
         defer { isLoading = false }
-        let service = service, id = household.id
-        await perform {
+        let service = service, id = household.id, turn = nextTurn()
+        await perform(turn: turn) {
             async let accounts = service.accounts(in: id)
             async let balances = service.balances(in: id)
             async let categories = service.categories(in: id)
             async let recent = service.movements(in: id, accountId: nil, limit: Self.recentLimit)
-            (self.accounts, self.balances, self.categories, self.recent) = try await (accounts, balances, categories, recent)
+            let loaded = try await (accounts, balances, categories, recent)
+            store(loaded.0, in: \.accounts, turn: turn)
+            store(loaded.1, in: \.balances, turn: turn)
+            store(loaded.2, in: \.categories, turn: turn)
+            store(loaded.3, in: \.recent, turn: turn)
         }
+        if !Task.isCancelled { hasLoaded = true }
     }
 
     /// Lanza el error: la pantalla distingue «sin movimientos» de «no se han podido cargar».
@@ -65,7 +73,7 @@ final class FinanceModel {
     func createAccount(_ draft: AccountDraft) async -> Bool {
         await perform {
             _ = try await service.createAccount(draft, in: household.id)
-            try await reloadAccounts()
+            await reloadAfterSave { try await reloadAccounts() }
         }
     }
 
@@ -73,7 +81,7 @@ final class FinanceModel {
     func updateAccount(_ account: Account) async -> Bool {
         await perform {
             _ = try await service.updateAccount(account)
-            try await reloadAccounts()
+            await reloadAfterSave { try await reloadAccounts() }
         }
     }
 
@@ -81,7 +89,7 @@ final class FinanceModel {
     func deleteAccount(_ account: Account) async -> Bool {
         await perform {
             try await service.deleteAccount(account.id)
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
     }
 
@@ -95,7 +103,7 @@ final class FinanceModel {
         var created: Movement?
         _ = await perform {
             created = try await service.addMovement(draft, in: household.id)
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
         return created
     }
@@ -111,10 +119,10 @@ final class FinanceModel {
         guard !movements.isEmpty else { return true }
         let saved = await perform {
             for movement in movements { _ = try await service.updateMovement(movement) }
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
         // Si otro dispositivo cambió alguno antes, se recarga para que se vea lo nuevo detrás del aviso.
-        if !saved { try? await reloadAll() }
+        if !saved { await reloadAfterSave { try await reloadAll() } }
         return saved
     }
 
@@ -123,7 +131,7 @@ final class FinanceModel {
     func delete(_ movements: [Movement]) async -> Bool {
         await perform {
             for movement in movements { try await service.deleteMovement(movement.id) }
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
     }
 
@@ -141,7 +149,7 @@ final class FinanceModel {
     func delete(_ movement: Movement) async -> Bool {
         let done = await perform {
             try await service.deleteMovement(movement.id)
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
         if done { lastDeleted = movement }
         return done
@@ -184,10 +192,10 @@ final class FinanceModel {
             let draft = TransferDraft(id: id, fromAccountId: from.id, toAccountId: to.id, categoryId: category, bookedOn: day,
                                       amount: amount, fromDescription: title, toDescription: toDescription ?? title)
             _ = try await service.addTransfer(draft, in: household.id)
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
         // Si falla puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
-        if !saved { try? await reloadAll() }
+        if !saved { await reloadAfterSave { try await reloadAll() } }
         return saved
     }
 
@@ -195,7 +203,7 @@ final class FinanceModel {
         var result: ImportResult?
         await perform {
             result = try await service.importMovements(drafts, in: household.id)
-            try await reloadAll()
+            await reloadAfterSave { try await reloadAll() }
         }
         return result
     }
@@ -207,12 +215,14 @@ final class FinanceModel {
             return false
         }
         return await perform {
-            if categories.contains(where: { $0.id == category.id }) {
-                _ = try await service.updateCategory(category)
-            } else {
-                _ = try await service.createCategory(category)
-            }
-            categories = try await service.categories(in: household.id)
+            let saved = categories.contains(where: { $0.id == category.id })
+                ? try await service.updateCategory(category)
+                : try await service.createCategory(category)
+            // Se ve ya, aunque falle la recarga: así guardarla otra vez la cambia en vez de crear otra.
+            markChanged(\.categories)
+            categories.removeAll { $0.id == category.id || $0.id == saved.id }
+            categories.append(saved)
+            await reloadAfterSave { try await reloadCategories() }
         }
     }
 
@@ -220,8 +230,12 @@ final class FinanceModel {
     func delete(_ category: BudgetCategory) async -> Bool {
         await perform {
             try await service.deleteCategory(category.id)
-            categories = try await service.categories(in: household.id)
-            try await reloadAll()
+            markChanged(\.categories)
+            categories.removeAll { $0.id == category.id }
+            await reloadAfterSave {
+                try await reloadCategories()
+                try await reloadAll()
+            }
         }
     }
 
@@ -249,29 +263,24 @@ final class FinanceModel {
     }
 
     private func reloadAccounts() async throws {
-        let service = service, id = household.id
+        let service = service, id = household.id, turn = nextTurn()
         async let accounts = service.accounts(in: id)
         async let balances = service.balances(in: id)
-        (self.accounts, self.balances) = try await (accounts, balances)
+        let loaded = try await (accounts, balances)
+        store(loaded.0, in: \.accounts, turn: turn)
+        store(loaded.1, in: \.balances, turn: turn)
     }
 
     private func reloadAll() async throws {
         try await reloadAccounts()
-        recent = try await service.movements(in: household.id, accountId: nil, limit: Self.recentLimit)
+        let turn = nextTurn()
+        let list = try await service.movements(in: household.id, accountId: nil, limit: Self.recentLimit)
+        store(list, in: \.recent, turn: turn)
     }
 
-    /// Ejecuta la operación y deja el error en español en `error`. Devuelve si fue bien.
-    @discardableResult
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
+    private func reloadCategories() async throws {
+        let turn = nextTurn()
+        let list = try await service.categories(in: household.id)
+        store(list, in: \.categories, turn: turn)
     }
 }

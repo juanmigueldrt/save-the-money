@@ -5,7 +5,7 @@ import STMCore
 /// Seguimiento: patrimonio neto con su historia, score crediticio e informes.
 @Observable
 @MainActor
-final class TrackingModel {
+final class TrackingModel: ServerModel {
     let household: Household
     private let finance: any FinanceService
     private let budgets: any BudgetService
@@ -18,6 +18,7 @@ final class TrackingModel {
     private(set) var reportMovements: [Movement] = []
     private(set) var isLoading = false
     var error: String?
+    @ObservationIgnored var turns = ReadTurns()
 
     var period: ReportPeriod = .thisMonth
     var kind: SpendingReport.Kind = .expense
@@ -46,8 +47,8 @@ final class TrackingModel {
     }
 
     func loadHistory() async {
-        let finance = finance, id = household.id
-        await perform { self.allMovements = try await finance.allMovements(in: id) }
+        let finance = finance, id = household.id, turn = nextTurn()
+        await perform(turn: turn) { store(try await finance.allMovements(in: id), in: \.allMovements, turn: turn) }
     }
 
     // MARK: Score
@@ -55,16 +56,23 @@ final class TrackingModel {
     var latestScore: CreditScore? { creditScores.first }
 
     func loadScores() async {
-        let scores = scores
-        await perform { self.creditScores = try await scores.creditScores() }
+        let scores = scores, turn = nextTurn()
+        await perform(turn: turn) { store(try await scores.creditScores(), in: \.creditScores, turn: turn) }
     }
 
     @discardableResult
     func add(_ score: CreditScore) async -> Bool {
         if let issue = score.issue { error = issue; return false }
         return await perform {
-            _ = try await scores.addCreditScore(score)
-            creditScores = try await scores.creditScores()
+            let saved = try await scores.addCreditScore(score)
+            // Se ve ya, aunque falle la recarga: así no se vuelve a apuntar.
+            markChanged(\.creditScores)
+            creditScores.append(saved)
+            creditScores.sort { $0.recordedOn > $1.recordedOn }
+            await reloadAfterSave {
+                let turn = nextTurn()
+                store(try await scores.creditScores(), in: \.creditScores, turn: turn)
+            }
         }
     }
 
@@ -72,6 +80,7 @@ final class TrackingModel {
     func delete(_ score: CreditScore) async -> Bool {
         await perform {
             try await scores.deleteCreditScore(score.id)
+            markChanged(\.creditScores)
             creditScores.removeAll { $0.id == score.id }
         }
     }
@@ -97,29 +106,15 @@ final class TrackingModel {
     }
 
     func loadReport() async {
-        let budgets = budgets, id = household.id, range = reportRange
+        let budgets = budgets, id = household.id, range = reportRange, turn = nextTurn()
         // Se carga desde el principio del periodo anterior para poder comparar.
         let from = min(previousRange.lowerBound, range.lowerBound)
         isLoading = true
         defer { isLoading = false }
-        await perform {
+        await perform(turn: turn) {
             let list = try await budgets.movements(in: id, from: from, through: range.upperBound)
             // Si se cambió de periodo mientras cargaba, no se pisa.
-            if range == self.reportRange { self.reportMovements = list }
+            if range == self.reportRange { store(list, in: \.reportMovements, turn: turn) }
         }
-    }
-
-    @discardableResult
-    private func perform(_ operation: () async throws -> Void) async -> Bool {
-        error = nil
-        do {
-            try await operation()
-            return true
-        } catch let appError as AppError {
-            error = appError.errorDescription
-        } catch {
-            self.error = AppError.unknown("").errorDescription
-        }
-        return false
     }
 }
