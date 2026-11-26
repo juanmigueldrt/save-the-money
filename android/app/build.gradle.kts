@@ -119,7 +119,7 @@ dependencies {
     implementation("androidx.activity:activity-compose:1.11.0")
     implementation("androidx.core:core-ktx:1.17.0")
     // supabase-kt 3.2.x es la última compilada con Kotlin 2.2 (la 3.3+ pide Kotlin 2.3).
-    implementation(platform("io.github.jan-tennert.supabase:bom:3.2.6"))
+    implementation(platform("io.github.jan-tennert.supabase:bom:3.9.0"))
     implementation("io.github.jan-tennert.supabase:auth-kt")
     implementation("io.github.jan-tennert.supabase:postgrest-kt")
     implementation("io.ktor:ktor-client-okhttp:3.3.1")
