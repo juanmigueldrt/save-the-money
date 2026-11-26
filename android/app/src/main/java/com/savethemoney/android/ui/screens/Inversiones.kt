@@ -101,7 +101,6 @@ private fun Aviso(text: String) = Text(text, style = StmType.bodySmall, color = 
 @Composable
 fun Pantalla25(nav: Nav) {
     val session = LocalSession.current
-    if (session.capture) return Diseno25(nav)
     val finance = session.finance ?: return
     val inv = finance.investments
     val c = Stm.colors
@@ -214,7 +213,6 @@ fun Pantalla25(nav: Nav) {
 @Composable
 fun Pantalla26(nav: Nav) {
     val session = LocalSession.current
-    if (session.capture) return Diseno26(nav)
     val finance = session.finance ?: return
     val inv = finance.investments
     val h = inv.selected ?: return run {
@@ -411,7 +409,6 @@ fun Pantalla26(nav: Nav) {
 @Composable
 fun Pantalla27(nav: Nav) {
     val session = LocalSession.current
-    if (session.capture) return Diseno27(nav)
     val finance = session.finance ?: return
     val inv = finance.investments
     val c = Stm.colors

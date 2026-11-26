@@ -267,14 +267,12 @@ fun Pantalla28(nav: Nav) {
                 IconBtn(StmIcons.arrowBack, nav::back, contentDescription = "Atrás")
                 Spacer(Modifier.weight(1f))
                 // Sólo el dueño puede cambiar el nombre (RLS de households).
-                if (soyDueno || session.capture) {
+                if (soyDueno) {
                     IconBtn(StmIcons.edit, { nombre = session.household?.name.orEmpty() }, contentDescription = "Cambiar el nombre del hogar")
                 }
             }
-            Text("Hogar", Modifier.padding(start = 16.dp, end = 16.dp, bottom = if (session.capture) 16.dp else 4.dp), style = StmType.headlineMedium, color = c.onSurface)
-            if (!session.capture) {
-                Text(session.household?.name.orEmpty(), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.bodyLarge, color = c.onSurfaceVariant)
-            }
+            Text("Hogar", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 4.dp), style = StmType.headlineMedium, color = c.onSurface)
+            Text(session.household?.name.orEmpty(), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.bodyLarge, color = c.onSurfaceVariant)
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
         overlay = quitando?.let { m ->

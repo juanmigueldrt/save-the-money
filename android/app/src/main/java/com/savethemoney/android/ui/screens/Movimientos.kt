@@ -129,7 +129,6 @@ import kotlin.math.abs
 fun Pantalla05(nav: Nav) {
     val session = LocalSession.current
     val finance = session.finance ?: return
-    var muestra by remember { mutableStateOf(session.capture) }
     var hoja by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf<String?>(null) }
     val action = rememberAction()
@@ -137,9 +136,6 @@ fun Pantalla05(nav: Nav) {
     // Modo «Seleccionar»: tocar marca en vez de abrir, y abajo salen las acciones para todos.
     var seleccionando by remember { mutableStateOf(false) }
     var elegidos by remember { mutableStateOf(emptySet<String>()) }
-    LaunchedEffect(Unit) {
-        if (session.capture) finance.categories.firstOrNull { it.name == "Comida" }?.let { finance.movementFilter = MovementFilter(categoryId = it.id) }
-    }
     val categorias = finance.recent.mapNotNull { it.categoryId }.groupingBy { it }.eachCount().entries
         .sortedByDescending { it.value }.mapNotNull { finance.category(it.key) }
     val visibles = filtro.apply(finance.recent, finance.categories, finance.today(), finance.household.monthStartDay)
@@ -189,12 +185,11 @@ fun Pantalla05(nav: Nav) {
         fab = if (seleccionando) null else { { Fab("Añadir") { nav.go(if (finance.activeAccounts.isEmpty()) 9 else 7) } } },
         snackbar = if (action.error != null) {
             { Snackbar(action.error!!) }
-        } else if (!seleccionando && (borrado != null || muestra)) {
+        } else if (!seleccionando && borrado != null) {
             {
                 // El diseño deja 16 dp entre FAB y snackbar; StmScreen pone 12.
                 Spacer(Modifier.height(4.dp))
                 Snackbar("Movimiento eliminado", "Deshacer") {
-                    muestra = false
                     action.run { finance.undoDelete() }
                 }
             }
@@ -390,8 +385,7 @@ private fun ResumenFiltro(items: List<Movement>, finance: FinanceModel, quitar: 
 fun Pantalla06(nav: Nav) {
     val session = LocalSession.current
     val finance = session.finance ?: return
-    // Solo las capturas abren la cuenta sin elegirla: ahí vale la primera de muestra.
-    val account = finance.selectedAccount ?: finance.activeAccounts.firstOrNull().takeIf { session.capture } ?: return
+    val account = finance.selectedAccount ?: return
     val c = Stm.colors
     var lista by remember(account.id) { mutableStateOf(emptyList<Movement>()) }
     var opciones by remember { mutableStateOf(false) }
@@ -513,7 +507,7 @@ fun Pantalla07(nav: Nav) {
     val finance = session.finance ?: return
     val c = Stm.colors
     val form = remember { finance.takeMovementForm() }
-    val base = remember { form.movement ?: if (session.capture) finance.recent.firstOrNull() else null }
+    val base = remember { form.movement }
     var tipo by remember { mutableIntStateOf(if (form.transfer) 2 else if (base?.isExpense == false) 1 else 0) }
     var importe by remember { mutableStateOf(base?.let { Money.input(abs(it.amountMinor)) } ?: form.amountMinor?.let(Money::input) ?: "") }
     var concepto by remember { mutableStateOf(base?.description ?: form.description) }
@@ -775,8 +769,7 @@ fun Pantalla07(nav: Nav) {
 fun Pantalla08(nav: Nav) {
     val session = LocalSession.current
     val finance = session.finance ?: return
-    // Solo las capturas abren el detalle sin tocar un movimiento: ahí vale el primero de muestra.
-    val m = finance.selectedMovement ?: finance.recent.firstOrNull().takeIf { session.capture } ?: return
+    val m = finance.selectedMovement ?: return
     val action = rememberAction()
     val editar = {
         finance.movementForm = MovementForm(movement = m)
@@ -825,10 +818,10 @@ fun Pantalla09(nav: Nav) {
     val finance = session.finance ?: return
     val c = Stm.colors
     val editando = remember { finance.takeAccountToEdit() }
-    var nombre by remember { mutableStateOf(editando?.name ?: if (session.capture) "Cuenta ahorro" else "") }
-    var tipo by remember { mutableStateOf(editando?.kind ?: finance.newAccountKind.also { finance.newAccountKind = null } ?: if (session.capture) AccountKind.Savings else AccountKind.Checking) }
+    var nombre by remember { mutableStateOf(editando?.name ?: "") }
+    var tipo by remember { mutableStateOf(editando?.kind ?: finance.newAccountKind.also { finance.newAccountKind = null } ?: AccountKind.Checking) }
     var saldo by remember {
-        mutableStateOf(editando?.openingMinor?.takeIf { it != 0L }?.let(Money::input) ?: if (session.capture) "1.500,00" else "")
+        mutableStateOf(editando?.openingMinor?.takeIf { it != 0L }?.let(Money::input) ?: "")
     }
     var compartir by remember { mutableStateOf(editando?.isShared ?: true) }
     var predeterminada by remember { mutableStateOf(editando?.isDefault ?: false) }
@@ -914,8 +907,7 @@ fun Pantalla09(nav: Nav) {
 fun Pantalla34(nav: Nav) {
     val session = LocalSession.current
     val finance = session.finance ?: return
-    // Solo las capturas abren el detalle sin tocar un movimiento: ahí vale el primero de muestra.
-    val m = finance.selectedMovement ?: finance.recent.firstOrNull().takeIf { session.capture } ?: return
+    val m = finance.selectedMovement ?: return
     var menu by remember { mutableStateOf(true) }
     val action = rememberAction()
     val cat = finance.category(m.categoryId)
