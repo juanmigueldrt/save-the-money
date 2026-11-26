@@ -106,6 +106,23 @@ class SharedVectorsTest {
         }
     }
 
+    /** ORC-132: desde qué día hay que cargar los movimientos de la tarjeta. */
+    @Test
+    fun cardUnpaidStatements() {
+        val vectors = load("card_installments.json", "unpaidStatements")
+        assertFalse(vectors.isEmpty())
+        for (v in vectors) {
+            val terms = CreditCardTerms(
+                accountId = "card", householdId = "home", creditLimit = 100_000,
+                statementDay = v.int("statementDay"), paymentDay = v.int("paymentDay"), paymentDelayMonths = v.int("paymentDelayMonths"),
+            )
+            val first = CreditCardCalculator.firstUnpaidStatement(terms, v.date("today"))
+            val label = "hoy ${v.str("today")}"
+            assertEquals(label, v.date("firstUnpaid"), first)
+            assertEquals(label, v.date("since"), terms.cycleStart(first))
+        }
+    }
+
     @Test
     fun cardSummaries() {
         for (v in load("card_installments.json", "summaries")) {

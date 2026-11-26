@@ -51,6 +51,7 @@ import com.savethemoney.android.data.CreditCardSummary
 import com.savethemoney.android.data.CreditCardTerms
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.parseDecimal
+import com.savethemoney.android.ui.CreditCardModel
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.LocalSession
@@ -109,6 +110,16 @@ private fun desglose(p: CardPayment, modo: CardPaymentMode): String {
 private fun avisoAbonos(n: Int) =
     (if (n == 1) "Hay 1 abono sin categoría" else "Hay $n abonos sin categoría") +
         ". Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
+
+/** Aviso de aplazados cuya compra no se ha podido cargar: sin ella no se sabe la cuota ni el capital. */
+private fun avisoAplazados(n: Int) =
+    (if (n == 1) "No se ha podido cargar la compra de 1 aplazado" else "No se han podido cargar las compras de $n aplazados") +
+        ". Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato."
+
+/** Aviso de que los extractos sin cobrar tienen más movimientos de los que se cargan de una vez. */
+private val avisoRecortados =
+    "Los extractos sin cobrar tienen ${CreditCardModel.CYCLE_LIMIT} movimientos o más y puede que no se hayan cargado todos: " +
+        "los cargos y lo gastado pueden salir más bajos de lo que son."
 
 private fun Double.barra() = toFloat().coerceIn(0f, 1f)
 
@@ -397,6 +408,8 @@ fun Pantalla11(nav: Nav) {
             val alerta = s.terms.alertPercent
             if (s.isOverAlert && alerta != null) nota("Has pasado del $alerta % del límite. Te quedan ${Money.format(s.available)}.", c.error)
             if (s.uncategorizedCredits.isNotEmpty()) nota(avisoAbonos(s.uncategorizedCredits.size), c.error)
+            if (s.unresolvedInstallments.isNotEmpty()) nota(avisoAplazados(s.unresolvedInstallments.size), c.error)
+            if (s.movementsTruncated) nota(avisoRecortados, c.error)
         },
         trasCalendario = {
             nota("Lo que gastas entra en el extracto del día ${s.terms.statementDay}, que se cobra $retraso.", c.onSurfaceVariant)

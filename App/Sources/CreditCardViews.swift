@@ -187,6 +187,17 @@ enum CardText {
         let credits = count == 1 ? "Hay 1 abono sin categoría" : "Hay \(count) abonos sin categoría"
         return "\(credits). Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
     }
+
+    /// Aviso de aplazados cuya compra no se ha podido cargar: sin ella no se sabe la cuota ni el capital.
+    static func unresolvedInstallments(_ count: Int) -> String {
+        let plans = count == 1 ? "No se ha podido cargar la compra de 1 aplazado" : "No se han podido cargar las compras de \(count) aplazados"
+        return "\(plans). Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato."
+    }
+
+    /// Aviso de que los extractos sin cobrar tienen más movimientos de los que se cargan de una vez.
+    static func movementsTruncated(_ limit: Int) -> String {
+        "Los extractos sin cobrar tienen \(limit) movimientos o más y puede que no se hayan cargado todos: los cargos y lo gastado pueden salir más bajos de lo que son."
+    }
 }
 
 /// Detalle de una tarjeta: calendario de cargos, coste del pago aplazado y compras a plazos.
@@ -214,6 +225,19 @@ struct CreditCardDetailView: View {
                     if !summary.uncategorizedCredits.isEmpty {
                         Label(CardText.uncategorizedCredits(summary.uncategorizedCredits.count),
                               systemImage: "exclamationmark.triangle")
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.negativeText)
+                            .card()
+                    }
+                    if !summary.unresolvedInstallments.isEmpty {
+                        Label(CardText.unresolvedInstallments(summary.unresolvedInstallments.count),
+                              systemImage: "exclamationmark.triangle")
+                            .font(Typography.subheadlineEmphasis)
+                            .foregroundStyle(Palette.negativeText)
+                            .card()
+                    }
+                    if summary.movementsTruncated {
+                        Label(CardText.movementsTruncated(CreditCardModel.cycleLimit), systemImage: "exclamationmark.triangle")
                             .font(Typography.subheadlineEmphasis)
                             .foregroundStyle(Palette.negativeText)
                             .card()
