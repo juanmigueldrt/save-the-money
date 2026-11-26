@@ -65,7 +65,7 @@ final class PlanningModel {
         isLoading = true
         defer { isLoading = false }
         let recurringService = recurringService, goalService = goalService, id = household.id
-        await perform {
+        let loaded = await perform {
             async let series = recurringService.recurringSeries(in: id)
             async let goals = goalService.goals(in: id)
             async let contributions = goalService.contributions(in: id)
@@ -73,7 +73,8 @@ final class PlanningModel {
             (self.series, self.goals, self.contributions, self.charges) = try await (series, goals, contributions, charges)
         }
         await syncCharges(movements: knownMovements)
-        await reschedule()
+        // Si la carga falla, los avisos ya programados se quedan como estaban.
+        if loaded { await reschedule() }
     }
 
     // MARK: Cargos pendientes

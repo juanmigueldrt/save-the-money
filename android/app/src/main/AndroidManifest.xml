@@ -8,6 +8,8 @@
     <application
         android:name=".StmApp"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/reglas_copia"
+        android:fullBackupContent="@xml/reglas_copia_antiguas"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"

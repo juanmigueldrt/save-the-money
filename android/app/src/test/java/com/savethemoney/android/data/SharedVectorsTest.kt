@@ -38,6 +38,17 @@ class SharedVectorsTest {
     private fun JsonElement.rango(key: String): String = this[key]!!.jsonArray.joinToString("..") { it.jsonPrimitive.content }
 
     @Test
+    fun monthlyTotalStartsAndEnds() {
+        for (v in load("monthly_total.json")) {
+            val series = v["series"]!!.jsonArray.map { s ->
+                RecurringSeries("s", "h", "Serie", kind = RecurringKind.Subscription, amountMinor = s.long("amount"),
+                    startsOn = s.str("startsOn"), endsOn = s["endsOn"]?.jsonPrimitive?.content)
+            }
+            assertEquals(v.str("name"), v.long("expected"), series.monthlyTotal(RecurringKind.Subscription, v.date("day")))
+        }
+    }
+
+    @Test
     fun moneyParsing() {
         for (v in load("money_parse.json")) {
             assertEquals("«${v.str("input")}»", v["minor"]?.jsonPrimitive?.long, Money.parse(v.str("input")))

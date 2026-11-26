@@ -65,7 +65,14 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
 import com.savethemoney.android.data.AmountExpression
 import com.savethemoney.android.data.Money
@@ -93,6 +100,28 @@ fun StmIcon(icon: ImageVector, tint: Color, modifier: Modifier = Modifier, size:
 /** Toque con onda que respeta la forma del elemento. */
 fun Modifier.tap(shape: Shape? = null, enabled: Boolean = true, role: Role = Role.Button, onClick: (() -> Unit)?): Modifier =
     if (onClick == null) this else (if (shape != null) clip(shape) else this).clickable(enabled = enabled, role = role, onClick = onClick)
+
+/** Interruptor o casilla: TalkBack anuncia «activado»/«desactivado»; sin [onChange] anuncia el estado pero no es pulsable. */
+fun Modifier.tapToggle(checked: Boolean, kind: Role, onChange: ((Boolean) -> Unit)?): Modifier =
+    if (onChange == null) {
+        semantics {
+            role = kind
+            toggleableState = ToggleableState(checked)
+        }
+    } else {
+        toggleable(checked, role = kind, onValueChange = onChange)
+    }
+
+/** Opción de un grupo (chip, segmento, pestaña): TalkBack anuncia «seleccionado»; sin [onClick] no es pulsable. */
+fun Modifier.tapSelect(isSelected: Boolean, kind: Role, onClick: (() -> Unit)?): Modifier =
+    if (onClick == null) {
+        semantics {
+            role = kind
+            selected = isSelected
+        }
+    } else {
+        selectable(isSelected, role = kind, onClick = onClick)
+    }
 
 // ───────────────────────── Estructura de pantalla ─────────────────────────
 
@@ -169,7 +198,7 @@ fun LargeTitle(title: String, subtitle: String? = null, style: TextStyle = StmTy
 /** «Botón de icono» de 40 dp. */
 @Composable
 fun IconBtn(icon: ImageVector, onClick: (() -> Unit)?, tint: Color = Stm.colors.onSurfaceVariant, contentDescription: String? = null) {
-    Box(Modifier.size(40.dp).tap(CircleShape, onClick = onClick ?: {}), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(40.dp).tap(CircleShape, onClick = onClick), contentAlignment = Alignment.Center) {
         StmIcon(icon, tint, contentDescription = contentDescription)
     }
 }
@@ -255,7 +284,7 @@ fun Chip(
     Row(
         Modifier.height(32.dp).clip(shape)
             .let { if (selected) it.background(c.secondaryContainer) else it.border(1.dp, c.outline, shape) }
-            .tap(role = Role.Checkbox, onClick = onClick)
+            .tapSelect(selected, Role.Checkbox, onClick)
             .padding(start = if (lead != null) 8.dp else 16.dp, end = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -278,7 +307,7 @@ fun ChipRow(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
 fun Segmented(options: List<String>, selected: Int, onSelect: ((Int) -> Unit)? = null, modifier: Modifier = Modifier.fillMaxWidth()) {
     val c = Stm.colors
     val shape = RoundedCornerShape(20.dp)
-    Row(modifier.height(40.dp).clip(shape).border(1.dp, c.outline, shape)) {
+    Row(modifier.height(40.dp).clip(shape).border(1.dp, c.outline, shape).selectableGroup()) {
         options.forEachIndexed { i, label ->
             if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(c.outline))
             val on = i == selected
@@ -286,7 +315,7 @@ fun Segmented(options: List<String>, selected: Int, onSelect: ((Int) -> Unit)? =
             val outer = options.size > 2 && (i == 0 || i == options.lastIndex)
             Row(
                 Modifier.weight(if (outer) 1f + 4f / 124f else 1f).fillMaxHeight().let { if (on) it.background(c.secondaryContainer) else it }
-                    .tap(role = Role.RadioButton, onClick = onSelect?.let { { it(i) } }),
+                    .tapSelect(on, Role.RadioButton, onSelect?.let { { it(i) } }),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -300,14 +329,13 @@ fun Segmented(options: List<String>, selected: Int, onSelect: ((Int) -> Unit)? =
     }
 }
 
-
 /** «Interruptor» de 52 × 32. */
 @Composable
 fun StmSwitch(checked: Boolean, onChange: ((Boolean) -> Unit)? = null) {
     val c = Stm.colors
     val track = RoundedCornerShape(16.dp)
     Box(
-        Modifier.size(52.dp, 48.dp).tap(role = Role.Switch, onClick = onChange?.let { { it(!checked) } }),
+        Modifier.size(52.dp, 48.dp).tapToggle(checked, Role.Switch, onChange),
         contentAlignment = Alignment.Center,
     ) {
         Box(
@@ -604,7 +632,6 @@ fun ListItem(
     }
 }
 
-
 /** «Divisor» con sangría de 72 dp (alineado con el texto tras el icono). */
 @Composable
 fun Divider(inset: Dp = 72.dp, endInset: Dp = 16.dp) {
@@ -664,11 +691,11 @@ private val Tab.icon: ImageVector
 fun NavBar(selected: Tab?, onSelect: (Tab) -> Unit, badgeOnMore: Boolean = false) {
     val c = Stm.colors
     Column(Modifier.fillMaxWidth().background(c.surfaceContainer).navigationBarsPadding()) {
-        Row(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 8.dp, vertical = 12.dp)) {
+        Row(Modifier.fillMaxWidth().height(80.dp).padding(horizontal = 8.dp, vertical = 12.dp).selectableGroup()) {
             Tab.entries.forEach { tab ->
                 val on = tab == selected
                 Column(
-                    Modifier.weight(1f).height(56.dp).tap(role = Role.Tab, onClick = { onSelect(tab) }),
+                    Modifier.weight(1f).height(56.dp).tapSelect(on, Role.Tab, { onSelect(tab) }),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(

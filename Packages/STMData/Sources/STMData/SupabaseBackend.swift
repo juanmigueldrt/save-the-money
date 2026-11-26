@@ -151,11 +151,14 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     }
 
     public func acceptInvite(_ code: InviteCode) async throws -> Household {
-        try await mapped {
+        // Un código que no sirve devuelve null en vez de un error, para que el servidor guarde el intento fallido.
+        let joined: Household? = try await mapped {
             try await client.rpc("accept_invite", params: ["invite_code": code.value])
                 .execute()
                 .value
         }
+        guard let joined else { throw AppError.invalidOrExpiredInvite }
+        return joined
     }
 
     public func leave(householdId: UUID) async throws {
@@ -228,6 +231,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
         case "STM02": .invalidInput(InvestmentTrade.notEnoughShares)
         case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
+        // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
+        case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }
