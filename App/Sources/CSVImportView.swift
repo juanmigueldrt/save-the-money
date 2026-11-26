@@ -18,6 +18,9 @@ struct CSVImportView: View {
     @State private var error: String?
     @State private var result: ImportResult?
     @State private var createdSeries = 0
+    /// Id de cada pago fijo que crea la importación, por su nombre: se fija la primera vez que se intenta guardar y se
+    /// repite en cada reintento, así que repetir una importación que falló a medias no lo duplica.
+    @State private var seriesIds: [String: UUID] = [:]
     /// Marcas de cada fila (por número de línea): pago fijo, suscripción o compra con tarjeta.
     @State private var marks: [Int: CSVRowMark] = [:]
     @State private var isImporting = false
@@ -150,6 +153,20 @@ struct CSVImportView: View {
         return Self.buttonTitle(validCount: validDrafts.count)
     }
 
+    /// Las series con el id ya fijado para su nombre, o con el suyo (que queda fijado). `CSVImportPlan.make` les da uno
+    /// nuevo cada vez y no repite un nombre dentro del plan.
+    static func pinned(_ series: [RecurringSeries], ids: inout [String: UUID]) -> [RecurringSeries] {
+        series.map { item in
+            let id = ids[item.name] ?? item.id
+            ids[item.name] = id
+            return RecurringSeries(id: id, householdId: item.householdId, name: item.name, kind: item.kind, amount: item.amount,
+                                   accountId: item.accountId, categoryId: item.categoryId, recurrence: item.recurrence,
+                                   startsOn: item.startsOn, endsOn: item.endsOn, remindDaysBefore: item.remindDaysBefore,
+                                   archivedAt: item.archivedAt, introAmount: item.introAmount, introCharges: item.introCharges,
+                                   createsPending: item.createsPending, pendingFrom: item.pendingFrom, updatedAt: item.updatedAt)
+        }
+    }
+
     /// "Importar", "Importar 1 movimiento", "Importar 2 movimientos".
     static func buttonTitle(validCount: Int) -> String {
         switch validCount {
@@ -236,7 +253,7 @@ struct CSVImportView: View {
             return
         }
         // Los pagos fijos se crean después, para no dejarlos a medias si falla la importación.
-        for series in plan.newSeries {
+        for series in Self.pinned(plan.newSeries, ids: &seriesIds) {
             if await planning.save(series) { createdSeries += 1 } else { error = planning.error }
         }
         result = imported

@@ -69,8 +69,27 @@ extension InMemoryBackend: FinanceService {
         financeMovements.removeAll { $0.accountId == accountId }
         creditCardList.removeAll { $0.accountId == accountId }
         installmentList.removeAll { $0.accountId == accountId || gone.contains($0.movementId) }
+        // Como `on delete set null` del servidor: lo que la usaba se queda sin cuenta y con versión nueva
+        // (el disparador `touch_updated_at` también salta en ese cambio).
         for index in creditCardList.indices where creditCardList[index].payFromAccountId == accountId {
             creditCardList[index].payFromAccountId = nil
+            creditCardList[index].updatedAt = nextVersion()
+        }
+        for index in recurring.indices where recurring[index].accountId == accountId {
+            recurring[index].accountId = nil
+            recurring[index].updatedAt = nextVersion()
+        }
+        for index in goalList.indices where goalList[index].accountId == accountId {
+            goalList[index].accountId = nil
+            goalList[index].updatedAt = nextVersion()
+        }
+        for index in holdingList.indices where holdingList[index].accountId == accountId {
+            holdingList[index].accountId = nil
+            holdingList[index].updatedAt = nextVersion()
+        }
+        for index in planList.indices where planList[index].accountId == accountId {
+            planList[index].accountId = nil
+            planList[index].updatedAt = nextVersion()
         }
     }
 
@@ -116,11 +135,14 @@ extension InMemoryBackend: FinanceService {
         let user = try requireMember(of: category.householdId)
         guard isMine(categoryId, in: category.householdId, user: user) else { return }
         financeCategories.removeAll { $0.id == categoryId }
+        // Como `on delete set null` del servidor: sin categoría y con versión nueva.
         for index in financeMovements.indices where financeMovements[index].categoryId == categoryId {
             financeMovements[index].categoryId = nil
+            financeMovements[index].updatedAt = nextVersion()
         }
         for index in recurring.indices where recurring[index].categoryId == categoryId {
             recurring[index].categoryId = nil
+            recurring[index].updatedAt = nextVersion()
         }
         for owner in budgets.keys {
             for index in budgets[owner, default: []].indices {

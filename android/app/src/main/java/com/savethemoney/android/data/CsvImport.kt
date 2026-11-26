@@ -378,5 +378,12 @@ object ImportMarks {
         }
     }
 
+    /**
+     * Las series de [series] con el id ya fijado para su nombre en [ids], o con uno nuevo que queda fijado. Se llama al
+     * empezar cada intento: repetir una importación que falló a medias repite el alta en vez de duplicarla.
+     */
+    fun pinned(series: List<RecurringSeries>, ids: MutableMap<String, String>): List<RecurringSeries> =
+        series.map { it.copy(id = ids.getOrPut(key(it.name)) { java.util.UUID.randomUUID().toString() }) }
+
     fun key(name: String): String = CsvMapping.normalize(name).filterNot { it.isWhitespace() }
 }

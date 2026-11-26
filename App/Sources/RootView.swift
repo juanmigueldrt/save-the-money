@@ -288,6 +288,33 @@ struct HouseholdReload {
         await tracking.loadScores()
         await tracking.loadReport()
     }
+
+    /// Borra la cuenta y recarga lo que la usaba (ver `reloadReferences`).
+    @MainActor
+    func deleteAccount(_ account: Account) async -> Bool {
+        guard await finance.deleteAccount(account) else { return false }
+        await reloadReferences()
+        return true
+    }
+
+    /// Borra la categoría y recarga lo que la usaba (ver `reloadReferences`).
+    @MainActor
+    func delete(_ category: BudgetCategory) async -> Bool {
+        guard await finance.delete(category) else { return false }
+        await reloadReferences()
+        return true
+    }
+
+    /// Tras borrar una cuenta o una categoría. El servidor deja sin ella (`on delete set null`, con versión nueva) los
+    /// pagos fijos, las metas, las inversiones, sus aportaciones y las tarjetas que la usaban, y el presupuesto pierde
+    /// su límite. Se recargan para que la siguiente edición no dé un falso «ha cambiado en otro dispositivo».
+    @MainActor
+    private func reloadReferences() async {
+        await budgets.load()
+        await cards.load(accounts: finance.accounts, balances: finance.balances, categories: finance.categories)
+        await planning.load()
+        await investments.load()
+    }
 }
 
 #Preview {

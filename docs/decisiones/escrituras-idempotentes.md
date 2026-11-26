@@ -59,6 +59,8 @@ sigue decidiendo quién apunta y quién cambia cada fila.
   columna `version` entera.
 - Cualquier cambio de la fila en el servidor cambia la versión, también los indirectos (por
   ejemplo borrar su categoría la deja sin categoría). La app recibe `STM05`, recarga y se repite.
+  Tras borrar una cuenta o una categoría desde la app, esta recarga ya lo que la usaba (movimientos,
+  pagos fijos, metas, inversiones, tarjetas y presupuesto), así que la siguiente edición no avisa (ORC-147).
 
 ## Qué cubre y qué no
 
@@ -70,7 +72,8 @@ Cubre:
 No cubre (se queda como estaba):
 
 - Borrar un movimiento: es idempotente por naturaleza, pero no deja rastro para otro dispositivo.
-- Importar un CSV: ya no duplica gracias a la huella (`account_id, import_hash`).
+- Importar un CSV: ya no duplica gracias a la huella (`account_id, import_hash`). Los pagos fijos que
+  crea llevan un id fijado al primer intento, por su nombre, y repetir la importación lo reutiliza (ORC-147).
 - Confirmar un pago fijo, duplicar un movimiento y «Deshacer» un borrado: cada pulsación es un
   movimiento nuevo con identificador nuevo.
 - El presupuesto del periodo (`budgets`, `budget_lines`) y el calendario de cobro (`pay_schedules`):
