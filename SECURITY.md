@@ -31,7 +31,7 @@ Supabase en el momento: borrarlo del historial no basta.
 
 - La sesión se guarda en el Llavero.
 - Los logs marcan importes, nombres y notas como privados.
-- «Borrar datos» borra en el servidor sólo los datos de quien lo pide.
+- «Borrar datos» borra en el servidor sólo lo que creó quien lo pide. Lo de otros miembros se borra sólo si cuelga de algo suyo (p. ej. los movimientos de una cuenta).
 
 ## Avisar de un problema
 
