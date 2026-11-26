@@ -104,6 +104,7 @@ fun Pantalla01(nav: Nav) {
             )
             Spacer(Modifier.height(24.dp))
             Btn("Entrar", { action.run { session.signIn(user, password) } }, Modifier.fillMaxWidth(), large = true, enabled = canSubmit)
+            session.signOutNotice?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) }
             Spacer(Modifier.height(24.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 Btn("Crear cuenta", { nav.go(2) }, kind = BtnKind.Text)

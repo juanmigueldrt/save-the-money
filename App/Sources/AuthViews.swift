@@ -22,6 +22,8 @@ struct AuthFlowView: View {
                     }
                     .padding(.top, Spacing.s64)
 
+                    ErrorText(message: session.signOutError)
+
                     if showingSignUp {
                         SignUpView(onShowLogin: { showingSignUp = false })
                     } else {

@@ -127,9 +127,12 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         Unit
     }
 
+    // Un código que no sirve devuelve null en vez de un error, para que el servidor guarde el intento fallido.
     override suspend fun acceptInvite(code: InviteCode): Household = mapped {
-        client.postgrest.rpc("accept_invite", buildJsonObject { put("invite_code", code.value) }).decodeAs()
-    }
+        client.postgrest.rpc("accept_invite", buildJsonObject { put("invite_code", code.value) })
+            .takeUnless { it.data.trim() == "null" }
+            ?.decodeAs<Household>()
+    } ?: throw AppError.InvalidOrExpiredInvite
 
     override suspend fun leave(householdId: String) = mapped {
         client.from("household_members").delete {
@@ -199,6 +202,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
             "STM02" -> AppError.InvalidInput(InvestmentTrade.NOT_ENOUGH_SHARES)
             "STM03" -> AppError.InvalidInput(InvestmentTrade.NEEDED_BY_LATER_SALE)
+            // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
+            "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

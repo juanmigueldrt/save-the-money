@@ -54,6 +54,7 @@ final class SessionModel {
     /// Cualquier otro fallo no descarta la sesión guardada: se lanza para avisar y, si aún no
     /// había un hogar abierto, se pasa a «sin conexión» con reintento.
     func refresh() async throws {
+        signOutError = nil
         guard await services.auth.currentUserId() != nil else {
             state = .signedOut
             return
@@ -90,8 +91,16 @@ final class SessionModel {
         try await refresh()
     }
 
+    /// Si el cierre no llegó al servidor. Este dispositivo ya está desconectado; el aviso se ve en la pantalla de entrar.
+    private(set) var signOutError: String?
+
     func signOut() async {
-        try? await services.auth.signOut()
+        signOutError = nil
+        do {
+            try await services.auth.signOut()
+        } catch {
+            signOutError = "No se ha podido cerrar la sesión en el servidor. " + ((error as? AppError)?.errorDescription ?? "")
+        }
         state = .signedOut
     }
 

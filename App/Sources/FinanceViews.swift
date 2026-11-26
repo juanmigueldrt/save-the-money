@@ -262,6 +262,8 @@ struct MovementsView: View {
 
     @Environment(FinanceModel.self) private var finance
     @State private var accountMovements: [Movement] = []
+    /// Aviso si no se han podido cargar los movimientos de la cuenta (no es lo mismo que estar vacía).
+    @State private var accountLoadError: String?
     @State private var filter = MovementFilter()
     @State private var customFrom = CalendarDay.gregorian.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var customThrough = Date()
@@ -306,8 +308,13 @@ struct MovementsView: View {
                 }
                 .environment(\.locale, Locale(identifier: "es_ES"))
             }
+            if let accountLoadError {
+                Section { ErrorText(message: accountLoadError) }
+            }
             if source.isEmpty {
-                EmptyHint(text: "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+                if accountLoadError == nil {
+                    EmptyHint(text: "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+                }
             } else if isFiltering {
                 Section {
                     filterSummary
@@ -558,7 +565,14 @@ struct MovementsView: View {
 
     private func reloadAccount() async {
         guard let account else { return }
-        accountMovements = await finance.movements(of: account)
+        do {
+            accountMovements = try await finance.movements(of: account)
+            accountLoadError = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            accountLoadError = "No se han podido cargar los movimientos. " + ((error as? AppError)?.errorDescription ?? "")
+        }
     }
 
     private func delete(_ movement: Movement) async {
@@ -583,6 +597,7 @@ struct AccountDetailView: View {
     @State private var editing = false
     @State private var adjusting = false
     @State private var movements: [Movement] = []
+    @State private var chartError: String?
 
     private var current: Account { finance.account(account.id) ?? account }
 
@@ -605,6 +620,12 @@ struct AccountDetailView: View {
                 .padding(.horizontal, Spacing.s16)
                 .padding(.bottom, Spacing.s12)
                 .background(Palette.bgGrouped2)
+            if let chartError {
+                ErrorText(message: chartError)
+                    .padding(.horizontal, Spacing.s16)
+                    .padding(.bottom, Spacing.s12)
+                    .background(Palette.bgGrouped2)
+            }
             if current.kind == .creditCard {
                 NavigationLink {
                     CreditCardDetailView(account: current)
@@ -631,7 +652,16 @@ struct AccountDetailView: View {
         }
         .sheet(isPresented: $editing) { AccountFormView(account: current) }
         .sheet(isPresented: $adjusting) { BalanceAdjustmentView(account: current) }
-        .task(id: finance.recent) { movements = await finance.movements(of: current) }
+        .task(id: finance.recent) {
+            do {
+                movements = try await finance.movements(of: current)
+                chartError = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                chartError = "No se han podido cargar los movimientos del gráfico. " + ((error as? AppError)?.errorDescription ?? "")
+            }
+        }
     }
 }
 

@@ -66,6 +66,32 @@ final class CSVImportTests: XCTestCase {
         XCTAssertEqual(rows[0].draft?.bookedOn.iso, "2026-10-05")
     }
 
+    func testFilaConCargoYAbonoSeMarcaConAviso() throws {
+        let text = """
+        Fecha;Concepto;Cargo;Abono
+        05/03/2026;Ambos;5,00;7,00
+        06/03/2026;Solo abono;0,00;7,00
+        """
+        let table = CSVTable.parse(text)
+        let mapping = try XCTUnwrap(CSVMapping.detect(in: table))
+        let rows = CSVImporter.rows(in: table, mapping: mapping, accountId: account)
+        XCTAssertNil(rows[0].draft, "no se queda con uno de los dos importes")
+        XCTAssertEqual(rows[0].issue, "Tiene cargo y abono a la vez")
+        XCTAssertEqual(rows[1].draft?.amount.minor, 700)
+        XCTAssertNil(rows[1].issue)
+    }
+
+    func testSeparadorPorColumnasConstantesNoPorRecuento() {
+        let text = """
+        28/10/2026;PAGO BIZUM, CENA, JUAN;-12,50
+        29/10/2026;CINE, PALOMITAS, REFRESCO, PARKING;-8,00
+        """
+        XCTAssertEqual(CSVTable.parse(text).delimiter, ";", "hay más comas, pero sólo ; da 3 columnas en todas las líneas")
+        XCTAssertEqual(CSVTable.parse(text).rows[0], ["28/10/2026", "PAGO BIZUM, CENA, JUAN", "-12,50"])
+        XCTAssertEqual(CSVTable.parse("a,b\nc,d\n").delimiter, ",")
+        XCTAssertEqual(CSVTable.parse("sin separador").delimiter, ";")
+    }
+
     func testFileWithoutHeader() throws {
         let text = """
         28/10/26\tCafetería de prueba\t-2,10
