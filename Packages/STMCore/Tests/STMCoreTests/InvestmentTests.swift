@@ -237,8 +237,8 @@ final class InvestmentTests: XCTestCase {
         XCTAssertEqual(holding.feeRate, dec("0.15"))
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(holding)) as! [String: Any]
         XCTAssertEqual(encoded["asset_class"] as? String, "fixed_income")
-        XCTAssertNil(encoded["id"])
-        XCTAssertNil(encoded["household_id"])
+        XCTAssertEqual(encoded["id"] as? String, "7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0011")
+        XCTAssertEqual(encoded["household_id"] as? String, "7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0012")
 
         let tradeJSON = """
         {"id":"7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0013","household_id":"7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0012",
@@ -258,7 +258,7 @@ final class InvestmentTests: XCTestCase {
         let plan = try JSONDecoder().decode(InvestmentPlan.self, from: Data(planJSON.utf8))
         XCTAssertTrue(plan.isPaused)
         let planEncoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(plan)) as! [String: Any]
-        XCTAssertNil(planEncoded["holding_id"], "el activo de un plan no se cambia")
+        XCTAssertEqual(planEncoded["holding_id"] as? String, "7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0011")
         XCTAssertEqual(planEncoded["amount_minor"] as? Int, 15_000)
     }
 

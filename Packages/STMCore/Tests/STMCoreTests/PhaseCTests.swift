@@ -174,7 +174,7 @@ final class PhaseCTests: XCTestCase {
         XCTAssertNotNil(ExtraBudget(householdId: home, name: "X", limit: .zero).issue)
         let data = try JSONEncoder().encode(extra)
         let decoded = try JSONDecoder().decode(ExtraBudget.self, from: data)
-        XCTAssertEqual(decoded.name, "Vacaciones")
+        XCTAssertEqual(decoded, extra, "vuelve igual; el nombre se limpia al guardarlo en el servidor, no al codificarlo")
         XCTAssertEqual(decoded.endsOn, day(2026, 12, 15))
     }
 

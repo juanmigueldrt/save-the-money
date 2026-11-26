@@ -20,7 +20,7 @@ extension SupabaseBackend: CreditScoreService {
         if let issue = score.issue { throw AppError.invalidInput(issue) }
         return try await mapped {
             try await client.from("credit_scores")
-                .insert(score)
+                .insert(NewCreditScoreRow(score: score))
                 .select(Self.scoreColumns)
                 .single()
                 .execute()
@@ -35,5 +35,26 @@ extension SupabaseBackend: CreditScoreService {
                 .eq("id", value: scoreId.uuidString)
                 .execute()
         }
+    }
+}
+
+/// Sólo las columnas que se escriben de un score; el id y el dueño los pone el servidor.
+struct NewCreditScoreRow: Encodable, Sendable {
+    let score: CreditScore
+
+    private enum CodingKeys: String, CodingKey {
+        case score, provider, note
+        case maxScore = "max_score"
+        case recordedOn = "recorded_on"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(score.score, forKey: .score)
+        try c.encode(score.maxScore, forKey: .maxScore)
+        try c.encode(score.trimmedProvider, forKey: .provider)
+        try c.encode(score.recordedOn, forKey: .recordedOn)
+        let cleanNote = score.note?.trimmingCharacters(in: .whitespacesAndNewlines)
+        try c.encode(cleanNote?.isEmpty == false ? cleanNote : nil, forKey: .note)
     }
 }
