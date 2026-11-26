@@ -3,7 +3,8 @@
 
 Para cada tamaño N (por defecto 10000 y 50000) el hogar de prueba llega a N movimientos repartidos en seis años y cuatro
 cuentas, y a N/10 precios y N/10 operaciones de inversión en cinco activos. Después cronometra, tres veces cada una, las
-mismas peticiones que hacen las apps, página a página (offset/limit de 1000, el `max_rows` de supabase/config.toml):
+mismas peticiones que hacen las apps, página a página (de 1000 filas, el `max_rows` de supabase/config.toml). Los
+movimientos se piden por cursor (cada página, detrás de la última fila de la anterior) y lo demás con offset/limit:
 
   - movimientos, iOS: `allMovements` (STMData/SupabaseFinance.swift), orden booked_on.asc,id.asc;
   - movimientos, Android: `movements(householdId, from, through)` (data/SupabaseFinance.kt) que llama TrackingModel,
@@ -190,11 +191,14 @@ def fill(table, target, row):
         loaded[table] += count
 
 
-def measure(table, query):
-    """Pide todas las páginas como allRows / allPages. Devuelve (filas, peticiones, segundos, bytes, filas leídas)."""
+def measure(table, query, cursor=None):
+    """Pide todas las páginas como allRows / allPages o, con `cursor`, como allPagesByCursor: `cursor` recibe la última
+    fila leída (None en la primera página) y devuelve los filtros de la página siguiente.
+    Devuelve (filas, peticiones, segundos, bytes, filas leídas)."""
     rows, pages, seconds, size = [], 0, 0.0, 0
     while True:
-        page_query = query + [("offset", str(len(rows))), ("limit", str(PAGE))]
+        page_query = query + (cursor(rows[-1] if rows else None) if cursor else [("offset", str(len(rows)))])
+        page_query += [("limit", str(PAGE))]
         start = time.perf_counter()
         code, raw = raw_call("GET", f"/rest/v1/{table}", page_query, token=token)
         seconds += time.perf_counter() - start
@@ -233,15 +237,20 @@ def check(name, expected, received):
 
 
 REQUESTS = [
+    # Los cursores son los de downloadAfterFilter (iOS) y movementDownloadAfterFilter (Android).
     ("movimientos (iOS, allMovements)", "transactions",
-     [("select", MOVEMENT), HOUSEHOLD, ("order", "booked_on.asc,id.asc")]),
+     [("select", MOVEMENT), HOUSEHOLD, ("order", "booked_on.asc,id.asc")],
+     lambda last: [("booked_on", f"gte.{last['booked_on']}"),
+                   ("or", f"(booked_on.gt.{last['booked_on']},id.gt.{last['id']})")] if last else []),
     ("movimientos (Android, TrackingModel)", "transactions",
-     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", "gte.1900-01-01"), ("booked_on", "lte.2999-12-31"),
-      ("order", "booked_on.desc,id.asc")]),
-    ("precios (holdingPrices)", "holding_prices", [("select", PRICE), HOUSEHOLD, ("order", "priced_on.asc,id.asc")]),
-    ("operaciones (trades)", "investment_trades", [("select", TRADE), HOUSEHOLD, ("order", "traded_on.asc,id.asc")]),
+     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", "gte.1900-01-01"), ("order", "booked_on.desc,id.asc")],
+     lambda last: [("booked_on", f"lte.{last['booked_on']}"),
+                   ("or", f"(booked_on.lt.{last['booked_on']},id.gt.{last['id']})")] if last
+     else [("booked_on", "lte.2999-12-31")]),
+    ("precios (holdingPrices)", "holding_prices", [("select", PRICE), HOUSEHOLD, ("order", "priced_on.asc,id.asc")], None),
+    ("operaciones (trades)", "investment_trades", [("select", TRADE), HOUSEHOLD, ("order", "traded_on.asc,id.asc")], None),
     ("saldos (account_balances)", "account_balances",
-     [("select", "account_id,balance_minor"), HOUSEHOLD, ("order", "account_id.asc")]),
+     [("select", "account_id,balance_minor"), HOUSEHOLD, ("order", "account_id.asc")], None),
 ]
 EXPECTED_ROWS = {"transactions": lambda: loaded["transactions"], "holding_prices": lambda: loaded["holding_prices"],
                  "investment_trades": lambda: loaded["investment_trades"], "account_balances": lambda: ACCOUNTS}
@@ -254,9 +263,9 @@ for n in SIZES:
     fill("transactions", n, movement)
     fill("holding_prices", n // 10, price)
     fill("investment_trades", n // 10, trade)
-    for name, table, query in REQUESTS:
+    for name, table, query, cursor in REQUESTS:
         for run in range(1, RUNS + 1):
-            count, pages, seconds, size, rows = measure(table, query)
+            count, pages, seconds, size, rows = measure(table, query, cursor)
             ms = seconds * 1000
             line = f"| {n} | {name} | {run} | {count} | {pages} | {ms:.1f} | {ms / pages:.1f} | {size} |"
             print(line, flush=True)

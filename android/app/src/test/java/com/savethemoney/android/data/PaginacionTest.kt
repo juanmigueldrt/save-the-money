@@ -55,4 +55,43 @@ class PaginacionTest {
             assertEquals(2, paginas.pedidas.size)
         }
     }
+
+    /** ORC-70: por cursor, cada página se pide con la última fila de la anterior, hasta una incompleta. */
+    @Test
+    fun porCursorPideCadaPaginaDetrasDeLaUltimaFila() = runBlocking {
+        val pedidas = mutableListOf<Long?>()
+        val filas = allPagesByCursor<Long> { ultima ->
+            pedidas += ultima
+            val desde = (ultima ?: -1L) + 1
+            (desde until minOf(desde + 1000, 2037L)).toList()
+        }
+        assertEquals((0L until 2037L).toList(), filas)
+        assertEquals(listOf(null, 999L, 1999L), pedidas)
+    }
+
+    @Test
+    fun porCursorExactamenteMilFilasPideUnaPaginaMasVacia() = runBlocking {
+        val pedidas = mutableListOf<Long?>()
+        val filas = allPagesByCursor<Long> { ultima ->
+            pedidas += ultima
+            if (ultima == null) (0L until 1000L).toList() else emptyList()
+        }
+        assertEquals((0L until 1000L).toList(), filas)
+        assertEquals(listOf(null, 999L), pedidas)
+    }
+
+    @Test
+    fun porCursorUnFalloEnLaSegundaPaginaFallaLaCargaEntera() = runBlocking {
+        var pedidas = 0
+        try {
+            val filas = allPagesByCursor<Long> { ultima ->
+                pedidas += 1
+                if (ultima != null) throw FalloDePagina()
+                (0L until 1000L).toList()
+            }
+            fail("Devolvió ${filas.size} filas en vez de fallar")
+        } catch (e: FalloDePagina) {
+            assertEquals(2, pedidas)
+        }
+    }
 }

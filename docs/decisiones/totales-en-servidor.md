@@ -1,6 +1,6 @@
 # Totales calculados en el servidor (ORC-70)
 
-Estado: medido (tabla de abajo). El coste no parece estar en descargar y sumar, sino en cómo se leen las filas: se está diagnosticando con los planes de ejecución antes de decidir si los totales se llevan al servidor.
+Estado: medido, diagnosticado y arreglado en el servidor y en las descargas (ORC-70, paso 2). Falta volver a medir. Los totales no se han llevado al servidor: con lo encontrado, lo más probable es que no haga falta (ver «¿Sigue compensando…?»).
 
 ## El problema
 
@@ -48,7 +48,7 @@ Script: `supabase/tests/api/medicion_movimientos.py`. Workflow: `.github/workflo
 - **Son tiempos del Supabase local en un runner de CI, no de un móvil con red móvil.** El cliente y el servidor están en la misma máquina: no hay latencia de red ni límite de ancho de banda, y el runner no es el servidor de producción. Sirven para ver cómo crece el coste con N y cuánto pesa cada parte, no para prometer tiempos al usuario.
 - Por eso se apuntan también los bytes: el coste de transferencia se calcula aparte, con el ancho de banda que se quiera suponer. Son bytes del cuerpo **sin comprimir** (el script no pide gzip). iOS (URLSession) lo pide siempre y el JSON se comprime mucho, así que lo que viaja por la red será menos. En Android no se ha comprobado.
 - No mide lo que pasa en el dispositivo después: decodificar el JSON, guardar la lista en memoria y recalcular `NetWorth.history` o `SpendingReport`.
-- Las páginas se piden una detrás de otra, como en las apps. Con `offset`, cada página obliga al servidor a saltarse las anteriores: el coste por página puede crecer con N.
+- Las páginas se piden una detrás de otra, como en las apps. En la primera medición todas iban con `offset`, que obliga al servidor a saltarse las páginas anteriores. Desde el paso 2 de ORC-70 los movimientos se piden por cursor, en las apps y en el script.
 
 ## Resultados
 
@@ -69,9 +69,9 @@ Ejecución del workflow (enlace y fecha): pendiente de apuntar.
 - Los saldos, que es lo único que ya suma el servidor, cuestan unos 85 microsegundos por movimiento (0,87 s / 10.000 y 4,25 s / 50.000). Sumar 50.000 enteros debería costar milisegundos.
 - 50.000 movimientos no se cargan en un tiempo aceptable: la opción A queda descartada tal cual.
 
-## Diagnóstico (ORC-70, paso 2)
+## Diagnóstico
 
-Estado: hipótesis escritas antes de ver los planes. Los planes los imprime el workflow (`supabase/tests/api/medicion_planes.sql`, que lanza el script después de medir cada tamaño) y todavía no se han leído. Lo que sigue hay que confirmarlo o corregirlo con ellos.
+Estado: confirmado con los planes de ejecución (más abajo). Lo que sigue se escribió antes de verlos y se deja como estaba.
 
 ### Qué hay en el servidor
 
@@ -80,7 +80,7 @@ Estado: hipótesis escritas antes de ver los planes. Los planes los imprime el w
 - El `(select …)` que envuelve la llamada no la convierte en un valor que se calcula una vez: la llamada depende de dos columnas de la fila (`household_id` y `created_by`), así que es una subconsulta correlacionada y se ejecuta para cada fila que recorre la consulta. El consejo de Supabase de envolver en `select` sólo ahorra trabajo cuando lo envuelto no depende de la fila, como `(select auth.uid())`.
 - `transactions` tiene el índice `(household_id, booked_on desc)`, que ya sirve para el orden por fecha de las dos apps. `holding_prices` e `investment_trades` sólo tienen índice por `household_id`: su orden (`priced_on, id` y `traded_on, id`) no lo da ningún índice.
 
-### Lo que se espera ver en los planes
+### Lo que se esperaba ver en los planes
 
 Si cada fila recorrida cuesta unos 85 µs de política, las cifras medidas salen solas:
 
@@ -93,7 +93,7 @@ Si cada fila recorrida cuesta unos 85 µs de política, las cifras medidas salen
 | Precios u operaciones, 1.000: cada página recorre todas las filas | 2.000 en 2 páginas | 0,17 s | 0,18 s |
 | Precios u operaciones, 5.000: lo mismo | 30.000 en 6 páginas | 2,6 s | 2,6 s |
 
-Por eso se espera:
+Por eso se esperaba:
 
 1. **Página del medio de movimientos** (bloques 1.1 y 1.2): `Limit` sobre `Incremental Sort` (ya ordenado por `booked_on`, falta `id`) sobre un `Index Scan` de `transactions_household_booked_idx`, con `Filter: (SubPlan …)`. El `SubPlan` con tantos `loops` como `offset` + 1000, y casi todo el tiempo dentro de él: unos 2,2 s con `offset` 25.000 y menos de 0,1 s en la primera página (1.3). El `offset` no es caro por saltarse filas, sino porque cada fila saltada pasa antes por la política.
 2. **Saldos** (1.4): la suma recorre los movimientos de las cuentas con el mismo `Filter: (SubPlan …)`, con `loops` = todos los movimientos.
@@ -101,17 +101,58 @@ Por eso se espera:
 4. **Sin RLS** (bloque 3): las mismas consultas en milisegundos.
 5. **Coste por fila** (bloque 4): 4.2 (`is_mine`) cerca de 85 µs por fila; 4.4 y 4.5 (el autor y la pertenencia calculados una vez) cerca de 4.1 (sin condición).
 
-Si los planes dicen otra cosa (por ejemplo, que el tiempo está en el `Sort` o en el `json_agg`, o que el plan genérico del bloque 2 no usa el índice), este apartado se corrige antes de tocar nada.
+### Lo que dijeron los planes
 
-### Arreglos candidatos (ninguno hecho)
+Ejecución 45820500401 del workflow (2026-11-26), con 50.000 movimientos. Las cinco previsiones se cumplieron:
 
-Se deciden con los planes delante, en una migración nueva:
+| Consulta | Con RLS | Sin RLS | Qué muestra el plan |
+|---|---:|---:|---|
+| Movimientos, página del medio (`offset` 25.000), iOS y Android | 2.130 ms | 28 ms | `Index Scan` de `transactions_household_booked_idx` con `Filter: (SubPlan 1)`, 26.033 ejecuciones de 0,079 ms |
+| Movimientos, primera página | 85 ms | | 1.009 ejecuciones del `SubPlan` |
+| Saldos (`account_balances`) | 4.010 ms | 23 ms | 50.000 ejecuciones del `SubPlan` sobre `transactions` |
+| Precios y operaciones, cualquier página | 400 ms | 3 ms | `Seq Scan` y `Sort`, 5.000 ejecuciones del `SubPlan` en cada página |
 
-- Que la política cueste poco por fila: `created_by = (select auth.uid())` y la pertenencia al hogar buscada una vez por consulta, en lugar de una llamada a función por fila. Tiene que ser exactamente equivalente: quién lee, crea, cambia y borra cada fila no puede cambiar. Si no se puede demostrar, no se toca.
-- Paginación por cursor (`booked_on`, `id`) en la descarga completa de las dos apps, como la lista de ORC-85, para que cada página no recorra las anteriores.
-- Índices que den el orden de las páginas: `(household_id, booked_on, id)` en `transactions` y los equivalentes en `holding_prices` e `investment_trades`.
+Coste de cada forma de la condición sobre los 50.000 movimientos (bloque 4): sin condición, 5 ms; `(select private.is_mine(…))`, 3.978 ms; sólo `(select private.is_member(…))`, 479 ms; el autor y la pertenencia calculados una vez, 8 a 11 ms. El plan genérico (bloque 2) fue el mismo que el normal. El `Sort` y el `json_agg` no pesaban.
 
-Después se vuelve a medir, se apuntan aquí los números nuevos y se decide si todavía compensa llevar los totales al servidor.
+El problema no era descargar y sumar en el dispositivo, ni el `offset` en sí, sino la política: 0,08 ms por cada fila que la consulta recorre, y con `offset` cada página recorre todas las anteriores.
+
+## Qué se ha cambiado (ORC-70, paso 2)
+
+Migración `20261126170000_orc70_lectura_barata.sql`, pruebas `24_orc70_lectura_barata.test.sql`.
+
+1. **Política de lectura de `transactions`, `holding_prices` e `investment_trades`.** Antes: `(select private.is_mine(household_id, created_by))`. Ahora: `created_by = (select auth.uid()) and household_id = any (array(select private.my_household_ids()))`. El usuario y la lista de sus hogares se calculan una vez por consulta, no por fila. Es la misma condición escrita de otra forma (la migración explica por qué, caso a caso) y las pruebas comparan fila a fila lo que ve cada usuario con lo que daba `private.is_mine`: lo propio, lo de otro miembro, filas sin autor, filas de alguien que ya no es miembro, filas con su nombre en un hogar ajeno, y una sesión sin usuario.
+2. **Lo que no se ha tocado.** Las políticas de alta, cambio y borrado de esas tres tablas y todas las de las demás (cuentas, activos, presupuestos, metas, tarjetas…) siguen con `private.is_mine`: son tablas de pocas filas por hogar, donde 0,08 ms por fila no se nota, y cada política que no cambia es una menos que demostrar.
+3. **Índices** `(household_id, priced_on, id)` en `holding_prices` y `(household_id, traded_on, id)` en `investment_trades`: dan el orden en que las apps piden las páginas. `transactions` no necesita otro: `transactions_household_booked_idx` ya da el orden por fecha y dentro de un día hay pocas filas que ordenar por `id`.
+4. **Descarga completa de movimientos por cursor**, en iOS (`allMovements`) y en Android (`movements(householdId, from, through)`): cada página se pide detrás de la última fila de la anterior, con el día de esa fila como límite (`booked_on >= día` en iOS, `<=` en Android) para que el servidor empiece a leer el índice ahí, y un `or` que desempata por `id` dentro del día. Cada app conserva su orden. De paso, un alta o un borrado a mitad de la descarga ya no hace saltar ni repetir filas. Precios y operaciones siguen con `offset`: con el índice y la política nueva, saltarse 5.000 filas cuesta milisegundos.
+
+El script de medición y `medicion_planes.sql` piden ahora los movimientos igual que las apps, por cursor.
+
+## Después del arreglo
+
+Pendiente: los números los pone quien lance otra vez el workflow «Medición de carga» en la rama, con 10.000 y 50.000 movimientos (mediana de las tres ejecuciones). La columna «Antes» es la de la tabla de Resultados.
+
+| Movimientos | Petición | Antes | Después |
+|---:|---|---:|---:|
+| 10.000 | Descargarlos todos | 5,8 s | |
+| 10.000 | Por página | 0,53 s | |
+| 10.000 | Saldos (`account_balances`) | 0,87 s | |
+| 10.000 | Precios y operaciones (1.000 filas) | 0,18 s | |
+| 50.000 | Descargarlos todos | 116 s | |
+| 50.000 | Por página | 2,3 s | |
+| 50.000 | Saldos (`account_balances`) | 4,25 s | |
+| 50.000 | Precios y operaciones (5.000 filas) | 2,6 s | |
+
+Ejecución del workflow (enlace y fecha): pendiente.
+
+Lo que se espera, por los planes sin RLS: una página de movimientos en decenas de milisegundos dentro de Postgres, los saldos de 50.000 movimientos en unos 25 ms, y la descarga completa limitada por lo que tarda en viajar y decodificarse el JSON (21,8 MB con 50.000 movimientos), no por la base de datos.
+
+### ¿Sigue compensando llevar los totales al servidor?
+
+Pendiente de esos números. Lo que ya se sabe:
+
+- La razón de tiempo que motivó el ticket desaparece si se confirma lo de arriba: sumar en el servidor no habría arreglado nada, porque la suma que ya hacía el servidor (`account_balances`) era igual de lenta por la misma política.
+- Lo que queda son los bytes: Patrimonio e Informes siguen bajando una fila por movimiento (4,4 MB por cada 10.000, sin comprimir) cada vez que cambia la lista. Para eso la opción B (pedir sólo tres columnas, y en Informes sólo los últimos meses) es más barata que cualquier agregado en el servidor y no obliga a repetir en SQL las reglas de `STMCore`.
+- Recomendación provisional: no hacer C, D ni E; medir, y si el tamaño de la respuesta molesta en el móvil, hacer B en otro ticket.
 
 ## Opciones para llevar los totales al servidor
 

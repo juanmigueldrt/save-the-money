@@ -4,11 +4,12 @@
 -- Variables de psql (las pasa el script con -v):
 --   hogar      id del hogar de medición
 --   claims     JSON de `request.jwt.claims` del usuario de medición ({"sub": …, "role": "authenticated"})
---   mitad      offset de una página del medio de los movimientos
+--   mitad      cuántos movimientos van delante de la página del medio: su cursor es la fila que hay en ese puesto
 --   mitad_inv  offset de una página del medio de los precios y de las operaciones
 --
 -- Las consultas llevan la forma que genera PostgREST (un CTE `pgrst_source` con el select, el filtro, el orden y
--- el limit/offset, y fuera el json_agg). El último bloque saca de pg_stat_statements el SQL que PostgREST mandó de
+-- el limit/offset, y fuera el json_agg). Los movimientos se piden por cursor, como las apps desde ORC-70: el día de
+-- la última fila de la página anterior y, para desempatar dentro del día, su id. El último bloque saca de pg_stat_statements el SQL que PostgREST mandó de
 -- verdad, para comprobar que la forma es la misma, con sus tiempos medios dentro de Postgres.
 --
 -- Bloques 1 y 2: con el rol y las claims del usuario, como hace PostgREST y como hacen las pruebas pgTAP: se aplica
@@ -24,29 +25,38 @@ select 'transactions' as tabla, count(*) as filas from public.transactions where
 union all select 'holding_prices', count(*) from public.holding_prices where household_id = :'hogar'
 union all select 'investment_trades', count(*) from public.investment_trades where household_id = :'hogar';
 
+-- La última fila de la página anterior a la del medio, en el orden de cada app (se lee como postgres, sin RLS).
+select booked_on as dia_asc, id as id_asc from public.transactions where household_id = :'hogar'
+order by booked_on asc, id asc offset :mitad limit 1 \gset
+select booked_on as dia_desc, id as id_desc from public.transactions where household_id = :'hogar'
+order by booked_on desc, id asc offset :mitad limit 1 \gset
+
 \echo
 \echo '=== 1. Con RLS (rol authenticated y las claims del usuario) ==='
 begin;
 set local request.jwt.claims to :'claims';
 set local role authenticated;
 
-\echo '--- 1.1 Movimientos, iOS (allMovements): página del medio, offset' :mitad
+\echo '--- 1.1 Movimientos, iOS (allMovements): página del medio, detrás de' :mitad 'filas, por cursor' 
 explain (analyze, buffers)
 with pgrst_source as (
   select :movimiento from "public"."transactions"
   where "public"."transactions"."household_id" = :'hogar'
+    and "public"."transactions"."booked_on" >= :'dia_asc'
+    and ("public"."transactions"."booked_on" > :'dia_asc' or "public"."transactions"."id" > :'id_asc')
   order by "public"."transactions"."booked_on" asc, "public"."transactions"."id" asc
-  limit 1000 offset :mitad
+  limit 1000 offset 0
 ) :cola;
 
-\echo '--- 1.2 Movimientos, Android (TrackingModel): página del medio, offset' :mitad
+\echo '--- 1.2 Movimientos, Android (TrackingModel): página del medio, detrás de' :mitad 'filas, por cursor' 
 explain (analyze, buffers)
 with pgrst_source as (
   select :movimiento from "public"."transactions"
   where "public"."transactions"."household_id" = :'hogar'
-    and "public"."transactions"."booked_on" >= '1900-01-01' and "public"."transactions"."booked_on" <= '2999-12-31'
+    and "public"."transactions"."booked_on" >= '1900-01-01' and "public"."transactions"."booked_on" <= :'dia_desc'
+    and ("public"."transactions"."booked_on" < :'dia_desc' or "public"."transactions"."id" > :'id_desc')
   order by "public"."transactions"."booked_on" desc, "public"."transactions"."id" asc
-  limit 1000 offset :mitad
+  limit 1000 offset 0
 ) :cola;
 
 \echo '--- 1.3 Movimientos, iOS: la primera página (offset 0), para comparar con la del medio'
@@ -100,28 +110,32 @@ begin;
 set local request.jwt.claims to :'claims';
 set local role authenticated;
 set local plan_cache_mode to force_generic_plan;
-prepare pagina (uuid, bigint, bigint) as
+prepare pagina (uuid, date, uuid, bigint, bigint) as
 with pgrst_source as (
   select :movimiento from "public"."transactions"
   where "public"."transactions"."household_id" = $1
+    and "public"."transactions"."booked_on" >= $2
+    and ("public"."transactions"."booked_on" > $2 or "public"."transactions"."id" > $3)
   order by "public"."transactions"."booked_on" asc, "public"."transactions"."id" asc
-  limit $2 offset $3
+  limit $4 offset $5
 ) :cola;
-\echo '--- 2.1 Movimientos, iOS: página del medio, offset' :mitad
-explain (analyze, buffers) execute pagina (:'hogar', 1000, :mitad);
+\echo '--- 2.1 Movimientos, iOS: página del medio, detrás de' :mitad 'filas, por cursor'
+explain (analyze, buffers) execute pagina (:'hogar', :'dia_asc', :'id_asc', 1000, 0);
 deallocate pagina;
 rollback;
 
 \echo
 \echo '=== 3. Las mismas consultas sin RLS (rol postgres) ==='
 begin;
-\echo '--- 3.1 Movimientos, iOS: página del medio, offset' :mitad
+\echo '--- 3.1 Movimientos, iOS: página del medio, detrás de' :mitad 'filas, por cursor' 
 explain (analyze, buffers)
 with pgrst_source as (
   select :movimiento from "public"."transactions"
   where "public"."transactions"."household_id" = :'hogar'
+    and "public"."transactions"."booked_on" >= :'dia_asc'
+    and ("public"."transactions"."booked_on" > :'dia_asc' or "public"."transactions"."id" > :'id_asc')
   order by "public"."transactions"."booked_on" asc, "public"."transactions"."id" asc
-  limit 1000 offset :mitad
+  limit 1000 offset 0
 ) :cola;
 
 \echo '--- 3.2 Saldos (account_balances)'
@@ -155,7 +169,7 @@ set local request.jwt.claims to :'claims';
 explain (analyze, buffers)
 select count(*) from public.transactions t where t.household_id = :'hogar';
 
-\echo '--- 4.2 La condición de la política de hoy: (select private.is_mine(household_id, created_by))'
+\echo '--- 4.2 La condición de antes de ORC-70, que siguen usando el cambio y el borrado: (select private.is_mine(household_id, created_by))'
 explain (analyze, buffers)
 select count(*) from public.transactions t
 where t.household_id = :'hogar' and (select private.is_mine(t.household_id, t.created_by));
@@ -170,12 +184,12 @@ explain (analyze, buffers)
 select count(*) from public.transactions t
 where t.household_id = :'hogar' and t.created_by = (select auth.uid());
 
-\echo '--- 4.5 Autor y pertenencia buscados una vez (candidata para la parte B, sin decidir)'
+\echo '--- 4.5 La condición de la política de lectura desde ORC-70: el autor y los hogares del usuario, calculados una vez'
 explain (analyze, buffers)
 select count(*) from public.transactions t
 where t.household_id = :'hogar'
   and t.created_by = (select auth.uid())
-  and t.household_id in (select m.household_id from public.household_members m where m.user_id = (select auth.uid()));
+  and t.household_id = any (array(select private.my_household_ids()));
 rollback;
 
 \echo

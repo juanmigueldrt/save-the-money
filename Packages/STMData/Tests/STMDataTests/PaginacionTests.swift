@@ -56,4 +56,41 @@ final class PaginacionTests: XCTestCase {
         }
         XCTAssertEqual(paginas.pedidas.count, 2)
     }
+
+    /// ORC-70: por cursor, cada página se pide con la última fila de la anterior, hasta una incompleta.
+    func testPorCursorPideCadaPaginaDetrasDeLaUltimaFila() async throws {
+        var pedidas: [Int?] = []
+        let filas = try await SupabaseBackend.allPagesByCursor { (ultima: Int?) -> [Int] in
+            pedidas.append(ultima)
+            let desde = (ultima ?? -1) + 1
+            return Array(desde..<min(desde + 1000, 2037))
+        }
+        XCTAssertEqual(filas, Array(0..<2037))
+        XCTAssertEqual(pedidas, [nil, 999, 1999])
+    }
+
+    func testPorCursorExactamenteMilFilasPideUnaPaginaMasVacia() async throws {
+        var pedidas: [Int?] = []
+        let filas = try await SupabaseBackend.allPagesByCursor { (ultima: Int?) -> [Int] in
+            pedidas.append(ultima)
+            return ultima == nil ? Array(0..<1000) : []
+        }
+        XCTAssertEqual(filas, Array(0..<1000))
+        XCTAssertEqual(pedidas, [nil, 999])
+    }
+
+    func testPorCursorUnFalloEnLaSegundaPaginaFallaLaCargaEntera() async {
+        var pedidas = 0
+        do {
+            let filas = try await SupabaseBackend.allPagesByCursor { (ultima: Int?) -> [Int] in
+                pedidas += 1
+                if ultima != nil { throw FalloDePagina() }
+                return Array(0..<1000)
+            }
+            XCTFail("Devolvió \(filas.count) filas en vez de fallar")
+        } catch {
+            XCTAssertTrue(error is FalloDePagina)
+        }
+        XCTAssertEqual(pedidas, 2)
+    }
 }

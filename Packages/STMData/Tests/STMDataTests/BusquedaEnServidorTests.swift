@@ -80,4 +80,12 @@ final class BusquedaEnServidorTests: XCTestCase {
         XCTAssertEqual(SupabaseBackend.afterFilter(movement),
                        "booked_on.lt.2021-03-05,and(booked_on.eq.2021-03-05,id.lt.abcdef00-0000-0000-0000-000000000001)")
     }
+
+    /// ORC-70: la descarga completa va en orden ascendente; el día mínimo viaja aparte, como `booked_on=gte.`.
+    func testCursorDeLaDescargaCompletaEsDiaPosteriorOMayorId() throws {
+        let movement = Movement(id: UUID(uuidString: "ABCDEF00-0000-0000-0000-000000000001")!, householdId: UUID(), accountId: UUID(),
+                                bookedOn: CalendarDay(year: 2021, month: 3, day: 5)!, amount: Money(minor: -1), description: "x")
+        XCTAssertEqual(SupabaseBackend.downloadAfterFilter(movement),
+                       "booked_on.gt.2021-03-05,id.gt.abcdef00-0000-0000-0000-000000000001")
+    }
 }
