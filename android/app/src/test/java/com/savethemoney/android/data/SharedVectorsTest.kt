@@ -18,6 +18,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Test
 import java.io.File
 import java.time.LocalDate
+import java.time.YearMonth
 
 /**
  * Vectores de `testdata/vectors/`, compartidos con iOS (SharedVectorsTests.swift).
@@ -61,6 +62,28 @@ class SharedVectorsTest {
             val got = parseDecimal(v.str("input"), v.int("maxFractionDigits"))
             // Sin ceros finales: para BigDecimal 1250 y 1250.0 no son iguales.
             assertEquals("«${v.str("input")}» con ${v.str("maxFractionDigits")} decimales", expected?.stripTrailingZeros(), got?.stripTrailingZeros())
+        }
+    }
+
+    @Test
+    fun netWorthHistory() {
+        for (v in load("net_worth.json", "cases")) {
+            val accounts = v["accounts"]!!.jsonArray.map {
+                Account(
+                    it.str("key"), "home", it.str("key"), openingMinor = it["opening"]!!.jsonPrimitive.long,
+                    archivedAt = it["archivedAt"]?.jsonPrimitive?.content, createdAt = it["createdAt"]?.jsonPrimitive?.content,
+                    includeInNetWorth = it["includeInNetWorth"]?.jsonPrimitive?.content?.toBooleanStrict() ?: true,
+                )
+            }
+            val movements = v["movements"]!!.jsonArray.mapIndexed { i, m ->
+                Movement("m$i", "home", m.str("account"), null, m.str("day"), m["amount"]!!.jsonPrimitive.long, "Movimiento")
+            }
+            val history = NetWorth.history(accounts, movements, v.int("months"), YearMonth.parse(v.str("through")))
+            val name = v.str("name")
+            fun expected(key: String) = v[key]!!.jsonArray.map { it.jsonPrimitive.long }
+            assertEquals(name, expected("assets"), history.map { it.assets })
+            assertEquals(name, expected("liabilities"), history.map { it.liabilities })
+            assertEquals(name, expected("net"), history.map { it.net })
         }
     }
 
