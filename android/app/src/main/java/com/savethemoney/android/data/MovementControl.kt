@@ -186,6 +186,8 @@ data class CsvSavedFormat(
     val monthFirst: Boolean = false,
     /** Cuenta a la que se importó la última vez. */
     val accountId: String? = null,
+    /** Separador elegido. Nulo en formatos guardados antes de recordarlo. */
+    val delimiter: Char? = null,
 ) {
     val mapping: CsvMapping?
         get() {
@@ -203,7 +205,7 @@ data class CsvSavedFormat(
             val split = mapping.amount as? AmountColumns.Split
             return CsvSavedFormat(
                 fingerprint(table, mapping.headerRow), mapping.headerRow, mapping.date, mapping.description,
-                signed?.column, split?.debit, split?.credit, mapping.dateOrder == DateOrder.MonthDayYear, accountId,
+                signed?.column, split?.debit, split?.credit, mapping.dateOrder == DateOrder.MonthDayYear, accountId, table.delimiter,
             )
         }
 
@@ -215,9 +217,15 @@ data class CsvSavedFormat(
             return "n:${table.rows.take(20).maxOfOrNull { it.size } ?: 0}"
         }
 
-        /** El formato guardado que encaja con este archivo, si hay alguno. */
-        fun match(table: CsvTable, saved: List<CsvSavedFormat>): CsvSavedFormat? =
-            saved.firstOrNull { fingerprint(table, it.headerRow) == it.fingerprint }
+        /** El formato guardado que encaja con este texto, y el archivo leído con su separador guardado. */
+        fun match(texto: String, saved: List<CsvSavedFormat>): Pair<CsvSavedFormat, CsvTable>? {
+            val tablas = HashMap<Char?, CsvTable>()
+            for (format in saved) {
+                val table = tablas.getOrPut(format.delimiter) { CsvTable.parse(texto, format.delimiter) }
+                if (fingerprint(table, format.headerRow) == format.fingerprint) return format to table
+            }
+            return null
+        }
 
         /** Añade o sustituye (por huella) y deja como mucho 20, el más reciente primero. */
         fun remember(format: CsvSavedFormat, saved: List<CsvSavedFormat>): List<CsvSavedFormat> =

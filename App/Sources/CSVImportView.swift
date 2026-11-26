@@ -172,16 +172,17 @@ struct CSVImportView: View {
                 error = "No he podido leer el texto del archivo."
                 return
             }
-            let parsed = CSVTable.parse(text)
+            let saved = CSVSavedFormat.match(text: text, in: SavedCSVFormats.load())
+            let parsed = saved?.table ?? CSVTable.parse(text)
             fileText = text
             fileName = url.lastPathComponent
             marks = [:]
             review = CSVRowReview()
             table = parsed
-            if let saved = CSVSavedFormat.match(parsed, in: SavedCSVFormats.load()), let known = saved.mapping {
+            if let saved, let known = saved.format.mapping {
                 mapping = known
                 usedSavedFormat = true
-                if let account = saved.accountId, finance.activeAccounts.contains(where: { $0.id == account }) {
+                if let account = saved.format.accountId, finance.activeAccounts.contains(where: { $0.id == account }) {
                     accountId = account
                 }
             } else {
