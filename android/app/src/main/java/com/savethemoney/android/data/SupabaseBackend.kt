@@ -219,6 +219,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "STM02" -> AppError.InvalidInput(InvestmentTrade.NOT_ENOUGH_SHARES)
             "STM03" -> AppError.InvalidInput(InvestmentTrade.NEEDED_BY_LATER_SALE)
             // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
+            // update_movement: el movimiento cambió (o se borró) después de leerlo.
+            "STM05" -> AppError.MovementChanged
             "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
             // El trigger de households: no se cambia base_currency con importes guardados.
             "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)

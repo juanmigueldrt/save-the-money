@@ -20,6 +20,11 @@ sealed class AppError(override val message: String) : Exception(message) {
     data object AlreadyMember : AppError("Ya formas parte de ese hogar.")
     data object Network : AppError("No hay conexión. Inténtalo de nuevo en un momento.")
     class InvalidInput(text: String) : AppError(text)
+
+    /** El movimiento que se quería cambiar ya no es el que se leyó: otro dispositivo lo cambió o lo borró antes. */
+    data object MovementChanged : AppError(
+        "Este movimiento ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta.",
+    )
     class Unknown(val code: String) : AppError("Algo ha fallado. Inténtalo de nuevo.")
 }
 

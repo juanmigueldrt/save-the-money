@@ -80,6 +80,7 @@ import com.savethemoney.android.ui.components.MerchantLogo
 import com.savethemoney.android.data.MovementText
 import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.monthEndBalances
+import com.savethemoney.android.ui.Bloqueo
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.LocalSession
@@ -538,6 +539,8 @@ fun Pantalla07(nav: Nav) {
     val action = rememberAction()
     // Uno por formulario: si «Guardar» se repite tras un fallo de red, la transferencia no se guarda dos veces.
     val idTransferencia = remember { java.util.UUID.randomUUID().toString() }
+    // Lo mismo para un movimiento nuevo: el reintento lleva el mismo identificador y no se apunta dos veces.
+    val idMovimiento = remember { java.util.UUID.randomUUID().toString() }
     val cuentas = finance.activeAccounts.map { it.name to it.id }
     val enTarjeta = form.movement == null && tipo == 0 && finance.account(cuenta)?.kind == AccountKind.CreditCard
     val tipoCategoria = if (tipo == 1) CategoryKind.Income else CategoryKind.Expense
@@ -563,7 +566,7 @@ fun Pantalla07(nav: Nav) {
         } else {
             val draft = MovementDraft(
                 origen, categoria, fecha, if (tipo == 0) -valor else valor, concepto, nota,
-                excluded = excluido, payee = quien, tags = marcas,
+                excluded = excluido, payee = quien, tags = marcas, id = idMovimiento,
             )
             draft.issue?.let(::falla)
             val editando = form.movement
@@ -1278,6 +1281,8 @@ fun Vacio(texto: String) {
 @Composable
 fun SelectorFecha(inicial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
     val state = rememberDatePickerState(initialSelectedDateMillis = inicial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+    // Bloqueada, el diálogo (otra ventana) no se pinta; la fecha elegida se conserva y vuelve al desbloquear.
+    if (Bloqueo.app.bloqueada) return
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
