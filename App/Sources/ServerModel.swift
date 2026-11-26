@@ -1,5 +1,6 @@
 import Foundation
 import STMCore
+import STMData
 
 /// Lo que comparten los modelos de la app al hablar con el servidor: el error en español para la pantalla,
 /// qué pasa si la tarea se cancela y qué respuesta gana cuando dos lecturas se cruzan.
@@ -38,7 +39,9 @@ extension ServerModel {
     /// Una tarea cancelada no escribe `error`: la que la sustituye pone el suyo. Con `turn` (una carga), un fallo
     /// no tapa lo que ha dejado una carga que empezó después.
     @discardableResult
-    func perform(turn: Int? = nil, _ operation: () async throws -> Void) async -> Bool {
+    func perform(
+        turn: Int? = nil, _ operation: () async throws -> Void, function: String = #function
+    ) async -> Bool {
         guard !Task.isCancelled else { return false }
         error = nil
         do {
@@ -46,6 +49,7 @@ extension ServerModel {
             if let turn { _ = mayStore(\.error, turn: turn) }
             return true
         } catch {
+            Self.record(error, in: function)
             if let message = Self.message(for: error), turn.map({ mayStore(\.error, turn: $0) }) ?? true {
                 self.error = message
             }
@@ -56,10 +60,11 @@ extension ServerModel {
     /// Recarga tras una escritura. Nunca falla: lo guardado sigue guardado y, si la recarga falla, `error` lo dice
     /// como problema de carga, que se reintenta cargando y no guardando otra vez (como `reloadAfterSave` en Android).
     /// Si la escritura ya había fallado, su error va primero: por él el formulario sigue abierto.
-    func reloadAfterSave(_ reload: () async throws -> Void) async {
+    func reloadAfterSave(_ reload: () async throws -> Void, function: String = #function) async {
         do {
             try await reload()
         } catch {
+            Self.record(error, in: function)
             guard let message = Self.message(for: error) else { return }
             if let saveError = self.error, saveError != message {
                 self.error = saveError + " Además, no se han podido volver a cargar los datos: " + message
@@ -73,9 +78,11 @@ extension ServerModel {
     /// cambiara la fila antes (STM05) o que ya estuviera guardada con otros datos (STM01); así se ve lo que hay
     /// detrás del aviso. Devuelve si se guardó.
     @discardableResult
-    func write(_ operation: () async throws -> Void, thenReload reload: () async throws -> Void) async -> Bool {
-        let saved = await perform(operation)
-        await reloadAfterSave(reload)
+    func write(
+        _ operation: () async throws -> Void, thenReload reload: () async throws -> Void, function: String = #function
+    ) async -> Bool {
+        let saved = await perform(operation, function: function)
+        await reloadAfterSave(reload, function: function)
         return saved
     }
 
@@ -109,6 +116,13 @@ extension ServerModel {
     /// Un cambio que el servidor ya ha guardado se ve siempre; las lecturas que empezaron antes ya no lo pisan.
     func markChanged<Value>(_ slice: KeyPath<Self, Value>) {
         _ = turns.claim(slice, turn: turns.next())
+    }
+
+    /// Registra un fallo que no viene del servidor (ORC-72). Los del servidor ya los registra `mapped` en STMData,
+    /// antes de convertirlos en `AppError`; las cancelaciones no son fallos.
+    static func record(_ error: any Error, in function: String) {
+        guard !(error is AppError), message(for: error) != nil else { return }
+        ErrorLog.record(error, in: function)
     }
 
     /// El texto para la pantalla, o nil si la tarea se ha cancelado: eso no es un fallo que enseñar.

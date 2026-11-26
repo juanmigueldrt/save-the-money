@@ -39,7 +39,15 @@ Supabase en el momento: borrarlo del historial no basta.
     anteriores se cifra y se borra al arrancar; si no se puede descifrar, la app
     arranca sin sesión. Esas preferencias quedan fuera de las copias en la nube
     y de la transferencia entre dispositivos.
-- Los logs marcan importes, nombres y notas como privados.
+- Las apps sólo registran fallos, en el registro local del dispositivo (`Logger` en
+  iOS y macOS, categoría `errores`; `android.util.Log` en Android, etiqueta `STM`).
+  Cada línea lleva como mucho: el nombre de la operación (un texto fijo del código),
+  el tipo del error, su código (de Postgres, de Supabase Auth o de red) y el estado
+  HTTP. Nunca el mensaje del error ni el cuerpo de la petición o la respuesta, que
+  pueden citar importes, nombres, notas, beneficiarios, etiquetas, usuarios, correos,
+  tokens o códigos de invitación; tampoco ids de hogar, usuario o fila. No se envía
+  nada fuera del dispositivo:
+  [docs/decisiones/informes-de-fallos.md](docs/decisiones/informes-de-fallos.md).
 - «Borrar datos» borra en el servidor sólo lo que creó quien lo pide. Lo de otros miembros se borra sólo si cuelga de algo suyo (p. ej. los movimientos de una cuenta).
 
 ## Avisar de un problema
