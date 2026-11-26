@@ -1,5 +1,7 @@
 package com.savethemoney.android.data
 
+import com.savethemoney.android.ui.FinanceModel
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -208,6 +210,44 @@ class SharedVectorsTest {
             val previous = preset.previousRange(hoy, inicio)
             assertEquals(preset.name, v.rango("previousRange"), "${previous.start}..${previous.endInclusive}")
             assertEquals(preset.name, v.long("previousTotal"), SpendingReport(movimientos, emptyList(), previous, monthStartDay = inicio).total)
+        }
+    }
+
+    @Test
+    fun householdMonth() = runBlocking {
+        val file = Json.parseToJsonElement(File("../../testdata/vectors/household_month.json").readText())
+        val hoy = file.date("today")
+        val categorias = file["categories"]!!.jsonArray.map { c ->
+            BudgetCategory(c.str("id"), "hogar", c.str("name"), CategoryKind.entries.first { it.name.equals(c.str("kind"), ignoreCase = true) })
+        }
+        val movimientos = file["movements"]!!.jsonArray.map { m ->
+            Movement(m.str("id"), "hogar", "cuenta", m.str("category"), m.str("day"), m.long("minor"), m.str("id"))
+        }
+        // Gasto del mes: lo que pinta el Resumen, a través de FinanceModel con el servicio en memoria.
+        for (v in file["spent"]!!.jsonArray) {
+            val inicio = v.int("monthStartDay")
+            val service = InMemoryFinance()
+            val cuenta = service.createAccount(AccountDraft("Corriente", AccountKind.Checking), "hogar")
+            val ids = categorias.associate { c -> c.id to service.createCategory(c).id }
+            for (m in movimientos) {
+                service.addMovement(MovementDraft(cuenta.id, ids[m.categoryId], m.day, m.amountMinor, m.description), "hogar")
+            }
+            val model = FinanceModel(Household("hogar", "Casa", monthStartDay = inicio), service, { hoy })
+            model.load()
+            assertEquals("inicio $inicio", v.long("minor"), model.spentThisMonth)
+        }
+        for (v in file["rise"]!!.jsonArray) {
+            val inicio = v.int("monthStartDay")
+            val sube = biggestRise(movimientos, categorias, monthContaining(hoy, inicio), inicio)
+            assertEquals("inicio $inicio", v["title"]?.jsonPrimitive?.content, sube?.title)
+            assertEquals("inicio $inicio", v["percent"]?.jsonPrimitive?.long, sube?.percent)
+            assertEquals("inicio $inicio", v["previous"]?.jsonPrimitive?.content, sube?.previous?.let { "%04d-%02d".format(it.year, it.monthValue) })
+        }
+        for (v in file["filters"]!!.jsonArray) {
+            val inicio = v.int("monthStartDay")
+            val preset = MovementDateFilter.entries.first { it.name.replaceFirstChar { c -> c.lowercase() } == v.str("dates") }
+            val visibles = MovementFilter(dates = preset).apply(movimientos, categorias, hoy, inicio)
+            assertEquals("${v.str("dates")} inicio $inicio", v["ids"]!!.jsonArray.map { it.jsonPrimitive.content }, visibles.map { it.id })
         }
     }
 
