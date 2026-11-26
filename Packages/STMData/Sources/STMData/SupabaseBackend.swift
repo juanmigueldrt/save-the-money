@@ -255,6 +255,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
         // El trigger de households: no se cambia base_currency con importes guardados.
         case "STM06": .invalidInput(Household.currencyLocked)
+        // Transferencias: la otra pata no se pudo cambiar o borrar a la vez.
+        case "STM07": .invalidInput(TransferDraft.otherLegLocked)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

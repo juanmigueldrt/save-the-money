@@ -246,6 +246,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
             // El trigger de households: no se cambia base_currency con importes guardados.
             "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)
+            // Transferencias: la otra pata no se pudo cambiar o borrar a la vez.
+            "STM07" -> AppError.InvalidInput(TransferDraft.OTHER_LEG_LOCKED)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

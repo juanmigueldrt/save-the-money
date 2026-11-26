@@ -189,6 +189,12 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         Unit
     }
 
+    /** delete_transfer borra las dos patas en una sola transacción, o ninguna (STM07). */
+    override suspend fun deleteTransfer(transferId: String) = backend.mapped {
+        client.postgrest.rpc("delete_transfer", buildJsonObject { put("transfer", transferId) })
+        Unit
+    }
+
     override suspend fun importMovements(drafts: List<MovementDraft>, householdId: String): ImportResult = backend.mapped {
         drafts.firstNotNullOfOrNull { it.issue }?.let(::fail)
         var inserted = 0
@@ -668,7 +674,7 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
-        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at"
+        const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"
 
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500

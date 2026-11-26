@@ -7,7 +7,7 @@ import Supabase
 extension SupabaseBackend: FinanceService {
     private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
     private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
-    static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at"
+    static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
     private static let importBatchSize = 500
 
@@ -232,6 +232,13 @@ extension SupabaseBackend: FinanceService {
                 .delete()
                 .eq("id", value: movementId.uuidString)
                 .execute()
+        }
+    }
+
+    /// `delete_transfer` borra las dos patas en una sola transacción, o ninguna (STM07).
+    public func deleteTransfer(_ transferId: UUID) async throws {
+        try await mapped {
+            try await client.rpc("delete_transfer", params: ["transfer": transferId.uuidString]).execute()
         }
     }
 
