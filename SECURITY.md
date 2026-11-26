@@ -29,7 +29,13 @@ Supabase en el momento: borrarlo del historial no basta.
 
 ## En la app
 
-- La sesión se guarda en el Llavero.
+- La sesión (tokens de acceso y de refresco) no se guarda nunca en claro:
+  - iOS y macOS: en el Llavero (almacén por defecto de supabase-swift).
+  - Android: cifrada con AES-GCM y una clave de Android Keystore que no sale del
+    dispositivo, en las preferencias de la app. Una sesión en claro de versiones
+    anteriores se cifra y se borra al arrancar; si no se puede descifrar, la app
+    arranca sin sesión. Esas preferencias quedan fuera de las copias en la nube
+    y de la transferencia entre dispositivos.
 - Los logs marcan importes, nombres y notas como privados.
 - «Borrar datos» borra en el servidor sólo lo que creó quien lo pide. Lo de otros miembros se borra sólo si cuelga de algo suyo (p. ej. los movimientos de una cuenta).
 
