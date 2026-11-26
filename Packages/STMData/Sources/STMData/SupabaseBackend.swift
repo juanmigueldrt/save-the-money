@@ -221,9 +221,12 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         switch postgresCode {
         case "P0002": .invalidOrExpiredInvite
         case "23505":
-            if message.contains("already a member") { .alreadyMember }
-            else if message.contains("categories_household_name_idx") { .invalidInput("Ya hay una categoría con ese nombre.") }
-            else { .usernameTaken }
+            // profiles.username es único: Postgres nombra la restricción en el mensaje.
+            if message.contains("already a member") { .alreadyMember } else if message.contains("categories_household_name_idx") {
+                .invalidInput("Ya hay una categoría con ese nombre.")
+            } else if message.contains("profiles_username_key") { .usernameTaken } else {
+                .invalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
+            }
         case "28000", "PGRST301": .notSignedIn
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
