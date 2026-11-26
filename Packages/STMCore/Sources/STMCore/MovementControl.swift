@@ -234,10 +234,13 @@ public struct CSVSavedFormat: Codable, Hashable, Sendable {
     public var monthFirst: Bool
     /// Cuenta a la que se importó la última vez.
     public var accountId: UUID?
+    /// Separador elegido (`;`, tabulador o `,`). Nil en formatos guardados antes de recordarlo.
+    public var delimiter: String?
 
     public init(table: CSVTable, mapping: CSVMapping, accountId: UUID?) {
         fingerprint = Self.fingerprint(of: table, headerRow: mapping.headerRow)
         headerRow = mapping.headerRow
+        delimiter = String(table.delimiter)
         date = mapping.date
         description = mapping.description
         switch mapping.amount {
@@ -270,10 +273,15 @@ public struct CSVSavedFormat: Codable, Hashable, Sendable {
         return "n:\(width)"
     }
 
-    /// El formato guardado que encaja con este archivo, si hay alguno.
-    public static func match(_ table: CSVTable, in saved: [CSVSavedFormat]) -> CSVSavedFormat? {
+    /// El formato guardado que encaja con este texto, y el archivo leído con su separador guardado.
+    /// Sin separador guardado se lee con el detectado, como antes.
+    public static func match(text: String, in saved: [CSVSavedFormat]) -> (format: CSVSavedFormat, table: CSVTable)? {
+        var tables: [Character?: CSVTable] = [:]
         for format in saved {
-            if fingerprint(of: table, headerRow: format.headerRow) == format.fingerprint { return format }
+            let delimiter = format.delimiter?.first
+            let table = tables[delimiter] ?? CSVTable.parse(text, delimiter: delimiter)
+            tables[delimiter] = table
+            if fingerprint(of: table, headerRow: format.headerRow) == format.fingerprint { return (format, table) }
         }
         return nil
     }
