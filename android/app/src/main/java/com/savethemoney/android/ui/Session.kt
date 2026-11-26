@@ -28,6 +28,9 @@ class Session(
     private val notifier: Notifier = NoNotifier,
     /** Borra lo que queda en el dispositivo de la cuenta: exportados y avisos mostrados. */
     private val borrarLocal: () -> Unit = {},
+    /** El hogar que eligió cada persona en este dispositivo (id de usuario a id de hogar), en las preferencias. */
+    private val hogarElegido: (String) -> String? = { null },
+    private val eligeHogar: (String, String) -> Unit = { _, _ -> },
 ) {
     sealed interface State {
         data object Loading : State
@@ -48,6 +51,10 @@ class Session(
 
     /** Código recibido por enlace o QR, pendiente de usar. */
     var pendingInvite by mutableStateOf<InviteCode?>(null)
+
+    /** Los hogares de quien ha entrado, para elegir cuál abrir cuando hay más de uno. */
+    var households by mutableStateOf<List<Household>>(emptyList())
+        private set
 
     val profile: Profile? get() = when (val s = state) {
         is State.Ready -> s.profile
@@ -92,6 +99,7 @@ class Session(
             notifier.replaceReminders(emptyList())
             borrarLocal()
             finance = null
+            households = emptyList()
             state = State.SignedOut
             signOutNotice = AppError.NotSignedIn.message
         }
@@ -110,7 +118,9 @@ class Session(
             } else {
                 val profile = backend.myProfile()
                 val homes = backend.households()
-                val home = homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
+                households = homes
+                val elegido = hogarElegido(profile.id)
+                val home = homes.firstOrNull { it.id == elegido } ?: homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
                 if (home != null) State.Ready(profile, home) else State.NeedsHousehold(profile)
             }
         } catch (e: AppError.NotSignedIn) {
@@ -125,8 +135,9 @@ class Session(
             throw error
         }
         if (next is State.Ready) {
-            // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros.
-            if (finance?.household?.id != next.household.id) {
+            // Se carga antes de cambiar de estado para que Inicio no aparezca a ceros. Otro día de inicio del mes
+            // también da modelos nuevos: presupuestos e informes van por otros periodos.
+            if (finance?.household?.id != next.household.id || finance?.household?.monthStartDay != next.household.monthStartDay) {
                 finance = FinanceModel(next.household, financeService, today, notifier).also { it.load() }
             }
         } else if (next !is State.Loading) {
@@ -163,6 +174,17 @@ class Session(
         }
     }
 
+    /** Nombre visible: vacío vuelve al nombre de usuario; como al crear la cuenta, como mucho 60 caracteres. */
+    suspend fun setDisplayName(name: String) {
+        val actual = profile ?: return
+        val nuevo = backend.updateProfile(SignUpForm(displayName = name).trimmedDisplayName, actual.theme)
+        state = when (val s = state) {
+            is State.Ready -> s.copy(profile = nuevo)
+            is State.NeedsHousehold -> s.copy(profile = nuevo)
+            else -> s
+        }
+    }
+
     /** Si el cierre no llegó al servidor. Este dispositivo ya está desconectado; el aviso se ve en la pantalla de entrar. */
     var signOutNotice by mutableStateOf<String?>(null)
         private set
@@ -180,6 +202,7 @@ class Session(
         notifier.replaceReminders(emptyList())
         borrarLocal()
         finance = null
+        households = emptyList()
         state = State.SignedOut
     }
 
@@ -188,16 +211,47 @@ class Session(
         refresh()
     }
 
+    /** Tras unirse se abre el hogar nuevo; si ya tenía otro, sigue en los dos y puede volver a él con [open]. */
     suspend fun join(code: InviteCode) {
-        backend.acceptInvite(code)
+        val joined = backend.acceptInvite(code)
         pendingInvite = null
+        profile?.let { eligeHogar(it.id, joined.id) }
         refresh()
+    }
+
+    /**
+     * Abre otro de sus hogares y lo recuerda en este dispositivo. Las finanzas son nuevas y se cargan antes de
+     * cambiar de estado: nada del hogar anterior se ve con el nuevo.
+     */
+    suspend fun open(household: Household) {
+        val s = state as? State.Ready ?: return
+        if (s.household.id == household.id || households.none { it.id == household.id }) return
+        eligeHogar(s.profile.id, household.id)
+        refresh()
+    }
+
+    /** Sólo el dueño. No cambia ningún dato guardado: las finanzas se rehacen y todo se recalcula con los meses nuevos. */
+    suspend fun setMonthStartDay(day: Int) {
+        val h = household ?: return
+        val updated = backend.setMonthStartDay(h.id, day)
+        households = households.map { if (it.id == updated.id) updated else it }
+        val s = state
+        if (s is State.Ready && s.household.id == updated.id) {
+            val nuevo = FinanceModel(updated, financeService, today, notifier).also { it.load() }
+            // Si mientras cargaba se abrió otro hogar, no se pisa.
+            val ahora = state
+            if (ahora is State.Ready && ahora.household.id == updated.id) {
+                finance = nuevo
+                state = ahora.copy(household = updated)
+            }
+        }
     }
 
     /** Sólo el dueño; el nombre nuevo se ve enseguida en la app. */
     suspend fun renameHousehold(household: Household, name: String) {
         val renamed = backend.renameHousehold(household.id, name)
         val s = state
+        households = households.map { if (it.id == renamed.id) renamed else it }
         if (s is State.Ready && s.household.id == renamed.id) {
             finance?.household = renamed
             state = s.copy(household = renamed)

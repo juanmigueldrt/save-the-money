@@ -201,3 +201,135 @@ final class ModelosDelHogarTests: XCTestCase {
         XCTAssertNil(session.models)
     }
 }
+
+/// ORC-112: día de inicio del mes, nombre visible, elegir hogar y enlace de invitación con un hogar abierto.
+@MainActor
+final class AjustesDelHogarTests: XCTestCase {
+    private var defaults = UserDefaults.standard
+
+    override func setUp() async throws {
+        defaults = try XCTUnwrap(UserDefaults(suiteName: "ajustes-hogar-\(UUID().uuidString)"))
+    }
+
+    /// Ana tiene su hogar y además entra en el de Bea con una invitación de Bea. Devuelve la sesión de Ana.
+    private func anaConDosHogares() async throws -> SessionModel {
+        let services = AppServices.demo()
+        let bea = SessionModel(services: services, defaults: defaults)
+        try await bea.signUp(SignUpForm(username: "bea", password: clave, passwordConfirmation: clave))
+        try await bea.createHousehold(name: "Casa de Bea")
+        let created = await bea.models?.household.invite()
+        let invite = try XCTUnwrap(created?.inviteCode)
+        let ana = SessionModel(services: services, defaults: defaults)
+        try await ana.signUp(SignUpForm(username: "ana", password: clave, passwordConfirmation: clave))
+        try await ana.createHousehold(name: "Casa de Ana")
+        try await ana.join(invite)
+        return ana
+    }
+
+    private func hogar(_ name: String, de session: SessionModel) throws -> Household {
+        try XCTUnwrap(session.households.first { $0.name == name })
+    }
+
+    func testCambiarElDiaDeInicioRehaceLosModelosConElDiaNuevoSinTocarMovimientos() async throws {
+        let session = SessionModel(services: .demo(), defaults: defaults)
+        try await session.signUp(SignUpForm(username: "ana", password: clave, passwordConfirmation: clave))
+        try await session.createHousehold(name: "Casa")
+        guard case .ready(_, let household) = session.state else { return XCTFail("sin hogar") }
+        let account = try await session.services.finance.createAccount(AccountDraft(name: "Corriente"), in: household.id)
+        let day = try XCTUnwrap(CalendarDay(year: 2026, month: 11, day: 20))
+        _ = try await session.services.finance.addMovement(
+            MovementDraft(accountId: account.id, bookedOn: day, amount: Money(minor: -4_250), description: "Compra"), in: household.id)
+        let antes = try await session.services.finance.allMovements(in: household.id)
+        let modelos = try XCTUnwrap(session.models)
+
+        try await session.setMonthStartDay(25)
+
+        let despues = try XCTUnwrap(session.models)
+        XCTAssertFalse(despues.finance === modelos.finance, "los modelos guardaban el día de antes")
+        XCTAssertEqual(despues.finance.household.monthStartDay, 25)
+        XCTAssertEqual(despues.budgets.household.monthStartDay, 25)
+        XCTAssertEqual(despues.tracking.household.monthStartDay, 25)
+        XCTAssertEqual(despues.planning.household.monthStartDay, 25)
+        XCTAssertEqual(despues.investments.household.monthStartDay, 25)
+        XCTAssertEqual(despues.cards.household.monthStartDay, 25)
+        XCTAssertEqual(session.households.map(\.monthStartDay), [25])
+        let guardados = try await session.services.finance.allMovements(in: household.id)
+        XCTAssertEqual(guardados, antes)
+    }
+
+    func testSoloElDuenoCambiaElDiaDeInicio() async throws {
+        let ana = try await anaConDosHogares()
+        ana.open(try hogar("Casa de Bea", de: ana))
+
+        do {
+            try await ana.setMonthStartDay(10)
+            XCTFail("un miembro no debería poder cambiarlo")
+        } catch let error as AppError {
+            XCTAssertEqual(error, .invalidInput(Household.monthStartDayOwnerOnly))
+        }
+        guard case .ready(_, let abierto) = ana.state else { return XCTFail("sin hogar") }
+        XCTAssertEqual(abierto.monthStartDay, 1)
+    }
+
+    func testElNombreVisibleSeGuardaRecortadoYVacioVuelveAlUsuario() async throws {
+        let session = SessionModel(services: .demo(), defaults: defaults)
+        try await session.signUp(SignUpForm(username: "ana", password: clave, passwordConfirmation: clave))
+        try await session.createHousehold(name: "Casa")
+
+        try await session.setDisplayName("  Ana María  ")
+        XCTAssertEqual(try perfil(session).displayName, "Ana María")
+        try await session.setDisplayName("   ")
+        XCTAssertNil(try perfil(session).displayName)
+        XCTAssertEqual(try perfil(session).name, "ana")
+    }
+
+    func testAlUnirseConUnHogarAbiertoSeAbreElNuevoYSeSigueEnLosDos() async throws {
+        let ana = try await anaConDosHogares()
+        let deAna = try hogar("Casa de Ana", de: ana), deBea = try hogar("Casa de Bea", de: ana)
+
+        XCTAssertEqual(Set(ana.households.map(\.id)), [deAna.id, deBea.id])
+        guard case .ready(_, let abierto) = ana.state else { return XCTFail("sin hogar") }
+        XCTAssertEqual(abierto.id, deBea.id)
+        XCTAssertNil(ana.pendingInvite)
+    }
+
+    func testUnEnlaceConUnHogarAbiertoNoUneSolo() async throws {
+        let session = SessionModel(services: .demo(), defaults: defaults)
+        try await session.signUp(SignUpForm(username: "ana", password: clave, passwordConfirmation: clave))
+        try await session.createHousehold(name: "Casa")
+        guard case .ready(_, let household) = session.state else { return XCTFail("sin hogar") }
+
+        session.handle(url: try XCTUnwrap(URL(string: "savethemoney://unirse/4K9Q2X")))
+
+        XCTAssertEqual(session.pendingInvite?.value, "4K9Q2X")
+        guard case .ready(_, let abierto) = session.state else { return XCTFail("sin hogar") }
+        XCTAssertEqual(abierto.id, household.id)
+        XCTAssertEqual(session.households.map(\.id), [household.id])
+    }
+
+    func testCambiarDeHogarDaModelosNuevosYSeRecuerdaEnElDispositivo() async throws {
+        let ana = try await anaConDosHogares()
+        let deAna = try hogar("Casa de Ana", de: ana), deBea = try hogar("Casa de Bea", de: ana)
+        let account = try await ana.services.finance.createAccount(AccountDraft(name: "Solo de Bea"), in: deBea.id)
+        let deBeaModelos = try XCTUnwrap(ana.models)
+        await deBeaModelos.finance.load()
+        XCTAssertEqual(deBeaModelos.finance.accounts.map(\.id), [account.id])
+
+        ana.open(deAna)
+
+        let nuevos = try XCTUnwrap(ana.models)
+        XCTAssertEqual(nuevos.householdId, deAna.id)
+        XCTAssertFalse(nuevos.finance === deBeaModelos.finance)
+        XCTAssertTrue(nuevos.finance.accounts.isEmpty, "no debe verse nada del otro hogar")
+        // Una carga del hogar anterior que acaba tarde se queda en sus modelos, que ya no se ven.
+        await deBeaModelos.finance.load()
+        await nuevos.finance.load()
+        XCTAssertTrue(nuevos.finance.accounts.isEmpty)
+
+        // Otra sesión en el mismo dispositivo abre el que se eligió, no el predeterminado.
+        let otra = SessionModel(services: ana.services, defaults: defaults)
+        await otra.start()
+        guard case .ready(_, let abierto) = otra.state else { return XCTFail("sin hogar") }
+        XCTAssertEqual(abierto.id, deAna.id)
+    }
+}

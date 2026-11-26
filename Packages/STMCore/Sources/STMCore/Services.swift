@@ -69,6 +69,9 @@ public protocol HouseholdService: Sendable {
     func removeMember(_ userId: UUID, from householdId: UUID) async throws
     /// Cambia el nombre del hogar. Sólo puede quien lo creó.
     func renameHousehold(_ householdId: UUID, to name: String) async throws -> Household
+    /// Cambia el día en que empieza el mes del hogar (`Household.monthStartDays`). Sólo puede quien lo creó.
+    /// No toca ningún dato guardado: solo cambia qué días cuentan en cada mes de presupuestos e informes.
+    func setMonthStartDay(_ householdId: UUID, to day: Int) async throws -> Household
 }
 
 /// Cuentas, categorías y movimientos de un hogar.

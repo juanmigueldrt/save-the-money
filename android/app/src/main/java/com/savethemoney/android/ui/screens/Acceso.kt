@@ -49,6 +49,7 @@ import com.savethemoney.android.ui.components.NavBar
 import com.savethemoney.android.ui.components.OutlinedField
 import com.savethemoney.android.ui.components.StmCard
 import com.savethemoney.android.ui.components.StmIcon
+import com.savethemoney.android.ui.components.SelectorSheet
 import com.savethemoney.android.ui.components.StmScreen
 import com.savethemoney.android.ui.components.Tab
 import com.savethemoney.android.ui.components.TopBar
@@ -57,6 +58,7 @@ import com.savethemoney.android.ui.theme.Brand
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
 import android.content.Intent
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -69,6 +71,7 @@ import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.HouseholdInvite
 import com.savethemoney.android.data.HouseholdMember
 import com.savethemoney.android.data.InviteCode
+import com.savethemoney.android.data.MONTH_START_DAYS
 import com.savethemoney.android.data.MemberRole
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
@@ -246,22 +249,44 @@ private fun OptionCard(
     }
 }
 
-/** 28 Hogar: miembros, qué se comparte e invitar a alguien. */
+/** Enlace de invitación con un hogar ya abierto: pregunta antes de unirse; nunca se une solo. */
+@Composable
+fun BoxScope.UnirseDesdeEnlace() {
+    val session = LocalSession.current
+    val code = session.pendingInvite ?: return
+    val action = rememberAction()
+    StmDialog(
+        "¿Unirte a otro hogar?",
+        "Con el código ${code.value} entrarás en otro hogar. Seguirás en ${session.household?.name.orEmpty()}: " +
+            "pertenecerás a los dos hogares y podrás cambiar de uno a otro en Hogar.",
+        onDismiss = { session.pendingInvite = null },
+        actions = {
+            Btn("Ahora no", { session.pendingInvite = null }, kind = BtnKind.Text)
+            Btn("Unirme", { action.run { session.join(code) } }, kind = BtnKind.Text, enabled = !action.busy)
+        },
+    ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = Stm.colors.error) } }
+}
+
+/** 28 Hogar: elegir hogar, ajustes del hogar y del perfil, miembros, qué se comparte e invitar a alguien. */
 @Composable
 fun Pantalla28(nav: Nav) {
     val c = Stm.colors
     val session = LocalSession.current
     val me = session.profile?.id
     var recarga by remember { mutableIntStateOf(0) }
-    val carga by produceState<Result<List<HouseholdMember>>?>(null, session.household, recarga) {
-        value = session.household?.let { h -> runCatching { session.backend.members(h.id) } }
+    // Con el id del hogar: al cambiar de hogar, la lista del anterior no se enseña mientras carga la del nuevo.
+    val carga by produceState<Pair<String, Result<List<HouseholdMember>>>?>(null, session.household, recarga) {
+        value = session.household?.let { h -> h.id to runCatching { session.backend.members(h.id) } }
     }
-    val members = carga?.getOrNull().orEmpty().sortedBy { it.profile.id != me }
-    val fallo = carga?.exceptionOrNull()?.let { (it as? AppError)?.message ?: "No se han podido cargar los miembros del hogar." }
+    val miembros = carga?.takeIf { it.first == session.household?.id }?.second
+    val members = miembros?.getOrNull().orEmpty().sortedBy { it.profile.id != me }
+    val fallo = miembros?.exceptionOrNull()?.let { (it as? AppError)?.message ?: "No se han podido cargar los miembros del hogar." }
     val soyDueno = members.any { it.profile.id == me && it.role == MemberRole.Owner }
     var quitando by remember { mutableStateOf<HouseholdMember?>(null) }
     var saliendo by remember { mutableStateOf(false) }
     var nombre by remember { mutableStateOf<String?>(null) }
+    var eligeDia by remember { mutableStateOf(false) }
+    var nombreVisible by remember { mutableStateOf<String?>(null) }
     val action = rememberAction()
     StmScreen(
         topBar = {
@@ -335,8 +360,75 @@ fun Pantalla28(nav: Nav) {
                     },
                 ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
             }
-        } else null,
+        } else if (eligeDia) {
+            {
+                SelectorSheet(
+                    "Día de inicio del mes",
+                    MONTH_START_DAYS.map { d -> "Día $d" to { action.run { session.setMonthStartDay(d) } } },
+                    { eligeDia = false },
+                )
+            }
+        } else nombreVisible?.let { texto ->
+            {
+                StmDialog(
+                    "Tu nombre visible", "Es como te ven los demás miembros. Vacío, se usa tu usuario; como mucho 60 caracteres.",
+                    onDismiss = { nombreVisible = null },
+                    actions = {
+                        Btn("Cancelar", { nombreVisible = null }, kind = BtnKind.Text)
+                        Btn("Guardar", {
+                            action.run {
+                                session.setDisplayName(texto)
+                                nombreVisible = null
+                                // La lista de miembros lleva el nombre: se vuelve a pedir.
+                                recarga++
+                            }
+                        }, kind = BtnKind.Text, enabled = !action.busy)
+                    },
+                ) {
+                    Spacer(Modifier.height(16.dp))
+                    FilledField("Nombre visible", texto, { nombreVisible = it }, autoFocus = true)
+                    action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) }
+                }
+            }
+        },
     ) {
+        if (session.households.size > 1) {
+            ListCard {
+                ListHeader("Tus hogares")
+                session.households.forEachIndexed { i, h ->
+                    if (i > 0) Divider()
+                    val abierto = h.id == session.household?.id
+                    ListItem(
+                        h.name, if (abierto) "Abierto" else "Abrir este hogar",
+                        onClick = if (abierto || action.busy) null else ({ action.run { session.open(h) } }),
+                    )
+                }
+            }
+            Text(
+                "Cada hogar tiene sus propias cuentas y presupuestos. Este dispositivo recuerda cuál abriste.",
+                Modifier.padding(16.dp), style = StmType.bodySmall, color = c.onSurfaceVariant,
+            )
+        }
+        ListCard {
+            ListHeader("Ajustes")
+            val dia = session.household?.monthStartDay ?: 1
+            // Sólo el dueño puede cambiarlo (RLS de households); los demás lo ven.
+            ListItem(
+                "Inicio del mes", if (soyDueno) "Día $dia" else "Día $dia · solo quien creó el hogar puede cambiarlo",
+                onClick = if (soyDueno) ({ eligeDia = true }) else null,
+            )
+            Divider()
+            ListItem("Tu nombre visible", session.profile?.name, onClick = { nombreVisible = session.profile?.displayName.orEmpty() })
+        }
+        Text(
+            "Presupuestos, informes y «este mes» cuentan desde el día de inicio. No se cambia ni se borra ningún movimiento.",
+            Modifier.padding(16.dp), style = StmType.bodySmall, color = c.onSurfaceVariant,
+        )
+        // Lo que no se pudo guardar desde una hoja (día de inicio, cambiar de hogar): el aviso del servidor.
+        if (!eligeDia && nombreVisible == null && nombre == null && quitando == null && !saliendo) {
+            action.error?.let { Text(it, Modifier.padding(horizontal = 16.dp), style = StmType.bodySmall, color = c.error) }
+        }
+        Spacer(Modifier.height(16.dp))
         ListCard {
             ListHeader("Miembros")
             members.forEachIndexed { i, m ->
