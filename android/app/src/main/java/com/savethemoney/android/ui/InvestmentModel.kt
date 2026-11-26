@@ -20,6 +20,7 @@ import com.savethemoney.android.data.Portfolio
 import com.savethemoney.android.data.PortfolioPoint
 import com.savethemoney.android.data.Position
 import com.savethemoney.android.data.PriceHistory
+import com.savethemoney.android.data.TradeCash
 import com.savethemoney.android.data.charges
 import com.savethemoney.android.data.counts
 import com.savethemoney.android.data.monthlyTotal
@@ -127,12 +128,28 @@ class InvestmentModel(
         prices = service.holdingPrices(household.id)
     }
 
-    suspend fun add(trade: InvestmentTrade) {
+    /**
+     * Guarda la operación y, con [cash], su movimiento en la cuenta: los dos o ninguno, en una sola llamada.
+     * Con el mismo id (uno por formulario) reintentar no duplica. Desde las pantallas se llama por
+     * FinanceModel.addTrade, que además recarga los saldos.
+     */
+    suspend fun add(trade: InvestmentTrade, cash: TradeCash? = null) {
         trade.issue(trades)?.let { throw AppError.InvalidInput(it) }
-        trades = trades + service.addTrade(trade)
+        val saved = try {
+            service.addTrade(trade, cash)
+        } catch (e: AppError) {
+            // Puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
+            try {
+                trades = service.trades(household.id)
+            } catch (_: AppError) {
+            }
+            throw e
+        }
+        trades = trades.filter { it.id != saved.id } + saved
     }
 
     suspend fun delete(trade: InvestmentTrade) {
+        trade.deletionIssue(trades)?.let { throw AppError.InvalidInput(it) }
         service.deleteTrade(trade.id)
         trades = trades.filter { it.id != trade.id }
     }

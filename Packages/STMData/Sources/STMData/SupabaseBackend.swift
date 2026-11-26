@@ -13,8 +13,10 @@ public struct SupabaseBackend: AuthService, HouseholdService {
 
     // MARK: AuthService
 
+    /// La sesión guardada en el Llavero, aunque haya caducado: sin red no se puede renovar,
+    /// pero sigue siendo de esta persona. Si el servidor la rechaza, supabase-swift la borra.
     public func currentUserId() async -> UUID? {
-        try? await client.auth.session.user.id
+        client.auth.currentSession?.user.id
     }
 
     public func signUp(username: Username, password: String, displayName: String?) async throws -> UUID {
@@ -41,11 +43,15 @@ public struct SupabaseBackend: AuthService, HouseholdService {
     private static let householdColumns = "id,name,base_currency,month_start_day"
     private static let inviteColumns = "id,household_id,code,status,expires_at"
 
+    /// Renueva la sesión si ha caducado. Sólo es «sin sesión» si ya no hay ninguna guardada
+    /// (no la había o el servidor la rechazó y supabase-swift la borró); si sigue guardada, el
+    /// fallo es de red o del servidor y no debe mandar al login.
     private func userId() async throws -> UUID {
         do {
             return try await client.auth.session.user.id
         } catch {
-            throw AppError.notSignedIn
+            guard client.auth.currentSession != nil else { throw AppError.notSignedIn }
+            throw error is URLError ? AppError.network : AppError.unknown("auth")
         }
     }
 
@@ -219,6 +225,9 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
         case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
+        // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
+        case "STM02": .invalidInput(InvestmentTrade.notEnoughShares)
+        case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

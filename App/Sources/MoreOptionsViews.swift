@@ -162,7 +162,7 @@ struct MoreView: View {
                         .foregroundStyle(Palette.negativeText)
                 }
             } footer: {
-                Text("Borra las cuentas, movimientos, presupuestos, pagos fijos y metas de todo el hogar.")
+                Text("Borra lo que creaste tú: cuentas, tarjetas, movimientos, presupuestos, pagos fijos, metas e inversiones. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo.")
             }
 
             Section {
@@ -435,10 +435,10 @@ struct ResetHouseholdView: View {
                 VStack(alignment: .leading, spacing: Spacing.s24) {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
                         Eyebrow("Empezar de cero")
-                        Text("Se borrará todo lo apuntado en «\(household.name)»")
+                        Text("Se borrará lo que creaste en «\(household.name)»")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        Text("Cuentas, tarjetas, movimientos, categorías propias, presupuestos, pagos fijos, metas e inversiones, para todas las personas del hogar. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan.")
+                        Text("Cuentas, tarjetas, movimientos, categorías propias, presupuestos, pagos fijos, metas e inversiones que creaste tú. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan.")
                             .font(Typography.subheadline)
                             .foregroundStyle(Palette.labelSecondary)
                         Text("No se puede deshacer. Si quieres guardar una copia, exporta antes el CSV.")

@@ -919,8 +919,8 @@ fun Pantalla33(nav: Nav) {
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = {
             StmDialog(
-                "¿Borrar todos los datos?",
-                "Se borrarán las cuentas, movimientos, presupuestos, metas, tarjetas e inversiones del hogar. Esta acción no se puede deshacer.",
+                "¿Borrar lo que creaste?",
+                "Borra lo que creaste tú: cuentas, tarjetas, movimientos, presupuestos, pagos fijos, metas e inversiones. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo. Esta acción no se puede deshacer.",
                 icon = StmIcons.deleteForever,
                 onDismiss = nav::back,
                 actions = {

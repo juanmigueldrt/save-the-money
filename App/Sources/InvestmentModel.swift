@@ -132,18 +132,52 @@ final class InvestmentModel {
 
     // MARK: Operaciones
 
+    /// Guarda la operación y, con `cash`, su movimiento en la cuenta: los dos o ninguno, en una sola llamada.
+    /// Con el mismo `trade.id` (uno por formulario) reintentar no duplica.
     @discardableResult
-    func add(_ trade: InvestmentTrade) async -> Bool {
+    func add(_ trade: InvestmentTrade, cash: TradeCash? = nil) async -> Bool {
         if let issue = trade.issue(given: trades) { error = issue; return false }
-        return await perform {
-            let saved = try await service.addTrade(trade)
-            trades.append(saved)
+        let saved = await perform {
+            let stored = try await service.addTrade(trade, cash: cash)
+            trades.removeAll { $0.id == stored.id }
+            trades.append(stored)
         }
+        // Si falla puede que ya estuviera guardada (con otros datos): se recarga para que se vea detrás del aviso.
+        if !saved, let stored = try? await service.trades(in: household.id) { trades = stored }
+        return saved
+    }
+
+    /// Compra (`BuyQuote.trade`): con cuenta, el cargo de `total` (con comisión, categoría de ahorro) va con la operación.
+    @discardableResult
+    func buy(_ trade: InvestmentTrade, of holding: Holding, paying total: Money, from accountId: UUID?,
+             finance: FinanceModel) async -> Bool {
+        let savings = finance.categories.first { $0.kind == .expense && $0.budgetGroup == .savings }
+        let cash = accountId.map {
+            TradeCash(accountId: $0, categoryId: savings?.id, amount: -total, description: "Compra de \(holding.trimmedName)")
+        }
+        return await add(trade, cash: cash, finance: finance)
+    }
+
+    /// Venta: con cuenta, el ingreso (lo vendido menos la comisión) va con la operación.
+    @discardableResult
+    func sell(_ trade: InvestmentTrade, of holding: Holding, into accountId: UUID?, finance: FinanceModel) async -> Bool {
+        let cash = accountId.map {
+            TradeCash(accountId: $0, amount: trade.cashImpact, description: "Venta de \(holding.trimmedName)")
+        }
+        return await add(trade, cash: cash, finance: finance)
+    }
+
+    private func add(_ trade: InvestmentTrade, cash: TradeCash?, finance: FinanceModel) async -> Bool {
+        let saved = await add(trade, cash: cash)
+        // Saldos y movimientos al día; también si falla, por si se guardó y no llegó la respuesta.
+        if cash != nil { await finance.load() }
+        return saved
     }
 
     @discardableResult
     func delete(_ trade: InvestmentTrade) async -> Bool {
-        await perform {
+        if let issue = trade.deletionIssue(given: trades) { error = issue; return false }
+        return await perform {
             try await service.deleteTrade(trade.id)
             trades.removeAll { $0.id == trade.id }
         }
