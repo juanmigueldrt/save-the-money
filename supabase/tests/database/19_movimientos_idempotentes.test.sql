@@ -175,7 +175,7 @@ select lives_ok(
 select is(
   (select format('%s %s', amount_minor, updated_at > '2026-11-01 10:00:00.123456+00')
    from public.transactions where id = '20000000-0000-0000-0000-000000000004'),
-  '-2000 true', 'queda el importe nuevo y cambia la versión');
+  '-2000 t', 'queda el importe nuevo y cambia la versión');
 select throws_ok(
   $$ select pg_temp.cambiar('20000000-0000-0000-0000-000000000004', '2026-11-01 10:00:00.123456+00', 'cuenta', -3000) $$,
   'STM05', null, 'otro dispositivo que aún tiene la versión antigua no pisa el cambio');
