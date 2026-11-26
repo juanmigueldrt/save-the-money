@@ -587,6 +587,8 @@ fun Pantalla32(nav: Nav) {
     val cardShape = RoundedCornerShape(12.dp)
     var nombre by remember { mutableStateOf<String?>(null) }
     var tabla by remember { mutableStateOf<CsvTable?>(null) }
+    // Texto del archivo, para volver a leerlo si el usuario cambia el separador.
+    var textoCsv by remember { mutableStateOf<String?>(null) }
     var mapeo by remember { mutableStateOf<CsvMapping?>(null) }
     var cuenta by remember { mutableStateOf(finance.takeCsvAccount() ?: finance.defaultAccount?.id) }
     // Revisión fila a fila (por número de línea): no importar, categoría elegida a mano, excluir.
@@ -607,19 +609,34 @@ fun Pantalla32(nav: Nav) {
     val action = rememberAction()
 
     fun cargar(texto: String, archivo: String) {
-        val t = CsvTable.parse(texto)
+        val guardado = if (session.capture) null else CsvSavedFormat.match(texto, FormatosCsv.load(context))
+        val formato = guardado?.first
+        val t = guardado?.second ?: CsvTable.parse(texto)
+        textoCsv = texto
         nombre = archivo
         tabla = t
-        val guardado = if (session.capture) null else CsvSavedFormat.match(t, FormatosCsv.load(context))
-        val conocido = guardado?.mapping
+        val conocido = formato?.mapping
         mapeo = conocido ?: CsvMapping.detect(t)
         formatoGuardado = conocido != null
-        guardado?.accountId?.takeIf { id -> finance.activeAccounts.any { it.id == id } }?.let { cuenta = it }
+        formato?.accountId?.takeIf { id -> finance.activeAccounts.any { it.id == id } }?.let { cuenta = it }
         revision = CsvRowReview()
         resultado = null
         aviso = null
         marcas = emptyMap()
         verTodas = false
+        creados = null
+    }
+    // Vuelve a leer el archivo con el separador elegido y detecta las columnas, como en iOS.
+    fun cambiarSeparador(separador: Char) {
+        val texto = textoCsv ?: return
+        if (separador == tabla?.delimiter) return
+        val t = CsvTable.parse(texto, separador)
+        tabla = t
+        mapeo = CsvMapping.detect(t)
+        formatoGuardado = false
+        revision = CsvRowReview()
+        resultado = null
+        marcas = emptyMap()
         creados = null
     }
     LaunchedEffect(Unit) { if (session.capture) cargar(CSV_MUESTRA, "movimientos-octubre.csv") }
@@ -725,6 +742,7 @@ fun Pantalla32(nav: Nav) {
                 val cerrar = { selector = null }
                 val columnas = { fijar: (Int) -> Unit -> (0 until anchura).map { i -> columna(i) to { fijar(i) } } }
                 when (campo) {
+                    "separador" -> SelectorSheet("Separador", SEPARADORES.map { s -> etiquetaSeparador(s) to { cambiarSeparador(s) } }, cerrar)
                     "fecha" -> SelectorSheet("Fecha", columnas { i -> mapeo = mapeo?.copy(date = i) }, cerrar)
                     "concepto" -> SelectorSheet("Concepto", columnas { i -> mapeo = mapeo?.copy(description = i) }, cerrar)
                     "importe" -> SelectorSheet("Importe", columnas { i -> mapeo = mapeo?.copy(amount = AmountColumns.Signed(i)) }, cerrar)
@@ -759,6 +777,7 @@ fun Pantalla32(nav: Nav) {
             }
             if (nombre != null) IconBtn(StmIcons.close, {
                 nombre = null
+                textoCsv = null
                 tabla = null
                 mapeo = null
                 resultado = null
@@ -767,6 +786,12 @@ fun Pantalla32(nav: Nav) {
         aviso?.let {
             Spacer(Modifier.height(12.dp))
             Text(it, style = StmType.bodySmall, color = c.error)
+        }
+        if (t != null) {
+            Spacer(Modifier.height(16.dp))
+            FilledField("Separador", etiquetaSeparador(t.delimiter), trailing = StmIcons.arrowDropDown, onClick = { selector = "separador" })
+            Spacer(Modifier.height(8.dp))
+            Text("Si las columnas salen mal, prueba con otro separador.", style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         if (t != null && m == null) {
             Spacer(Modifier.height(12.dp))
@@ -916,6 +941,15 @@ private fun leerCsv(context: Context, uri: Uri): Result<Pair<String, String>> = 
 }
 
 private const val MAX_CSV_BYTES = 10L * 1024 * 1024
+/** Mismos separadores y orden que en iOS (`CSVTable.delimiters`). */
+private val SEPARADORES = listOf(';', '\t', ',')
+
+private fun etiquetaSeparador(c: Char) = when (c) {
+    ';' -> "Punto y coma (;)"
+    '\t' -> "Tabulador"
+    else -> "Coma (,)"
+}
+
 private const val CSV_MUESTRA = "Fecha;Concepto;Cuenta;Importe\n03/10/2026;Supermercado Día;;-64,20\n01/10/2026;Nómina;;2150,00\n"
 
 /** 33 Borrar datos: diálogo de confirmación sobre Más opciones. */

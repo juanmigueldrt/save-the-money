@@ -116,6 +116,39 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    /// ORC-96: intereses, cuotas, mensualidades y proyecciones con decimales exactos, al céntimo.
+    func testInterestIsExactToTheCent() throws {
+        struct File: Decodable {
+            var installments: [Quota]; var monthlyInterest: [Interest]; var recurringMonthly: [Monthly]; var projection: [Projection]
+        }
+        struct Quota: Decodable { var principal: Int; var months: Int; var rate: Decimal; var payment: Int }
+        struct Interest: Decodable { var capital: Int; var rate: Decimal; var interest: Int }
+        struct Monthly: Decodable { var amount: Int; var every: Int; var unit: RecurrenceUnit; var monthly: Int }
+        struct Projection: Decodable { var monthly: Int; var rate: Decimal; var months: Int; var value: Int }
+        let file: File = try load("interest.json")
+        // Como `decodeNumeric`: un número JSON puede llegar con ruido de coma flotante (14.99 → 14.990000000000002).
+        func rate(_ value: Decimal) -> Decimal { value.rounded(scale: 8) }
+        XCTAssertFalse(file.installments.isEmpty)
+        for v in file.installments {
+            let quota = CardInstallment.payment(principal: Money(minor: v.principal), months: v.months, rate: rate(v.rate))
+            XCTAssertEqual(quota.minor, v.payment, "\(v.principal) en \(v.months) meses al \(v.rate) %")
+        }
+        XCTAssertFalse(file.monthlyInterest.isEmpty)
+        for v in file.monthlyInterest {
+            XCTAssertEqual(CreditCardCalculator.monthlyInterest(v.capital, rate: rate(v.rate)), v.interest, "\(v.capital) al \(v.rate) %")
+        }
+        XCTAssertFalse(file.recurringMonthly.isEmpty)
+        for v in file.recurringMonthly {
+            XCTAssertEqual(Recurrence(every: v.every, unit: v.unit).monthly(v.amount), v.monthly, "\(v.amount) cada \(v.every) \(v.unit)")
+        }
+        XCTAssertFalse(file.projection.isEmpty)
+        for v in file.projection {
+            let plan = InvestmentPlan(householdId: UUID(), holdingId: UUID(), amount: Money(minor: v.monthly),
+                                      startsOn: day("2026-01-01"), expectedAnnualReturn: rate(v.rate))
+            XCTAssertEqual(plan.projectedValue(months: v.months).minor, v.value, "\(v.monthly) al \(v.rate) % en \(v.months) meses")
+        }
+    }
+
     /// ORC-132: desde qué día hay que cargar los movimientos de la tarjeta.
     func testCardUnpaidStatements() throws {
         struct File: Decodable { var unpaidStatements: [Unpaid] }
@@ -341,6 +374,25 @@ final class SharedVectorsTests: XCTestCase {
             let input = String(repeating: v.text, count: v.repeat)
             XCTAssertEqual(input.utf8.count, v.utf8Bytes)
             XCTAssertEqual(SHA256.hex(input), v.sha256, "«\(v.text)» × \(v.repeat)")
+        }
+    }
+
+    func testMoneyOfSeveralCurrencies() throws {
+        struct File: Decodable { var totals: [Total]; var conversions: [Conversion] }
+        struct Amount: Decodable { var minor: Int; var currency: String }
+        struct Total: Decodable { var name: String; var amounts: [Amount]; var expected: Amount? }
+        struct Conversion: Decodable { var minor: Int; var rate: String; var expected: Int }
+        let file: File = try load("money_currencies.json")
+        XCTAssertFalse(file.totals.isEmpty)
+        XCTAssertFalse(file.conversions.isEmpty)
+        for v in file.totals {
+            let total = v.amounts.map { Money(minor: $0.minor, currency: $0.currency) }.reduce(Money.zero, +)
+            XCTAssertEqual(total, v.expected.map { Money(minor: $0.minor, currency: $0.currency) } ?? .mixed, v.name)
+        }
+        for v in file.conversions {
+            let rate = try XCTUnwrap(Decimal(string: v.rate, locale: Locale(identifier: "en_US_POSIX")))
+            XCTAssertEqual(Money(minor: v.minor, currency: "USD").converted(to: "EUR", rate: rate),
+                           Money(minor: v.expected), "\(v.minor) × \(v.rate)")
         }
     }
 }

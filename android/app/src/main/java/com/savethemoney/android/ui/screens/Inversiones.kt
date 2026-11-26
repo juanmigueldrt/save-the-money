@@ -143,7 +143,7 @@ fun Pantalla25(nav: Nav) {
         },
     ) {
         Spacer(Modifier.height(7.5.dp))
-        Text(euros(cartera.value), style = StmType.displaySmall, color = c.onSurface)
+        Text(if (cartera.mixedCurrencies) Money.MIXED else euros(cartera.value), style = StmType.displaySmall, color = c.onSurface)
         if (cartera.cost > 0) {
             Spacer(Modifier.height(4.5.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

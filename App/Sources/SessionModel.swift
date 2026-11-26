@@ -20,9 +20,12 @@ final class SessionModel {
     var pendingInvite: InviteCode?
 
     let services: AppServices
+    /// Borra lo que queda en el dispositivo de la cuenta (avisos, preferencias, exportados).
+    private let clearLocalData: @Sendable () async -> Void
 
-    init(services: AppServices) {
+    init(services: AppServices, clearLocalData: @escaping @Sendable () async -> Void = {}) {
         self.services = services
+        self.clearLocalData = clearLocalData
     }
 
     var isDemo: Bool { services.isDemo }
@@ -101,6 +104,8 @@ final class SessionModel {
         } catch {
             signOutError = "No se ha podido cerrar la sesión en el servidor. " + ((error as? AppError)?.errorDescription ?? "")
         }
+        // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
+        await clearLocalData()
         state = .signedOut
     }
 
