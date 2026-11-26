@@ -29,8 +29,9 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 
-/** Avisos locales (ORC-86): una carga fallida no los toca y entre todos no pasan de 64. Datos inventados. */
+/** Avisos locales (ORC-86, ORC-121): una carga fallida no los toca, entre todos no pasan de 64 y no se pierden. Datos inventados. */
 class AvisosTest {
     private val home = "home"
     private val household = Household(home, "Casa")
@@ -111,6 +112,42 @@ class AvisosTest {
         assertEquals(AppError.Network.message, reopened.error)
         assertEquals("una carga fallida no reprograma", 1, notifier.count(CardAlerts.PREFIX))
         assertEquals(scheduled, notifier.byPrefix[CardAlerts.PREFIX])
+    }
+
+    @Test fun avisoDeHoyConLaHoraPasadaSeMuestraAlMomento() {
+        // A las 10:00 se crea un pago que vence mañana con aviso un día antes: el aviso era hoy a las 9:00.
+        val series = RecurringSeries("s", home, "Gimnasio", amountMinor = 3000, startsOn = "2026-11-27", remindDaysBefore = 1)
+        val planned = ReminderPlanner.plan(listOf(series), day(2026, 11, 26))
+        val (now, later) = LocalNotifier.split(planned, emptySet(), LocalDateTime.of(2026, 11, 26, 10, 0))
+        assertEquals(listOf("2026-11-26"), now.map { it.fireOn })
+        assertEquals(listOf("2026-12-26"), later.map { it.fireOn })
+    }
+
+    @Test fun planificadorDescartaLoMostradoYLoDeDiasPasados() {
+        fun aviso(id: String, fireOn: String, hour: Int = 9) = PlannedReminder(id, fireOn, hour, "Aviso de prueba", "Texto")
+        val pending = listOf(
+            aviso("ayer", "2026-11-25"),
+            aviso("mostrado", "2026-11-26"),
+            aviso("hoy-pasado", "2026-11-26"),
+            aviso("hoy-justo", "2026-11-26", hour = 10),
+            aviso("hoy-luego", "2026-11-26", hour = 21),
+            aviso("manana", "2026-11-27"),
+        )
+        val (now, later) = LocalNotifier.split(pending, setOf("mostrado"), LocalDateTime.of(2026, 11, 26, 10, 0))
+        assertEquals(listOf("hoy-pasado", "hoy-justo"), now.map { it.id })
+        assertEquals(listOf("hoy-luego", "manana"), later.map { it.id })
+    }
+
+    @Test fun alertaSoloSeMarcaComoEnviadaSiSeMuestra() {
+        val alerts = listOf(BudgetAlert("a", "Comida al 80 %", "Texto"), BudgetAlert("b", "Ocio pasado", "Texto"))
+        val shown = mutableListOf<String>()
+        val sinPermiso = LocalNotifier.sendAlerts(alerts, setOf("viejo"), { false })
+        assertEquals(setOf("viejo"), sinPermiso)
+        val conPermiso = LocalNotifier.sendAlerts(alerts, sinPermiso) { shown += it.id; true }
+        assertEquals(setOf("viejo", "a", "b"), conPermiso)
+        // Lo ya enviado no se vuelve a mostrar.
+        LocalNotifier.sendAlerts(alerts, conPermiso) { shown += it.id; true }
+        assertEquals(listOf("a", "b"), shown)
     }
 
     @Test fun todosLosAvisosJuntosNoPasanDe64() {
