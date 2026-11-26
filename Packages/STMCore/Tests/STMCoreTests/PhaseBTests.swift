@@ -136,6 +136,16 @@ final class PhaseBTests: XCTestCase {
         XCTAssertEqual(byPayee.map(\.title), ["Hotel Sol"])
     }
 
+    /// Un traspaso importado (dos movimientos sin categoría, mismo día, importes opuestos, cuentas distintas) no es gasto ni ingreso.
+    func testGroupedSpendingSkipsUncategorizedTransfers() {
+        var entrada = movement("DE NOMINA", 10_000, tags: ["ahorro"])
+        entrada.accountId = UUID()
+        let list = [movement("A AHORRO", -10_000, tags: ["ahorro"]), entrada, movement("HUCHA", -700, tags: ["ahorro"])]
+        let byTag = GroupedSpending.report(.tag, movements: list, categories: [], range: day(2026, 11, 1)...day(2026, 11, 30))
+        XCTAssertEqual(byTag.map(\.spent.minor), [700])
+        XCTAssertEqual(byTag.map(\.income.minor), [0])
+    }
+
     // MARK: Cuentas
 
     func testDefaultAccountAndNetWorth() async throws {

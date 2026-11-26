@@ -143,6 +143,19 @@ class PhaseBTest {
         assertEquals(listOf("Hotel Sol"), byPayee.map { it.title })
     }
 
+    /** Un traspaso importado (dos movimientos sin categoría, mismo día, importes opuestos, cuentas distintas) no es gasto ni ingreso. */
+    @Test
+    fun groupedSpendingSkipsUncategorizedTransfers() {
+        val list = listOf(
+            movement("A AHORRO", -10_000, tags = listOf("ahorro")),
+            movement("DE NOMINA", 10_000, tags = listOf("ahorro")).copy(accountId = "otra"),
+            movement("HUCHA", -700, tags = listOf("ahorro")),
+        )
+        val byTag = GroupedSpending.report(GroupedSpending.Grouping.Tag, list, emptyList(), day(2026, 11, 1)..day(2026, 11, 30))
+        assertEquals(listOf(700L), byTag.map { it.spent })
+        assertEquals(listOf(0L), byTag.map { it.income })
+    }
+
     @Test
     fun defaultAccountAndNetWorth() {
         val a = Account("a", home, "Nómina", openingMinor = 10_000)

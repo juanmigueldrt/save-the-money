@@ -262,10 +262,13 @@ public struct SpendingReport: Hashable, Sendable {
         var totals: [String: (title: String, icon: String?, minor: Int, count: Int)] = [:]
         var months: [MonthKey: Int] = [:]
         var total = 0
-        for movement in movements where !movement.excluded && range.contains(movement.bookedOn) {
+        let inRange = movements.filter { !$0.excluded && range.contains($0.bookedOn) }
+        // Antes del filtro de cuentas: la otra pata de un traspaso puede estar en una cuenta que no se mira.
+        let transfers = Movement.uncategorizedTransferIds(in: inRange, categoryIds: Set(byId.keys))
+        for movement in inRange {
             if !accountIds.isEmpty && !accountIds.contains(movement.accountId) { continue }
             let category = movement.categoryId.flatMap { byId[$0] }
-            if category?.kind == .transfer { continue }
+            if category?.kind == .transfer || transfers.contains(movement.id) { continue }
             let matches: Bool
             switch kind {
             case .expense: matches = category.map { $0.kind == .expense } ?? movement.amount.isNegative

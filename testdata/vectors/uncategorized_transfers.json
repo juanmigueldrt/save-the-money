@@ -1,0 +1,133 @@
+{
+  "_source": "Worked out by hand from the rule (ORC-80). A movement without a known category is a transfer between own accounts when it has a transferId, or when it pairs one to one with another such movement of the same household, same day and exactly opposite amount in a different account (each outgoing one takes the first unpaired incoming one, in list order, from another account). Excluded movements are left out before pairing. Transfers count as neither income nor expense. Categorized movements keep their behaviour. Period: 2026-11-01..2026-11-30, no budget. budgetSpent is the budget's total spent (groups plus uncategorized). Categories: comida = expense in needs, nomina = income, traspaso = transfer; any other key is a category that no longer exists. Amounts are integer cents.",
+  "vectors": [
+    {
+      "name": "Traspaso importado entre cuentas propias: ni ingreso ni gasto",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": ["a", "b"],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Misma cuenta: no es traspaso",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "A", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 50000
+    },
+    {
+      "name": "Distinto día: no es traspaso",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-06", "amount": 50000 }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 50000
+    },
+    {
+      "name": "Distinto importe: no es traspaso",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 49999 }
+      ],
+      "transfers": [],
+      "budgetIncome": 49999, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 49999
+    },
+    {
+      "name": "Tres candidatos: sólo se anula un par",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 },
+        { "key": "c", "account": "C", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": ["a", "b"],
+      "budgetIncome": 50000, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 50000
+    },
+    {
+      "name": "Dos traspasos el mismo día y por el mismo importe",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 },
+        { "key": "c", "account": "B", "day": "2026-11-05", "amount": -50000 },
+        { "key": "d", "account": "A", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": ["a", "b", "c", "d"],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Otro hogar: no es traspaso",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000 },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000, "household": "otro" }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 50000
+    },
+    {
+      "name": "Los dos con categoría: cuentan como hoy",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "category": "comida" },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000, "category": "nomina" }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 50000
+    },
+    {
+      "name": "Una pata con categoría: las dos cuentan",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "category": "comida" },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 50000, "reportExpense": 50000, "reportIncome": 50000
+    },
+    {
+      "name": "Categoría que ya no existe: cuenta como sin categoría",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "category": "borrada" },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": ["a", "b"],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Transferencia de la app sin categoría",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "transfer": "t1" },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000, "transfer": "t1" }
+      ],
+      "transfers": ["a", "b"],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Pata de transferencia de la app sin la otra en la lista: es traspaso",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-30", "amount": -50000, "transfer": "t2" }
+      ],
+      "transfers": ["a"],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Transferencia de la app con categoría de traspaso: no cuenta, como hoy",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "category": "traspaso", "transfer": "t3" },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000, "category": "traspaso", "transfer": "t3" }
+      ],
+      "transfers": [],
+      "budgetIncome": 0, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 0
+    },
+    {
+      "name": "Una pata excluida: la otra cuenta",
+      "movements": [
+        { "key": "a", "account": "A", "day": "2026-11-05", "amount": -50000, "excluded": true },
+        { "key": "b", "account": "B", "day": "2026-11-05", "amount": 50000 }
+      ],
+      "transfers": [],
+      "budgetIncome": 50000, "budgetSpent": 0, "reportExpense": 0, "reportIncome": 50000
+    }
+  ]
+}

@@ -285,6 +285,51 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    /// ORC-80: los traspasos sin categoría no cuentan en el presupuesto ni en los informes.
+    func testUncategorizedTransfers() throws {
+        struct File: Decodable { var vectors: [Caso] }
+        struct Caso: Decodable {
+            var name: String; var movements: [Apunte]; var transfers: [String]
+            var budgetIncome: Int; var budgetSpent: Int; var reportExpense: Int; var reportIncome: Int
+        }
+        struct Apunte: Decodable {
+            var key: String; var account: String; var day: String; var amount: Int
+            var category: String?; var transfer: String?; var household: String?; var excluded: Bool?
+        }
+        let file: File = try load("uncategorized_transfers.json")
+        XCTAssertFalse(file.vectors.isEmpty)
+        let home = UUID()
+        let categories = [BudgetCategory(householdId: home, name: "comida", kind: .expense, budgetGroup: .needs),
+                          BudgetCategory(householdId: home, name: "nomina", kind: .income),
+                          BudgetCategory(householdId: home, name: "traspaso", kind: .transfer)]
+        var ids: [String: UUID] = Dictionary(uniqueKeysWithValues: categories.map { ($0.name, $0.id) })
+        func id(_ key: String) -> UUID {
+            if let known = ids[key] { return known }
+            let new = UUID()
+            ids[key] = new
+            return new
+        }
+        let range = day("2026-11-01")...day("2026-11-30")
+        for v in file.vectors {
+            let movements = v.movements.map { m in
+                Movement(id: id("\(v.name)/\(m.key)"), householdId: m.household.map(id) ?? home, accountId: id(m.account),
+                         categoryId: m.category.map(id), bookedOn: day(m.day), amount: Money(minor: m.amount),
+                         description: m.key, excluded: m.excluded ?? false, transferId: m.transfer.map(id))
+            }
+            let found = Movement.uncategorizedTransferIds(in: movements.filter { !$0.excluded },
+                                                          categoryIds: Set(categories.map(\.id)))
+            XCTAssertEqual(v.movements.filter { found.contains(id("\(v.name)/\($0.key)")) }.map(\.key), v.transfers, v.name)
+            let budget = BudgetReport(budget: nil, month: MonthKey(year: 2026, month: 11), categories: categories,
+                                      movements: movements)
+            XCTAssertEqual(budget.income.minor, v.budgetIncome, v.name)
+            XCTAssertEqual(budget.totalSpent.minor, v.budgetSpent, v.name)
+            XCTAssertEqual(SpendingReport(movements: movements, categories: categories, range: range, kind: .expense).total.minor,
+                           v.reportExpense, v.name)
+            XCTAssertEqual(SpendingReport(movements: movements, categories: categories, range: range, kind: .income).total.minor,
+                           v.reportIncome, v.name)
+        }
+    }
+
     func testHouseholdMonth() throws {
         struct File: Decodable {
             var today: String; var categories: [Categoria]; var movements: [Apunte]
