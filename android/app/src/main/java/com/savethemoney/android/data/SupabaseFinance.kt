@@ -25,16 +25,24 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     private fun fail(text: String): Nothing = throw AppError.InvalidInput(text)
 
     override suspend fun accounts(householdId: String): List<Account> = backend.mapped {
-        client.from("accounts").select(Columns.raw(ACCOUNT)) {
-            filter { eq("household_id", householdId) }
-            order("created_at", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("accounts").select(Columns.raw(ACCOUNT)) {
+                filter { eq("household_id", householdId) }
+                order("created_at", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Account>()
+        }
     }
 
     override suspend fun balances(householdId: String): Map<String, Long> = backend.mapped {
-        client.from("account_balances").select(Columns.raw("account_id,balance_minor")) {
-            filter { eq("household_id", householdId) }
-        }.decodeList<BalanceRow>().associate { it.accountId to it.balanceMinor }
+        allPages { from, to ->
+            client.from("account_balances").select(Columns.raw("account_id,balance_minor")) {
+                filter { eq("household_id", householdId) }
+                order("account_id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<BalanceRow>()
+        }.associate { it.accountId to it.balanceMinor }
     }
 
     override suspend fun createAccount(draft: AccountDraft, householdId: String): Account = backend.mapped {
@@ -60,10 +68,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun categories(householdId: String): List<BudgetCategory> = backend.mapped {
-        client.from("categories").select(Columns.raw(CATEGORY)) {
-            filter { eq("household_id", householdId) }
-            order("name", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("categories").select(Columns.raw(CATEGORY)) {
+                filter { eq("household_id", householdId) }
+                order("name", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<BudgetCategory>()
+        }
     }
 
     private fun CategoryKind.groupOf(category: BudgetCategory) = if (this == CategoryKind.Expense) category.budgetGroup else null
@@ -102,12 +114,16 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
 
     override suspend fun movements(householdId: String, ids: List<String>): List<Movement> = backend.mapped {
         if (ids.isEmpty()) return@mapped emptyList()
-        client.from("transactions").select(Columns.raw(MOVEMENT)) {
-            filter {
-                eq("household_id", householdId)
-                isIn("id", ids)
-            }
-        }.decodeList()
+        allPages { from, to ->
+            client.from("transactions").select(Columns.raw(MOVEMENT)) {
+                filter {
+                    eq("household_id", householdId)
+                    isIn("id", ids)
+                }
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Movement>()
+        }
     }
 
     override suspend fun movements(householdId: String, accountId: String, since: LocalDate, limit: Int): List<Movement> = backend.mapped {
@@ -307,16 +323,13 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         Unit
     }
 
-    /** El servidor devuelve como mucho 1000 filas por petición (max_rows): se pide por páginas. */
     override suspend fun resetHousehold(householdId: String) = backend.mapped<Unit> {
         client.postgrest.rpc("reset_household", buildJsonObject { put("target_household", householdId) })
     }
 
     override suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement> = backend.mapped {
-        val all = mutableListOf<Movement>()
-        while (true) {
-            val start = all.size.toLong()
-            val page = client.from("transactions").select(Columns.raw(MOVEMENT)) {
+        allPages { first, last ->
+            client.from("transactions").select(Columns.raw(MOVEMENT)) {
                 filter {
                     eq("household_id", householdId)
                     gte("booked_on", from.toString())
@@ -324,12 +337,9 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
                 }
                 order("booked_on", Order.DESCENDING)
                 order("id", Order.ASCENDING)
-                range(start, start + PAGE - 1)
+                range(first, last)
             }.decodeList<Movement>()
-            all += page
-            if (page.size < PAGE) break
         }
-        all
     }
 
     // MARK: pagos fijos y metas. household_id solo al insertar: el servidor no deja cambiarlo después.
@@ -337,10 +347,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     private fun withHousehold(columns: JsonObject, householdId: String) = JsonObject(columns + ("household_id" to JsonPrimitive(householdId)))
 
     override suspend fun recurringSeries(householdId: String): List<RecurringSeries> = backend.mapped {
-        client.from("recurring_series").select(Columns.raw(SERIES)) {
-            filter { eq("household_id", householdId) }
-            order("name", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("recurring_series").select(Columns.raw(SERIES)) {
+                filter { eq("household_id", householdId) }
+                order("name", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<RecurringSeries>()
+        }
     }
 
     override suspend fun createRecurring(series: RecurringSeries): RecurringSeries = backend.mapped {
@@ -406,10 +420,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun goals(householdId: String): List<Goal> = backend.mapped {
-        client.from("goals").select(Columns.raw(GOAL)) {
-            filter { eq("household_id", householdId) }
-            order("created_at", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("goals").select(Columns.raw(GOAL)) {
+                filter { eq("household_id", householdId) }
+                order("created_at", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Goal>()
+        }
     }
 
     override suspend fun createGoal(goal: Goal): Goal = backend.mapped {
@@ -431,10 +449,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun contributions(householdId: String): List<GoalContribution> = backend.mapped {
-        client.from("goal_contributions").select(Columns.raw(CONTRIBUTION)) {
-            filter { eq("household_id", householdId) }
-            order("made_on", Order.DESCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("goal_contributions").select(Columns.raw(CONTRIBUTION)) {
+                filter { eq("household_id", householdId) }
+                order("made_on", Order.DESCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<GoalContribution>()
+        }
     }
 
     override suspend fun addContribution(contribution: GoalContribution): GoalContribution = backend.mapped {
@@ -450,7 +472,13 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun creditCards(householdId: String): List<CreditCardTerms> = backend.mapped {
-        client.from("credit_cards").select(Columns.raw(CARD)) { filter { eq("household_id", householdId) } }.decodeList()
+        allPages { from, to ->
+            client.from("credit_cards").select(Columns.raw(CARD)) {
+                filter { eq("household_id", householdId) }
+                order("account_id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<CreditCardTerms>()
+        }
     }
 
     // No se usa upsert: haría UPDATE de la cuenta y el hogar, que no se pueden cambiar.
@@ -466,7 +494,13 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun cardInstallments(householdId: String): List<CardInstallment> = backend.mapped {
-        client.from("card_installments").select(Columns.raw(INSTALLMENT)) { filter { eq("household_id", householdId) } }.decodeList()
+        allPages { from, to ->
+            client.from("card_installments").select(Columns.raw(INSTALLMENT)) {
+                filter { eq("household_id", householdId) }
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<CardInstallment>()
+        }
     }
 
     override suspend fun saveInstallment(installment: CardInstallment): CardInstallment = backend.mapped {
@@ -491,10 +525,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun creditScores(): List<CreditScore> = backend.mapped {
-        client.from("credit_scores").select(Columns.raw(SCORE)) {
-            order("recorded_on", Order.DESCENDING)
-            order("created_at", Order.DESCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("credit_scores").select(Columns.raw(SCORE)) {
+                order("recorded_on", Order.DESCENDING)
+                order("created_at", Order.DESCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<CreditScore>()
+        }
     }
 
     override suspend fun addCreditScore(score: CreditScore): CreditScore = backend.mapped {
@@ -525,10 +563,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun holdings(householdId: String): List<Holding> = backend.mapped {
-        client.from("holdings").select(Columns.raw(HOLDING)) {
-            filter { eq("household_id", householdId) }
-            order("name", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("holdings").select(Columns.raw(HOLDING)) {
+                filter { eq("household_id", householdId) }
+                order("name", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Holding>()
+        }
     }
 
     private fun Holding.columns() = buildJsonObject {
@@ -610,10 +652,14 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     }
 
     override suspend fun investmentPlans(householdId: String): List<InvestmentPlan> = backend.mapped {
-        client.from("investment_plans").select(Columns.raw(PLAN)) {
-            filter { eq("household_id", householdId) }
-            order("starts_on", Order.ASCENDING)
-        }.decodeList()
+        allPages { from, to ->
+            client.from("investment_plans").select(Columns.raw(PLAN)) {
+                filter { eq("household_id", householdId) }
+                order("starts_on", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<InvestmentPlan>()
+        }
     }
 
     private fun InvestmentPlan.columns() = buildJsonObject {
@@ -647,21 +693,16 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         client.from("investment_plans").delete { filter { eq("id", planId) } }
     }
 
-    /** Todas las filas del hogar, de 1000 en 1000 (el máximo que devuelve el servidor por petición). */
+    /** Todas las filas del hogar, por páginas ([allPages]). */
     private suspend inline fun <reified Row : Any> allRows(table: String, columns: String, householdId: String, orderBy: String): List<Row> = backend.mapped {
-        val all = mutableListOf<Row>()
-        while (true) {
-            val start = all.size.toLong()
-            val page = client.from(table).select(Columns.raw(columns)) {
+        allPages { from, to ->
+            client.from(table).select(Columns.raw(columns)) {
                 filter { eq("household_id", householdId) }
                 order(orderBy, Order.ASCENDING)
                 order("id", Order.ASCENDING)
-                range(start, start + 999)
+                range(from, to)
             }.decodeList<Row>()
-            all += page
-            if (page.size < 1000) break
         }
-        all
     }
 
     private companion object {
@@ -671,7 +712,6 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val CONTRIBUTION = "id,household_id,goal_id,amount_minor,made_on,note,created_by"
         const val BUDGET = "household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
         const val EXTRA = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite"
-        const val PAGE = 1000
         const val ACCOUNT = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon"
         const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"

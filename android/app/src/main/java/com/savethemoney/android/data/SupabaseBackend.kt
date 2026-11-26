@@ -118,7 +118,13 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
     }
 
     override suspend fun households(): List<Household> = mapped {
-        client.from("households").select(Columns.raw(HOUSEHOLD)) { order("created_at", Order.ASCENDING) }.decodeList()
+        allPages { from, to ->
+            client.from("households").select(Columns.raw(HOUSEHOLD)) {
+                order("created_at", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Household>()
+        }
     }
 
     override suspend fun createHousehold(name: String): Household = mapped {
@@ -126,25 +132,38 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
     }
 
     override suspend fun members(householdId: String): List<HouseholdMember> = mapped {
-        val memberships = client.from("household_members").select(Columns.raw("id,household_id,user_id,role")) {
-            filter { eq("household_id", householdId) }
-        }.decodeList<Membership>()
+        val memberships = allPages { from, to ->
+            client.from("household_members").select(Columns.raw("id,household_id,user_id,role")) {
+                filter { eq("household_id", householdId) }
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Membership>()
+        }
         if (memberships.isEmpty()) return@mapped emptyList()
-        val profiles = client.from("profiles").select(Columns.raw(PROFILE)) {
-            filter { isIn("id", memberships.map { it.userId }) }
-        }.decodeList<Profile>().associateBy { it.id }
+        val profiles = allPages { from, to ->
+            client.from("profiles").select(Columns.raw(PROFILE)) {
+                filter { isIn("id", memberships.map { it.userId }) }
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<Profile>()
+        }.associateBy { it.id }
         memberships.mapNotNull { m -> profiles[m.userId]?.let { HouseholdMember(it, m.role) } }
     }
 
     override suspend fun pendingInvites(householdId: String): List<HouseholdInvite> = mapped {
-        client.from("household_invites").select(Columns.raw(INVITE)) {
-            filter {
-                eq("household_id", householdId)
-                eq("status", "pending")
-                gt("expires_at", Instant.now().toString())
-            }
-            order("created_at", Order.DESCENDING)
-        }.decodeList()
+        val now = Instant.now().toString()
+        allPages { from, to ->
+            client.from("household_invites").select(Columns.raw(INVITE)) {
+                filter {
+                    eq("household_id", householdId)
+                    eq("status", "pending")
+                    gt("expires_at", now)
+                }
+                order("created_at", Order.DESCENDING)
+                order("id", Order.ASCENDING)
+                range(from, to)
+            }.decodeList<HouseholdInvite>()
+        }
     }
 
     override suspend fun createInvite(householdId: String): HouseholdInvite = mapped {
@@ -265,6 +284,23 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
                 else -> AppError.Unknown("auth")
             }
         }
+    }
+}
+
+/** Filas por petición: el servidor devuelve como mucho 1000 (`max_rows` en supabase/config.toml). */
+internal const val PAGE_SIZE = 1000
+
+/**
+ * Todas las filas de una consulta, pedidas por páginas. [page] recibe la primera y la última fila (incluidas)
+ * y debe ordenar por una clave única (`id` al final) para que las páginas no salten ni repitan filas.
+ * Un error en cualquier página hace fallar la carga entera: nunca se devuelve una lista a medias.
+ */
+internal suspend fun <T> allPages(page: suspend (from: Long, to: Long) -> List<T>): List<T> {
+    val all = mutableListOf<T>()
+    while (true) {
+        val rows = page(all.size.toLong(), all.size + PAGE_SIZE - 1L)
+        all += rows
+        if (rows.size < PAGE_SIZE) return all
     }
 }
 

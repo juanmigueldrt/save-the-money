@@ -7,13 +7,12 @@ extension SupabaseBackend: CreditScoreService {
     private static let scoreColumns = "id,score,max_score,provider,recorded_on,note"
 
     public func creditScores() async throws -> [CreditScore] {
-        try await mapped {
-            try await client.from("credit_scores")
+        try await allRows {
+            client.from("credit_scores")
                 .select(Self.scoreColumns)
                 .order("recorded_on", ascending: false)
                 .order("created_at", ascending: false)
-                .execute()
-                .value
+                .order("id")
         }
     }
 

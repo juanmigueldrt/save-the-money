@@ -13,13 +13,12 @@ extension SupabaseBackend: InvestmentService {
     // MARK: Activos
 
     public func holdings(in householdId: UUID) async throws -> [Holding] {
-        try await mapped {
-            try await client.from("holdings")
+        try await allRows {
+            client.from("holdings")
                 .select(Self.holdingColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("name")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -58,7 +57,13 @@ extension SupabaseBackend: InvestmentService {
     // MARK: Precios
 
     public func holdingPrices(in householdId: UUID) async throws -> [HoldingPrice] {
-        try await allRows(of: "holding_prices", columns: Self.priceColumns, householdId: householdId, orderedBy: "priced_on")
+        try await allRows {
+            client.from("holding_prices")
+                .select(Self.priceColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .order("priced_on")
+                .order("id")
+        }
     }
 
     /// `record_holding_price` apunta el precio del día y el precio actual del activo en una sola transacción.
@@ -77,7 +82,13 @@ extension SupabaseBackend: InvestmentService {
     // MARK: Operaciones
 
     public func trades(in householdId: UUID) async throws -> [InvestmentTrade] {
-        try await allRows(of: "investment_trades", columns: Self.tradeColumns, householdId: householdId, orderedBy: "traded_on")
+        try await allRows {
+            client.from("investment_trades")
+                .select(Self.tradeColumns)
+                .eq("household_id", value: householdId.uuidString)
+                .order("traded_on")
+                .order("id")
+        }
     }
 
     /// `create_trade` guarda la operación y su movimiento en una sola transacción y no repite una ya guardada.
@@ -107,13 +118,12 @@ extension SupabaseBackend: InvestmentService {
     // MARK: Planes
 
     public func investmentPlans(in householdId: UUID) async throws -> [InvestmentPlan] {
-        try await mapped {
-            try await client.from("investment_plans")
+        try await allRows {
+            client.from("investment_plans")
                 .select(Self.planColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("starts_on")
-                .execute()
-                .value
+                .order("id")
         }
     }
 
@@ -146,30 +156,6 @@ extension SupabaseBackend: InvestmentService {
     public func deletePlan(_ planId: UUID) async throws {
         try await mapped {
             try await client.from("investment_plans").delete().eq("id", value: planId.uuidString).execute()
-        }
-    }
-
-    // MARK: Paginación
-
-    /// Todas las filas del hogar, de 1000 en 1000 (el máximo que devuelve el servidor por petición).
-    private func allRows<Row: Decodable & Sendable>(of table: String, columns: String, householdId: UUID,
-                                                    orderedBy column: String) async throws -> [Row] {
-        let pageSize = 1000
-        var all: [Row] = []
-        while true {
-            let start = all.count
-            let page: [Row] = try await mapped {
-                try await client.from(table)
-                    .select(columns)
-                    .eq("household_id", value: householdId.uuidString)
-                    .order(column)
-                    .order("id")
-                    .range(from: start, to: start + pageSize - 1)
-                    .execute()
-                    .value
-            }
-            all += page
-            if page.count < pageSize { return all }
         }
     }
 }
