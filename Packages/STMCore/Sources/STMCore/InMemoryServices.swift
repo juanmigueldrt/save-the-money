@@ -29,6 +29,8 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     var holdingList: [Holding] = []
     var holdingPriceList: [HoldingPrice] = []
     var tradeList: [InvestmentTrade] = []
+    /// El movimiento que apuntó cada operación guardada con cuenta, por el id de la operación.
+    var tradeMovements: [UUID: UUID] = [:]
     var planList: [InvestmentPlan] = []
     var creditCardList: [CreditCardTerms] = []
     var installmentList: [CardInstallment] = []

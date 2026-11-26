@@ -363,8 +363,15 @@ public struct CalendarDay: Hashable, Comparable, Codable, Sendable, CustomString
         self.day = day
     }
 
-    /// Hoy (o la fecha dada) en el calendario y zona del usuario.
-    public init(_ date: Date = Date(), calendar: Calendar = .current) {
+    /// Calendario gregoriano en la zona del usuario: el del dispositivo puede ser budista, japonés o islámico.
+    public static var gregorian: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return calendar
+    }
+
+    /// Hoy (o la fecha dada) en el calendario gregoriano y zona del usuario.
+    public init(_ date: Date = Date(), calendar: Calendar = CalendarDay.gregorian) {
         let parts = calendar.dateComponents([.year, .month, .day], from: date)
         year = parts.year!
         month = parts.month!
@@ -382,7 +389,7 @@ public struct CalendarDay: Hashable, Comparable, Codable, Sendable, CustomString
     public var description: String { iso }
 
     /// Medianoche de ese día en el calendario dado, para DatePicker y formateo.
-    public func date(calendar: Calendar = .current) -> Date {
+    public func date(calendar: Calendar = CalendarDay.gregorian) -> Date {
         calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
