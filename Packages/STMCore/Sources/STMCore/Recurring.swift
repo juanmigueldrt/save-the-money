@@ -195,8 +195,11 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
 
     /// Lo que se cobra en un día de cargo concreto.
     public func amount(on due: CalendarDay) -> Money {
-        guard hasIntro else { return amount }
-        return amount(forCharge: max(0, occurrences(from: startsOn, through: due).count - 1))
+        guard hasIntro, let introCharges else { return amount }
+        // Solo importa si el cargo cae en la oferta: se cuentan como mucho `introCharges + 1` cargos,
+        // no todos desde el principio (el resultado es el mismo).
+        let cap = recurrence.occurrence(introCharges, from: startsOn)
+        return amount(forCharge: max(0, occurrences(from: startsOn, through: min(due, cap)).count - 1))
     }
 
     /// Día del último cargo con precio de oferta, si hay oferta.

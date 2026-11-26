@@ -37,6 +37,22 @@ class Action(private val scope: CoroutineScope) {
     }
 }
 
+/**
+ * Recarga tras una escritura que ya se ha guardado. Nunca lanza: si fallara, [Action] lo daría por fallo de guardado,
+ * el formulario seguiría abierto y «Guardar» otra vez podría duplicar. Devuelve el mensaje del fallo, para que el
+ * modelo lo muestre como problema de carga (se reintenta cargando, no guardando).
+ */
+suspend fun reloadAfterSave(block: suspend () -> Unit): String? = try {
+    block()
+    null
+} catch (e: CancellationException) {
+    throw e
+} catch (e: AppError) {
+    e.message
+} catch (e: Exception) {
+    AppError.Unknown("app").message
+}
+
 @Composable
 fun rememberAction(): Action {
     val scope = rememberCoroutineScope()
