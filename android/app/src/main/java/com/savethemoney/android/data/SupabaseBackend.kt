@@ -220,6 +220,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "STM03" -> AppError.InvalidInput(InvestmentTrade.NEEDED_BY_LATER_SALE)
             // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
             "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
+            // El trigger de households: no se cambia base_currency con importes guardados.
+            "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 
