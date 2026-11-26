@@ -711,11 +711,17 @@ struct AccountFormView: View {
                     Picker("Tipo", selection: $kind) {
                         ForEach(AccountKind.allCases, id: \.self) { Text($0.title).tag($0) }
                     }
+                    .disabled(isCardLocked)
                     TextField("Saldo inicial, p. ej. 1.250,00", text: $openingBalance)
                         .decimalInput()
                     Toggle("Compartida con el hogar", isOn: $isShared)
                 } footer: {
-                    Text("El saldo inicial es lo que había en la cuenta antes del primer movimiento que apuntes o importes.")
+                    VStack(alignment: .leading, spacing: Spacing.s4) {
+                        if isCardLocked {
+                            Text("Una tarjeta de crédito no puede cambiar de tipo.")
+                        }
+                        Text("El saldo inicial es lo que había en la cuenta antes del primer movimiento que apuntes o importes.")
+                    }
                 }
                 Section {
                     Toggle("Cuenta predeterminada", isOn: $isDefault)
@@ -751,6 +757,9 @@ struct AccountFormView: View {
         .frame(minWidth: 360, minHeight: 360)
         .onAppear(perform: fill)
     }
+
+    /// Una tarjeta ya creada no puede cambiar de tipo (el servidor también lo rechaza).
+    private var isCardLocked: Bool { account?.kind == .creditCard }
 
     private func fill() {
         guard let account else {
