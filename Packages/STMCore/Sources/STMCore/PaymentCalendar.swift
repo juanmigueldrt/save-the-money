@@ -63,15 +63,37 @@ public struct CalendarPayment: Hashable, Sendable, Identifiable {
 /// Junta pagos fijos, suscripciones, cargos de tarjeta y aportaciones a inversiones
 /// en un solo calendario. No guarda nada: se calcula con lo que ya hay.
 public struct PaymentCalendar: Hashable, Sendable {
+    /// Próximo cargo de una tarjeta, con el nombre de la tarjeta.
+    public struct CardDue: Hashable, Sendable {
+        public var name: String
+        public var accountId: UUID
+        public var payment: CardPayment
+
+        public init(name: String, accountId: UUID, payment: CardPayment) {
+            self.name = name
+            self.accountId = accountId
+            self.payment = payment
+        }
+    }
+
+    /// Plan de inversión, con el nombre del activo.
+    public struct PlanEntry: Hashable, Sendable {
+        public var name: String
+        public var plan: InvestmentPlan
+
+        public init(name: String, plan: InvestmentPlan) {
+            self.name = name
+            self.plan = plan
+        }
+    }
+
     public var series: [RecurringSeries]
     /// Próximos cargos de cada tarjeta, con el nombre de la tarjeta.
-    public var cardPayments: [(name: String, accountId: UUID, payment: CardPayment)]
+    public var cardPayments: [CardDue]
     /// Planes de inversión, con el nombre del activo.
-    public var plans: [(name: String, plan: InvestmentPlan)]
+    public var plans: [PlanEntry]
 
-    public init(series: [RecurringSeries] = [],
-                cardPayments: [(name: String, accountId: UUID, payment: CardPayment)] = [],
-                plans: [(name: String, plan: InvestmentPlan)] = []) {
+    public init(series: [RecurringSeries] = [], cardPayments: [CardDue] = [], plans: [PlanEntry] = []) {
         self.series = series
         self.cardPayments = cardPayments
         self.plans = plans
@@ -118,16 +140,6 @@ public struct PaymentCalendar: Hashable, Sendable {
         Array(payments(from: day.adding(days: 1), through: day.adding(days: 366)).prefix(limit))
     }
 
-    public static func == (lhs: PaymentCalendar, rhs: PaymentCalendar) -> Bool {
-        lhs.series == rhs.series && lhs.plans.map(\.plan) == rhs.plans.map(\.plan)
-            && lhs.cardPayments.map(\.payment) == rhs.cardPayments.map(\.payment)
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(series)
-        hasher.combine(plans.map(\.plan))
-        hasher.combine(cardPayments.map(\.payment))
-    }
 }
 
 /// Un mes del calendario de pagos.

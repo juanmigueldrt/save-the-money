@@ -28,6 +28,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
+import java.math.BigDecimal
 import java.time.LocalDate
 
 /**
@@ -242,6 +243,33 @@ class OperacionesDeModelosTest {
         cruzar(service, { model.load() }) { model.save(Holding("", "h", "Fondo de prueba")) }
 
         assertEquals("el activo guardado no desaparece", listOf("Fondo de prueba"), model.holdings.map { it.name })
+    }
+
+    /** El activo se guarda en el servidor y la respuesta tarda: la petición ya ha salido. */
+    private class ActivoConPuerta(private val base: InMemoryFinance) : FinanceService by base {
+        val puerta = Puerta(cortable = true)
+
+        override suspend fun createHolding(holding: Holding): Holding = base.createHolding(holding).also { puerta.pasar() }
+    }
+
+    @Test
+    fun inversionesElPrecioDeUnActivoNuevoTerminaAunqueSeSalgaDeLaPantalla() = runBlocking {
+        val base = InMemoryFinance()
+        val service = ActivoConPuerta(base)
+        val model = InvestmentModel(Household("h", "Casa"), service, NoNotifier) { hoy }
+        val activo = Holding("act-1", "h", "Fondo de prueba", price = BigDecimal("12.50"), priceOn = hoy.toString())
+
+        // La pantalla guarda el activo y su precio; se sale con el activo ya enviado, antes de apuntar el precio.
+        val pantalla = launch { model.save(activo, BigDecimal("12.50"), hoy) }
+        service.puerta.llegada.await()
+        pantalla.cancel()
+        service.puerta.abrir()
+        pantalla.join()
+        escrituras.children.toList().joinAll()
+
+        assertEquals("el activo guardado se ve", listOf("Fondo de prueba"), model.holdings.map { it.name })
+        assertEquals("el precio del día queda apuntado en el histórico", listOf(hoy.toString()), base.holdingPrices("h").map { it.pricedOn })
+        assertNull(model.error)
     }
 
     @Test
