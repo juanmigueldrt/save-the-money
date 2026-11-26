@@ -280,8 +280,12 @@ class Portfolio(holdings: List<Holding>, trades: List<InvestmentTrade>) {
     val positions: List<Position> = holdings.filter { !it.isArchived }.map { Position(it, trades) }.filter { it.quantity.signum() > 0 }
         .sortedWith(compareBy({ -it.value }, { it.holding.trimmedName }))
 
-    val value: Long get() = positions.sumOf { it.value }
-    val cost: Long get() = positions.sumOf { it.cost }
+    private fun total(amount: (Position) -> Long) = Money.total(positions.map { Money.Amount(amount(it), it.holding.currency) })
+
+    /** Hay posiciones en más de una moneda: no se suman sin convertir y se enseña [Money.MIXED] (ORC-71). */
+    val mixedCurrencies: Boolean get() = total { it.value } == null
+    val value: Long get() = total { it.value }?.minor ?: 0
+    val cost: Long get() = total { it.cost }?.minor ?: 0
     val gain: Long get() = value - cost
     val gainFraction: Double? get() = if (cost > 0) gain.toDouble() / cost else null
 

@@ -280,4 +280,15 @@ class SharedVectorsTest {
             assertEquals("«${v.str("text")}» × ${v.str("repeat")}", v.str("sha256"), CsvImporter.sha256Hex(input))
         }
     }
+
+    @Test
+    fun moneyOfSeveralCurrencies() {
+        fun JsonElement.amount() = Money.Amount(long("minor"), str("currency"))
+        for (v in load("money_currencies.json", "totals")) {
+            assertEquals(v.str("name"), v["expected"]?.amount(), Money.total(v["amounts"]!!.jsonArray.map { it.amount() }))
+        }
+        for (v in load("money_currencies.json", "conversions")) {
+            assertEquals("${v.str("minor")} × ${v.str("rate")}", v.long("expected"), Money.convert(v.long("minor"), v.str("rate").toBigDecimal()))
+        }
+    }
 }

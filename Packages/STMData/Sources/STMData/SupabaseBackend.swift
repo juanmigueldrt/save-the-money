@@ -236,6 +236,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "STM03": .invalidInput(InvestmentTrade.neededByLaterSale)
         // accept_invite: demasiados códigos fallidos; el mensaje acaba en «retry in N min».
         case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
+        // El trigger de households: no se cambia base_currency con importes guardados.
+        case "STM06": .invalidInput(Household.currencyLocked)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

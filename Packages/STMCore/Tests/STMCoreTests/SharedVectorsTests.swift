@@ -343,4 +343,23 @@ final class SharedVectorsTests: XCTestCase {
             XCTAssertEqual(SHA256.hex(input), v.sha256, "«\(v.text)» × \(v.repeat)")
         }
     }
+
+    func testMoneyOfSeveralCurrencies() throws {
+        struct File: Decodable { var totals: [Total]; var conversions: [Conversion] }
+        struct Amount: Decodable { var minor: Int; var currency: String }
+        struct Total: Decodable { var name: String; var amounts: [Amount]; var expected: Amount? }
+        struct Conversion: Decodable { var minor: Int; var rate: String; var expected: Int }
+        let file: File = try load("money_currencies.json")
+        XCTAssertFalse(file.totals.isEmpty)
+        XCTAssertFalse(file.conversions.isEmpty)
+        for v in file.totals {
+            let total = v.amounts.map { Money(minor: $0.minor, currency: $0.currency) }.reduce(Money.zero, +)
+            XCTAssertEqual(total, v.expected.map { Money(minor: $0.minor, currency: $0.currency) } ?? .mixed, v.name)
+        }
+        for v in file.conversions {
+            let rate = try XCTUnwrap(Decimal(string: v.rate, locale: Locale(identifier: "en_US_POSIX")))
+            XCTAssertEqual(Money(minor: v.minor, currency: "USD").converted(to: "EUR", rate: rate),
+                           Money(minor: v.expected), "\(v.minor) × \(v.rate)")
+        }
+    }
 }

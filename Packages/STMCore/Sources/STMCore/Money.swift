@@ -40,6 +40,7 @@ public struct Money: Hashable, Codable, Sendable {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = locale
+        if isMixed { return Money.mixedText }
         formatter.currencyCode = currency
         if options.hidesAmounts {
             return "•••• " + (formatter.currencySymbol ?? currency)
@@ -56,26 +57,55 @@ public struct Money: Hashable, Codable, Sendable {
 
 extension Money: Comparable {
     public static func < (lhs: Money, rhs: Money) -> Bool {
-        precondition(lhs.currency == rhs.currency, "No se comparan monedas distintas")
-        return lhs.minor < rhs.minor
+        // Monedas distintas no se comparan por importe: se ordenan por moneda, sin cerrar la app.
+        lhs.currency == rhs.currency ? lhs.minor < rhs.minor : lhs.currency < rhs.currency
     }
 }
 
 extension Money: AdditiveArithmetic {
     public static var zero: Money { Money(minor: 0) }
 
+    /// Suma sin mezclar monedas. Con monedas distintas el resultado es `Money.mixed`, que en
+    /// pantalla sale como «Varias monedas» en vez de una cifra falsa; nunca cierra la app.
+    /// Un cero no tiene moneda que mezclar: `0 € + 5 $` son `5 $`. Para sumar monedas
+    /// distintas hay que convertir antes con `converted(to:rate:)`.
     public static func + (lhs: Money, rhs: Money) -> Money {
-        precondition(lhs.currency == rhs.currency, "No se suman monedas distintas")
-        return Money(minor: lhs.minor + rhs.minor, currency: lhs.currency)
+        combined(lhs, rhs.minor, rhs)
     }
 
     public static func - (lhs: Money, rhs: Money) -> Money {
-        precondition(lhs.currency == rhs.currency, "No se restan monedas distintas")
-        return Money(minor: lhs.minor - rhs.minor, currency: lhs.currency)
+        combined(lhs, -rhs.minor, rhs)
+    }
+
+    private static func combined(_ lhs: Money, _ added: Int, _ rhs: Money) -> Money {
+        if lhs.isMixed || rhs.isMixed { return .mixed }
+        if lhs.currency == rhs.currency { return Money(minor: lhs.minor + added, currency: lhs.currency) }
+        if added == 0 { return lhs }
+        if lhs.minor == 0 { return Money(minor: added, currency: rhs.currency) }
+        return .mixed
     }
 
     public static prefix func - (value: Money) -> Money {
         Money(minor: -value.minor, currency: value.currency)
+    }
+}
+
+extension Money {
+    /// Moneda del resultado de sumar o restar monedas distintas sin convertir. No es un código
+    /// ISO (la base solo admite tres mayúsculas), así que ninguna cuenta puede tenerla.
+    public static let mixedCurrency = "*"
+    /// Lo que se enseña en vez de un importe cuando se han mezclado monedas.
+    public static let mixedText = "Varias monedas"
+    /// «No es un importe»: lo devuelven `+` y `-` con monedas distintas, y se contagia a lo que se le sume.
+    public static let mixed = Money(minor: 0, currency: mixedCurrency)
+
+    public var isMixed: Bool { currency == Money.mixedCurrency }
+
+    /// Conversión explícita: el importe por el tipo de cambio (unidades de `currency` por cada
+    /// unidad de la moneda de origen), redondeado al céntimo más cercano (0,5 se aleja del cero).
+    public func converted(to currency: String, rate: Decimal) -> Money {
+        let cents = (Decimal(minor) * rate).rounded(scale: 0)
+        return Money(minor: NSDecimalNumber(decimal: cents).intValue, currency: currency)
     }
 }
 
