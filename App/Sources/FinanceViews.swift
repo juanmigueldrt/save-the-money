@@ -46,7 +46,8 @@ struct SummaryView: View {
 
                 VStack(alignment: .leading, spacing: Spacing.s8) {
                     Eyebrow("Gastado este mes")
-                    Text(MonthSummary.spent(movements: finance.recent, categories: finance.categories).formatted())
+                    Text(MonthSummary.spent(movements: finance.recent, categories: finance.categories,
+                                            monthStartDay: finance.household.monthStartDay).formatted())
                         .titleFont(.title1)
                         .foregroundStyle(Palette.label)
                         .contentTransition(.numericText())
@@ -291,7 +292,7 @@ struct MovementsView: View {
     }
 
     private var filtered: [Movement] {
-        effectiveFilter.apply(to: source, categories: finance.categories)
+        effectiveFilter.apply(to: source, categories: finance.categories, monthStartDay: finance.household.monthStartDay)
     }
 
     private var isFiltering: Bool {

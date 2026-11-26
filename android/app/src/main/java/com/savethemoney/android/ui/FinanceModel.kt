@@ -21,6 +21,7 @@ import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.MovementTags
 import com.savethemoney.android.data.Payee
 import com.savethemoney.android.data.PendingCharge
+import com.savethemoney.android.data.ReportPeriod
 import com.savethemoney.android.data.defaultAccount
 import com.savethemoney.android.data.NoNotifier
 import com.savethemoney.android.data.Notifier
@@ -74,6 +75,7 @@ class FinanceModel(
     var lastDeleted by mutableStateOf<Movement?>(null)
 
     // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
+
     /** El movimiento que se tocó, tal cual salía en su lista: la de una cuenta puede traer movimientos que no están en [recent]. */
     var tappedMovement by mutableStateOf<Movement?>(null)
     var selectedAccountId by mutableStateOf<String?>(null)
@@ -110,10 +112,13 @@ class FinanceModel(
         return recent.filter { thisMonth(it) && it.accountId in ids }.sumOf { it.amountMinor }
     }
 
-    /** Gasto del mes sin contar transferencias entre cuentas. */
-    val spentThisMonth: Long get() = -recent
-        .filter { thisMonth(it) && it.isExpense && !it.excluded && category(it.categoryId)?.kind != CategoryKind.Transfer }
-        .sumOf { it.amountMinor }
+    /** Gasto del mes del hogar sin contar transferencias entre cuentas. */
+    val spentThisMonth: Long get() {
+        val period = ReportPeriod.ThisMonth.range(today(), household.monthStartDay)
+        return -recent
+            .filter { it.day in period && it.isExpense && !it.excluded && category(it.categoryId)?.kind != CategoryKind.Transfer }
+            .sumOf { it.amountMinor }
+    }
 
     fun takeMovementForm(): MovementForm = (movementForm ?: MovementForm()).also { movementForm = null }
     fun takeAccountToEdit(): Account? = accountToEdit.also { accountToEdit = null }

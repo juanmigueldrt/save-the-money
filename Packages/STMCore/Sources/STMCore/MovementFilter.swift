@@ -51,17 +51,16 @@ public enum MovementDateFilter: String, CaseIterable, Sendable, Identifiable {
     }
 
     /// Días incluidos; nil = sin límite. `custom` usa las fechas dadas (en cualquier orden).
-    public func range(today: CalendarDay, custom: ClosedRange<CalendarDay>? = nil) -> ClosedRange<CalendarDay>? {
-        let month = MonthKey(today)
+    /// Los meses y el año siguen el mes del hogar (`monthStartDay`), igual que los informes.
+    public func range(today: CalendarDay, custom: ClosedRange<CalendarDay>? = nil,
+                      monthStartDay: Int = 1) -> ClosedRange<CalendarDay>? {
         switch self {
         case .all: return nil
-        case .thisMonth: return month.firstDay...today
-        case .lastMonth:
-            let previous = month.adding(months: -1)
-            return previous.firstDay...month.firstDay.adding(days: -1)
+        case .thisMonth: return ReportPeriod.thisMonth.range(today: today, monthStartDay: monthStartDay)
+        case .lastMonth: return ReportPeriod.lastMonth.range(today: today, monthStartDay: monthStartDay)
         case .last30Days: return today.adding(days: -29)...today
         case .last90Days: return today.adding(days: -89)...today
-        case .thisYear: return MonthKey(year: today.year, month: 1).firstDay...today
+        case .thisYear: return ReportPeriod.thisYear.range(today: today, monthStartDay: monthStartDay)
         case .custom: return custom
         }
     }
@@ -100,18 +99,18 @@ public struct MovementFilter: Hashable, Sendable {
         [accountId != nil, kind != .all, categoryId != nil, dates != .all, status != .all, tag != nil].filter { $0 }.count
     }
 
-    public func dateRange(today: CalendarDay) -> ClosedRange<CalendarDay>? {
+    public func dateRange(today: CalendarDay, monthStartDay: Int = 1) -> ClosedRange<CalendarDay>? {
         var custom: ClosedRange<CalendarDay>?
         if let from = customFrom, let through = customThrough {
             custom = min(from, through)...max(from, through)
         }
-        return dates.range(today: today, custom: custom)
+        return dates.range(today: today, custom: custom, monthStartDay: monthStartDay)
     }
 
     public func apply(to movements: [Movement], categories: [BudgetCategory],
-                      today: CalendarDay = CalendarDay()) -> [Movement] {
+                      today: CalendarDay = CalendarDay(), monthStartDay: Int = 1) -> [Movement] {
         let byId = Dictionary(categories.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        let range = dateRange(today: today)
+        let range = dateRange(today: today, monthStartDay: monthStartDay)
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         let amountQuery = query.isEmpty ? nil : Money(parsing: query)
         return movements.filter { movement in

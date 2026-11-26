@@ -233,6 +233,55 @@ final class SharedVectorsTests: XCTestCase {
         }
     }
 
+    func testHouseholdMonth() throws {
+        struct File: Decodable {
+            var today: String; var categories: [Categoria]; var movements: [Apunte]
+            var spent: [Gasto]; var rise: [Subida]; var filters: [Filtro]
+        }
+        struct Categoria: Decodable { var id: String; var name: String; var kind: String }
+        struct Apunte: Decodable { var id: String; var day: String; var category: String; var minor: Int }
+        struct Gasto: Decodable { var monthStartDay: Int; var minor: Int }
+        struct Subida: Decodable { var monthStartDay: Int; var title: String?; var percent: Int?; var previous: String? }
+        struct Filtro: Decodable { var dates: String; var monthStartDay: Int; var ids: [String] }
+        let file: File = try load("household_month.json")
+        let home = UUID(), account = UUID()
+        var categoryIds: [String: UUID] = [:]
+        var categories: [BudgetCategory] = []
+        for c in file.categories {
+            let id = UUID()
+            categoryIds[c.id] = id
+            categories.append(BudgetCategory(id: id, householdId: home, name: c.name,
+                                             kind: try XCTUnwrap(CategoryKind(rawValue: c.kind))))
+        }
+        var names: [UUID: String] = [:]
+        let movements = file.movements.map { m -> Movement in
+            let id = UUID()
+            names[id] = m.id
+            return Movement(id: id, householdId: home, accountId: account, categoryId: categoryIds[m.category],
+                            bookedOn: day(m.day), amount: Money(minor: m.minor), description: m.id)
+        }
+        let today = day(file.today)
+        for g in file.spent {
+            let spent = MonthSummary.spent(movements: movements, categories: categories, today: today,
+                                           monthStartDay: g.monthStartDay)
+            XCTAssertEqual(spent.minor, g.minor, "inicio \(g.monthStartDay)")
+        }
+        for s in file.rise {
+            let month = MonthKey.containing(today, startDay: s.monthStartDay)
+            let rise = BiggestRise.find(movements: movements, categories: categories, month: month,
+                                        monthStartDay: s.monthStartDay)
+            XCTAssertEqual(rise?.title, s.title, "inicio \(s.monthStartDay)")
+            XCTAssertEqual(rise?.percent, s.percent, "inicio \(s.monthStartDay)")
+            XCTAssertEqual(rise.map { String(format: "%04ld-%02ld", $0.previous.year, $0.previous.month) }, s.previous,
+                           "inicio \(s.monthStartDay)")
+        }
+        for f in file.filters {
+            let filter = MovementFilter(dates: try XCTUnwrap(MovementDateFilter(rawValue: f.dates), f.dates))
+            let kept = filter.apply(to: movements, categories: categories, today: today, monthStartDay: f.monthStartDay)
+            XCTAssertEqual(kept.compactMap { names[$0.id] }, f.ids, "\(f.dates) inicio \(f.monthStartDay)")
+        }
+    }
+
     func testImportFingerprint() throws {
         struct File: Decodable { var vectors: [Vector] }
         struct Vector: Decodable { var name: String; var csv: String; var rows: [Row] }
