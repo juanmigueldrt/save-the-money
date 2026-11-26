@@ -66,18 +66,32 @@ data class CsvTable(val rows: List<List<String>>, val delimiter: Char) {
             return CsvTable(rows, sep)
         }
 
-        /** El separador que más se repite fuera de comillas en las primeras líneas. */
+        /**
+         * Separadores que se prueban; en caso de empate gana el primero. La coma va la última
+         * porque también aparece en conceptos e importes ("PAGO BIZUM, CENA", "-12,50").
+         */
+        val delimiters = listOf(';', '\t', ',')
+
+        /**
+         * El separador que da el mismo número de columnas (dos o más) en más líneas de las 20 primeras.
+         * Contar cuántas veces aparece no vale: "28/10/2026;PAGO BIZUM, CENA, JUAN;-12,50" tiene más comas.
+         */
         fun guessDelimiter(text: String): Char {
-            val candidates = listOf(';', ',', '\t')
-            val counts = mutableMapOf<Char, Int>()
+            var end = text.length
             var inQuotes = false
             var lines = 0
-            for (ch in text) {
-                if (ch == '"') inQuotes = !inQuotes
-                else if (!inQuotes && ch in candidates) counts[ch] = (counts[ch] ?: 0) + 1
-                else if (!inQuotes && ch == '\n' && ++lines >= 20) break
+            for ((i, ch) in text.withIndex()) {
+                if (ch == '"') {
+                    inQuotes = !inQuotes
+                } else if (!inQuotes && ch == '\n' && ++lines >= 20) {
+                    end = i + 1
+                    break
+                }
             }
-            return candidates.maxBy { counts[it] ?: 0 }
+            val sample = text.substring(0, end)
+            fun score(candidate: Char): Int =
+                parse(sample, candidate).rows.filter { it.size >= 2 }.groupingBy { it.size }.eachCount().values.maxOrNull() ?: 0
+            return delimiters.maxBy(::score)
         }
     }
 }
@@ -230,6 +244,11 @@ object CsvImporter {
                 is AmountColumns.Split -> {
                     val out = money(cell(a.debit))?.let { -abs(it) }
                     val into = money(cell(a.credit))?.let { abs(it) }
+                    // Con cargo y abono a la vez no se sabe cuál vale: se avisa en vez de quedarse con uno.
+                    if (out != null && into != null && out != 0L && into != 0L) {
+                        result += CsvImportRow(line, issue = "Tiene cargo y abono a la vez")
+                        continue
+                    }
                     listOfNotNull(out, into).firstOrNull { it != 0L } ?: out ?: into
                 }
             }
