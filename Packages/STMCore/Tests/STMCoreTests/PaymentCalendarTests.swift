@@ -37,8 +37,8 @@ final class PaymentCalendarTests: XCTestCase {
         let plan = InvestmentPlan(householdId: household, holdingId: UUID(), amount: Money(minor: 10_000),
                                   startsOn: day(2026, 3, 10))
         let calendar = PaymentCalendar(series: [rent, salary, gym, old],
-                                       cardPayments: [(name: "Visa", accountId: card, payment: payment)],
-                                       plans: [(name: "Fondo indexado", plan: plan)])
+                                       cardPayments: [.init(name: "Visa", accountId: card, payment: payment)],
+                                       plans: [.init(name: "Fondo indexado", plan: plan)])
 
         let november = calendar.month(MonthKey(year: 2026, month: 11))
         XCTAssertEqual(november.payments(on: day(2026, 11, 5)).map(\.title), ["Alquiler"])
@@ -65,8 +65,27 @@ final class PaymentCalendarTests: XCTestCase {
         var plan = InvestmentPlan(householdId: household, holdingId: UUID(), amount: Money(minor: 5_000),
                                   startsOn: day(2026, 1, 1))
         plan.pausedAt = Date()
-        let calendar = PaymentCalendar(plans: [(name: "Fondo", plan: plan)])
+        let calendar = PaymentCalendar(plans: [.init(name: "Fondo", plan: plan)])
         XCTAssertTrue(calendar.month(MonthKey(year: 2026, month: 11)).payments.isEmpty)
+    }
+
+    /// Con la igualdad a mano, dos calendarios con otro nombre o otra cuenta salían iguales y la pantalla no se repintaba.
+    func testIgualdadMiraNombresYCuentas() {
+        let payment = CardPayment(due: day(2026, 12, 1), statement: day(2026, 11, 1), amount: Money(minor: 45_000),
+                                  purchases: Money(minor: 45_000), installments: .zero, interest: .zero, isEstimate: true)
+        let plan = InvestmentPlan(householdId: household, holdingId: UUID(), amount: Money(minor: 10_000),
+                                  startsOn: day(2026, 3, 10))
+        let base = PaymentCalendar(cardPayments: [.init(name: "Visa", accountId: card, payment: payment)],
+                                   plans: [.init(name: "Fondo", plan: plan)])
+
+        XCTAssertEqual(base, PaymentCalendar(cardPayments: [.init(name: "Visa", accountId: card, payment: payment)],
+                                             plans: [.init(name: "Fondo", plan: plan)]))
+        XCTAssertNotEqual(base, PaymentCalendar(cardPayments: [.init(name: "Oro", accountId: card, payment: payment)],
+                                                plans: [.init(name: "Fondo", plan: plan)]), "cambia el nombre de la tarjeta")
+        XCTAssertNotEqual(base, PaymentCalendar(cardPayments: [.init(name: "Visa", accountId: bank, payment: payment)],
+                                                plans: [.init(name: "Fondo", plan: plan)]), "cambia la cuenta de la tarjeta")
+        XCTAssertNotEqual(base, PaymentCalendar(cardPayments: [.init(name: "Visa", accountId: card, payment: payment)],
+                                                plans: [.init(name: "Otro fondo", plan: plan)]), "cambia el nombre del activo")
     }
 
     func testImportMarks() {

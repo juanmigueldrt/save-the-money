@@ -544,9 +544,8 @@ fun Pantalla39(nav: Nav) {
             note = nota.trim().ifEmpty { null },
         )
         item.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = inv.save(item)
-        // Un precio nuevo también queda en el histórico, para el gráfico.
-        if (cambiaPrecio && valor.signum() > 0) inv.recordPrice(valor, hoy, saved)
+        // Un precio nuevo también queda en el histórico, para el gráfico: va en la misma escritura que el activo.
+        inv.save(item, price = valor.takeIf { cambiaPrecio && it.signum() > 0 }, priceDay = hoy)
         nav.back()
     }
 

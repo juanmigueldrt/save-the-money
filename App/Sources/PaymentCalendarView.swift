@@ -11,10 +11,12 @@ struct PaymentCalendarSource {
 
     var calendar: PaymentCalendar {
         let cardPayments = cards.cardAccounts.flatMap { account in
-            (cards.summary(for: account)?.payments ?? []).map { (name: account.name, accountId: account.id, payment: $0) }
+            (cards.summary(for: account)?.payments ?? []).map {
+                PaymentCalendar.CardDue(name: account.name, accountId: account.id, payment: $0)
+            }
         }
         let plans = investments.plans.map { plan in
-            (name: investments.holding(plan.holdingId)?.name ?? "Inversión", plan: plan)
+            PaymentCalendar.PlanEntry(name: investments.holding(plan.holdingId)?.name ?? "Inversión", plan: plan)
         }
         return PaymentCalendar(series: planning.series, cardPayments: cardPayments, plans: plans)
     }
