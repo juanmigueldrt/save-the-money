@@ -57,14 +57,12 @@ extension SupabaseBackend: RecurringService, GoalService {
     // MARK: Cargos pendientes
 
     public func recurringCharges(in householdId: UUID) async throws -> [RecurringCharge] {
-        try await mapped {
-            try await client.from("recurring_charges")
+        try await allRows {
+            client.from("recurring_charges")
                 .select(Self.chargeColumns)
                 .eq("household_id", value: householdId.uuidString)
                 .order("due_on", ascending: false)
-                .limit(500)
-                .execute()
-                .value
+                .order("id")
         }
     }
 
