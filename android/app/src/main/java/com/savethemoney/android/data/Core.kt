@@ -12,6 +12,11 @@ sealed class AppError(override val message: String) : Exception(message) {
     data object WeakPassword : AppError("La contraseña es demasiado débil. Usa al menos ${SignUpForm.MIN_PASSWORD} caracteres.")
     data object NotSignedIn : AppError("Tu sesión ha caducado. Vuelve a iniciar sesión.")
     data object InvalidOrExpiredInvite : AppError("Ese código no es válido o ha caducado. Pide uno nuevo.")
+
+    /** Demasiados códigos fallidos seguidos: el servidor no deja probar más hasta que pasen estos minutos. */
+    data class TooManyInviteAttempts(val minutes: Int) : AppError(
+        "Has probado demasiados códigos. Vuelve a intentarlo dentro de ${if (minutes == 1) "1 minuto" else "$minutes minutos"}.",
+    )
     data object AlreadyMember : AppError("Ya formas parte de ese hogar.")
     data object Network : AppError("No hay conexión. Inténtalo de nuevo en un momento.")
     class InvalidInput(text: String) : AppError(text)

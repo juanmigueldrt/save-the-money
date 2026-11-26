@@ -5,7 +5,7 @@ import Supabase
 /// Cuentas, categorías y movimientos sobre Supabase. El RLS del servidor decide
 /// qué se ve; aquí no se filtra por seguridad, sólo por lo que pide la pantalla.
 extension SupabaseBackend: FinanceService {
-    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth"
+    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
     private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
     static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
