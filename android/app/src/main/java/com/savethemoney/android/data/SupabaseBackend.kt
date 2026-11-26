@@ -193,7 +193,9 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "23505" -> when {
                 "already a member" in message -> AppError.AlreadyMember
                 "categories_household_name_idx" in message -> AppError.InvalidInput("Ya hay una categoría con ese nombre.")
-                else -> AppError.UsernameTaken
+                // profiles.username es único: Postgres nombra la restricción en el mensaje.
+                "profiles_username_key" in message -> AppError.UsernameTaken
+                else -> AppError.InvalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
             }
             "28000", "PGRST301" -> AppError.NotSignedIn
             "23503", "23514", "22P02" -> AppError.InvalidInput("Algún dato no es válido. Revisa el formulario.")
