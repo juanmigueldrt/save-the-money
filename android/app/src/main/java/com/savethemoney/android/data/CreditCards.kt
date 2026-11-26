@@ -2,15 +2,23 @@ package com.savethemoney.android.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 
 // CreditCards.swift de STMCore: condiciones, compras aplazadas y cuánto se paga cada mes.
-// Los tipos de interés van en Double como en el cálculo de iOS; los importes, siempre en céntimos.
+// Los tipos de interés se guardan en Double (numeric(5, 2) en la base de datos) y las cuentas se hacen
+// con BigDecimal, como Decimal en iOS; los importes, siempre en céntimos.
+
+/**
+ * El tipo tal como se escribió: `BigDecimal.valueOf` usa el decimal más corto que da ese Double
+ * (14.99 → 14.99, no 14.9900000000000002131628…). Exacto para tipos de hasta 15 cifras.
+ */
+internal fun Double.exact(): BigDecimal = BigDecimal.valueOf(this)
 
 @Serializable
 enum class CardPaymentMode(val title: String, val detail: String) {
@@ -89,12 +97,21 @@ data class CardInstallment(
         /** Plazos que se ofrecen en la app. La base de datos admite de 2 a 48. */
         val commonMonths = listOf(3, 6, 9, 12)
 
-        /** Cuota mensual de una compra de [principal] (en positivo), sistema francés. */
+        /**
+         * Cuota mensual de una compra de [principal] (en positivo), sistema francés:
+         * P·r/(1 − (1 + r)^−n) = P·r·(1 + r)^n/((1 + r)^n − 1), con r = TIN/1200.
+         * Con BigDecimal a [INTEREST_SCALE] decimales y la cuota al céntimo, mitad hacia arriba (igual en iOS).
+         */
         fun payment(principal: Long, months: Int, rate: Double): Long {
             if (months <= 0 || principal <= 0) return 0
-            val r = rate / 1200
-            val p = principal.toDouble()
-            return Math.round(if (r == 0.0) p / months else p * r / (1 - (1 + r).pow(-months.toDouble())))
+            val p = BigDecimal(principal)
+            val tin = rate.exact()
+            if (tin.signum() == 0) return p.divide(BigDecimal(months), 0, RoundingMode.HALF_UP).toLong()
+            val r = tin.divide(BigDecimal(1200), INTEREST_SCALE, RoundingMode.HALF_UP)
+            var growth = BigDecimal.ONE
+            repeat(months) { growth = growth.timesRounded(BigDecimal.ONE + r) }
+            val factor = r.timesRounded(growth).divide(growth - BigDecimal.ONE, INTEREST_SCALE, RoundingMode.HALF_UP)
+            return p.multiply(factor).setScale(0, RoundingMode.HALF_UP).toLong()
         }
     }
 }
@@ -288,9 +305,9 @@ object CreditCardCalculator {
      */
     internal fun revolvingStep(capital: Long, terms: CreditCardTerms): Step {
         if (capital <= 0) return Step(0, 0, 0)
-        val interest = Math.round(capital.toDouble() * terms.revolvingRate / 1200)
+        val interest = monthlyInterest(capital, terms.revolvingRate)
         val owed = capital + interest
-        val percent = Math.round(capital.toDouble() * terms.minPaymentPercent / 100)
+        val percent = (BigDecimal(capital) * terms.minPaymentPercent.exact()).divide(BigDecimal(100), 0, RoundingMode.HALF_UP).toLong()
         val minimum = max(percent + interest, terms.minPayment)
         val wanted = if (terms.paymentMode == CardPaymentMode.Fixed) max(terms.fixedPayment ?: 0, minimum) else minimum
         val payment = min(wanted, owed)
@@ -299,13 +316,16 @@ object CreditCardCalculator {
 
     internal data class Row(val payment: Long, val interest: Long, val principal: Long)
 
+    /** Intereses de un mes: capital × TIN / 1200, exactos y al céntimo, mitad hacia arriba. */
+    internal fun monthlyInterest(capital: Long, rate: Double): Long =
+        (BigDecimal(capital) * rate.exact()).divide(BigDecimal(1200), 0, RoundingMode.HALF_UP).toLong()
+
     /** Cuotas de un aplazado: la última ajusta el redondeo para que el capital cuadre. */
     internal fun amortization(principal: Long, months: Int, rate: Double): List<Row> {
         val quota = CardInstallment.payment(principal, months, rate)
-        val r = rate / 1200
         var remaining = principal
         return List(months) { index ->
-            val interest = Math.round(remaining.toDouble() * r)
+            val interest = monthlyInterest(remaining, rate)
             val part = if (index == months - 1) remaining else min(remaining, quota - interest)
             remaining -= part
             Row(part + interest, interest, part)
