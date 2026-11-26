@@ -61,7 +61,7 @@ Supabase local en un runner de GitHub, mediana de las tres ejecuciones. Son las 
 
 Precios y operaciones (una décima parte de las filas): 0,18 s con 1.000 y 2,6 s con 5.000.
 
-Ejecución del workflow (enlace y fecha): pendiente de apuntar.
+Ejecución del workflow: [45817403865](https://github.com/juanmigueldrt/save-the-money/actions/runs/45817403865), 26-11-2026. Los planes de ejecución: [45820500401](https://github.com/juanmigueldrt/save-the-money/actions/runs/45820500401), mismo día.
 
 ### Lectura
 
@@ -125,34 +125,34 @@ Migración `20261126170000_orc70_lectura_barata.sql`, pruebas `24_orc70_lectura_
 3. **Índices** `(household_id, priced_on, id)` en `holding_prices` y `(household_id, traded_on, id)` en `investment_trades`: dan el orden en que las apps piden las páginas. `transactions` no necesita otro: `transactions_household_booked_idx` ya da el orden por fecha y dentro de un día hay pocas filas que ordenar por `id`.
 4. **Descarga completa de movimientos por cursor**, en iOS (`allMovements`) y en Android (`movements(householdId, from, through)`): cada página se pide detrás de la última fila de la anterior, con el día de esa fila como límite (`booked_on >= día` en iOS, `<=` en Android) para que el servidor empiece a leer el índice ahí, y un `or` que desempata por `id` dentro del día. Cada app conserva su orden. De paso, un alta o un borrado a mitad de la descarga ya no hace saltar ni repetir filas. Precios y operaciones siguen con `offset`: con el índice y la política nueva, saltarse 5.000 filas cuesta milisegundos.
 
-El script de medición y `medicion_planes.sql` piden ahora los movimientos igual que las apps, por cursor.
+El script de medición y `medicion_planes.psql` piden ahora los movimientos igual que las apps, por cursor.
 
 ## Después del arreglo
 
-Pendiente: los números los pone quien lance otra vez el workflow «Medición de carga» en la rama, con 10.000 y 50.000 movimientos (mediana de las tres ejecuciones). La columna «Antes» es la de la tabla de Resultados.
+Medido con el workflow «Medición de carga» sobre la rama del arreglo, con 10.000 y 50.000 movimientos (mediana de las tres ejecuciones). La columna «Antes» es la de la tabla de Resultados.
 
 | Movimientos | Petición | Antes | Después |
 |---:|---|---:|---:|
-| 10.000 | Descargarlos todos | 5,8 s | |
-| 10.000 | Por página | 0,53 s | |
-| 10.000 | Saldos (`account_balances`) | 0,87 s | |
-| 10.000 | Precios y operaciones (1.000 filas) | 0,18 s | |
-| 50.000 | Descargarlos todos | 116 s | |
-| 50.000 | Por página | 2,3 s | |
-| 50.000 | Saldos (`account_balances`) | 4,25 s | |
-| 50.000 | Precios y operaciones (5.000 filas) | 2,6 s | |
+| 10.000 | Descargarlos todos | 5,8 s | 0,08 s |
+| 10.000 | Por página | 0,53 s | 0,007 s |
+| 10.000 | Saldos (`account_balances`) | 0,87 s | 0,012 s |
+| 10.000 | Precios y operaciones (1.000 filas) | 0,18 s | 0,006 s y 0,009 s |
+| 50.000 | Descargarlos todos | 116 s | 0,40 s (iOS) y 0,35 s (Android) |
+| 50.000 | Por página | 2,3 s | 0,008 s |
+| 50.000 | Saldos (`account_balances`) | 4,25 s | 0,028 s |
+| 50.000 | Precios y operaciones (5.000 filas) | 2,6 s | 0,025 s y 0,033 s |
 
-Ejecución del workflow (enlace y fecha): pendiente.
+Ejecución del workflow: [45826443661](https://github.com/juanmigueldrt/save-the-money/actions/runs/45826443661), 26-11-2026.
 
-Lo que se espera, por los planes sin RLS: una página de movimientos en decenas de milisegundos dentro de Postgres, los saldos de 50.000 movimientos en unos 25 ms, y la descarga completa limitada por lo que tarda en viajar y decodificarse el JSON (21,8 MB con 50.000 movimientos), no por la base de datos.
+Con 50.000 movimientos la descarga completa pasa de 116 s a 0,4 s (unas 300 veces menos) y los saldos de 4,25 s a 28 ms. El tiempo ya crece en línea con las filas: cada página tarda lo mismo con 10.000 que con 50.000. Los bytes no cambian (21,8 MB con 50.000 movimientos): lo que queda es lo que tarda en viajar y decodificarse el JSON, que esta medición no ve porque el servidor está al lado.
 
 ### ¿Sigue compensando llevar los totales al servidor?
 
-Pendiente de esos números. Lo que ya se sabe:
+Con los números de arriba:
 
-- La razón de tiempo que motivó el ticket desaparece si se confirma lo de arriba: sumar en el servidor no habría arreglado nada, porque la suma que ya hacía el servidor (`account_balances`) era igual de lenta por la misma política.
+- La razón de tiempo que motivó el ticket desaparece: sumar en el servidor no habría arreglado nada, porque la suma que ya hacía el servidor (`account_balances`) era igual de lenta por la misma política.
 - Lo que queda son los bytes: Patrimonio e Informes siguen bajando una fila por movimiento (4,4 MB por cada 10.000, sin comprimir) cada vez que cambia la lista. Para eso la opción B (pedir sólo tres columnas, y en Informes sólo los últimos meses) es más barata que cualquier agregado en el servidor y no obliga a repetir en SQL las reglas de `STMCore`.
-- Recomendación provisional: no hacer C, D ni E; medir, y si el tamaño de la respuesta molesta en el móvil, hacer B en otro ticket.
+- Recomendación: no hacer C, D ni E. Si el tamaño de la respuesta molesta en el móvil, hacer B en otro ticket.
 
 ## Opciones para llevar los totales al servidor
 

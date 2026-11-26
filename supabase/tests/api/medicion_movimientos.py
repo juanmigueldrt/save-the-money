@@ -22,7 +22,7 @@ y por las mismas restricciones que los de la app, y se leen igual que se leería
 cronometra. Comprueba además que llegan todas las filas y que la suma de los movimientos y los saldos coinciden con lo
 cargado; si algo no cuadra sale con código 1 (después de escribir la tabla).
 
-Después de medir cada tamaño lanza `medicion_planes.sql` con psql contra la base de datos local (la URL de
+Después de medir cada tamaño lanza `medicion_planes.psql` con psql contra la base de datos local (la URL de
 `supabase status`) e imprime los EXPLAIN (ANALYZE, BUFFERS) de las mismas peticiones, con el RLS del usuario y sin él.
 
 Uso, con el Supabase local arrancado (`supabase start`):
@@ -46,7 +46,8 @@ import urllib.parse
 import urllib.request
 
 ROOT = pathlib.Path(__file__).resolve().parents[3]
-PLANS_SQL = pathlib.Path(__file__).with_name("medicion_planes.sql")
+# Extensión .psql y no .sql: `supabase test db` ejecuta como prueba pgTAP todo .sql que haya bajo supabase/tests.
+PLANS_SQL = pathlib.Path(__file__).with_name("medicion_planes.psql")
 PAGE = 1000  # max_rows de supabase/config.toml, el mismo tamaño de página que usan las apps
 BATCH = 1000  # filas por petición al cargar los datos de prueba
 RUNS = 3
@@ -213,7 +214,7 @@ def measure(table, query, cursor=None):
 
 
 def plans(n):
-    """Lanza medicion_planes.sql con psql y devuelve lo que imprime: los EXPLAIN (ANALYZE, BUFFERS) de las peticiones."""
+    """Lanza medicion_planes.psql con psql y devuelve lo que imprime: los EXPLAIN (ANALYZE, BUFFERS) de las peticiones."""
     variables = {"hogar": household_id, "claims": json.dumps({"sub": user_id, "role": "authenticated"}),
                  "mitad": n // 2 // PAGE * PAGE, "mitad_inv": n // 10 // 2 // PAGE * PAGE}
     if shutil.which("psql") and DB_URL:
