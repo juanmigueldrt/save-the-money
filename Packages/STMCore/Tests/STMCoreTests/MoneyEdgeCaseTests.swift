@@ -18,7 +18,7 @@ final class MoneyEdgeCaseTests: XCTestCase {
         XCTAssertEqual(a + b, Money(minor: 1_300, currency: "USD"))
         XCTAssertEqual(a - b, Money(minor: 800, currency: "USD"))
         XCTAssertEqual(-a, Money(minor: -1_050, currency: "USD"))
-        XCTAssertEqual(Money.zero("USD") + a, a)
+        XCTAssertEqual(Money(minor: 0, currency: "USD") + a, a)
         XCTAssertEqual(Money(minor: 1_000, currency: "USD").split(percentages: [50, 30, 20]),
                        [Money(minor: 500, currency: "USD"), Money(minor: 300, currency: "USD"), Money(minor: 200, currency: "USD")])
         XCTAssertEqual(Money(parsing: "1.234,56", currency: "GBP"), Money(minor: 123_456, currency: "GBP"))

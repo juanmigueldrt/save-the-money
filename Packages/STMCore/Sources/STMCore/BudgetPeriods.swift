@@ -294,7 +294,7 @@ public enum SmartBudget {
 // MARK: - Presupuestos extra
 
 /// Un presupuesto aparte del del periodo, con nombre, límite y fechas propias (p. ej. «Vacaciones»).
-public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable {
+public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable, Named {
     public let id: UUID
     public var householdId: UUID
     public var name: String
@@ -320,8 +320,6 @@ public struct ExtraBudget: Identifiable, Hashable, Sendable, Codable {
         self.accountIds = accountIds
         self.isFavorite = isFavorite
     }
-
-    public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     public var issue: String? {
         if trimmedName.isEmpty { return "Ponle un nombre." }
