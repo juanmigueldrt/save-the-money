@@ -2,6 +2,7 @@ package com.savethemoney.android.data
 
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.Locale
 import kotlin.math.abs
 
 // Export.swift de STMCore.
@@ -31,7 +32,7 @@ object MovementsCsv {
     fun amountText(minor: Long): String =
         (if (minor < 0) "-" else "") + "${abs(minor) / 100}," + (abs(minor) % 100).toString().padStart(2, '0')
 
-    fun dayText(d: LocalDate) = "%02d/%02d/%04d".format(d.dayOfMonth, d.monthValue, d.year)
+    fun dayText(d: LocalDate) = String.format(Locale.ROOT, "%02d/%02d/%04d", d.dayOfMonth, d.monthValue, d.year)
 
     /** Entrecomilla si hace falta y desactiva fórmulas: un texto que empieza por "=", "+", "-" o "@" Excel lo ejecutaría. */
     fun field(value: String): String {

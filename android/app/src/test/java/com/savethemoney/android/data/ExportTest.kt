@@ -8,6 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 import java.time.LocalDate
 import java.time.YearMonth
+import java.util.Locale
 
 class ExportTest {
     @Test
@@ -24,6 +25,17 @@ class ExportTest {
             MovementsCsv.text(movs, listOf(cuenta), emptyList()),
         )
         assertEquals(0xEF.toByte(), MovementsCsv.bytes(movs, listOf(cuenta), emptyList())[0])
+    }
+
+    @Test
+    fun fechaConDigitosLatinosAunqueElIdiomaSeaArabe() {
+        val antes = Locale.getDefault(Locale.Category.FORMAT)
+        try {
+            Locale.setDefault(Locale.Category.FORMAT, Locale.forLanguageTag("ar-SA-u-nu-arab"))
+            assertEquals("26/11/2026", MovementsCsv.dayText(LocalDate.of(2026, 11, 26)))
+        } finally {
+            Locale.setDefault(Locale.Category.FORMAT, antes)
+        }
     }
 
     @Test
