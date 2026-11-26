@@ -139,6 +139,20 @@ class InvestmentTest {
         assertEquals(-50_100, saved.cashImpact)
     }
 
+    @Test fun planCountsByItsStartMonth() {
+        // Aportación de 300 €. Datos inventados. Hoy es el 2 de noviembre de 2026.
+        val today = day(2026, 11, 2)
+        val h = fund()
+        assertEquals("empieza el mes que viene: no cuenta", 0L, listOf(plan(h, 30_000, day(2026, 12, 5))).monthlyTotal(today))
+        assertEquals("empieza más tarde este mes: cuenta", 30_000L, listOf(plan(h, 30_000, day(2026, 11, 5))).monthlyTotal(today))
+        assertEquals("empieza el último día de este mes: cuenta", 30_000L, listOf(plan(h, 30_000, day(2026, 11, 30))).monthlyTotal(today))
+        assertEquals("empieza el día 1 del mes siguiente: no cuenta", 0L, listOf(plan(h, 30_000, day(2026, 12, 1))).monthlyTotal(day(2026, 11, 30)))
+        val ended = plan(h, 30_000, day(2026, 1, 5)).copy(endsOn = "2026-11-01")
+        assertEquals("terminó ayer: no cuenta", 0L, listOf(ended).monthlyTotal(today))
+        assertEquals("empieza este mes: cuenta como activo", 1, listOf(plan(h, 30_000, day(2026, 11, 5))).counts(today).first)
+        assertEquals("empieza el mes que viene: no cuenta como activo", 0, listOf(plan(h, 30_000, day(2026, 12, 5))).counts(today).first)
+    }
+
     @Test fun plansCalendarTotalsAndProjection() {
         val h = fund()
         val monthly = plan(h, 30_000, day(2026, 1, 5))

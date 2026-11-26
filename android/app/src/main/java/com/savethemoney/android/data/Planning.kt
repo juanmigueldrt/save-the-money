@@ -184,9 +184,15 @@ fun List<RecurringSeries>.yearlyTotal(kinds: Set<RecurringKind>, from: LocalDate
     return filter { !it.isArchived && it.kind in kinds }.sumOf { s -> s.occurrences(from, end).sumOf(s::amountOn) }
 }
 
-/** Lo que suman al mes las series activas de ese tipo. */
-fun List<RecurringSeries>.monthlyTotal(kind: RecurringKind, day: LocalDate): Long =
-    filter { !it.isArchived && it.kind == kind && it.endDay?.isBefore(day) != true }.sumOf { it.monthlyAmount(day) }
+/**
+ * Lo que suman al mes las series activas de ese tipo. Cuenta una serie si empezó en el mes de [day]
+ * o antes (aunque sea después de [day]) y no terminó antes de [day].
+ */
+fun List<RecurringSeries>.monthlyTotal(kind: RecurringKind, day: LocalDate): Long {
+    val monthEnd = day.withDayOfMonth(day.lengthOfMonth())
+    return filter { !it.isArchived && it.kind == kind && !it.startDay.isAfter(monthEnd) && it.endDay?.isBefore(day) != true }
+        .sumOf { it.monthlyAmount(day) }
+}
 
 @Serializable
 enum class GoalKind { @SerialName("savings") Savings, @SerialName("debt") Debt }

@@ -742,14 +742,18 @@ extension Array where Element == InvestmentPlan {
             .sorted { $0.due != $1.due ? $0.due < $1.due : $0.plan.amount.minor > $1.plan.amount.minor }
     }
 
-    /// Lo que suman al mes los planes activos ("420 € al mes").
+    /// Lo que suman al mes los planes activos ("420 € al mes"). Cuenta un plan si empezó en el mes de `day`
+    /// o antes (aunque sea después de `day`) y no terminó antes de `day`.
     public func monthlyTotal(on day: CalendarDay) -> Money {
-        filter { $0.isActive(on: day) }.reduce(Money.zero) { $0 + $1.monthlyAmount }
+        filter { $0.isActive(on: day) && MonthKey($0.startsOn) <= MonthKey(day) }
+            .reduce(Money.zero) { $0 + $1.monthlyAmount }
     }
 
-    /// Cuántos están activos y cuántos en pausa (los archivados no cuentan).
+    /// Cuántos están activos y cuántos en pausa (los archivados no cuentan). Misma regla de inicio que `monthlyTotal`.
     public func counts(on day: CalendarDay) -> (active: Int, paused: Int) {
-        let live = filter { !$0.isArchived && ($0.endsOn.map { $0 >= day } ?? true) }
+        let live = filter {
+            !$0.isArchived && MonthKey($0.startsOn) <= MonthKey(day) && ($0.endsOn.map { $0 >= day } ?? true)
+        }
         return (live.filter { !$0.isPaused }.count, live.filter(\.isPaused).count)
     }
 }
