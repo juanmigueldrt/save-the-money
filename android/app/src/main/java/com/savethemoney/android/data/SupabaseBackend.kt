@@ -190,6 +190,9 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "23503", "23514", "22P02" -> AppError.InvalidInput("Algún dato no es válido. Revisa el formulario.")
             // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
             "STM01" -> AppError.InvalidInput(TransferDraft.STORED_WITH_OTHER_DATA)
+            // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.
+            "STM02" -> AppError.InvalidInput(InvestmentTrade.NOT_ENOUGH_SHARES)
+            "STM03" -> AppError.InvalidInput(InvestmentTrade.NEEDED_BY_LATER_SALE)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

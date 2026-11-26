@@ -537,56 +537,43 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
     override suspend fun holdingPrices(householdId: String): List<HoldingPrice> =
         allRows("holding_prices", PRICE, householdId, "priced_on")
 
+    /** record_holding_price apunta el precio del día y el precio actual del activo en una sola transacción. */
     override suspend fun recordPrice(price: BigDecimal, day: LocalDate, holdingId: String): Holding = backend.mapped {
         if (price.signum() < 0) fail("El precio no puede ser negativo.")
-        val holding = client.from("holdings").select(Columns.raw(HOLDING)) { filter { eq("id", holdingId) } }.decodeSingle<Holding>()
-        // No se usa upsert: haría UPDATE de columnas que no se pueden cambiar (hogar, activo, día).
-        val updated = client.from("holding_prices").update(buildJsonObject { put("price", price.toPlainString()) }) {
-            select(Columns.raw(PRICE))
-            filter {
-                eq("holding_id", holdingId)
-                eq("priced_on", day.toString())
-            }
-        }.decodeList<HoldingPrice>()
-        if (updated.isEmpty()) {
-            client.from("holding_prices").insert(buildJsonObject {
-                put("household_id", holding.householdId)
-                put("holding_id", holdingId)
-                put("priced_on", day.toString())
-                put("price", price.toPlainString())
-            })
+        val params = buildJsonObject {
+            put("holding", holdingId)
+            put("priced", day.toString())
+            put("new_price", price.toPlainString())
         }
-        if (holding.priceDay?.isAfter(day) == true) return@mapped holding
-        client.from("holdings").update(buildJsonObject {
-            put("price", price.toPlainString())
-            put("price_on", day.toString())
-        }) {
-            select(Columns.raw(HOLDING))
-            filter { eq("id", holdingId) }
-        }.decodeSingle()
+        client.postgrest.rpc("record_holding_price", params) { select(Columns.raw(HOLDING)) }.decodeList<Holding>().first()
     }
 
     override suspend fun trades(householdId: String): List<InvestmentTrade> =
         allRows("investment_trades", TRADE, householdId, "traded_on")
 
-    override suspend fun addTrade(trade: InvestmentTrade): InvestmentTrade = backend.mapped {
-        if (trade.side == TradeSide.Sell) {
-            val others = client.from("investment_trades").select(Columns.raw(TRADE)) { filter { eq("holding_id", trade.holdingId) } }.decodeList<InvestmentTrade>()
-            trade.issue(others)?.let(::fail)
-        } else {
-            trade.issue?.let(::fail)
+    /**
+     * create_trade guarda la operación y su movimiento en una sola transacción y no repite una ya guardada.
+     * Que haya participaciones para vender lo comprueba el servidor, con todas las operaciones del activo.
+     */
+    override suspend fun addTrade(trade: InvestmentTrade, cash: TradeCash?): InvestmentTrade = backend.mapped {
+        trade.issue?.let(::fail)
+        cash?.let { MovementDraft(it.accountId, it.categoryId, trade.day, it.amountMinor, it.description).issue?.let(::fail) }
+        val params = buildJsonObject {
+            put("trade", trade.id.ifEmpty { java.util.UUID.randomUUID().toString() })
+            put("household", trade.householdId)
+            put("holding", trade.holdingId)
+            put("traded", trade.tradedOn)
+            put("trade_side", Json.encodeToJsonElement(trade.side))
+            put("shares", trade.quantity.toPlainString())
+            put("unit_price", trade.price.toPlainString())
+            put("fee", trade.feeMinor)
+            put("trade_note", trade.note)
+            put("account", cash?.accountId)
+            put("category", cash?.categoryId)
+            put("cash", cash?.amountMinor)
+            put("label", cash?.description?.trim())
         }
-        val row = buildJsonObject {
-            put("household_id", trade.householdId)
-            put("holding_id", trade.holdingId)
-            put("traded_on", trade.tradedOn)
-            put("side", Json.encodeToJsonElement(trade.side))
-            put("quantity", trade.quantity.toPlainString())
-            put("price", trade.price.toPlainString())
-            put("fee_minor", trade.feeMinor)
-            put("note", trade.note)
-        }
-        client.from("investment_trades").insert(row) { select(Columns.raw(TRADE)) }.decodeSingle()
+        client.postgrest.rpc("create_trade", params) { select(Columns.raw(TRADE)) }.decodeList<InvestmentTrade>().first()
     }
 
     override suspend fun deleteTrade(tradeId: String) = backend.mapped<Unit> {

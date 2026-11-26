@@ -197,6 +197,29 @@ public protocol GoalService: Sendable {
     func deleteContribution(_ contributionId: UUID) async throws
 }
 
+public extension InvestmentService {
+    /// Solo la operación, sin movimiento en ninguna cuenta.
+    func addTrade(_ trade: InvestmentTrade) async throws -> InvestmentTrade {
+        try await addTrade(trade, cash: nil)
+    }
+}
+
+/// El movimiento en la cuenta que acompaña a una compra o venta; se guarda el mismo día que la operación.
+public struct TradeCash: Hashable, Sendable {
+    public var accountId: UUID
+    public var categoryId: UUID?
+    /// Lo que entra en la cuenta (venta) o sale (compra, en negativo).
+    public var amount: Money
+    public var description: String
+
+    public init(accountId: UUID, categoryId: UUID? = nil, amount: Money, description: String) {
+        self.accountId = accountId
+        self.categoryId = categoryId
+        self.amount = amount
+        self.description = description
+    }
+}
+
 /// Score crediticio de quien tiene la sesión abierta. No se comparte con el hogar.
 public protocol CreditScoreService: Sendable {
     /// Los más recientes primero.
@@ -221,7 +244,12 @@ public protocol InvestmentService: Sendable {
 
     /// Compras y ventas de todos los activos del hogar, por fecha.
     func trades(in householdId: UUID) async throws -> [InvestmentTrade]
-    func addTrade(_ trade: InvestmentTrade) async throws -> InvestmentTrade
+    /// Guarda una compra o venta y, con `cash`, su movimiento en la cuenta: los dos o ninguno.
+    /// Repetir la llamada con el mismo `trade.id` devuelve la operación ya guardada y no apunta nada nuevo;
+    /// con otros datos falla con `TransferDraft.storedWithOtherData`. Una venta que deje la posición
+    /// en negativo en cualquier fecha falla con `InvestmentTrade.notEnoughShares`.
+    func addTrade(_ trade: InvestmentTrade, cash: TradeCash?) async throws -> InvestmentTrade
+    /// Borrar una compra de la que depende una venta posterior falla con `InvestmentTrade.neededByLaterSale`.
     func deleteTrade(_ tradeId: UUID) async throws
 
     func investmentPlans(in householdId: UUID) async throws -> [InvestmentPlan]

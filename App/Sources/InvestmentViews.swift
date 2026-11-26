@@ -551,6 +551,8 @@ struct BuyCard: View {
     @State private var accountId: UUID?
     @State private var tradedOn = Date()
     @State private var repeatMonthly = false
+    /// Uno por compra: reintentar tras un fallo no la duplica. Se cambia al guardarla.
+    @State private var tradeId = UUID()
     @State private var error: String?
     @State private var done: String?
     @State private var isWorking = false
@@ -616,24 +618,24 @@ struct BuyCard: View {
         isWorking = true
         defer { isWorking = false }
         let day = CalendarDay(tradedOn)
-        guard await investments.add(quote.trade(for: holding, price: holding.price, on: day)) else {
+        let trade = quote.trade(for: holding, price: holding.price, on: day, id: tradeId)
+        guard await investments.buy(trade, of: holding, paying: quote.total, from: accountId, finance: finance) else {
             error = investments.error
             return
         }
-        if let accountId {
-            let savings = finance.categories.first { $0.kind == .expense && $0.budgetGroup == .savings }
-            let draft = MovementDraft(accountId: accountId, categoryId: savings?.id, bookedOn: day,
-                                      amount: -quote.total, description: "Compra de \(holding.trimmedName)")
-            if !(await finance.add(draft)) { error = finance.error }
-        }
-        if repeatMonthly {
-            let plan = InvestmentPlan(householdId: holding.householdId, holdingId: holding.id, accountId: accountId,
-                                      amount: quote.amount, startsOn: day.adding(months: 1))
-            if !(await investments.save(plan)) { error = investments.error }
-        }
+        let monthly = repeatMonthly
+        tradeId = UUID()
         text = ""
         repeatMonthly = false
         done = "Compra apuntada: \(InvestmentText.quantity(quote.quantity)) participaciones."
+        // El plan va aparte: la compra ya está guardada entera, y si el plan falla se dice solo eso.
+        if monthly {
+            let plan = InvestmentPlan(householdId: holding.householdId, holdingId: holding.id, accountId: accountId,
+                                      amount: quote.amount, startsOn: day.adding(months: 1))
+            if !(await investments.save(plan)) {
+                error = "La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas."
+            }
+        }
     }
 }
 
@@ -883,6 +885,8 @@ struct SellView: View {
     @State private var fee = ""
     @State private var soldOn = Date()
     @State private var accountId: UUID?
+    /// Uno por formulario: reintentar tras un fallo no duplica la venta.
+    @State private var tradeId = UUID()
     @State private var error: String?
     @State private var isWorking = false
 
@@ -939,15 +943,13 @@ struct SellView: View {
             return
         }
         let day = CalendarDay(soldOn)
-        let trade = InvestmentTrade(householdId: holding.householdId, holdingId: holding.id, tradedOn: day, side: .sell,
-                                    quantity: amount, price: priceValue, fee: feeValue)
+        let trade = InvestmentTrade(id: tradeId, householdId: holding.householdId, holdingId: holding.id, tradedOn: day,
+                                    side: .sell, quantity: amount, price: priceValue, fee: feeValue)
         isWorking = true
         defer { isWorking = false }
-        guard await investments.add(trade) else { error = investments.error; return }
-        if let accountId {
-            let draft = MovementDraft(accountId: accountId, bookedOn: day, amount: trade.cashImpact,
-                                      description: "Venta de \(holding.trimmedName)")
-            if !(await finance.add(draft)) { error = finance.error; return }
+        guard await investments.sell(trade, of: holding, into: accountId, finance: finance) else {
+            error = investments.error
+            return
         }
         dismiss()
     }

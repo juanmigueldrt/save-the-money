@@ -38,9 +38,9 @@ import com.savethemoney.android.data.InvestmentPlan
 import com.savethemoney.android.data.InvestmentText
 import com.savethemoney.android.data.InvestmentTrade
 import com.savethemoney.android.data.Money
-import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.Recurrence
 import com.savethemoney.android.data.RecurrenceUnit
+import com.savethemoney.android.data.TradeCash
 import com.savethemoney.android.data.TradeSide
 import com.savethemoney.android.data.parseDecimal
 import com.savethemoney.android.ui.Fechas
@@ -229,6 +229,8 @@ fun Pantalla26(nav: Nav) {
     var cuenta by remember(h.id) { mutableStateOf(h.accountId) }
     var fecha by remember { mutableStateOf(hoy) }
     var repetir by remember { mutableStateOf(false) }
+    // Uno por compra: reintentar tras un fallo no la duplica. Se cambia al guardarla.
+    var idCompra by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
     var hecho by remember { mutableStateOf<String?>(null) }
     var eligeCuenta by remember { mutableStateOf(false) }
     var eligeFecha by remember { mutableStateOf(false) }
@@ -236,20 +238,27 @@ fun Pantalla26(nav: Nav) {
     val action = rememberAction()
     val tasa = if (fee.isBlank()) BigDecimal.ZERO else parseDecimal(fee, maxFractionDigits = 3)
     val quote = tasa?.let { t ->
-        if (mode == 0) Money.parse(amount)?.let { BuyQuote.byAmount(it, h.price, t) } else parseDecimal(amount)?.let { BuyQuote.byQuantity(it, h.price, t) }
+        if (mode == 0) Money.entered(amount)?.let { BuyQuote.byAmount(it, h.price, t) } else parseDecimal(amount)?.let { BuyQuote.byQuantity(it, h.price, t) }
     }
 
     fun comprar(q: BuyQuote) = action.run {
         hecho = null
-        inv.add(q.trade(h, h.price, fecha))
-        cuenta?.let { id ->
-            val ahorro = finance.categories.firstOrNull { it.kind == CategoryKind.Expense && it.budgetGroup == BudgetGroup.Savings }
-            finance.add(MovementDraft(id, ahorro?.id, fecha, -q.total, "Compra de ${h.trimmedName}"))
-        }
-        if (repetir) inv.save(InvestmentPlan("", h.householdId, h.id, cuenta, q.amount, startsOn = fecha.plusMonths(1).toString()))
+        val ahorro = finance.categories.firstOrNull { it.kind == CategoryKind.Expense && it.budgetGroup == BudgetGroup.Savings }
+        val cargo = cuenta?.let { TradeCash(it, ahorro?.id, -q.total, "Compra de ${h.trimmedName}") }
+        finance.addTrade(q.trade(h, h.price, fecha, id = idCompra), cargo)
+        val mensual = repetir
+        idCompra = java.util.UUID.randomUUID().toString()
         amount = ""
         repetir = false
         hecho = "Compra apuntada: ${InvestmentText.quantity(q.quantity)} participaciones."
+        // El plan va aparte: la compra ya está guardada entera, y si el plan falla se dice solo eso.
+        if (mensual) {
+            try {
+                inv.save(InvestmentPlan("", h.householdId, h.id, cuenta, q.amount, startsOn = fecha.plusMonths(1).toString()))
+            } catch (_: AppError) {
+                throw AppError.InvalidInput("La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas.")
+            }
+        }
     }
 
     StmScreen(
@@ -659,16 +668,17 @@ fun Pantalla41(nav: Nav) {
     var cuenta by remember { mutableStateOf(h.accountId) }
     var eligeFecha by remember { mutableStateOf(false) }
     var eligeCuenta by remember { mutableStateOf(false) }
+    // Uno por formulario: reintentar tras un fallo no duplica la venta.
+    val idVenta = remember { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
 
     fun guardar() = action.run {
         val unidades = parseDecimal(cantidad)
         val valor = parseDecimal(precio, maxFractionDigits = 6)
         if (unidades == null || valor == null) throw AppError.InvalidInput("Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125.")
-        val fee = if (comision.isBlank()) 0L else Money.parse(comision)?.takeIf { it >= 0 } ?: throw AppError.InvalidInput("Escribe la comisión con números.")
-        val trade = InvestmentTrade("", h.householdId, h.id, fecha.toString(), TradeSide.Sell, unidades, valor, fee)
-        inv.add(trade)
-        cuenta?.let { finance.add(MovementDraft(it, null, fecha, trade.cashImpact, "Venta de ${h.trimmedName}")) }
+        val fee = if (comision.isBlank()) 0L else Money.entered(comision)?.takeIf { it >= 0 } ?: throw AppError.InvalidInput("Escribe la comisión con números.")
+        val trade = InvestmentTrade(idVenta, h.householdId, h.id, fecha.toString(), TradeSide.Sell, unidades, valor, fee)
+        finance.addTrade(trade, cuenta?.let { TradeCash(it, null, trade.cashImpact, "Venta de ${h.trimmedName}") })
         nav.back()
     }
 
