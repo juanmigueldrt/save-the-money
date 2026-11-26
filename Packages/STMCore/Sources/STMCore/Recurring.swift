@@ -123,13 +123,15 @@ public struct Recurrence: Hashable, Codable, Sendable {
         }
     }
 
-    /// Cuántas veces al año se repite, como fracción (52/2 = 26 para cada 2 semanas).
-    var perYear: Double {
-        switch unit {
-        case .week: 52.0 / Double(every)
-        case .month: 12.0 / Double(every)
-        case .year: 1.0 / Double(every)
+    /// Lo que suponen al mes cargos de `minor` céntimos: veces al año × importe / 12 (52/2 = 26 veces
+    /// para cada 2 semanas), exacto y al céntimo, mitad hacia arriba (igual en Android).
+    func monthly(_ minor: Int) -> Int {
+        let perYear = switch unit {
+        case .week: 52
+        case .month: 12
+        case .year: 1
         }
+        return Decimal(minor * perYear).divided(by: Decimal(12 * every), scale: 0).intValue
     }
 }
 
@@ -211,7 +213,7 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
     /// Lo que supone al mes desde ese día: con la oferta si el próximo cargo aún va a precio de oferta.
     public func monthlyAmount(on day: CalendarDay) -> Money {
         guard hasIntro, let next = nextDue(onOrAfter: day), isIntro(on: next), let introAmount else { return monthlyAmount }
-        return Money(minor: Int((Double(introAmount.minor) * recurrence.perYear / 12).rounded()), currency: amount.currency)
+        return Money(minor: recurrence.monthly(introAmount.minor), currency: amount.currency)
     }
 
     public var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
@@ -221,7 +223,7 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable {
 
     /// Lo que supone al mes, en promedio (una cuota anual de 120 € son 10 € al mes).
     public var monthlyAmount: Money {
-        Money(minor: Int((Double(amount.minor) * recurrence.perYear / 12).rounded()), currency: amount.currency)
+        Money(minor: recurrence.monthly(amount.minor), currency: amount.currency)
     }
 
     public var issue: String? {

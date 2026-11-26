@@ -202,13 +202,19 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
         return nil
     }
 
-    /// Cuota mensual de una compra de `principal` (en positivo), sistema francés.
+    /// Cuota mensual de una compra de `principal` (en positivo), sistema francés:
+    /// P·r/(1 − (1 + r)^−n) = P·r·(1 + r)^n/((1 + r)^n − 1), con r = TIN/1200.
+    /// Con `Decimal` a `Decimal.interestScale` decimales y la cuota al céntimo, mitad hacia arriba (igual en Android).
     public static func payment(principal: Money, months: Int, rate: Decimal) -> Money {
         guard months > 0, principal.minor > 0 else { return .zero }
-        let r = rate.doubleValue / 1200
-        let p = Double(principal.minor)
-        let quota = r == 0 ? p / Double(months) : p * r / (1 - pow(1 + r, -Double(months)))
-        return Money(minor: Int(quota.rounded()), currency: principal.currency)
+        let p = Decimal(principal.minor)
+        guard rate != 0 else { return Money(minor: p.divided(by: Decimal(months), scale: 0).intValue, currency: principal.currency) }
+        let scale = Decimal.interestScale
+        let r = rate.divided(by: 1200, scale: scale)
+        var growth: Decimal = 1
+        for _ in 0..<months { growth = growth.multiplied(by: 1 + r, scale: scale) }
+        let factor = r.multiplied(by: growth, scale: scale).divided(by: growth - 1, scale: scale)
+        return Money(minor: p.multiplied(by: factor, scale: 0).intValue, currency: principal.currency)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -464,23 +470,27 @@ public enum CreditCardCalculator {
     /// Cuota fija = la cuota, sin bajar del mínimo ni pasar de lo que se debe.
     static func revolvingStep(capital: Int, terms: CreditCardTerms) -> (payment: Int, interest: Int, remaining: Int) {
         guard capital > 0 else { return (0, 0, 0) }
-        let interest = Int((Double(capital) * terms.revolvingRate.doubleValue / 1200).rounded())
+        let interest = monthlyInterest(capital, rate: terms.revolvingRate)
         let owed = capital + interest
-        let percent = Int((Double(capital) * terms.minPaymentPercent.doubleValue / 100).rounded())
+        let percent = (Decimal(capital) * terms.minPaymentPercent).divided(by: 100, scale: 0).intValue
         let minimum = max(percent + interest, terms.minPayment.minor)
         let wanted = terms.paymentMode == .fixed ? max(terms.fixedPayment?.minor ?? 0, minimum) : minimum
         let payment = min(wanted, owed)
         return (payment, interest, owed - payment)
     }
 
+    /// Intereses de un mes: capital × TIN / 1200, exactos y al céntimo, mitad hacia arriba.
+    static func monthlyInterest(_ capital: Int, rate: Decimal) -> Int {
+        (Decimal(capital) * rate).divided(by: 1200, scale: 0).intValue
+    }
+
     /// Cuotas de un aplazado: la última ajusta el redondeo para que el capital cuadre.
     static func amortization(principal: Money, months: Int, rate: Decimal) -> [(payment: Int, interest: Int, principal: Int)] {
         let quota = CardInstallment.payment(principal: principal, months: months, rate: rate).minor
-        let r = rate.doubleValue / 1200
         var remaining = principal.minor
         var rows: [(payment: Int, interest: Int, principal: Int)] = []
         for index in 0..<months {
-            let interest = Int((Double(remaining) * r).rounded())
+            let interest = monthlyInterest(remaining, rate: rate)
             let part = index == months - 1 ? remaining : min(remaining, quota - interest)
             rows.append((part + interest, interest, part))
             remaining -= part

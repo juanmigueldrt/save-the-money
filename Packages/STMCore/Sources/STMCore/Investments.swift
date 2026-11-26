@@ -16,6 +16,38 @@ extension Decimal {
     }
 
     var doubleValue: Double { NSDecimalNumber(decimal: self).doubleValue }
+
+    /// La parte entera (para un valor ya redondeado a 0 decimales).
+    var intValue: Int { NSDecimalNumber(decimal: self).intValue }
+
+    /// Decimales de los cálculos intermedios de intereses (TIN/1200, potencias, raíces).
+    static let interestScale = 20
+
+    /// `self × other` redondeado a `scale` decimales, mitad hacia arriba (lejos del cero), como
+    /// `multiply(other).setScale(scale, HALF_UP)` en Android.
+    func multiplied(by other: Decimal, scale: Int) -> Decimal {
+        Self.roundedOperation(self, other, scale: scale, NSDecimalMultiply)
+    }
+
+    /// `self ÷ other` redondeado a `scale` decimales, mitad hacia arriba (lejos del cero), como
+    /// `divide(other, scale, HALF_UP)` en Android.
+    func divided(by other: Decimal, scale: Int) -> Decimal {
+        Self.roundedOperation(self, other, scale: scale, NSDecimalDivide)
+    }
+
+    /// `Decimal` guarda 38 cifras: la operación se trunca ahí (sobre los valores absolutos) y luego se
+    /// redondea. Truncar por debajo del decimal que se redondea no cambia el resultado, así que es el
+    /// mismo que el redondeo del valor exacto, siempre que la parte entera tenga como mucho 38 − scale − 1 cifras.
+    private static func roundedOperation(
+        _ lhs: Decimal, _ rhs: Decimal, scale: Int,
+        _ operation: (UnsafeMutablePointer<Decimal>, UnsafePointer<Decimal>, UnsafePointer<Decimal>,
+                      NSDecimalNumber.RoundingMode) -> NSDecimalNumber.CalculationError
+    ) -> Decimal {
+        var left = lhs.magnitude, right = rhs.magnitude, result = Decimal()
+        _ = operation(&result, &left, &right, .down)
+        let rounded = result.rounded(scale: scale)
+        return (lhs < 0) != (rhs < 0) ? -rounded : rounded
+    }
 }
 
 extension Money {
@@ -664,10 +696,20 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable {
     /// rentabilidad supuesta (interés compuesto mensual, cada aportación al empezar el mes).
     public func projectedValue(months: Int) -> Money {
         guard months > 0 else { return .zero }
-        let monthly = Double(monthlyAmount.minor)
-        let rate = pow(1 + expectedAnnualReturn.doubleValue / 100, 1.0 / 12) - 1
-        let factor = abs(rate) < 1e-12 ? Double(months) : (pow(1 + rate, Double(months)) - 1) / rate * (1 + rate)
-        return Money(minor: Int((monthly * factor).rounded()), currency: amount.currency)
+        let scale = Decimal.interestScale
+        let yearly = 1 + expectedAnnualReturn.divided(by: 100, scale: scale)
+        // Crecimiento mensual = raíz duodécima del anual, por Newton con un número fijo de pasos
+        // (los mismos que Android, para que salga lo mismo al céntimo).
+        var growth = 1 + expectedAnnualReturn.divided(by: 1200, scale: scale)
+        for _ in 0..<12 {
+            var power: Decimal = 1
+            for _ in 0..<11 { power = power.multiplied(by: growth, scale: scale) }
+            growth = (growth * 11 + yearly.divided(by: power, scale: scale)).divided(by: 12, scale: scale)
+        }
+        // Cada aportación crece desde el principio de su mes: factor = Σ crecimiento^k, k = 1…months.
+        var factor: Decimal = 0
+        for _ in 0..<months { factor = (factor + 1).multiplied(by: growth, scale: scale) }
+        return Money(minor: Decimal(monthlyAmount.minor).multiplied(by: factor, scale: 0).intValue, currency: amount.currency)
     }
 
     public var issue: String? {

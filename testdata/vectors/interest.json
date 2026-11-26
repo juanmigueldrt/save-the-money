@@ -1,0 +1,268 @@
+{
+  "_source": "ORC-96. Expected values computed with Python decimal with 120 significant digits (far more than the cent needs) and rounded half up (away from zero) to the cent, independently of the app code. installments: French amortisation q = P·r/(1−(1+r)^−n), r = rate/1200, rate 0 → P/n (same rule as card_installments.json). monthlyInterest: capital·rate/1200. recurringMonthly: amount·timesPerYear/(12·every), timesPerYear = 52 (week), 12 (month), 1 (year). projection: monthly·Σ g^k for k = 1…months, g = (1 + rate/100)^(1/12) (each contribution at the start of its month). The large principals and amounts are cases where the old Double code was one cent off; 600 at 1 %, 999 every 2 weeks, 5 every 2 months, 18 a year and 3 over 3 months are exact half cents.",
+  "installments": [
+    {
+      "principal": 1,
+      "months": 36,
+      "rate": 14.99,
+      "payment": 0
+    },
+    {
+      "principal": 1,
+      "months": 48,
+      "rate": 0.1,
+      "payment": 0
+    },
+    {
+      "principal": 2,
+      "months": 12,
+      "rate": 21.5,
+      "payment": 0
+    },
+    {
+      "principal": 3,
+      "months": 3,
+      "rate": 0,
+      "payment": 1
+    },
+    {
+      "principal": 100,
+      "months": 36,
+      "rate": 0.1,
+      "payment": 3
+    },
+    {
+      "principal": 100000,
+      "months": 36,
+      "rate": 14.99,
+      "payment": 3466
+    },
+    {
+      "principal": 100000,
+      "months": 48,
+      "rate": 21.5,
+      "payment": 3124
+    },
+    {
+      "principal": 123456,
+      "months": 36,
+      "rate": 0.1,
+      "payment": 3435
+    },
+    {
+      "principal": 59999,
+      "months": 48,
+      "rate": 14.99,
+      "payment": 1670
+    },
+    {
+      "principal": 99999999,
+      "months": 48,
+      "rate": 21.5,
+      "payment": 3123526
+    },
+    {
+      "principal": 100000000240,
+      "months": 36,
+      "rate": 0.1,
+      "payment": 2782062274
+    },
+    {
+      "principal": 100000000263,
+      "months": 48,
+      "rate": 0.1,
+      "payment": 2087589588
+    },
+    {
+      "principal": 100000003446,
+      "months": 48,
+      "rate": 14.99,
+      "payment": 2782568041
+    },
+    {
+      "principal": 100000018342,
+      "months": 48,
+      "rate": 21.5,
+      "payment": 3123526328
+    }
+  ],
+  "monthlyInterest": [
+    {
+      "capital": 1,
+      "rate": 14.99,
+      "interest": 0
+    },
+    {
+      "capital": 600,
+      "rate": 1,
+      "interest": 1
+    },
+    {
+      "capital": 2000,
+      "rate": 0.3,
+      "interest": 1
+    },
+    {
+      "capital": 12345678,
+      "rate": 21.5,
+      "interest": 221193
+    },
+    {
+      "capital": 100000,
+      "rate": 0.1,
+      "interest": 8
+    },
+    {
+      "capital": 99999999999,
+      "rate": 14.99,
+      "interest": 1249166667
+    },
+    {
+      "capital": 6000,
+      "rate": 0.1,
+      "interest": 1
+    }
+  ],
+  "recurringMonthly": [
+    {
+      "amount": 1,
+      "every": 1,
+      "unit": "week",
+      "monthly": 4
+    },
+    {
+      "amount": 3,
+      "every": 1,
+      "unit": "week",
+      "monthly": 13
+    },
+    {
+      "amount": 6,
+      "every": 1,
+      "unit": "week",
+      "monthly": 26
+    },
+    {
+      "amount": 999,
+      "every": 2,
+      "unit": "week",
+      "monthly": 2165
+    },
+    {
+      "amount": 1,
+      "every": 1,
+      "unit": "year",
+      "monthly": 0
+    },
+    {
+      "amount": 6,
+      "every": 1,
+      "unit": "year",
+      "monthly": 1
+    },
+    {
+      "amount": 18,
+      "every": 1,
+      "unit": "year",
+      "monthly": 2
+    },
+    {
+      "amount": 5,
+      "every": 2,
+      "unit": "month",
+      "monthly": 3
+    },
+    {
+      "amount": 1999,
+      "every": 3,
+      "unit": "month",
+      "monthly": 666
+    },
+    {
+      "amount": 100000000001,
+      "every": 1,
+      "unit": "week",
+      "monthly": 433333333338
+    }
+  ],
+  "projection": [
+    {
+      "monthly": 30000,
+      "rate": 0,
+      "months": 12,
+      "value": 360000
+    },
+    {
+      "monthly": 30000,
+      "rate": 5,
+      "months": 12,
+      "value": 369677
+    },
+    {
+      "monthly": 30000,
+      "rate": 5,
+      "months": 60,
+      "value": 2042701
+    },
+    {
+      "monthly": 1,
+      "rate": 50,
+      "months": 60,
+      "value": 198
+    },
+    {
+      "monthly": 10000,
+      "rate": -50,
+      "months": 60,
+      "value": 162916
+    },
+    {
+      "monthly": 100000,
+      "rate": 7.25,
+      "months": 60,
+      "value": 7204841
+    },
+    {
+      "monthly": 99999,
+      "rate": 14.99,
+      "months": 12,
+      "value": 1295344
+    },
+    {
+      "monthly": 100000000000,
+      "rate": 0.1,
+      "months": 60,
+      "value": 6015268015231
+    },
+    {
+      "monthly": 50000,
+      "rate": 21.5,
+      "months": 48,
+      "value": 3662761
+    },
+    {
+      "monthly": 5000,
+      "rate": -0.1,
+      "months": 36,
+      "value": 179723
+    },
+    {
+      "monthly": 10000006831,
+      "rate": 5,
+      "months": 12,
+      "value": 123225859471
+    },
+    {
+      "monthly": 10000000110,
+      "rate": 7.25,
+      "months": 60,
+      "value": 720484125968
+    },
+    {
+      "monthly": 10000000150,
+      "rate": -0.1,
+      "months": 12,
+      "value": 119934991864
+    }
+  ]
+}
