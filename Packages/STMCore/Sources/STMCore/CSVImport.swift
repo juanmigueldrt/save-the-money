@@ -224,9 +224,33 @@ public struct CSVMapping: Hashable, Sendable {
         return nil
     }
 
+    /// Texto plegado de la huella de importación, el mismo en iOS y Android (`CsvMapping.normalize`):
+    /// NFD; fuera las marcas no espaciadas (Mn), salvo U+FE0F justo detrás de un emoji; minúsculas
+    /// carácter a carácter (sin sigma final), ς→σ y ß→ss; fuera los espacios Unicode de los extremos.
+    /// Sin NFC. Así "Ñandú" y "nandu" dan lo mismo. Es una regla escrita a propósito en vez de
+    /// `folding`, cuya tabla es de Apple, no está documentada y no se puede repetir en Android.
     static func normalize(_ text: String) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_ES"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var folded = String.UnicodeScalarView()
+        var previous: UInt32 = 0
+        for scalar in text.decomposedStringWithCanonicalMapping.unicodeScalars {
+            defer { previous = scalar.value }
+            if scalar.properties.generalCategory == .nonspacingMark, scalar.value != 0xFE0F || !isEmojiBase(previous) {
+                continue
+            }
+            switch scalar.properties.lowercaseMapping {
+            case "ß": folded.append(contentsOf: "ss".unicodeScalars)
+            case "ς": folded.append("σ")
+            case let lower: folded.append(contentsOf: lower.unicodeScalars)
+            }
+        }
+        while folded.first?.properties.isWhitespace == true { folded.removeFirst() }
+        while folded.last?.properties.isWhitespace == true { folded.removeLast() }
+        return String(folded)
+    }
+
+    /// Emoji que se escriben con U+FE0F detrás («❤️»): ahí el selector se conserva, como hacía `folding`.
+    private static func isEmojiBase(_ value: UInt32) -> Bool {
+        (0x2000...0x2BFF).contains(value) || (0x1F000...0x1FAFF).contains(value) || [0x3030, 0x303D, 0x3297, 0x3299].contains(value)
     }
 }
 
@@ -282,7 +306,8 @@ public enum CSVImporter {
             }
 
             let description = collapseSpaces(cell(mapping.description))
-            let text = description.isEmpty ? "Sin concepto" : String(description.prefix(200))
+            // 200 puntos de código, lo que cuenta `char_length` en la base de datos (Android igual).
+            let text = description.isEmpty ? "Sin concepto" : String(String.UnicodeScalarView(description.unicodeScalars.prefix(200)))
             let key = "\(day.iso)|\(amount.minor)|\(CSVMapping.normalize(text))"
             let occurrence = seen[key, default: 0]
             seen[key] = occurrence + 1
@@ -334,7 +359,10 @@ public enum CSVImporter {
         String(text.map { $0 == "," ? "." : $0 == "." ? "," : $0 })
     }
 
+    /// Cada tramo de espacios Unicode (propiedad White_Space) pasa a un espacio. Por escalares, no por
+    /// caracteres visibles, para que una marca pegada a un espacio no se pierda distinto que en Android.
     private static func collapseSpaces(_ text: String) -> String {
-        text.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        text.unicodeScalars.split(whereSeparator: \.properties.isWhitespace)
+            .map { String(String.UnicodeScalarView($0)) }.joined(separator: " ")
     }
 }

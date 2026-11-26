@@ -2,10 +2,11 @@ package com.savethemoney.android.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.temporal.ChronoUnit
-import kotlin.math.roundToLong
 
 // Recurring.swift, Goals.swift, Reminders.swift y la parte flexible de Tracking.swift de STMCore.
 
@@ -38,10 +39,17 @@ data class Recurrence(val every: Int = 1, val unit: RecurrenceUnit = RecurrenceU
         RecurrenceUnit.Year -> start.plusMonths(12L * every * n)
     }
 
-    val perYear: Double get() = when (unit) {
-        RecurrenceUnit.Week -> 52.0 / every
-        RecurrenceUnit.Month -> 12.0 / every
-        RecurrenceUnit.Year -> 1.0 / every
+    /**
+     * Lo que suponen al mes cargos de [minor] céntimos: veces al año × importe / 12 (52/2 = 26 veces para
+     * cada 2 semanas), exacto y al céntimo, mitad hacia arriba (igual en iOS).
+     */
+    fun monthly(minor: Long): Long {
+        val perYear = when (unit) {
+            RecurrenceUnit.Week -> 52
+            RecurrenceUnit.Month -> 12
+            RecurrenceUnit.Year -> 1
+        }
+        return BigDecimal(minor * perYear).divide(BigDecimal(12L * every), 0, RoundingMode.HALF_UP).toLong()
     }
 
     companion object {
@@ -96,14 +104,14 @@ data class RecurringSeries(
     fun isIntro(due: LocalDate): Boolean = introEndsOn?.let { !due.isAfter(it) } ?: false
 
     /** Lo que supone al mes en promedio (una cuota anual de 120 € son 10 € al mes). */
-    val monthlyAmount: Long get() = (amountMinor * recurrence.perYear / 12).roundToLong()
+    val monthlyAmount: Long get() = recurrence.monthly(amountMinor)
 
     /** Lo que supone al mes desde ese día: con la oferta si el próximo cargo aún va a precio de oferta. */
     fun monthlyAmount(day: LocalDate): Long {
         val next = nextDue(day)
         val intro = introMinor
         if (!hasIntro || next == null || !isIntro(next) || intro == null) return monthlyAmount
-        return (intro * recurrence.perYear / 12).roundToLong()
+        return recurrence.monthly(intro)
     }
 
     val issue: String? get() {

@@ -1,0 +1,105 @@
+{
+  "description": "Importes de varias monedas (ORC-71). «totals»: suma de izquierda a derecha con la regla de Money.+ (iOS) y Money.total (Android); expected null significa que se han mezclado monedas y en pantalla sale «Varias monedas». Un importe de cero no tiene moneda que mezclar. «conversions»: minor por rate, redondeado a la unidad menor más cercana, con el 0,5 alejándose del cero. Esperados calculados a mano y con decimal de Python (ROUND_HALF_UP).",
+  "totals": [
+    {
+      "name": "sin importes: cero en la moneda por defecto",
+      "amounts": [],
+      "expected": { "minor": 0, "currency": "EUR" }
+    },
+    {
+      "name": "todo en euros",
+      "amounts": [
+        { "minor": 1000, "currency": "EUR" },
+        { "minor": 250, "currency": "EUR" }
+      ],
+      "expected": { "minor": 1250, "currency": "EUR" }
+    },
+    {
+      "name": "solo dólares: el total es en dólares (antes cerraba la app en iOS)",
+      "amounts": [
+        { "minor": 15000, "currency": "USD" }
+      ],
+      "expected": { "minor": 15000, "currency": "USD" }
+    },
+    {
+      "name": "dólares con un negativo",
+      "amounts": [
+        { "minor": 15000, "currency": "USD" },
+        { "minor": -2550, "currency": "USD" }
+      ],
+      "expected": { "minor": 12450, "currency": "USD" }
+    },
+    {
+      "name": "euros y dólares: no se suman",
+      "amounts": [
+        { "minor": 1000, "currency": "EUR" },
+        { "minor": 500, "currency": "USD" }
+      ],
+      "expected": null
+    },
+    {
+      "name": "un cero en euros no mezcla: 0 EUR + 5 USD son 5 USD",
+      "amounts": [
+        { "minor": 0, "currency": "EUR" },
+        { "minor": 500, "currency": "USD" }
+      ],
+      "expected": { "minor": 500, "currency": "USD" }
+    },
+    {
+      "name": "ni detrás: 5 USD + 0 EUR son 5 USD",
+      "amounts": [
+        { "minor": 500, "currency": "USD" },
+        { "minor": 0, "currency": "EUR" }
+      ],
+      "expected": { "minor": 500, "currency": "USD" }
+    },
+    {
+      "name": "una vez mezclado no se arregla: 5 USD + 3 EUR - 5 USD",
+      "amounts": [
+        { "minor": 500, "currency": "USD" },
+        { "minor": 300, "currency": "EUR" },
+        { "minor": -500, "currency": "USD" }
+      ],
+      "expected": null
+    },
+    {
+      "name": "si los dólares ya suman cero antes de llegar a los euros, quedan los euros",
+      "amounts": [
+        { "minor": 500, "currency": "USD" },
+        { "minor": -500, "currency": "USD" },
+        { "minor": 300, "currency": "EUR" }
+      ],
+      "expected": { "minor": 300, "currency": "EUR" }
+    },
+    {
+      "name": "ceros de varias monedas: cero en la moneda por defecto",
+      "amounts": [
+        { "minor": 0, "currency": "USD" },
+        { "minor": 0, "currency": "GBP" }
+      ],
+      "expected": { "minor": 0, "currency": "EUR" }
+    },
+    {
+      "name": "tres importes, dos monedas",
+      "amounts": [
+        { "minor": 100, "currency": "EUR" },
+        { "minor": 200, "currency": "USD" },
+        { "minor": 300, "currency": "EUR" }
+      ],
+      "expected": null
+    }
+  ],
+  "conversions": [
+    { "minor": 10000, "rate": "1.0837", "expected": 10837 },
+    { "minor": -10000, "rate": "1.0837", "expected": -10837 },
+    { "minor": 1, "rate": "0.5", "expected": 1 },
+    { "minor": -1, "rate": "0.5", "expected": -1 },
+    { "minor": 333, "rate": "0.015", "expected": 5 },
+    { "minor": 123456, "rate": "0.92274", "expected": 113918 },
+    { "minor": 250, "rate": "1.25", "expected": 313 },
+    { "minor": -250, "rate": "1.25", "expected": -313 },
+    { "minor": 1050, "rate": "0.85", "expected": 893 },
+    { "minor": 0, "rate": "1.0837", "expected": 0 },
+    { "minor": 4999, "rate": "1", "expected": 4999 }
+  ]
+}

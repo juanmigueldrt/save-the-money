@@ -3,6 +3,8 @@ package com.savethemoney.android.data
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import java.math.BigDecimal
+import java.math.RoundingMode
 import kotlin.math.abs
 
 /**
@@ -64,6 +66,36 @@ object Money {
         }
         return sign + number + if (symbol) " €" else ""
     }
+
+    /** Un importe con su moneda, para sumar sin mezclar monedas ([total]). */
+    data class Amount(val minor: Long, val currency: String = "EUR")
+
+    /** Lo que se enseña en vez de un importe cuando se han mezclado monedas (`Money.mixedText` en iOS). */
+    const val MIXED = "Varias monedas"
+
+    /** El servidor no deja cambiar la moneda de un hogar que ya tiene importes (ORC-71): no se convierten. */
+    const val BASE_CURRENCY_LOCKED = "No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados."
+
+    /**
+     * Suma sin mezclar monedas, con la misma regla que `Money.+` en iOS: nulo si hay importes de
+     * monedas distintas (en pantalla, [MIXED] en vez de una cifra falsa). Un cero no tiene moneda
+     * que mezclar: 0 € + 5 $ son 5 $. Para sumar monedas distintas hay que convertir antes con [convert].
+     */
+    fun total(amounts: List<Amount>): Amount? = amounts.fold<Amount, Amount?>(Amount(0)) { sum, next ->
+        when {
+            sum == null -> null
+            sum.currency == next.currency -> Amount(sum.minor + next.minor, sum.currency)
+            next.minor == 0L -> sum
+            sum.minor == 0L -> next
+            else -> null
+        }
+    }
+
+    /**
+     * Conversión explícita: [minor] por el tipo de cambio (unidades de la moneda de destino por cada
+     * unidad de la de origen), redondeado al céntimo más cercano (0,5 se aleja del cero).
+     */
+    fun convert(minor: Long, rate: BigDecimal): Long = BigDecimal(minor).multiply(rate).setScale(0, RoundingMode.HALF_UP).toLong()
 
     /** Lo que se escribe en un campo de importe: un número o una cuenta ("12,50+3×2"). */
     fun entered(text: String): Long? = parse(text) ?: AmountExpression.evaluate(text)

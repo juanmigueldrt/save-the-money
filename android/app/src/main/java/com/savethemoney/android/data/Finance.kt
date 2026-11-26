@@ -136,7 +136,8 @@ data class Movement(
     /** Etiquetas en minúsculas, sin «#». */
     val tags: List<String> = emptyList(),
 ) {
-    val day: LocalDate get() = LocalDate.parse(bookedOn.take(10))
+    /** Se analiza una vez al crear el movimiento: los informes la leen miles de veces. */
+    @kotlinx.serialization.Transient val day: LocalDate = LocalDate.parse(bookedOn.take(10))
     val isExpense: Boolean get() = amountMinor < 0
     val isReviewed: Boolean get() = reviewedAt != null
 

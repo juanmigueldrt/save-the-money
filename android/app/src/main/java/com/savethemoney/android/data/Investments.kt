@@ -20,7 +20,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
-import kotlin.math.pow
 import kotlin.math.roundToLong
 
 // Investments.swift de STMCore: activos, precios a mano, compras y ventas, y planes de aportación.
@@ -38,6 +37,12 @@ private typealias Numeric = @Serializable(with = NumericSerializer::class) BigDe
 
 private val HUNDRED = BigDecimal(100)
 private const val WORK_SCALE = 30
+
+/** Decimales de los cálculos intermedios de intereses (TIN/1200, potencias, raíces), los mismos que en iOS. */
+internal const val INTEREST_SCALE = 20
+
+/** Producto redondeado a [INTEREST_SCALE] decimales, mitad hacia arriba (como `multiplied(by:scale:)` en iOS). */
+internal fun BigDecimal.timesRounded(other: BigDecimal): BigDecimal = multiply(other).setScale(INTEREST_SCALE, RoundingMode.HALF_UP)
 
 /** Unos euros con decimales, redondeados al céntimo (0,5 hacia arriba, y hacia abajo en negativos). */
 fun BigDecimal.toMinor(): Long = multiply(HUNDRED).setScale(0, RoundingMode.HALF_UP).toLong()
@@ -280,8 +285,12 @@ class Portfolio(holdings: List<Holding>, trades: List<InvestmentTrade>) {
     val positions: List<Position> = holdings.filter { !it.isArchived }.map { Position(it, trades) }.filter { it.quantity.signum() > 0 }
         .sortedWith(compareBy({ -it.value }, { it.holding.trimmedName }))
 
-    val value: Long get() = positions.sumOf { it.value }
-    val cost: Long get() = positions.sumOf { it.cost }
+    private fun total(amount: (Position) -> Long) = Money.total(positions.map { Money.Amount(amount(it), it.holding.currency) })
+
+    /** Hay posiciones en más de una moneda: no se suman sin convertir y se enseña [Money.MIXED] (ORC-71). */
+    val mixedCurrencies: Boolean get() = total { it.value } == null
+    val value: Long get() = total { it.value }?.minor ?: 0
+    val cost: Long get() = total { it.cost }?.minor ?: 0
     val gain: Long get() = value - cost
     val gainFraction: Double? get() = if (cost > 0) gain.toDouble() / cost else null
 
@@ -394,9 +403,20 @@ data class InvestmentPlan(
     /** Lo que valdrían en [months] meses las aportaciones de ese tiempo (interés compuesto mensual). */
     fun projectedValue(months: Int): Long {
         if (months <= 0) return 0
-        val rate = (1 + expectedAnnualReturn.toDouble() / 100).pow(1.0 / 12) - 1
-        val factor = if (abs(rate) < 1e-12) months.toDouble() else ((1 + rate).pow(months) - 1) / rate * (1 + rate)
-        return (monthlyAmount * factor).roundToLong()
+        val yearly = BigDecimal.ONE + expectedAnnualReturn.divide(HUNDRED, INTEREST_SCALE, RoundingMode.HALF_UP)
+        // Crecimiento mensual = raíz duodécima del anual, por Newton con un número fijo de pasos
+        // (los mismos que iOS, para que salga lo mismo al céntimo).
+        var growth = BigDecimal.ONE + expectedAnnualReturn.divide(BigDecimal(1200), INTEREST_SCALE, RoundingMode.HALF_UP)
+        repeat(12) {
+            var power = BigDecimal.ONE
+            repeat(11) { power = power.timesRounded(growth) }
+            growth = (growth * BigDecimal(11) + yearly.divide(power, INTEREST_SCALE, RoundingMode.HALF_UP))
+                .divide(BigDecimal(12), INTEREST_SCALE, RoundingMode.HALF_UP)
+        }
+        // Cada aportación crece desde el principio de su mes: factor = Σ crecimiento^k, k = 1…months.
+        var factor = BigDecimal.ZERO
+        repeat(months) { factor = (factor + BigDecimal.ONE).timesRounded(growth) }
+        return BigDecimal(monthlyAmount).multiply(factor).setScale(0, RoundingMode.HALF_UP).toLong()
     }
 
     val issue: String? get() = when {
