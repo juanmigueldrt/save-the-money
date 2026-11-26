@@ -150,6 +150,56 @@ public struct MovementFilter: Hashable, Sendable {
     }
 }
 
+/// La búsqueda de la lista de movimientos, que se hace en el servidor (ORC-85) para encontrar también los que no
+/// están cargados. Encuentra un movimiento si su concepto, sus notas o su beneficiario contienen el texto (sin
+/// distinguir mayúsculas), si lleva justo esa etiqueta ("#viaje"), si su categoría es una cuyo nombre contiene el
+/// texto o si el importe es ese ("12,50" en los dos sentidos; "-12,50" sólo gastos).
+public struct MovementSearch: Hashable, Sendable {
+    /// Lo que se manda como mucho, en caracteres Unicode: el resto se ignora.
+    public static let maxLength = 100
+
+    /// El texto sin caracteres de control ni espacios a los lados, recortado a `maxLength`.
+    public let text: String
+    /// Las categorías cuyo nombre contiene el texto: los movimientos sólo guardan el id.
+    public let categoryIds: [UUID]
+    /// La etiqueta que se busca, si el texto (sin «#») vale como etiqueta.
+    public let tag: String?
+    /// El importe escrito, si el texto es un importe.
+    public let amount: Money?
+    /// El importe llevaba signo menos: sólo ese importe con su signo.
+    public let signedAmount: Bool
+
+    /// nil si no queda nada que buscar.
+    public init?(_ raw: String, categories: [BudgetCategory]) {
+        let clean = String(String.UnicodeScalarView(raw.unicodeScalars.filter { !CharacterSet.controlCharacters.contains($0) }))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let capped = String(String.UnicodeScalarView(clean.unicodeScalars.prefix(Self.maxLength)))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !capped.isEmpty else { return nil }
+        text = capped
+        categoryIds = categories.filter { $0.name.localizedCaseInsensitiveContains(capped) }.map(\.id)
+        let bare = capped.hasPrefix("#") ? String(capped.dropFirst()) : capped
+        let tag = MovementTags.clean(bare)
+        // Sólo si el texto entero es una etiqueta válida: así lo que va al servidor no lleva nada que escapar.
+        self.tag = !tag.isEmpty && tag == bare.lowercased() && tag.count <= MovementTags.maxLength ? tag : nil
+        amount = Money(parsing: capped)
+        signedAmount = capped.hasPrefix("-") || capped.hasPrefix("\u{2212}")
+    }
+
+    /// La misma regla que aplica el servidor, para el servicio en memoria y las pruebas.
+    public func matches(_ movement: Movement) -> Bool {
+        if movement.description.localizedCaseInsensitiveContains(text) { return true }
+        if movement.notes?.localizedCaseInsensitiveContains(text) ?? false { return true }
+        if movement.payee?.localizedCaseInsensitiveContains(text) ?? false { return true }
+        if let tag, movement.tags.contains(tag) { return true }
+        if let categoryId = movement.categoryId, categoryIds.contains(categoryId) { return true }
+        if let amount {
+            return signedAmount ? movement.amount.minor == amount.minor : abs(movement.amount.minor) == abs(amount.minor)
+        }
+        return false
+    }
+}
+
 /// Movimientos de un mismo día con lo que suman (sin contar transferencias).
 public struct MovementDay: Hashable, Sendable, Identifiable {
     public var day: CalendarDay

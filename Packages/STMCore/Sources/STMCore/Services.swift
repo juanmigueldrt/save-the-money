@@ -93,6 +93,11 @@ public protocol FinanceService: Sendable {
 
     /// Movimientos más recientes primero. Con `accountId`, sólo los de esa cuenta.
     func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement]
+    /// Una página de la lista de movimientos (ORC-85): más recientes primero por día y, dentro del día, por id
+    /// descendente, como mucho `limit`, empezando justo después de `after` (la última fila de la página anterior).
+    /// Con `accountId`, sólo los de esa cuenta; con `search`, sólo los que encuentra la búsqueda.
+    func movements(in householdId: UUID, accountId: UUID?, search: MovementSearch?, after: Movement?,
+                   limit: Int) async throws -> [Movement]
     /// Movimientos por id, sean o no de los más recientes. Los que ya no existen no vienen.
     func movements(in householdId: UUID, ids: [UUID]) async throws -> [Movement]
     /// Movimientos de la cuenta desde ese día (incluido), más recientes primero, como mucho `limit`.

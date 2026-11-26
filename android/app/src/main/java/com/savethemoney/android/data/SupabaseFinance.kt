@@ -4,6 +4,8 @@ import io.github.jan.supabase.postgrest.from
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
+import io.github.jan.supabase.annotations.SupabaseExperimental
+import io.github.jan.supabase.postgrest.query.PostgrestRequestBuilder
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
@@ -17,6 +19,7 @@ import kotlinx.serialization.json.addJsonObject
 import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.YearMonth
+import kotlin.math.abs
 
 /** Cuentas, categorías y movimientos sobre Supabase. El RLS del servidor decide qué se ve. */
 class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
@@ -111,6 +114,20 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
             limit(limit.toLong())
         }.decodeList()
     }
+
+    /**
+     * Páginas por cursor (día e id de la última fila) y no por `range`: si entra o se borra un movimiento entre página y
+     * página, la siguiente no repite ni se salta filas.
+     */
+    override suspend fun movements(householdId: String, accountId: String?, search: MovementSearch?, after: Movement?, limit: Int): List<Movement> =
+        backend.mapped {
+            client.from("transactions").select(Columns.raw(MOVEMENT)) {
+                movementPage(householdId, accountId, search, after)
+                order("booked_on", Order.DESCENDING)
+                order("id", Order.DESCENDING)
+                limit(limit.toLong())
+            }.decodeList()
+        }
 
     override suspend fun movements(householdId: String, ids: List<String>): List<Movement> = backend.mapped {
         if (ids.isEmpty()) return@mapped emptyList()
@@ -909,3 +926,56 @@ private data class NewChargeRow(
     @SerialName("due_on") val dueOn: String,
     @SerialName("amount_minor") val amountMinor: Long,
 )
+
+/**
+ * Los filtros de una página de la lista (ORC-85): el hogar, la cuenta, la búsqueda y el cursor. La búsqueda y el cursor van
+ * cada uno en su `or=(…)`, que PostgREST junta con AND. Van por [PostgrestRequestBuilder.params] y no por `filter { or {} }`:
+ * en postgrest-kt 3.2 un segundo `or {}` pisa al primero, y su escapado deja sin comillas un valor con `\` o `"` si no
+ * lleva `,.:()`, con lo que PostgREST leería las barras tal cual y la búsqueda de "50%" no encontraría nada.
+ */
+@OptIn(SupabaseExperimental::class)
+internal fun PostgrestRequestBuilder.movementPage(householdId: String, accountId: String?, search: MovementSearch?, after: Movement?) {
+    filter {
+        eq("household_id", householdId)
+        if (accountId != null) eq("account_id", accountId)
+    }
+    val logic = listOfNotNull(search?.let(::movementSearchFilter), after?.let(::movementAfterFilter))
+    if (logic.isNotEmpty()) params["or"] = (params["or"] ?: emptyList()) + logic.map { "($it)" }
+}
+
+/**
+ * Lo que va dentro de `or=(…)` para buscar. El texto del usuario va siempre entre comillas (así comas, puntos, paréntesis y
+ * dos puntos no son sintaxis de PostgREST) y con los comodines de LIKE escapados. La etiqueta, los ids y el importe no
+ * llevan nada que escapar: sólo letras, números, «-», «_» o un entero. Como `searchFilter` de iOS.
+ */
+internal fun movementSearchFilter(search: MovementSearch): String {
+    val pattern = postgrestQuoted("*" + likeEscaped(search.text) + "*")
+    val parts = listOf("description", "notes", "payee").map { "$it.ilike.$pattern" }.toMutableList()
+    search.tag?.let { parts += "tags.cs.{$it}" }
+    if (search.categoryIds.isNotEmpty()) parts += "category_id.in.(${search.categoryIds.joinToString(",") { it.lowercase() }})"
+    search.amountMinor?.let { amount ->
+        parts += if (search.signedAmount) "amount_minor.eq.$amount" else "amount_minor.in.(${abs(amount)},${-abs(amount)})"
+    }
+    return parts.joinToString(",")
+}
+
+/** Las filas que van detrás de [after] en el orden de la lista: un día anterior, o el mismo día y un id menor. */
+internal fun movementAfterFilter(after: Movement): String =
+    "booked_on.lt.${after.bookedOn},and(booked_on.eq.${after.bookedOn},id.lt.${after.id.lowercase()})"
+
+/**
+ * `\`, `%` y `_` se buscan tal cual. PostgREST convierte cada `*` en `%` y no deja escaparlo, así que un `*` escrito cuenta
+ * como «un carácter cualquiera» (`_`): encuentra lo mismo y algo más, nunca menos.
+ */
+internal fun likeEscaped(text: String): String = buildString {
+    text.forEach { ch ->
+        when (ch) {
+            '\\', '%', '_' -> append('\\').append(ch)
+            '*' -> append('_')
+            else -> append(ch)
+        }
+    }
+}
+
+/** Un valor entre comillas dobles para un filtro de PostgREST: dentro, `\` y `"` van con `\` delante. */
+internal fun postgrestQuoted(value: String): String = "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

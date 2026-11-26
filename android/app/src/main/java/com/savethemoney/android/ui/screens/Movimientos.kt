@@ -138,8 +138,15 @@ fun Pantalla05(nav: Nav) {
     var elegidos by remember { mutableStateOf(emptySet<String>()) }
     val categorias = finance.recent.mapNotNull { it.categoryId }.groupingBy { it }.eachCount().entries
         .sortedByDescending { it.value }.mapNotNull { finance.category(it.key) }
-    val visibles = filtro.apply(finance.recent, finance.categories, finance.today(), finance.household.monthStartDay)
+    // Las filas cargadas de la lista general (ORC-85). La búsqueda la hace el servidor; lo demás se filtra aquí, sobre lo cargado.
+    val cargados = if (finance.list.accountId == null) finance.list.rows else emptyList()
+    val visibles = filtro.copy(search = "").apply(cargados, finance.categories, finance.today(), finance.household.monthStartDay)
     val filtrando = filtro.activeCount > 0 || filtro.search.isNotBlank()
+    LaunchedEffect(filtro.search) {
+        // Al escribir, espera a que se pare un momento antes de preguntar al servidor.
+        if (finance.list.search != filtro.search) delay(300)
+        finance.showList(null, filtro.search)
+    }
     val marcados = visibles.filter { it.id in elegidos }
     fun terminaSeleccion() {
         seleccionando = false
@@ -265,9 +272,14 @@ fun Pantalla05(nav: Nav) {
             Spacer(Modifier.height(16.dp))
         }
         if (visibles.isEmpty()) {
-            Vacio(if (finance.recent.isEmpty()) "No hay movimientos. Apunta uno con Añadir o importa un CSV desde Más opciones." else "Nada coincide con la búsqueda o los filtros.")
+            when {
+                finance.listError != null -> Unit
+                cargados.isEmpty() && (finance.isLoading || finance.isLoadingList || finance.list.accountId != null) -> Vacio("Cargando…")
+                cargados.isEmpty() && filtro.search.isBlank() -> Vacio("No hay movimientos. Apunta uno con Añadir o importa un CSV desde Más opciones.")
+                else -> Vacio("Nada coincide con la búsqueda o los filtros.")
+            }
         } else {
-            ListaMovimientos(visibles.take(MAX_FILAS), finance, seleccion = if (seleccionando) elegidos else null) { m ->
+            ListaMovimientos(visibles, finance, seleccion = if (seleccionando) elegidos else null) { m ->
                 if (seleccionando) {
                     elegidos = if (m.id in elegidos) elegidos - m.id else elegidos + m.id
                 } else {
@@ -276,6 +288,7 @@ fun Pantalla05(nav: Nav) {
                 }
             }
         }
+        if (finance.list.accountId == null) PieLista(finance)
     }
     eligeFecha?.let { campo ->
         val actual = (if (campo == "desde") filtro.customFrom else filtro.customThrough) ?: finance.today()
@@ -397,13 +410,14 @@ fun Pantalla06(nav: Nav) {
     var ajustando by remember { mutableStateOf(false) }
     val action = rememberAction()
     var fallo by remember(account.id) { mutableStateOf<String?>(null) }
+    LaunchedEffect(account.id) { finance.showList(account.id, "") }
     LaunchedEffect(account.id, finance.recent) {
         try {
             lista = finance.movements(account)
             fallo = null
         } catch (e: AppError) {
             // Se queda la lista que había, con el aviso: no es lo mismo que una cuenta sin movimientos.
-            fallo = "No se han podido cargar los movimientos. ${e.message}"
+            fallo = "No se han podido cargar los movimientos del gráfico. ${e.message}"
         }
     }
     val hoy = finance.today()
@@ -487,8 +501,12 @@ fun Pantalla06(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         fallo?.let { Text(it, Modifier.padding(vertical = 8.dp), style = StmType.bodyMedium, color = Stm.colors.error) }
-        if (lista.isEmpty() && fallo == null) Vacio("Todavía no hay movimientos en esta cuenta.")
-        lista.take(MAX_FILAS).groupBy { it.day.withDayOfMonth(1) }.forEach { (mes, items) ->
+        // La lista de la cuenta va por páginas (ORC-85); [lista] solo alimenta el gráfico.
+        val filas = if (finance.list.accountId == account.id) finance.list.rows else emptyList()
+        if (filas.isEmpty() && finance.listError == null) {
+            Vacio(if (finance.isLoadingList || finance.list.accountId != account.id) "Cargando…" else "Todavía no hay movimientos en esta cuenta.")
+        }
+        filas.groupBy { it.day.withDayOfMonth(1) }.forEach { (mes, items) ->
             ListCard {
                 ListHeader(Fechas.mesTitulo(mes) + if (mes.year != hoy.year) " ${mes.year}" else "")
                 items.forEachIndexed { i, m ->
@@ -501,6 +519,7 @@ fun Pantalla06(nav: Nav) {
             }
             Spacer(Modifier.height(16.dp))
         }
+        if (finance.list.accountId == account.id) PieLista(finance)
     }
 }
 
@@ -1057,8 +1076,22 @@ private fun BoxScope.HojaAjusteSaldo(finance: FinanceModel, account: Account, ce
 
 // ───────────────────────── Piezas de estas pantallas ─────────────────────────
 
-// shortcut: la pantalla no es perezosa, se pintan como mucho 200 filas; pasar a LazyColumn si hace falta ver más.
-private const val MAX_FILAS = 200
+/**
+ * Al final de la lista de Movimientos: «Cargar más» pide la página siguiente. Si falla, el aviso y «Reintentar»: nunca
+ * parece que la lista se ha acabado (ORC-85).
+ */
+@Composable
+private fun PieLista(finance: FinanceModel) {
+    val action = rememberAction()
+    val error = finance.listError
+    if (error != null) {
+        Text(error, Modifier.padding(vertical = 8.dp), style = StmType.bodyMedium, color = Stm.colors.error)
+        Btn("Reintentar", { action.run { finance.retryList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
+    } else if (finance.list.hasMore) {
+        Btn(if (finance.isLoadingList) "Cargando…" else "Cargar más movimientos", { action.run { finance.loadMoreList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
+    }
+    Spacer(Modifier.height(16.dp))
+}
 
 /** Barra de 05 y 08: atrás, título, filtros (con cuántos hay puestos) y más opciones. */
 @Composable
@@ -1112,7 +1145,7 @@ private fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String? 
         detalle ?: cat?.name ?: "Sin categoría",
         if (detalle == null) finance.account(m.accountId)?.name else null,
         // En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina».
-        m.transferId?.let { t -> finance.recent.firstOrNull { it.transferId == t && it.id != m.id } }
+        m.transferId?.let { t -> (finance.recent.firstOrNull { it.transferId == t && it.id != m.id } ?: finance.list.rows.firstOrNull { it.transferId == t && it.id != m.id }) }
             ?.let { otra -> finance.account(otra.accountId)?.name }?.let { (if (m.isExpense) "Hacia " else "Desde ") + it },
         m.payee,
         m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },

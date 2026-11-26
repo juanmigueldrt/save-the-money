@@ -18,6 +18,7 @@ import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.ImportResult
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDraft
+import com.savethemoney.android.data.MovementSearch
 import com.savethemoney.android.data.MovementTags
 import com.savethemoney.android.data.Payee
 import com.savethemoney.android.data.PendingCharge
@@ -68,6 +69,24 @@ class FinanceModel(
         private set
     var recent by mutableStateOf(emptyList<Movement>())
         private set
+
+    /**
+     * La lista de Movimientos que se ve (la general o la de una cuenta), por páginas y con la búsqueda hecha en el servidor
+     * (ORC-85). Va aparte de [recent]: saldos, resúmenes y sugerencias siguen viendo lo mismo que antes.
+     */
+    var list by mutableStateOf(MovementList())
+        private set
+
+    /** Por qué no se ha podido cargar la lista o su página siguiente. Lo ya cargado se queda. */
+    var listError by mutableStateOf<String?>(null)
+        private set
+    private var listLoads by mutableStateOf(0)
+
+    /** Se está cargando la lista o una página. */
+    val isLoadingList: Boolean get() = listLoads > 0
+
+    /** La lista se ha abierto alguna vez: desde entonces se recarga con cada cambio. */
+    private var listShown = false
     var error by mutableStateOf<String?>(null)
         private set
 
@@ -158,6 +177,7 @@ class FinanceModel(
                 turns.store(::recent, newRecent, turn)
             }
             turns.store(::error, null, turn)
+            reloadList()
             planning.load()
             planning.syncCharges(recent)
             budgets.load()
@@ -175,7 +195,81 @@ class FinanceModel(
         }
     }
 
+    /** Los últimos movimientos de la cuenta, para su gráfico. */
     suspend fun movements(account: Account): List<Movement> = service.movements(household.id, account.id, RECENT_LIMIT)
+
+    /** Enseña la lista de esa cuenta (nula: todas) con esa búsqueda. Si es otra lista empieza de cero; si es la misma, vuelve a cargar lo que ya se veía. */
+    suspend fun showList(accountId: String?, search: String) {
+        listShown = true
+        if (list.accountId != accountId || list.search != search) {
+            // Desde aquí, una lectura de la lista anterior que llegue tarde ya no la pisa.
+            turns.changed(::list, MovementList(accountId, search))
+            turns.changed(::listError, null)
+        }
+        reloadList()
+    }
+
+    /**
+     * La página siguiente, al llegar al final. Si falla, lo cargado se queda, [listError] lo dice y se puede volver a pedir.
+     * No pide nada mientras otra lectura de la lista está en marcha: empezaría en un sitio viejo.
+     */
+    suspend fun loadMoreList() {
+        val base = list
+        val last = base.rows.lastOrNull() ?: return
+        if (!base.hasMore || listLoads > 0) return
+        readList {
+            val (rows, hasMore) = fetchList(base, last, LIST_PAGE_SIZE)
+            base.copy(rows = base.rows + rows, hasMore = hasMore)
+        }
+    }
+
+    /** «Reintentar»: vuelve a cargar lo que había y una página más. */
+    suspend fun retryList() = reloadList(LIST_PAGE_SIZE)
+
+    /** Vuelve a pedir la lista abierta desde el principio, tantas filas como se veían (como poco una página). */
+    private suspend fun reloadList(extra: Int = 0) {
+        if (!listShown) return
+        val current = list
+        readList {
+            val (rows, hasMore) = fetchList(current, null, maxOf(current.rows.size + extra, LIST_PAGE_SIZE))
+            current.copy(rows = rows, hasMore = hasMore)
+        }
+    }
+
+    /** Una lectura de la lista con su turno: lo que trae (o su error) sólo se guarda si nada que empezó después lo ha guardado ya. */
+    private suspend fun readList(read: suspend () -> MovementList) {
+        val turn = turns.next()
+        listLoads++
+        try {
+            val loaded = read()
+            turns.store(::list, loaded, turn)
+            turns.store(::listError, null, turn)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            val message = (e as? AppError)?.message ?: AppError.Unknown("app").message
+            turns.store(::listError, "No se han podido cargar los movimientos. $message", turn)
+        } finally {
+            listLoads--
+        }
+    }
+
+    /**
+     * Pide al menos [count] filas detrás de [after], página a página, hasta tenerlas o llegar al final. Una página que llega
+     * incompleta es el final; una llena dice que puede haber más.
+     */
+    private suspend fun fetchList(list: MovementList, after: Movement?, count: Int): Pair<List<Movement>, Boolean> {
+        val search = MovementSearch.of(list.search, categories)
+        val rows = mutableListOf<Movement>()
+        var cursor = after
+        while (true) {
+            val page = service.movements(household.id, list.accountId, search, cursor, LIST_PAGE_SIZE)
+            rows += page
+            if (page.size < LIST_PAGE_SIZE) return rows to false
+            if (rows.size >= count) return rows to true
+            cursor = page.last()
+        }
+    }
 
     // Escrituras: cada una corre como [escritura], así que termina (y recarga) aunque se salga de la pantalla.
 
@@ -321,6 +415,8 @@ class FinanceModel(
             // Pagos fijos: apunta los cargos que han llegado y empareja los que ya entraron por CSV.
             planning.syncCharges(recent)
         }?.let { turns.changed(::error, it) }
+        // Lo cambiado puede estar en una página de la lista que no entra en [recent].
+        reloadList()
     }
 
     private suspend fun fetchAccounts() {
@@ -365,10 +461,23 @@ class FinanceModel(
         reloadAll()
     }
 
-    private companion object {
-        const val RECENT_LIMIT = 500
+    companion object {
+        /** Movimientos recientes que se cargan para resúmenes, sugerencias y pagos fijos (la lista va por páginas). */
+        private const val RECENT_LIMIT = 500
+
+        /** Filas por página de la lista de Movimientos. */
+        const val LIST_PAGE_SIZE = 200
     }
 }
+
+/** Lo que se ve en la lista de Movimientos: de qué cuenta (nula: todas), qué se busca y las filas cargadas, en el orden del servidor. */
+data class MovementList(
+    val accountId: String? = null,
+    val search: String = "",
+    val rows: List<Movement> = emptyList(),
+    /** Puede haber más en el servidor: la última página llegó llena. */
+    val hasMore: Boolean = false,
+)
 
 /** Fechas en español con los textos del diseño ("Hoy", "3 de noviembre", "5 nov 2026"). */
 object Fechas {
