@@ -175,8 +175,15 @@ public struct CSVMapping: Hashable, Sendable {
             return Double(values.filter(test).count) / Double(values.count)
         }
         let columns = Array(0..<width)
-        guard let date = columns.first(where: { share($0) { DateOrder.dayMonthYear.parse($0) != nil } > 0.8 }),
-              let amount = columns.first(where: { $0 != date && share($0) { Money(parsing: $0) != nil } > 0.8 }) else { return nil }
+        guard let date = columns.first(where: { share($0) { DateOrder.dayMonthYear.parse($0) != nil } > 0.8 }) else { return nil }
+        func amountColumn(_ test: (String) -> Bool) -> Int? {
+            columns.first { $0 != date && share($0, test) > 0.8 }
+        }
+        // Sólo si ninguna columna vale con la regla común se prueba el formato inglés ("1,234"),
+        // para que un archivo que ya se detectaba siga eligiendo la misma columna.
+        guard let amount = amountColumn({ Money(parsing: $0) != nil })
+            ?? amountColumn({ Money(parsing: $0) != nil || Money(parsing: CSVImporter.swapSeparators($0)) != nil })
+        else { return nil }
         let textColumns = columns.filter { $0 != date && $0 != amount }
         guard let description = textColumns.max(by: { averageLength(sample, $0) < averageLength(sample, $1) }) else { return nil }
         return CSVMapping(headerRow: nil, date: date, description: description, amount: .signed(amount),
@@ -230,6 +237,8 @@ public enum CSVImporter {
     public static func rows(in table: CSVTable, mapping: CSVMapping, accountId: UUID) -> [CSVImportRow] {
         var seen: [String: Int] = [:]
         var result: [CSVImportRow] = []
+        let decimalPoint = usesDecimalPoint(table, mapping: mapping)
+        func money(_ text: String) -> Money? { Money(parsing: decimalPoint ? swapSeparators(text) : text) }
 
         for index in table.rows.indices where index >= mapping.firstDataRow {
             let row = table.rows[index]
@@ -246,10 +255,10 @@ public enum CSVImporter {
             let amount: Money?
             switch mapping.amount {
             case .signed(let column):
-                amount = Money(parsing: cell(column))
+                amount = money(cell(column))
             case .split(let debit, let credit):
-                let out = Money(parsing: cell(debit)).map { Money(minor: -abs($0.minor)) }
-                let into = Money(parsing: cell(credit)).map { Money(minor: abs($0.minor)) }
+                let out = money(cell(debit)).map { Money(minor: -abs($0.minor)) }
+                let into = money(cell(credit)).map { Money(minor: abs($0.minor)) }
                 amount = [out, into].compactMap { $0 }.first { $0.minor != 0 } ?? out ?? into
             }
             guard let amount, amount.minor != 0 else {
@@ -268,6 +277,46 @@ public enum CSVImporter {
             result.append(CSVImportRow(line: line, draft: draft, issue: nil))
         }
         return result
+    }
+
+    /// Formato numérico del archivo, decidido una vez con las celdas de importe (Android: `CsvImporter.usesDecimalPoint`).
+    ///
+    /// Sólo cuentan las celdas que dicen por sí solas cuál es su separador decimal: las que tienen
+    /// «,» y «.» (decimal el último) y las que tienen un solo separador seguido de una o dos cifras
+    /// ("12,50" dice coma; "12.5" dice punto). "1,234" o "1.250" no dicen nada.
+    ///
+    /// - Si todas las que dicen algo dicen punto, el archivo está en formato inglés y cada celda se
+    ///   lee con «,» y «.» intercambiados: "1,234" es 1234,00, "1.5" es 1,50 y "1.250" no vale
+    ///   (en inglés serían 3 decimales).
+    /// - Si dicen coma, si no coinciden o si ninguna dice nada, no se adivina: se aplica la regla
+    ///   común de `Money(parsing:)` y una fila ambigua se lista como no importable, igual que antes.
+    static func usesDecimalPoint(_ table: CSVTable, mapping: CSVMapping) -> Bool {
+        let columns: [Int]
+        switch mapping.amount {
+        case .signed(let column): columns = [column]
+        case .split(let debit, let credit): columns = [debit, credit]
+        }
+        var votes = Set<Character>()
+        for row in table.rows.dropFirst(mapping.firstDataRow) {
+            for column in columns where row.indices.contains(column) {
+                if let vote = decimalSeparatorVote(row[column]) { votes.insert(vote) }
+            }
+        }
+        return votes == ["."]
+    }
+
+    /// «,» o «.» si la celda deja claro cuál es su separador decimal; nil si no lo deja claro.
+    static func decimalSeparatorVote(_ text: String) -> Character? {
+        let separators = text.filter { $0 == "," || $0 == "." }
+        if separators.contains(","), separators.contains(".") { return separators.last }
+        guard separators.count == 1, let separator = separators.first, let index = text.firstIndex(of: separator) else { return nil }
+        let digits = text[text.index(after: index)...].prefix { ("0"..."9").contains($0) }
+        return (1...2).contains(digits.count) ? separator : nil
+    }
+
+    /// Cambia «,» por «.» y al revés: "1,234.56" pasa a "1.234,56".
+    static func swapSeparators(_ text: String) -> String {
+        String(text.map { $0 == "," ? "." : $0 == "." ? "," : $0 })
     }
 
     private static func collapseSpaces(_ text: String) -> String {

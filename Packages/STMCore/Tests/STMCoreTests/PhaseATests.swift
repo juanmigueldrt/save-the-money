@@ -18,6 +18,7 @@ final class PhaseATests: XCTestCase {
         XCTAssertEqual(AmountExpression.evaluate("20−7,40")?.minor, 1_260)
         XCTAssertEqual(AmountExpression.evaluate("-5+2")?.minor, -300)
         XCTAssertEqual(AmountExpression.evaluate("1.234,56+0,44")?.minor, 123_500)
+        XCTAssertEqual(AmountExpression.evaluate("1\u{202F}234,56+0,44")?.minor, 123_500)
         XCTAssertNil(AmountExpression.evaluate("10/0"))
         XCTAssertNil(AmountExpression.evaluate("10+"))
         XCTAssertNil(AmountExpression.evaluate("(10+2"))
