@@ -106,10 +106,10 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** Al volver a la app, lo que haya apuntado la pareja. */
+    /** Al volver a la app, lo que haya apuntado la pareja; si estaba «sin conexión», se reintenta. */
     override fun onResume() {
         super.onResume()
-        lifecycleScope.launch { session.finance?.load() }
+        lifecycleScope.launch { session.resume() }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -159,6 +159,7 @@ fun App(capture: Int? = null) {
         if (capture != null) seedSample(session.backend, session.financeService)
         session.start()
     }
+    LaunchedEffect(Unit) { session.watchSession() }
     if (capture == null) {
         LaunchedEffect(session.state) {
             when (session.state) {
