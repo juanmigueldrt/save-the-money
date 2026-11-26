@@ -1,5 +1,6 @@
 package com.savethemoney.android.ui
 
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -32,9 +33,12 @@ class TrackingModel(private val household: Household, private val service: Finan
 
     /** Meses desde el primer movimiento hasta hoy, ambos incluidos. */
     val monthsWithData: Int get() {
-        val first = allMovements.minOfOrNull { YearMonth.from(it.day) } ?: return 2
+        val first = firstMonth ?: return 2
         return (java.time.temporal.ChronoUnit.MONTHS.between(first, YearMonth.from(today())).toInt() + 1).coerceAtLeast(2)
     }
+
+    /** Se recalcula sólo cuando cambian los movimientos, no en cada recomposición. */
+    private val firstMonth by derivedStateOf { allMovements.minOfOrNull { YearMonth.from(it.day) } }
 
     private suspend fun guarded(block: suspend () -> Unit) {
         try {

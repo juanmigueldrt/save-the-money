@@ -9,12 +9,14 @@ struct SaveTheMoneyApp: App {
     init() {
         // Antes de pintar nada, para que todo salga con las fuentes del manual de marca.
         BrandFonts.register()
+        // Lo exportado en una sesión anterior no debe seguir en la carpeta temporal.
+        ExportFiles.clear()
         let config = AppConfig.fromBundle()
         var services = AppServices.make(config: config)
         #if DEBUG
         if ScreenshotMode.isActive { services = .demo() }
         #endif
-        _session = State(initialValue: SessionModel(services: services))
+        _session = State(initialValue: SessionModel(services: services, clearLocalData: { await LocalAccountData.clear() }))
     }
 
     var body: some Scene {

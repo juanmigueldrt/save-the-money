@@ -191,13 +191,30 @@ final class PhaseBTests: XCTestCase {
         let format = CSVSavedFormat(table: table, mapping: mapping, accountId: account)
         XCTAssertEqual(format.mapping, mapping)
         let saved = CSVSavedFormat.remember(format, in: [])
-        let sameBank = CSVTable.parse("Otro titular\nFecha;Concepto;Cargo;Abono\n05/11/2026;PAN;1;\n")
-        XCTAssertEqual(CSVSavedFormat.match(sameBank, in: saved)?.accountId, account)
-        XCTAssertNil(CSVSavedFormat.match(CSVTable.parse("Date,Amount,Text\n2026-11-01,1,a\n"), in: saved))
+        let sameBank = "Otro titular\nFecha;Concepto;Cargo;Abono\n05/11/2026;PAN;1;\n"
+        XCTAssertEqual(CSVSavedFormat.match(text: sameBank, in: saved)?.format.accountId, account)
+        XCTAssertNil(CSVSavedFormat.match(text: "Date,Amount,Text\n2026-11-01,1,a\n", in: saved))
         // Guardar otra vez el mismo formato no lo duplica.
         XCTAssertEqual(CSVSavedFormat.remember(format, in: saved).count, 1)
         let data = try JSONEncoder().encode(saved)
         XCTAssertEqual(try JSONDecoder().decode([CSVSavedFormat].self, from: data), saved)
+    }
+
+    func testSavedCSVFormatRemembersDelimiter() throws {
+        // Separador elegido a mano (coma): el siguiente archivo del banco se lee con él.
+        let table = CSVTable.parse("Banco de prueba\nFecha,Concepto,Importe\n01/11/2026,CAFE,-1.50\n02/11/2026,NOMINA,1000\n", delimiter: ",")
+        let mapping = try XCTUnwrap(CSVMapping.detect(in: table))
+        let format = CSVSavedFormat(table: table, mapping: mapping, accountId: account)
+        XCTAssertEqual(format.delimiter, ",")
+        let saved = CSVSavedFormat.remember(format, in: [])
+        let sameBank = "Otro titular\nFecha,Concepto,Importe\n05/11/2026,PAN,-2.00\n"
+        let found = try XCTUnwrap(CSVSavedFormat.match(text: sameBank, in: saved))
+        XCTAssertEqual(found.table.delimiter, ",")
+        XCTAssertEqual(found.table.rows, CSVTable.parse(sameBank, delimiter: ",").rows)
+        // Un formato guardado sin separador (anterior a recordarlo) se lee con el detectado.
+        var legacy = format
+        legacy.delimiter = nil
+        XCTAssertEqual(CSVSavedFormat.match(text: sameBank, in: [legacy])?.table.delimiter, CSVTable.parse(sameBank).delimiter)
     }
 
     func testCSVRowReview() throws {

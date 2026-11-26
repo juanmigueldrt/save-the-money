@@ -59,6 +59,7 @@ import com.savethemoney.android.data.Username
 import com.savethemoney.android.ui.LocalNotifier
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.borrarExportados
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.SCREEN_COUNT
 import com.savethemoney.android.ui.screens.ScreenFor
@@ -130,6 +131,12 @@ internal fun capturaPedida(habilitado: Boolean, extra: Int): Int? = extra.takeIf
 class StmApp : android.app.Application() {
     private var session: Session? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        // Lo exportado en una sesión anterior no debe seguir en la caché.
+        borrarExportados(this)
+    }
+
     fun session(capture: Boolean): Session = session ?: run {
         val demo = capture || BuildConfig.SUPABASE_ANON_KEY.isBlank() || BuildConfig.SUPABASE_URL.isBlank()
         val backend: Backend
@@ -143,7 +150,9 @@ class StmApp : android.app.Application() {
             finance = SupabaseFinance(remote)
         }
         val today: () -> LocalDate = if (capture) ({ CAPTURE_DAY }) else LocalDate::now
-        Session(backend, finance, isDemo = demo, capture = capture, today = today, notifier = if (capture) NoNotifier else LocalNotifier(this)).also { session = it }
+        val avisos = if (capture) null else LocalNotifier(this)
+        Session(backend, finance, isDemo = demo, capture = capture, today = today, notifier = avisos ?: NoNotifier,
+            borrarLocal = { borrarExportados(this); avisos?.borrarTodo() }).also { session = it }
     }
 }
 

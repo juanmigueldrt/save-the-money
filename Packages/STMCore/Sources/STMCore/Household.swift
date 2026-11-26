@@ -14,6 +14,10 @@ public struct Household: Identifiable, Hashable, Codable, Sendable {
         self.monthStartDay = monthStartDay
     }
 
+    /// El servidor no deja cambiar la moneda de un hogar que ya tiene importes (ORC-71): no se convierten.
+    public static let currencyLocked =
+        "No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados."
+
     enum CodingKeys: String, CodingKey {
         case id, name
         case baseCurrency = "base_currency"

@@ -91,6 +91,39 @@ struct NoBudgetAlerts: BudgetAlerting {
     func notify(_ alerts: [BudgetAlert]) async {}
 }
 
+/// Lo que una cuenta deja en el dispositivo: avisos de la app (pendientes y ya mostrados), sus
+/// preferencias y los ficheros exportados. Se borra al cerrar sesión.
+enum LocalAccountData {
+    /// Prefijo de todos los identificadores de aviso que crea la app.
+    static let reminderPrefix = "stm."
+
+    /// Preferencias de avisos de esta cuenta. Se quedan en el dispositivo a propósito: el tema
+    /// (`SessionModel.themeKey`), la vista de importes (`DisplayPreferences`) y los formatos de CSV guardados.
+    static let accountKeys = [
+        LocalReminders.enabledKey, LocalBudgetAlerts.enabledKey, LocalBudgetAlerts.sentKey,
+        HabitSettings.logReminderKey, HabitSettings.logHourKey, HabitSettings.weeklySummaryKey
+    ]
+
+    /// Sólo los identificadores que son de la app: el centro de notificaciones puede tener otros.
+    static func ownIdentifiers(_ identifiers: [String]) -> [String] {
+        identifiers.filter { $0.hasPrefix(reminderPrefix) }
+    }
+
+    static func clearPreferences(in defaults: UserDefaults = .standard) {
+        accountKeys.forEach { defaults.removeObject(forKey: $0) }
+    }
+
+    static func clear() async {
+        let center = UNUserNotificationCenter.current()
+        let pending = await center.pendingNotificationRequests().map(\.identifier)
+        center.removePendingNotificationRequests(withIdentifiers: ownIdentifiers(pending))
+        let delivered = await center.deliveredNotifications().map(\.request.identifier)
+        center.removeDeliveredNotifications(withIdentifiers: ownIdentifiers(delivered))
+        clearPreferences()
+        ExportFiles.clear()
+    }
+}
+
 /// Avisos inmediatos en el dispositivo. Cada aviso (mes, categoría y umbral) sale una sola vez.
 struct LocalBudgetAlerts: BudgetAlerting {
     static let enabledKey = "budgetAlertsEnabled"

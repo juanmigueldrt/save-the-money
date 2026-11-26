@@ -238,6 +238,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         // update_movement: el movimiento cambió (o se borró) después de leerlo.
         case "STM05": .movementChanged
         case "STM04": .tooManyInviteAttempts(minutes: message.split(separator: " ").lazy.compactMap { Int($0) }.first ?? 15)
+        // El trigger de households: no se cambia base_currency con importes guardados.
+        case "STM06": .invalidInput(Household.currencyLocked)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

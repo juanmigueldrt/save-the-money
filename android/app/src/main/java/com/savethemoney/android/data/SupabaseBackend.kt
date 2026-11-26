@@ -222,6 +222,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             // update_movement: el movimiento cambió (o se borró) después de leerlo.
             "STM05" -> AppError.MovementChanged
             "STM04" -> AppError.TooManyInviteAttempts(Regex("""retry in (\d+) min""").find(message)?.groupValues?.get(1)?.toInt() ?: 15)
+            // El trigger de households: no se cambia base_currency con importes guardados.
+            "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

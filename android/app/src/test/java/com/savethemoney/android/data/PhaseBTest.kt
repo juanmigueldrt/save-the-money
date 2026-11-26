@@ -185,13 +185,27 @@ class PhaseBTest {
         val format = CsvSavedFormat.of(table, mapping, account)
         assertEquals(mapping, format.mapping)
         val saved = CsvSavedFormat.remember(format, emptyList())
-        val sameBank = CsvTable.parse("Otro titular\nFecha;Concepto;Cargo;Abono\n05/11/2026;PAN;1;\n")
-        assertEquals(account, CsvSavedFormat.match(sameBank, saved)?.accountId)
-        assertNull(CsvSavedFormat.match(CsvTable.parse("Date,Amount,Text\n2026-11-01,1,a\n"), saved))
+        assertEquals(account, CsvSavedFormat.match("Otro titular\nFecha;Concepto;Cargo;Abono\n05/11/2026;PAN;1;\n", saved)?.first?.accountId)
+        assertNull(CsvSavedFormat.match("Date,Amount,Text\n2026-11-01,1,a\n", saved))
         // Guardar otra vez el mismo formato no lo duplica.
         assertEquals(1, CsvSavedFormat.remember(format, saved).size)
         val json = Json.encodeToString(saved)
         assertEquals(saved, Json.decodeFromString<List<CsvSavedFormat>>(json))
+    }
+
+    @Test
+    fun savedCsvFormatRemembersDelimiter() {
+        // Separador elegido a mano (coma): el siguiente archivo del banco se lee con él.
+        val table = CsvTable.parse("Banco de prueba\nFecha,Concepto,Importe\n01/11/2026,CAFE,-1.50\n02/11/2026,NOMINA,1000\n", ',')
+        val format = CsvSavedFormat.of(table, CsvMapping.detect(table)!!, account)
+        assertEquals(',', format.delimiter)
+        val saved = CsvSavedFormat.remember(format, emptyList())
+        val sameBank = "Otro titular\nFecha,Concepto,Importe\n05/11/2026,PAN,-2.00\n"
+        val (_, found) = CsvSavedFormat.match(sameBank, saved)!!
+        assertEquals(',', found.delimiter)
+        assertEquals(CsvTable.parse(sameBank, ',').rows, found.rows)
+        // Un formato guardado sin separador (anterior a recordarlo) se lee con el detectado.
+        assertEquals(CsvTable.parse(sameBank).delimiter, CsvSavedFormat.match(sameBank, listOf(format.copy(delimiter = null)))!!.second.delimiter)
     }
 
     @Test

@@ -89,6 +89,27 @@ class SharedVectorsTest {
         }
     }
 
+    /** ORC-96: intereses, cuotas, mensualidades y proyecciones con decimales exactos, al céntimo. */
+    @Test
+    fun interestIsExactToTheCent() {
+        for (v in load("interest.json", "installments")) {
+            val got = CardInstallment.payment(v.long("principal"), v.int("months"), v["rate"]!!.jsonPrimitive.double)
+            assertEquals("${v.str("principal")} en ${v.str("months")} meses al ${v.str("rate")} %", v.long("payment"), got)
+        }
+        for (v in load("interest.json", "monthlyInterest")) {
+            val got = CreditCardCalculator.monthlyInterest(v.long("capital"), v["rate"]!!.jsonPrimitive.double)
+            assertEquals("${v.str("capital")} al ${v.str("rate")} %", v.long("interest"), got)
+        }
+        for (v in load("interest.json", "recurringMonthly")) {
+            val unit = RecurrenceUnit.entries.first { it.name.lowercase() == v.str("unit") }
+            assertEquals("${v.str("amount")} cada ${v.str("every")} ${v.str("unit")}", v.long("monthly"), Recurrence(v.int("every"), unit).monthly(v.long("amount")))
+        }
+        for (v in load("interest.json", "projection")) {
+            val plan = InvestmentPlan("p", "h", "a", amountMinor = v.long("monthly"), startsOn = "2026-01-01", expectedAnnualReturn = v.str("rate").toBigDecimal())
+            assertEquals("${v.str("monthly")} al ${v.str("rate")} % en ${v.str("months")} meses", v.long("value"), plan.projectedValue(v.int("months")))
+        }
+    }
+
     @Test
     fun cardInstallmentsAndStatementDates() {
         for (v in load("card_installments.json", "installments")) {
@@ -278,6 +299,17 @@ class SharedVectorsTest {
             val input = v.str("text").repeat(v.int("repeat"))
             assertEquals(v.int("utf8Bytes"), input.toByteArray(Charsets.UTF_8).size)
             assertEquals("«${v.str("text")}» × ${v.str("repeat")}", v.str("sha256"), CsvImporter.sha256Hex(input))
+        }
+    }
+
+    @Test
+    fun moneyOfSeveralCurrencies() {
+        fun JsonElement.amount() = Money.Amount(long("minor"), str("currency"))
+        for (v in load("money_currencies.json", "totals")) {
+            assertEquals(v.str("name"), v["expected"]?.amount(), Money.total(v["amounts"]!!.jsonArray.map { it.amount() }))
+        }
+        for (v in load("money_currencies.json", "conversions")) {
+            assertEquals("${v.str("minor")} × ${v.str("rate")}", v.long("expected"), Money.convert(v.long("minor"), v.str("rate").toBigDecimal()))
         }
     }
 }

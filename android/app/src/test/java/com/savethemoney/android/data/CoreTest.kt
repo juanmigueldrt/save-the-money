@@ -95,6 +95,7 @@ class CoreTest {
         )
         assertEquals(AppError.TooManyInviteAttempts(15), SupabaseBackend.postgresError("STM04", "otro texto"))
         assertEquals(AppError.MovementChanged, SupabaseBackend.postgresError("STM05", ""))
+        assertEquals(Money.BASE_CURRENCY_LOCKED, SupabaseBackend.postgresError("STM06", "").message)
         assertEquals(AppError.InvalidCredentials, SupabaseBackend.authError("Invalid login credentials"))
         assertEquals(AppError.UsernameTaken, SupabaseBackend.authError("user_already_exists"))
     }

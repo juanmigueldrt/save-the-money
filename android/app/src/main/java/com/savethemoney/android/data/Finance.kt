@@ -138,7 +138,8 @@ data class Movement(
     /** Versión de la fila: el `updated_at` del servidor tal cual llegó, sin convertirlo a fecha. Se devuelve igual al cambiar el movimiento. */
     @SerialName("updated_at") val updatedAt: String? = null,
 ) {
-    val day: LocalDate get() = LocalDate.parse(bookedOn.take(10))
+    /** Se analiza una vez al crear el movimiento: los informes la leen miles de veces. */
+    @kotlinx.serialization.Transient val day: LocalDate = LocalDate.parse(bookedOn.take(10))
     val isExpense: Boolean get() = amountMinor < 0
     val isReviewed: Boolean get() = reviewedAt != null
 
