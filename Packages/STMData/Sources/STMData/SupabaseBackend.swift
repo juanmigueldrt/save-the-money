@@ -189,16 +189,16 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         guard let valid = HouseholdName.validated(name) else {
             throw AppError.invalidInput("El nombre del hogar tiene que tener entre 1 y 80 letras.")
         }
-        // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila y falla.
-        return try await mapped {
+        // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila.
+        let rows: [Household] = try await mapped {
             try await client.from("households")
                 .update(["name": valid])
                 .eq("id", value: householdId.uuidString)
                 .select(Self.householdColumns)
-                .single()
                 .execute()
                 .value
         }
+        return try Self.changedHousehold(rows, ownerOnly: Household.renameOwnerOnly)
     }
 
     public func setMonthStartDay(_ householdId: UUID, to day: Int) async throws -> Household {
@@ -212,7 +212,12 @@ public struct SupabaseBackend: AuthService, HouseholdService {
                 .execute()
                 .value
         }
-        guard let household = rows.first else { throw AppError.invalidInput(Household.monthStartDayOwnerOnly) }
+        return try Self.changedHousehold(rows, ownerOnly: Household.monthStartDayOwnerOnly)
+    }
+
+    /// La fila que devuelve el servidor tras un cambio del hogar. Sin fila, el cambio no era del dueño (RLS).
+    static func changedHousehold(_ rows: [Household], ownerOnly message: String) throws -> Household {
+        guard let household = rows.first else { throw AppError.invalidInput(message) }
         return household
     }
 
