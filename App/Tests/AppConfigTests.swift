@@ -237,7 +237,8 @@ final class PlanningModelTests: XCTestCase {
         let planned = await reminders.last
         XCTAssertEqual(planned.first?.fireOn, CalendarDay(year: 2026, month: 11, day: 3))
 
-        var archived = music
+        // Se archiva la que hay cargada (con su versión), como hace el formulario.
+        var archived = try XCTUnwrap(planning.series.first)
         archived.archivedAt = Date()
         _ = await planning.save(archived)
         let afterArchive = await reminders.last

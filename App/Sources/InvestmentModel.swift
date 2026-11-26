@@ -98,18 +98,27 @@ final class InvestmentModel: ServerModel {
 
     // MARK: Activos
 
+    /// Un activo sin versión (`updatedAt`) aún no se ha leído del servidor: es un alta, con el id que le dio el
+    /// formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ holding: Holding) async -> Holding? {
         if let issue = holding.issue { error = issue; return nil }
-        let isNew = !holdings.contains { $0.id == holding.id }
+        let isNew = holding.updatedAt == nil
         var result: Holding?
-        _ = await perform {
+        let ok = await perform {
             let saved = isNew ? try await service.createHolding(holding) : try await service.updateHolding(holding)
             markChanged(\.holdings)
             holdings.removeAll { $0.id == holding.id || $0.id == saved.id }
             holdings.append(saved)
             holdings.sort { $0.trimmedName.localizedStandardCompare($1.trimmedName) == .orderedAscending }
             result = saved
+        }
+        // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                store(try await service.holdings(in: household.id), in: \.holdings, turn: turn)
+            }
         }
         return result
     }
@@ -208,10 +217,11 @@ final class InvestmentModel: ServerModel {
 
     // MARK: Planes
 
+    /// Como `save(_ holding:)`: sin versión es un alta con el id del formulario; con versión, un cambio sobre ella.
     @discardableResult
     func save(_ plan: InvestmentPlan) async -> Bool {
         if let issue = plan.issue { error = issue; return false }
-        let isNew = !plans.contains { $0.id == plan.id }
+        let isNew = plan.updatedAt == nil
         let ok = await perform {
             let saved = isNew ? try await service.createPlan(plan) : try await service.updatePlan(plan)
             markChanged(\.plans)
@@ -219,7 +229,14 @@ final class InvestmentModel: ServerModel {
             plans.append(saved)
             plans.sort { $0.startsOn < $1.startsOn }
         }
-        if ok { await reschedule() }
+        // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                store(try await service.investmentPlans(in: household.id), in: \.plans, turn: turn)
+            }
+        }
+        await reschedule()
         return ok
     }
 

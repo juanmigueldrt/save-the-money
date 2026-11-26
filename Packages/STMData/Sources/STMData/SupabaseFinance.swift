@@ -5,8 +5,8 @@ import Supabase
 /// Cuentas, categorías y movimientos sobre Supabase. El RLS del servidor decide
 /// qué se ve; aquí no se filtra por seguridad, sólo por lo que pide la pantalla.
 extension SupabaseBackend: FinanceService {
-    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at"
-    private static let categoryColumns = "id,household_id,name,kind,budget_group,icon"
+    private static let accountColumns = "id,household_id,name,kind,currency,opening_balance_minor,owner_id,archived_at,is_default,include_in_net_worth,created_at,updated_at"
+    private static let categoryColumns = "id,household_id,name,kind,budget_group,icon,updated_at"
     static let movementColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"
     /// Filas por petición al importar, para no mandar un CSV enorme de golpe.
     private static let importBatchSize = 500
@@ -33,29 +33,23 @@ extension SupabaseBackend: FinanceService {
 
     public func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account {
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
-        let row = NewAccountRow(householdId: householdId, name: draft.trimmedName, kind: draft.kind,
-                                openingBalanceMinor: draft.openingBalance.minor, ownerId: draft.ownerId)
-        return try await mapped {
-            try await client.from("accounts")
-                .insert(row)
-                .select(Self.accountColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `create_account` no repite una cuenta ya guardada con ese id: devuelve la que había.
+        return try await saved("create_account", columns: Self.accountColumns, [
+            "account": .uuid(draft.id), "household": .uuid(householdId), "label": .string(draft.trimmedName),
+            "account_kind": .string(draft.kind.rawValue), "opening": .integer(draft.openingBalance.minor),
+            "owner": .uuid(draft.ownerId)
+        ])
     }
 
     public func updateAccount(_ account: Account) async throws -> Account {
-        let changes = AccountChanges(account)
-        return try await mapped {
-            try await client.from("accounts")
-                .update(changes)
-                .eq("id", value: account.id.uuidString)
-                .select(Self.accountColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `update_account` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        try await saved("update_account", columns: Self.accountColumns, [
+            "account": .uuid(account.id), "seen": .text(account.updatedAt),
+            "label": .string(account.name.trimmingCharacters(in: .whitespacesAndNewlines)),
+            "account_kind": .string(account.kind.rawValue), "opening": .integer(account.openingBalance.minor),
+            "owner": .uuid(account.ownerId), "archived": .timestamp(account.archivedAt),
+            "make_default": .bool(account.isDefault && !account.isArchived), "in_net_worth": .bool(account.includeInNetWorth)
+        ])
     }
 
     public func deleteAccount(_ accountId: UUID) async throws {
@@ -79,27 +73,22 @@ extension SupabaseBackend: FinanceService {
 
     public func createCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
         if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("categories")
-                .insert(CategoryRow(category, includeHousehold: true))
-                .select(Self.categoryColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `create_category` no repite una categoría ya guardada con ese id: devuelve la que había.
+        return try await saved("create_category", columns: Self.categoryColumns, [
+            "category": .uuid(category.id), "household": .uuid(category.householdId), "label": .string(category.trimmedName),
+            "category_kind": .string(category.kind.rawValue),
+            "budget": .text(category.kind == .expense ? category.budgetGroup?.rawValue : nil), "icon_name": .text(category.icon)
+        ])
     }
 
     public func updateCategory(_ category: BudgetCategory) async throws -> BudgetCategory {
         if let issue = category.issue(among: []) { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("categories")
-                .update(CategoryRow(category, includeHousehold: false))
-                .eq("id", value: category.id.uuidString)
-                .select(Self.categoryColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `update_category` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        // Solo nombre, grupo e icono: el tipo de una categoría no se cambia.
+        return try await saved("update_category", columns: Self.categoryColumns, [
+            "category": .uuid(category.id), "seen": .text(category.updatedAt), "label": .string(category.trimmedName),
+            "budget": .text(category.kind == .expense ? category.budgetGroup?.rawValue : nil), "icon_name": .text(category.icon)
+        ])
     }
 
     public func deleteCategory(_ categoryId: UUID) async throws {
@@ -329,91 +318,6 @@ private struct BalanceRow: Decodable {
 
 private struct IdRow: Decodable {
     var id: UUID
-}
-
-private struct NewAccountRow: Encodable, Sendable {
-    var householdId: UUID
-    var name: String
-    var kind: AccountKind
-    var openingBalanceMinor: Int
-    var ownerId: UUID?
-
-    enum CodingKeys: String, CodingKey {
-        case name, kind
-        case householdId = "household_id"
-        case openingBalanceMinor = "opening_balance_minor"
-        case ownerId = "owner_id"
-    }
-}
-
-private struct AccountChanges: Encodable, Sendable {
-    var name: String
-    var kind: AccountKind
-    var openingBalanceMinor: Int
-    var ownerId: UUID?
-    var archivedAt: String?
-    var isDefault: Bool
-    var includeInNetWorth: Bool
-
-    init(_ account: Account) {
-        isDefault = account.isDefault && !account.isArchived
-        includeInNetWorth = account.includeInNetWorth
-        name = account.name.trimmingCharacters(in: .whitespacesAndNewlines)
-        kind = account.kind
-        openingBalanceMinor = account.openingBalance.minor
-        ownerId = account.ownerId
-        archivedAt = account.archivedAt.map { ISO8601DateFormatter().string(from: $0) }
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case name, kind
-        case openingBalanceMinor = "opening_balance_minor"
-        case ownerId = "owner_id"
-        case archivedAt = "archived_at"
-        case isDefault = "is_default"
-        case includeInNetWorth = "include_in_net_worth"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(name, forKey: .name)
-        try c.encode(kind, forKey: .kind)
-        try c.encode(openingBalanceMinor, forKey: .openingBalanceMinor)
-        // null explícito para poder volver a compartida o desarchivar.
-        try c.encode(ownerId, forKey: .ownerId)
-        try c.encode(archivedAt, forKey: .archivedAt)
-        try c.encode(isDefault, forKey: .isDefault)
-        try c.encode(includeInNetWorth, forKey: .includeInNetWorth)
-    }
-}
-
-/// Columnas de una categoría que se pueden escribir. Al insertar va el hogar y el tipo;
-/// al cambiarla, sólo nombre, grupo e icono (es lo que permite el servidor).
-private struct CategoryRow: Encodable, Sendable {
-    var category: BudgetCategory
-    var includeHousehold: Bool
-
-    init(_ category: BudgetCategory, includeHousehold: Bool) {
-        self.category = category
-        self.includeHousehold = includeHousehold
-    }
-
-    enum CodingKeys: String, CodingKey {
-        case name, kind, icon
-        case householdId = "household_id"
-        case budgetGroup = "budget_group"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        if includeHousehold {
-            try c.encode(category.householdId, forKey: .householdId)
-            try c.encode(category.kind, forKey: .kind)
-        }
-        try c.encode(category.trimmedName, forKey: .name)
-        try c.encode(category.kind == .expense ? category.budgetGroup : nil, forKey: .budgetGroup)
-        try c.encode(category.icon, forKey: .icon)
-    }
 }
 
 /// Parámetros de `create_transfer`. La categoría se manda aunque sea nula: la función no tiene valor por defecto.

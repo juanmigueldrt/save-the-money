@@ -206,6 +206,8 @@ fun Pantalla21(nav: Nav) {
     var remind by remember(base) { mutableStateOf(base == null || base.remindDaysBefore != null) }
     var dias by remember(base) { mutableIntStateOf(base?.remindDaysBefore ?: 1) }
     var pendiente by remember(base) { mutableStateOf(base?.createsPending ?: true) }
+    // Identificador del pago fijo nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    val idPago = remember { java.util.UUID.randomUUID().toString() }
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf<String?>(null) }
     var confirmar by remember { mutableStateOf(false) }
@@ -218,7 +220,7 @@ fun Pantalla21(nav: Nav) {
         val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: falla("El importe no es válido.")
         val conOferta = offer && !esIngreso
         val oferta = if (conOferta) Money.entered(offerPrice)?.takeIf { it > 0 } ?: falla("El precio de oferta no es válido.") else null
-        val item = (editando ?: RecurringSeries("", planning.household.id, name, amountMinor = dinero, startsOn = fecha.toString())).copy(
+        val item = (editando ?: RecurringSeries(idPago, planning.household.id, name, amountMinor = dinero, startsOn = fecha.toString())).copy(
             name = name, kind = tipos[kind], amountMinor = dinero, accountId = cuenta, categoryId = categoria,
             every = cada.every, unit = cada.unit, startsOn = fecha.toString(), endsOn = if (conFin) fin.toString() else null,
             remindDaysBefore = if (remind) dias else null, introMinor = oferta, introCharges = if (conOferta) charges else null,
@@ -570,6 +572,8 @@ fun Pantalla24(nav: Nav) {
     val planning = finance.planning
     val c = Stm.colors
     val editando = remember { planning.takeGoal() }
+    // Identificador de la meta nueva, uno por formulario: reintentar el alta con el mismo no crea otra.
+    val idMeta = remember { java.util.UUID.randomUUID().toString() }
     val base = editando
     val hoy = planning.today()
     var kind by remember(base) { mutableIntStateOf(if (base?.kind == GoalKind.Debt) 1 else 0) }
@@ -602,7 +606,7 @@ fun Pantalla24(nav: Nav) {
         // Un campo vacío es cero o nada; lo que no se entiende, se avisa.
         val inicio = if (starting.isBlank()) 0 else Money.entered(starting) ?: falla("Algún importe no es válido.")
         val previsto = if (plan.isBlank()) null else Money.entered(plan) ?: falla("Algún importe no es válido.")
-        val item = (editando ?: Goal("", planning.household.id, name, targetMinor = meta)).copy(
+        val item = (editando ?: Goal(idMeta, planning.household.id, name, targetMinor = meta)).copy(
             name = name, kind = if (deuda) GoalKind.Debt else GoalKind.Savings, targetMinor = meta, startingMinor = inicio,
             monthlyPlanMinor = previsto, targetOn = fecha?.toString(), accountId = cuenta,
         )
@@ -712,12 +716,14 @@ fun Pantalla35(nav: Nav) {
     var fecha by remember { mutableStateOf(finance.today()) }
     var nota by remember { mutableStateOf("") }
     var eligeFecha by remember { mutableStateOf(false) }
+    // Identificador de la aportación, uno por formulario: reintentarla con el mismo no la apunta dos veces.
+    val idAportacion = remember { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
     val ahorro = goal.kind == GoalKind.Savings
 
     fun guardar() = action.run {
         val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("El importe no es válido.")
-        planning.contribute(if (sacar) -dinero else dinero, goal, fecha, nota)
+        planning.contribute(if (sacar) -dinero else dinero, goal, fecha, nota, idAportacion)
         nav.back()
     }
 

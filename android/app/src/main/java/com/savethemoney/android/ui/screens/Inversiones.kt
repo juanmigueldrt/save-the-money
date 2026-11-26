@@ -243,7 +243,8 @@ fun Pantalla26(nav: Nav) {
         hecho = null
         val ahorro = finance.categories.firstOrNull { it.kind == CategoryKind.Expense && it.budgetGroup == BudgetGroup.Savings }
         val cargo = cuenta?.let { TradeCash(it, ahorro?.id, -q.total, "Compra de ${h.trimmedName}") }
-        finance.addTrade(q.trade(h, h.price, fecha, id = idCompra), cargo)
+        val compra = q.trade(h, h.price, fecha, id = idCompra)
+        finance.addTrade(compra, cargo)
         val mensual = repetir
         idCompra = java.util.UUID.randomUUID().toString()
         amount = ""
@@ -252,7 +253,8 @@ fun Pantalla26(nav: Nav) {
         // El plan va aparte: la compra ya está guardada entera, y si el plan falla se dice solo eso.
         if (mensual) {
             try {
-                inv.save(InvestmentPlan("", h.householdId, h.id, cuenta, q.amount, startsOn = fecha.plusMonths(1).toString()))
+                // Con el id de la compra (uno por cada vez que se pulsa «Comprar»): el plan no se crea dos veces.
+                inv.save(InvestmentPlan(compra.id, h.householdId, h.id, cuenta, q.amount, startsOn = fecha.plusMonths(1).toString()))
             } catch (_: AppError) {
                 throw AppError.InvalidInput("La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas.")
             }
@@ -525,6 +527,8 @@ fun Pantalla39(nav: Nav) {
     var nota by remember { mutableStateOf(editando?.note.orEmpty()) }
     var selector by remember { mutableStateOf<String?>(null) }
     var borrando by remember { mutableStateOf(false) }
+    // Identificador del activo nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    val idActivo = remember { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
 
     fun guardar() = action.run {
@@ -533,7 +537,7 @@ fun Pantalla39(nav: Nav) {
         val hoy = finance.today()
         val cambiaPrecio = editando?.let { it.price.compareTo(valor) != 0 } ?: (valor.signum() > 0)
         val base = editando ?: Holding(
-            "", inv.householdId, nombre, price = valor, priceOn = if (valor.signum() > 0) hoy.toString() else null,
+            idActivo, inv.householdId, nombre, price = valor, priceOn = if (valor.signum() > 0) hoy.toString() else null,
         )
         val item = base.copy(
             name = nombre, symbol = simbolo, kind = tipo, assetClass = clase, ownerId = dueno, accountId = cuenta, feeRate = tasa,
@@ -725,6 +729,8 @@ fun Pantalla42(nav: Nav) {
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf(false) }
     var borrando by remember { mutableStateOf(false) }
+    // Identificador del plan nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
+    val idPlan = remember { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
 
     val borrador = run {
@@ -732,7 +738,7 @@ fun Pantalla42(nav: Nav) {
         val money = Money.entered(importe)
         val rate = parseDecimal(rentabilidad, maxFractionDigits = 2)
         if (id == null || money == null || rate == null) null
-        else (editando ?: InvestmentPlan("", inv.householdId, id, amountMinor = money, startsOn = inicio.toString())).copy(
+        else (editando ?: InvestmentPlan(idPlan, inv.householdId, id, amountMinor = money, startsOn = inicio.toString())).copy(
             amountMinor = money, every = recurrencia.every, unit = recurrencia.unit, accountId = cuenta, startsOn = inicio.toString(),
             expectedAnnualReturn = rate, remindDaysBefore = aviso,
         )

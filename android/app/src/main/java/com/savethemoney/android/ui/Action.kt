@@ -59,6 +59,22 @@ suspend fun reloadAfterSave(block: suspend () -> Unit): String? = try {
     AppError.Unknown("app").message
 }
 
+/**
+ * Una escritura y la recarga de lo que cambia (ORC-142). [reload] no lanza (usa [reloadAfterSave]). Si la escritura falla se
+ * recarga igual: puede que otro dispositivo cambiara la fila antes (STM05) o que ya estuviera guardada con otros datos
+ * (STM01); así se ve lo que hay detrás del aviso.
+ */
+suspend fun <T> guardarYRecargar(reload: suspend () -> Unit, write: suspend () -> T): T {
+    val saved = try {
+        write()
+    } catch (e: AppError) {
+        reload()
+        throw e
+    }
+    reload()
+    return saved
+}
+
 /** Padre de las escrituras en marcha: no es de ninguna pantalla, así que salir de una no las cancela. */
 internal val escrituras = SupervisorJob()
 

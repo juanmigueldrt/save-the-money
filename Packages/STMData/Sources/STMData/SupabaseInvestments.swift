@@ -5,10 +5,10 @@ import Supabase
 /// Inversiones sobre Supabase. El RLS sólo deja ver y tocar las del hogar; las claves
 /// foráneas compuestas impiden enlazar cuentas o activos de otro hogar.
 extension SupabaseBackend: InvestmentService {
-    private static let holdingColumns = "id,household_id,name,symbol,kind,asset_class,currency,account_id,owner_id,price,price_on,fee_rate,note,archived_at"
+    private static let holdingColumns = "id,household_id,name,symbol,kind,asset_class,currency,account_id,owner_id,price,price_on,fee_rate,note,archived_at,updated_at"
     private static let priceColumns = "id,household_id,holding_id,priced_on,price"
     private static let tradeColumns = "id,household_id,holding_id,traded_on,side,quantity,price,fee_minor,note"
-    private static let planColumns = "id,household_id,holding_id,account_id,amount_minor,every,unit,starts_on,ends_on,expected_annual_return,remind_days_before,paused_at,archived_at"
+    private static let planColumns = "id,household_id,holding_id,account_id,amount_minor,every,unit,starts_on,ends_on,expected_annual_return,remind_days_before,paused_at,archived_at,updated_at"
 
     // MARK: Activos
 
@@ -24,28 +24,25 @@ extension SupabaseBackend: InvestmentService {
 
     public func createHolding(_ holding: Holding) async throws -> Holding {
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
-        let row = NewRow(householdId: holding.householdId, fields: holding)
-        return try await mapped {
-            try await client.from("holdings")
-                .insert(row)
-                .select(Self.holdingColumns)
-                .single()
-                .execute()
-                .value
-        }
+        var params = Self.holdingParams(holding)
+        params["household"] = .uuid(holding.householdId)
+        return try await saved("create_holding", columns: Self.holdingColumns, params)
     }
 
     public func updateHolding(_ holding: Holding) async throws -> Holding {
         if let issue = holding.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("holdings")
-                .update(holding)
-                .eq("id", value: holding.id.uuidString)
-                .select(Self.holdingColumns)
-                .single()
-                .execute()
-                .value
-        }
+        var params = Self.holdingParams(holding)
+        params["seen"] = .text(holding.updatedAt)
+        return try await saved("update_holding", columns: Self.holdingColumns, params)
+    }
+
+    /// Lo que comparten `create_holding` y `update_holding`. La moneda no va: la pone el servidor al crear.
+    private static func holdingParams(_ holding: Holding) -> [String: AnyJSON] {
+        ["holding": .uuid(holding.id), "label": .string(holding.trimmedName), "ticker": .text(holding.trimmedSymbol),
+         "holding_kind": .string(holding.kind.rawValue), "asset": .string(holding.assetClass.rawValue),
+         "account": .uuid(holding.accountId), "owner": .uuid(holding.ownerId), "unit_price": .decimal(holding.price),
+         "priced": .day(holding.priceOn), "fee": .decimal(holding.feeRate), "remark": .text(holding.note),
+         "archived": .timestamp(holding.archivedAt)]
     }
 
     public func deleteHolding(_ holdingId: UUID) async throws {
@@ -129,28 +126,26 @@ extension SupabaseBackend: InvestmentService {
 
     public func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
         if let issue = plan.issue { throw AppError.invalidInput(issue) }
-        let row = NewRow(householdId: plan.householdId, fields: NewPlan(holdingId: plan.holdingId, plan: plan))
-        return try await mapped {
-            try await client.from("investment_plans")
-                .insert(row)
-                .select(Self.planColumns)
-                .single()
-                .execute()
-                .value
-        }
+        var params = Self.planParams(plan)
+        params["household"] = .uuid(plan.householdId)
+        params["holding"] = .uuid(plan.holdingId)
+        return try await saved("create_investment_plan", columns: Self.planColumns, params)
     }
 
     public func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
         if let issue = plan.issue { throw AppError.invalidInput(issue) }
-        return try await mapped {
-            try await client.from("investment_plans")
-                .update(plan)
-                .eq("id", value: plan.id.uuidString)
-                .select(Self.planColumns)
-                .single()
-                .execute()
-                .value
-        }
+        var params = Self.planParams(plan)
+        params["seen"] = .text(plan.updatedAt)
+        return try await saved("update_investment_plan", columns: Self.planColumns, params)
+    }
+
+    /// Lo que comparten `create_investment_plan` y `update_investment_plan`. El activo de un plan no se cambia.
+    private static func planParams(_ plan: InvestmentPlan) -> [String: AnyJSON] {
+        ["plan": .uuid(plan.id), "account": .uuid(plan.accountId), "amount": .integer(plan.amount.minor),
+         "step": .integer(plan.recurrence.every), "step_unit": .string(plan.recurrence.unit.rawValue),
+         "starts": .day(plan.startsOn), "ends": .day(plan.endsOn), "annual_return": .decimal(plan.expectedAnnualReturn),
+         "remind_days": .int(plan.remindDaysBefore), "paused": .timestamp(plan.pausedAt),
+         "archived": .timestamp(plan.archivedAt)]
     }
 
     public func deletePlan(_ planId: UUID) async throws {
@@ -199,19 +194,5 @@ private struct TradeParams: Encodable, Sendable {
         case tradeSide = "trade_side"
         case unitPrice = "unit_price"
         case tradeNote = "trade_note"
-    }
-}
-
-/// Un plan nuevo: sus columnas editables más el activo, que ya no se puede cambiar.
-private struct NewPlan: Encodable, Sendable {
-    var holdingId: UUID
-    var plan: InvestmentPlan
-
-    private enum CodingKeys: String, CodingKey { case holdingId = "holding_id" }
-
-    func encode(to encoder: Encoder) throws {
-        try plan.encode(to: encoder)
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(holdingId, forKey: .holdingId)
     }
 }

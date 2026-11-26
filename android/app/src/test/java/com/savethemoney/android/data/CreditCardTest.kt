@@ -308,15 +308,14 @@ class CreditCardTest {
         assertThrows(AppError::class.java) { runBlocking { f.saveCreditCard(CreditCardTerms(cuenta.id, home, 100_000)) } }
 
         val good = CreditCardTerms(tarjeta.id, home, 300_000, payFromAccountId = cuenta.id)
-        f.saveCreditCard(good)
-        f.saveCreditCard(good.copy(creditLimit = 250_000))
+        // Se cambian las guardadas (con su versión), como hace el formulario.
+        f.saveCreditCard(f.saveCreditCard(good).copy(creditLimit = 250_000))
         assertEquals(listOf(250_000L), f.creditCards(home).map { it.creditLimit })
 
         val compra = f.addMovement(MovementDraft(tarjeta.id, null, day(2026, 11, 3), -60_000, "Compra"), home)
         val otra = f.addMovement(MovementDraft(cuenta.id, null, day(2026, 11, 3), -1_000, "Otra"), home)
         assertThrows(AppError::class.java) { runBlocking { f.saveInstallment(CardInstallment("", home, tarjeta.id, otra.id, 3)) } }
-        f.saveInstallment(CardInstallment("", home, tarjeta.id, compra.id, 6))
-        f.saveInstallment(CardInstallment("", home, tarjeta.id, compra.id, 9))
+        f.saveInstallment(f.saveInstallment(CardInstallment("", home, tarjeta.id, compra.id, 6)).copy(months = 9))
         assertEquals(listOf(9), f.cardInstallments(home).map { it.months })
         f.deleteMovement(compra.id)
         assertTrue(f.cardInstallments(home).isEmpty())

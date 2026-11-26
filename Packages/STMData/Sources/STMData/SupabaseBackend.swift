@@ -230,6 +230,18 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    // MARK: Altas y cambios con función (ORC-142)
+
+    /// Llama a una función `create_…` o `update_…` y devuelve la fila guardada. Los parámetros van todos, también
+    /// los nulos: las funciones de cambio no tienen valores por defecto.
+    func saved<Row: Decodable & Sendable>(_ function: String, columns: String, _ params: [String: AnyJSON]) async throws -> Row {
+        let rows: [Row] = try await mapped {
+            try await client.rpc(function, params: params).select(columns).execute().value
+        }
+        guard let row = rows.first else { throw AppError.unknown(function) }
+        return row
+    }
+
     // MARK: Paginación
 
     /// Filas por petición: el servidor devuelve como mucho 1000 (`max_rows` en supabase/config.toml).
@@ -323,4 +335,15 @@ private struct ProfileChanges: Encodable, Sendable {
         try container.encode(displayName, forKey: .displayName)
         try container.encode(theme, forKey: .theme)
     }
+}
+
+/// Valores para los parámetros de las funciones del servidor, con los nulos explícitos.
+extension AnyJSON {
+    static func uuid(_ value: UUID?) -> AnyJSON { value.map { .string($0.uuidString) } ?? .null }
+    static func text(_ value: String?) -> AnyJSON { value.map { .string($0) } ?? .null }
+    static func int(_ value: Int?) -> AnyJSON { value.map { .integer($0) } ?? .null }
+    static func day(_ value: CalendarDay?) -> AnyJSON { value.map { .string($0.iso) } ?? .null }
+    static func timestamp(_ value: Date?) -> AnyJSON { value.map { .string(ISO8601DateFormatter().string(from: $0)) } ?? .null }
+    /// Como texto, para no pasar por `Double`: Postgres lo convierte a `numeric` sin perder decimales.
+    static func decimal(_ value: Decimal?) -> AnyJSON { value.map { .string(NSDecimalNumber(decimal: $0).stringValue) } ?? .null }
 }

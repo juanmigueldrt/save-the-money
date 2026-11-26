@@ -123,9 +123,21 @@ class InvestmentModel(
         turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
     }
 
+    /**
+     * Un activo sin versión ([Holding.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio el
+     * formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
+     */
     suspend fun save(holding: Holding): Holding = escritura(::sinPantalla) {
-        val isNew = holdings.none { it.id == holding.id }
-        val saved = if (isNew) service.createHolding(holding) else service.updateHolding(holding)
+        val saved = try {
+            if (holding.updatedAt == null) service.createHolding(holding) else service.updateHolding(holding)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadAfterSave {
+                val turn = turns.next()
+                turns.store(::holdings, service.holdings(household.id), turn)
+            }
+            throw e
+        }
         turns.changed(::holdings, (holdings.filter { it.id != saved.id } + saved).sortedBy { it.trimmedName.lowercase() })
         saved
     }
@@ -175,9 +187,19 @@ class InvestmentModel(
         turns.changed(::trades, trades.filter { it.id != trade.id })
     }
 
+    /** Como [save] de un activo: sin versión es un alta con el id del formulario; con versión, un cambio sobre ella. */
     suspend fun save(plan: InvestmentPlan): Unit = escritura(::sinPantalla) {
-        val isNew = plans.none { it.id == plan.id }
-        val saved = if (isNew) service.createPlan(plan) else service.updatePlan(plan)
+        val saved = try {
+            if (plan.updatedAt == null) service.createPlan(plan) else service.updatePlan(plan)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadAfterSave {
+                val turn = turns.next()
+                turns.store(::plans, service.investmentPlans(household.id), turn)
+            }
+            reschedule()
+            throw e
+        }
         turns.changed(::plans, (plans.filter { it.id != saved.id } + saved).sortedBy { it.startsOn })
         reschedule()
     }

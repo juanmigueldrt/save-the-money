@@ -6,8 +6,8 @@ import Supabase
 /// disparador comprueba que la cuenta es una tarjeta y las claves foráneas, que un
 /// aplazado es de una compra de esa misma tarjeta.
 extension SupabaseBackend: CreditCardService {
-    private static let cardColumns = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode,fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent"
-    private static let installmentColumns = "id,household_id,account_id,transaction_id,months,rate"
+    private static let cardColumns = "account_id,household_id,credit_limit_minor,statement_day,payment_day,payment_delay_months,payment_mode,fixed_payment_minor,min_payment_percent,min_payment_minor,revolving_rate,installment_rate,pay_from_account_id,remind_days_before,alert_percent,updated_at"
+    private static let installmentColumns = "id,household_id,account_id,transaction_id,months,rate,updated_at"
 
     public func creditCards(in householdId: UUID) async throws -> [CreditCardTerms] {
         try await allRows {
@@ -20,25 +20,23 @@ extension SupabaseBackend: CreditCardService {
 
     public func saveCreditCard(_ terms: CreditCardTerms) async throws -> CreditCardTerms {
         if let issue = terms.issue { throw AppError.invalidInput(issue) }
-        // No se usa upsert: haría UPDATE de la cuenta y el hogar, que no se pueden cambiar.
-        let updated: [CreditCardTerms] = try await mapped {
-            try await client.from("credit_cards")
-                .update(terms)
-                .eq("account_id", value: terms.accountId.uuidString)
-                .select(Self.cardColumns)
-                .execute()
-                .value
+        var params: [String: AnyJSON] = [
+            "card": .uuid(terms.accountId), "credit_limit": .integer(terms.creditLimit.minor),
+            "statement": .integer(terms.statementDay), "payment": .integer(terms.paymentDay),
+            "delay_months": .integer(terms.paymentDelayMonths), "mode": .string(terms.paymentMode.rawValue),
+            "fixed_payment": .int(terms.fixedPayment?.minor), "min_percent": .decimal(terms.minPaymentPercent),
+            "min_payment": .integer(terms.minPayment.minor), "revolving": .decimal(terms.revolvingRate),
+            "installments": .decimal(terms.installmentRate), "pay_from": .uuid(terms.payFromAccountId),
+            "remind_days": .int(terms.remindDaysBefore), "alert": .int(terms.alertPercent)
+        ]
+        // Sin versión son condiciones nuevas: `create_credit_card` no las repite si ya estaban guardadas.
+        guard let seen = terms.updatedAt else {
+            params["household"] = .uuid(terms.householdId)
+            return try await saved("create_credit_card", columns: Self.cardColumns, params)
         }
-        if let first = updated.first { return first }
-        let row = NewRow(householdId: terms.householdId, fields: NewCard(accountId: terms.accountId, terms: terms))
-        return try await mapped {
-            try await client.from("credit_cards")
-                .insert(row)
-                .select(Self.cardColumns)
-                .single()
-                .execute()
-                .value
-        }
+        // `update_credit_card` compara la versión y cambia la fila en la misma sentencia; si no coincide falla con STM05.
+        params["seen"] = .string(seen)
+        return try await saved("update_credit_card", columns: Self.cardColumns, params)
     }
 
     public func cardInstallments(in householdId: UUID) async throws -> [CardInstallment] {
@@ -52,60 +50,23 @@ extension SupabaseBackend: CreditCardService {
 
     public func saveInstallment(_ installment: CardInstallment) async throws -> CardInstallment {
         if let issue = installment.issue { throw AppError.invalidInput(issue) }
-        let updated: [CardInstallment] = try await mapped {
-            try await client.from("card_installments")
-                .update(installment)
-                .eq("transaction_id", value: installment.movementId.uuidString)
-                .select(Self.installmentColumns)
-                .execute()
-                .value
+        // Sin versión es un aplazado nuevo: `create_card_installment` no lo repite si ya estaba guardado.
+        guard let seen = installment.updatedAt else {
+            return try await saved("create_card_installment", columns: Self.installmentColumns, [
+                "installment": .uuid(installment.id), "household": .uuid(installment.householdId),
+                "card": .uuid(installment.accountId), "movement": .uuid(installment.movementId),
+                "plan_months": .integer(installment.months), "plan_rate": .decimal(installment.rate)
+            ])
         }
-        if let first = updated.first { return first }
-        let row = NewRow(householdId: installment.householdId, fields: NewInstallment(installment: installment))
-        return try await mapped {
-            try await client.from("card_installments")
-                .insert(row)
-                .select(Self.installmentColumns)
-                .single()
-                .execute()
-                .value
-        }
+        return try await saved("update_card_installment", columns: Self.installmentColumns, [
+            "installment": .uuid(installment.id), "seen": .string(seen),
+            "plan_months": .integer(installment.months), "plan_rate": .decimal(installment.rate)
+        ])
     }
 
     public func deleteInstallment(_ installmentId: UUID) async throws {
         try await mapped {
             try await client.from("card_installments").delete().eq("id", value: installmentId.uuidString).execute()
         }
-    }
-}
-
-/// Fila nueva de condiciones: las columnas editables más la cuenta.
-private struct NewCard: Encodable, Sendable {
-    var accountId: UUID
-    var terms: CreditCardTerms
-
-    private enum CodingKeys: String, CodingKey { case accountId = "account_id" }
-
-    func encode(to encoder: Encoder) throws {
-        try terms.encode(to: encoder)
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(accountId, forKey: .accountId)
-    }
-}
-
-/// Aplazado nuevo: plazo e interés más la tarjeta y el movimiento.
-private struct NewInstallment: Encodable, Sendable {
-    var installment: CardInstallment
-
-    private enum CodingKeys: String, CodingKey {
-        case accountId = "account_id"
-        case transactionId = "transaction_id"
-    }
-
-    func encode(to encoder: Encoder) throws {
-        try installment.encode(to: encoder)
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(installment.accountId, forKey: .accountId)
-        try c.encode(installment.movementId, forKey: .transactionId)
     }
 }

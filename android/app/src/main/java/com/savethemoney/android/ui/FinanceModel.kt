@@ -278,8 +278,8 @@ class FinanceModel(
         turns.changed(::error, (e as? AppError)?.message ?: AppError.Unknown("app").message)
     }
 
-    suspend fun createAccount(draft: AccountDraft): Account = escritura(::sinPantalla) { service.createAccount(draft, household.id).also { reloadAccounts() } }
-    suspend fun updateAccount(account: Account): Unit = escritura(::sinPantalla) { service.updateAccount(account); reloadAccounts() }
+    suspend fun createAccount(draft: AccountDraft): Account = escritura(::sinPantalla) { guardarYRecargar(::reloadAccounts) { service.createAccount(draft, household.id) } }
+    suspend fun updateAccount(account: Account): Unit = escritura(::sinPantalla) { guardarYRecargar(::reloadAccounts) { service.updateAccount(account) } }
     suspend fun deleteAccount(account: Account): Unit = escritura(::sinPantalla) { service.deleteAccount(account.id); reloadAll() }
 
     /** «Actualizar saldo»: apunta hoy un ajuste para que el saldo de la cuenta sea [actual]. */
@@ -376,10 +376,20 @@ class FinanceModel(
     suspend fun importMovements(drafts: List<MovementDraft>): ImportResult =
         escritura(::sinPantalla) { service.importMovements(drafts, household.id).also { reloadAll() } }
 
+    /**
+     * Una categoría sin versión ([BudgetCategory.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio
+     * el formulario, y guardarla otra vez con el mismo no crea otra. Con versión es un cambio sobre esa versión.
+     */
     suspend fun save(category: BudgetCategory): Unit = escritura(::sinPantalla) {
         category.issue(categories)?.let { throw AppError.InvalidInput(it) }
-        val saved = if (categories.any { it.id == category.id }) service.updateCategory(category) else service.createCategory(category)
-        // Se ve ya, aunque falle la recarga: así guardarla otra vez la actualiza en vez de crear otra.
+        val saved = try {
+            if (category.updatedAt == null) service.createCategory(category) else service.updateCategory(category)
+        } catch (e: AppError) {
+            // Si otro dispositivo la cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadAfterSave { reloadCategories() }
+            throw e
+        }
+        // Se ve ya, aunque falle la recarga.
         turns.changed(::categories, categories.filter { it.id != category.id && it.id != saved.id } + saved)
         reloadAfterSave { reloadCategories() }?.let { turns.changed(::error, it) }
     }

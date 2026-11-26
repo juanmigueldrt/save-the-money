@@ -101,13 +101,26 @@ final class PlanningModel: ServerModel {
                 store(all, in: \.charges, turn: turn)
             }
         }
+        var stale = false
         for match in PendingCharges.matches(charges: charges, series: series, movements: movements) {
-            guard (try? await recurringService.updateCharge(match.charge, status: .confirmed, transactionId: match.movement)) != nil,
-                  let index = charges.firstIndex(where: { $0.id == match.charge }) else { continue }
+            guard let charge = charges.first(where: { $0.id == match.charge }) else { continue }
+            guard let saved = try? await recurringService.updateCharge(charge, status: .confirmed, transactionId: match.movement),
+                  let index = charges.firstIndex(where: { $0.id == saved.id }) else {
+                stale = true
+                continue
+            }
             markChanged(\.charges)
-            charges[index].status = .confirmed
-            charges[index].transactionId = match.movement
+            charges[index] = saved
         }
+        // Si alguno no se pudo enlazar (por ejemplo, otro dispositivo lo cambió antes), se vuelven a leer.
+        if stale { await reloadCharges() }
+    }
+
+    /// Nunca falla: si no se pueden leer, se quedan los que había.
+    private func reloadCharges() async {
+        let turn = nextTurn()
+        guard let all = try? await recurringService.recurringCharges(in: household.id) else { return }
+        store(all, in: \.charges, turn: turn)
     }
 
     /// Crea el movimiento del cargo. Devuelve false si falla (el error queda en `error`).
@@ -121,25 +134,32 @@ final class PlanningModel: ServerModel {
                 charges[index].transactionId = movement.id
                 charges[index].amount = movement.amount
             }
+            // Confirmarlo cambia su versión en el servidor: se vuelven a leer.
+            await reloadCharges()
         }
     }
 
     /// Ese cargo no se ha cobrado (o no se va a cobrar).
     @discardableResult
     func skip(_ item: PendingCharge) async -> Bool {
-        await perform {
-            try await recurringService.updateCharge(item.charge.id, status: .skipped, transactionId: nil)
+        let ok = await perform {
+            let saved = try await recurringService.updateCharge(item.charge, status: .skipped, transactionId: nil)
             markChanged(\.charges)
-            if let index = charges.firstIndex(where: { $0.id == item.charge.id }) { charges[index].status = .skipped }
+            if let index = charges.firstIndex(where: { $0.id == saved.id }) { charges[index] = saved }
         }
+        // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok { await reloadCharges() }
+        return ok
     }
 
     // MARK: Pagos recurrentes
 
+    /// Un pago fijo sin versión (`updatedAt`) aún no se ha leído del servidor: es un alta, con el id que le dio el
+    /// formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ item: RecurringSeries) async -> Bool {
         if let issue = item.issue { error = issue; return false }
-        let isNew = !series.contains { $0.id == item.id }
+        let isNew = item.updatedAt == nil
         let ok = await perform {
             let saved = isNew ? try await recurringService.createRecurring(item) : try await recurringService.updateRecurring(item)
             markChanged(\.series)
@@ -147,7 +167,14 @@ final class PlanningModel: ServerModel {
             series.append(saved)
             series.sort { $0.trimmedName.localizedStandardCompare($1.trimmedName) == .orderedAscending }
         }
-        if ok { await reschedule() }
+        // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                store(try await recurringService.recurringSeries(in: household.id), in: \.series, turn: turn)
+            }
+        }
+        await reschedule()
         return ok
     }
 
@@ -185,11 +212,13 @@ final class PlanningModel: ServerModel {
 
     // MARK: Metas
 
+    /// Una meta sin versión (`updatedAt`) aún no se ha leído del servidor: es un alta, con el id que le dio el
+    /// formulario, y guardarla otra vez con el mismo no crea otra. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ goal: Goal) async -> Bool {
         if let issue = goal.issue { error = issue; return false }
-        let isNew = !goals.contains { $0.id == goal.id }
-        return await perform {
+        let isNew = goal.updatedAt == nil
+        let ok = await perform {
             let saved = isNew ? try await goalService.createGoal(goal) : try await goalService.updateGoal(goal)
             markChanged(\.goals)
             if let index = goals.firstIndex(where: { $0.id == goal.id || $0.id == saved.id }) {
@@ -198,6 +227,18 @@ final class PlanningModel: ServerModel {
                 goals.append(saved)
             }
         }
+        // Si otro dispositivo la cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok { await reloadAfterSave(reloadGoals) }
+        return ok
+    }
+
+    private func reloadGoals() async throws {
+        let turn = nextTurn()
+        async let goals = goalService.goals(in: household.id)
+        async let contributions = goalService.contributions(in: household.id)
+        let loaded = try await (goals, contributions)
+        store(loaded.0, in: \.goals, turn: turn)
+        store(loaded.1, in: \.contributions, turn: turn)
     }
 
     @discardableResult
@@ -211,21 +252,27 @@ final class PlanningModel: ServerModel {
         }
     }
 
+    /// `id` lo da el formulario, uno por formulario: apuntarla otra vez con el mismo no la duplica.
     @discardableResult
-    func contribute(_ amount: Money, to goal: Goal, on day: CalendarDay, note: String?) async -> Bool {
+    func contribute(_ amount: Money, to goal: Goal, on day: CalendarDay, note: String?, id: UUID = UUID()) async -> Bool {
         let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let item = GoalContribution(householdId: household.id, goalId: goal.id, amount: amount, madeOn: day,
+        let item = GoalContribution(id: id, householdId: household.id, goalId: goal.id, amount: amount, madeOn: day,
                                     note: trimmed?.isEmpty == false ? trimmed : nil)
         if let issue = item.issue { error = issue; return false }
         let ok = await perform {
             let saved = try await goalService.addContribution(item)
             markChanged(\.contributions)
+            contributions.removeAll { $0.id == saved.id }
             contributions.insert(saved, at: 0)
             contributions.sort { $0.madeOn > $1.madeOn }
         }
-        // Al llegar al objetivo, se marca como conseguida.
-        if ok, progress(of: goal).isReached, goal.completedAt == nil {
-            var done = goal
+        // Puede que ya estuviera guardada con otros datos: se recarga para que se vea detrás del aviso.
+        if !ok { await reloadAfterSave(reloadGoals) }
+        // Al llegar al objetivo, se marca como conseguida. Sobre la meta que hay cargada ahora, no la del formulario:
+        // solo se le pone la fecha, así que no pisa nada de lo que otro dispositivo haya cambiado.
+        if ok, let current = goals.first(where: { $0.id == goal.id }) ?? Optional(goal),
+           progress(of: current).isReached, current.completedAt == nil {
+            var done = current
             done.completedAt = Date()
             await save(done)
         }

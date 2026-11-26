@@ -83,6 +83,8 @@ data class RecurringSeries(
     @SerialName("creates_pending") val createsPending: Boolean = true,
     /** Desde qué día crea cargos pendientes (nulo: lo pone el servidor, hoy). */
     @SerialName("pending_from") val pendingFrom: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val hasIntro: Boolean get() = introMinor != null && (introCharges ?: 0) > 0
@@ -220,6 +222,8 @@ data class Goal(
     val icon: String? = null,
     @SerialName("completed_at") val completedAt: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
+    /** Versión de la fila: el `updated_at` del servidor tal cual llegó (como [Movement.updatedAt]). Se devuelve igual al cambiarla. */
+    @SerialName("updated_at") val updatedAt: String? = null,
 ) {
     val isArchived: Boolean get() = archivedAt != null
     val trimmedName: String get() = name.trim()

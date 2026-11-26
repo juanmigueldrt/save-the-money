@@ -71,7 +71,8 @@ final class InvestmentModelTests: XCTestCase {
         let scheduled = await reminders.byPrefix[ReminderPlanner.investmentPrefix] ?? []
         XCTAssertEqual(scheduled.map(\.fireOn), [day(2026, 11, 14), day(2026, 12, 14)])
 
-        let paused = await investments.setPaused(true, plan)
+        // Se pausa el que hay cargado (con su versión), como hace la pantalla.
+        let paused = await investments.setPaused(true, try XCTUnwrap(investments.plans.first))
         XCTAssertTrue(paused)
         XCTAssertEqual(investments.monthlyPlanned, .zero)
         XCTAssertEqual(investments.planCounts.active, 0)

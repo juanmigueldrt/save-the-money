@@ -158,12 +158,15 @@ public struct RecurringSeries: Identifiable, Hashable, Codable, Sendable, Named,
     public var createsPending: Bool
     /// Desde qué día crea cargos pendientes (nil: lo pone el servidor, hoy).
     public var pendingFrom: CalendarDay?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarla.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: RecurringKind = .subscription,
                 amount: Money, accountId: UUID? = nil, categoryId: UUID? = nil,
                 recurrence: Recurrence = .monthly, startsOn: CalendarDay, endsOn: CalendarDay? = nil,
                 remindDaysBefore: Int? = 1, archivedAt: Date? = nil, introAmount: Money? = nil, introCharges: Int? = nil,
-                createsPending: Bool = true, pendingFrom: CalendarDay? = nil) {
+                createsPending: Bool = true, pendingFrom: CalendarDay? = nil, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -348,6 +351,7 @@ extension RecurringSeries {
         case introCharges = "intro_charges"
         case createsPending = "creates_pending"
         case pendingFrom = "pending_from"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -368,6 +372,7 @@ extension RecurringSeries {
         introCharges = try c.decodeIfPresent(Int.self, forKey: .introCharges)
         createsPending = try c.decodeIfPresent(Bool.self, forKey: .createsPending) ?? true
         pendingFrom = try c.decodeIfPresent(CalendarDay.self, forKey: .pendingFrom)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).

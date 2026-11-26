@@ -89,7 +89,7 @@ class PhaseDTest {
 
         val draft = MovementDraft(checking.id, null, created[0].due, -3200, "Gimnasio")
         val movement = backend.confirmCharge(created[0].id, draft)
-        backend.updateCharge(created[1].id, ChargeStatus.Skipped, null)
+        backend.updateCharge(created[1], ChargeStatus.Skipped, null)
         val charges = backend.recurringCharges(home)
         assertEquals(movement.id, charges.first { it.id == created[0].id }.transactionId)
         assertEquals(-3200L, charges.first { it.id == created[0].id }.amountMinor)

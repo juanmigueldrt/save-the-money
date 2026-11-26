@@ -128,10 +128,26 @@ class PlanningModel(
                 turns.changed(::charges, charges + created)
             }
         }
-        for ((charge, movement) in PendingCharges.matches(charges, series, movements)) quietly {
-            service.updateCharge(charge, ChargeStatus.Confirmed, movement)
-            turns.changed(::charges, charges.map { if (it.id == charge) it.copy(status = ChargeStatus.Confirmed, transactionId = movement) else it })
+        var stale = false
+        for ((chargeId, movement) in PendingCharges.matches(charges, series, movements)) {
+            val charge = charges.firstOrNull { it.id == chargeId } ?: continue
+            try {
+                val saved = service.updateCharge(charge, ChargeStatus.Confirmed, movement)
+                turns.changed(::charges, charges.map { if (it.id == saved.id) saved else it })
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                stale = true
+            }
         }
+        // Si alguno no se pudo enlazar (por ejemplo, otro dispositivo lo cambió antes), se vuelven a leer.
+        if (stale) reloadCharges()
+    }
+
+    /** Nunca lanza: si no se pueden leer, se quedan los que había. */
+    private suspend fun reloadCharges() = quietly {
+        val turn = turns.next()
+        turns.store(::charges, service.recurringCharges(household.id), turn)
     }
 
     // Escrituras: cada una corre como [escritura], así que termina aunque se salga de la pantalla.
@@ -151,13 +167,21 @@ class PlanningModel(
                 if (it.id == item.id) it.copy(status = ChargeStatus.Confirmed, transactionId = movement.id, amountMinor = movement.amountMinor) else it
             },
         )
+        // Confirmarlo cambia su versión en el servidor: se vuelven a leer.
+        reloadCharges()
         movement
     }
 
     /** Ese cargo no se ha cobrado (o no se va a cobrar). */
     suspend fun skip(item: PendingCharge): Unit = escritura(::sinPantalla) {
-        service.updateCharge(item.id, ChargeStatus.Skipped, null)
-        turns.changed(::charges, charges.map { if (it.id == item.id) it.copy(status = ChargeStatus.Skipped) else it })
+        val saved = try {
+            service.updateCharge(item.charge, ChargeStatus.Skipped, null)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadCharges()
+            throw e
+        }
+        turns.changed(::charges, charges.map { if (it.id == saved.id) saved else it })
     }
 
     private suspend fun quietly(block: suspend () -> Unit) {
@@ -195,9 +219,23 @@ class PlanningModel(
         get() = notifier.budgetAlertsEnabled
         set(value) { notifier.budgetAlertsEnabled = value }
 
+    /**
+     * Un pago fijo sin versión ([RecurringSeries.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio el
+     * formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
+     */
     suspend fun save(item: RecurringSeries): Unit = escritura(::sinPantalla) {
         item.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = if (series.none { it.id == item.id }) service.createRecurring(item) else service.updateRecurring(item)
+        val saved = try {
+            if (item.updatedAt == null) service.createRecurring(item) else service.updateRecurring(item)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            quietly {
+                val turn = turns.next()
+                turns.store(::series, service.recurringSeries(household.id), turn)
+                reschedule()
+            }
+            throw e
+        }
         val collator = Collator.getInstance(Locale("es", "ES"))
         turns.changed(::series, (series.filter { it.id != saved.id } + saved).sortedWith(compareBy(collator) { it.trimmedName }))
         reschedule()
@@ -213,10 +251,29 @@ class PlanningModel(
         reschedule()
     }
 
+    /**
+     * Una meta sin versión ([Goal.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio el formulario,
+     * y guardarla otra vez con el mismo no crea otra. Con versión es un cambio sobre esa versión.
+     */
     suspend fun save(goal: Goal): Unit = escritura(::sinPantalla) {
         goal.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = if (goals.none { it.id == goal.id }) service.createGoal(goal) else service.updateGoal(goal)
+        val saved = try {
+            if (goal.updatedAt == null) service.createGoal(goal) else service.updateGoal(goal)
+        } catch (e: AppError) {
+            // Si otro dispositivo la cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadGoals()
+            throw e
+        }
         turns.changed(::goals, if (goals.any { it.id == saved.id }) goals.map { if (it.id == saved.id) saved else it } else goals + saved)
+    }
+
+    /** Tras una escritura que ha fallado. Nunca lanza: si también falla, se queda lo que había. */
+    private suspend fun reloadGoals() = quietly {
+        val turn = turns.next()
+        val newGoals = service.goals(household.id)
+        val newContributions = service.contributions(household.id)
+        turns.store(::goals, newGoals, turn)
+        turns.store(::contributions, newContributions, turn)
     }
 
     suspend fun setArchived(goal: Goal, archived: Boolean) =
@@ -228,13 +285,22 @@ class PlanningModel(
         turns.changed(::contributions, contributions.filter { it.goalId != goal.id })
     }
 
-    suspend fun contribute(amount: Long, goal: Goal, day: LocalDate, note: String?): Unit = escritura(::sinPantalla) {
-        val item = GoalContribution("", household.id, goal.id, amount, day.toString(), note?.trim()?.ifEmpty { null })
+    /** [id] lo da el formulario, uno por formulario: apuntarla otra vez con el mismo no la duplica. */
+    suspend fun contribute(amount: Long, goal: Goal, day: LocalDate, note: String?, id: String = ""): Unit = escritura(::sinPantalla) {
+        val item = GoalContribution(id, household.id, goal.id, amount, day.toString(), note?.trim()?.ifEmpty { null })
         item.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = service.addContribution(item)
-        turns.changed(::contributions, (contributions + saved).sortedByDescending { it.madeOn })
-        // Al llegar al objetivo, se marca como conseguida.
-        if (progress(goal).isReached && goal.completedAt == null) save(goal.copy(completedAt = Instant.now().toString()))
+        val saved = try {
+            service.addContribution(item)
+        } catch (e: AppError) {
+            // Puede que ya estuviera guardada con otros datos: se recarga para que se vea detrás del aviso.
+            reloadGoals()
+            throw e
+        }
+        turns.changed(::contributions, (contributions.filter { it.id != saved.id } + saved).sortedByDescending { it.madeOn })
+        // Al llegar al objetivo, se marca como conseguida. Sobre la meta que hay cargada ahora, no la del formulario: solo se
+        // le pone la fecha, así que no pisa nada de lo que otro dispositivo haya cambiado.
+        val current = goals.firstOrNull { it.id == goal.id } ?: goal
+        if (progress(current).isReached && current.completedAt == null) save(current.copy(completedAt = Instant.now().toString()))
     }
 
     suspend fun delete(contribution: GoalContribution): Unit = escritura(::sinPantalla) {

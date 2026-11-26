@@ -69,6 +69,16 @@ extension ServerModel {
         }
     }
 
+    /// Una escritura y la recarga de lo que cambia. Si la escritura falla se recarga igual: puede que otro dispositivo
+    /// cambiara la fila antes (STM05) o que ya estuviera guardada con otros datos (STM01); así se ve lo que hay
+    /// detrás del aviso. Devuelve si se guardó.
+    @discardableResult
+    func write(_ operation: () async throws -> Void, thenReload reload: () async throws -> Void) async -> Bool {
+        let saved = await perform(operation)
+        await reloadAfterSave(reload)
+        return saved
+    }
+
     /// El turno de una lectura que empieza.
     func nextTurn() -> Int { turns.next() }
 

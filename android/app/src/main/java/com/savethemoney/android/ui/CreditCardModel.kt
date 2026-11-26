@@ -162,7 +162,17 @@ class CreditCardModel(
 
     suspend fun save(item: CreditCardTerms): Unit = escritura(::sinPantalla) {
         item.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = service.saveCreditCard(item)
+        val saved = try {
+            service.saveCreditCard(item)
+        } catch (e: AppError) {
+            // Si otro dispositivo las cambió antes, se recargan para que se vea lo nuevo detrás del aviso.
+            reloadAfterSave {
+                val turn = turns.next()
+                turns.store(::terms, service.creditCards(household.id).associateBy { it.accountId }, turn)
+            }
+            recompute()
+            throw e
+        }
         turns.changed(::terms, terms + (saved.accountId to saved))
         // Con otro día de extracto cambian los ciclos sin cobrar: se vuelven a cargar sus movimientos.
         reloadAfterSave {
@@ -174,11 +184,19 @@ class CreditCardModel(
         recompute()
     }
 
+    /** Un aplazado nuevo lleva el id de su movimiento (hay uno por compra): repetirlo no crea otro. */
     suspend fun deferPurchase(movement: Movement, months: Int, account: Account, rate: Double): Unit = escritura(::sinPantalla) {
         val plan = installment(movement)?.copy(months = months, rate = rate)
-            ?: CardInstallment("", household.id, account.id, movement.id, months, rate)
+            ?: CardInstallment(movement.id, household.id, account.id, movement.id, months, rate)
         plan.issue?.let { throw AppError.InvalidInput(it) }
-        val saved = service.saveInstallment(plan)
+        val saved = try {
+            service.saveInstallment(plan)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, o ya estaba guardado con otros datos, se recarga detrás del aviso.
+            reloadAfterSave { reloadInstallments() }
+            recompute()
+            throw e
+        }
         // Se ve ya, aunque falle la recarga.
         turns.changed(::installments, installments.filter { it.movementId != saved.movementId } + saved)
         reloadAfterSave { reloadInstallments() }?.let { turns.changed(::error, it) }

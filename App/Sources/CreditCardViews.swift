@@ -436,6 +436,8 @@ struct CardTermsFormView: View {
     @State private var remindDays = 2
     @State private var alerts = true
     @State private var alertPercent = 80
+    /// La versión de las condiciones que se cargó al abrir el formulario (nil: aún no había): se guarda sobre ella.
+    @State private var seenVersion: String?
     @State private var error: String?
     @State private var isWorking = false
 
@@ -519,6 +521,7 @@ struct CardTermsFormView: View {
 
     private func fill() {
         guard let terms = cards.terms[account.id] else { return }
+        seenVersion = terms.updatedAt
         limit = terms.creditLimit.plainText
         statementDay = terms.statementDay
         paymentDay = terms.paymentDay
@@ -550,7 +553,8 @@ struct CardTermsFormView: View {
             accountId: account.id, householdId: account.householdId, creditLimit: limitMoney, statementDay: statementDay,
             paymentDay: paymentDay, paymentDelayMonths: delay, paymentMode: mode, fixedPayment: fixedMoney,
             minPaymentPercent: percent, minPayment: minimum, revolvingRate: revolving, installmentRate: installment,
-            payFromAccountId: payFrom, remindDaysBefore: reminds ? remindDays : nil, alertPercent: alerts ? alertPercent : nil)
+            payFromAccountId: payFrom, remindDaysBefore: reminds ? remindDays : nil, alertPercent: alerts ? alertPercent : nil,
+            updatedAt: seenVersion)
         if let issue = terms.issue { error = issue; return }
         isWorking = true
         defer { isWorking = false }

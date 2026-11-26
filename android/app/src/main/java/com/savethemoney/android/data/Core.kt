@@ -27,9 +27,12 @@ sealed class AppError(override val message: String) : Exception(message) {
     data object Network : AppError("No hay conexión. Inténtalo de nuevo en un momento.")
     class InvalidInput(text: String) : AppError(text)
 
-    /** El movimiento que se quería cambiar ya no es el que se leyó: otro dispositivo lo cambió o lo borró antes. */
+    /**
+     * Lo que se quería cambiar (un movimiento o cualquier otra fila con versión, ORC-142) ya no es lo que se leyó: otro
+     * dispositivo lo cambió o lo borró antes.
+     */
     data object MovementChanged : AppError(
-        "Este movimiento ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta.",
+        "Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta.",
     )
     class Unknown(val code: String) : AppError("Algo ha fallado. Inténtalo de nuevo.")
 }

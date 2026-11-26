@@ -41,14 +41,29 @@ extension InMemoryBackend: BudgetService {
     public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
         let user = try requireBudgetMember(of: budget.householdId)
         if let issue = budget.issue { throw AppError.invalidInput(issue) }
-        // Uno ajeno no se ve: no se cambia.
-        if let stored = creators[budget.id], stored != user { throw AppError.unknown("no existe") }
+        let stored = extraBudgetList.first { $0.id == budget.id }
+        if budget.updatedAt == nil {
+            // Alta: repetirla solo vale con el mismo hogar, nombre, límite y primer día.
+            if let same = try replayed(stored, by: user, same: {
+                $0.householdId == budget.householdId && $0.name == budget.trimmedName
+                    && $0.limit.minor == budget.limit.minor && $0.startsOn == budget.startsOn
+            }) { return same }
+        } else {
+            // Cambio: solo de uno propio y sobre la versión leída (el STM05 del servidor).
+            guard let stored, creators[stored.id] == user, stored.updatedAt == budget.updatedAt else {
+                throw AppError.movementChanged
+            }
+        }
         var saved = budget
         saved.name = budget.trimmedName
+        saved.updatedAt = nextVersion()
         if saved.isFavorite {
-            // Un favorito por persona, como el disparador del servidor.
-            for index in extraBudgetList.indices where creators[extraBudgetList[index].id] == user {
+            // Un favorito por persona, como el disparador del servidor. El que deja de serlo cambia de versión.
+            for index in extraBudgetList.indices
+            where creators[extraBudgetList[index].id] == user && extraBudgetList[index].isFavorite
+                && extraBudgetList[index].id != budget.id {
                 extraBudgetList[index].isFavorite = false
+                extraBudgetList[index].updatedAt = nextVersion()
             }
         }
         extraBudgetList.removeAll { $0.id == budget.id }

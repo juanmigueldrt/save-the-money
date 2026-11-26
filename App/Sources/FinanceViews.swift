@@ -752,6 +752,8 @@ struct AccountFormView: View {
     @State private var isShared = true
     @State private var isDefault = false
     @State private var includeInNetWorth = true
+    /// Identificador de la cuenta nueva, uno por formulario: reintentar el alta con el mismo no crea otra.
+    @State private var newAccountId = UUID()
     @State private var error: String?
     @State private var isWorking = false
     @State private var confirmingDelete = false
@@ -839,7 +841,7 @@ struct AccountFormView: View {
 
     private func save() async {
         guard let opening = parsedOpening else { error = "El saldo inicial no es un importe válido."; return }
-        let draft = AccountDraft(name: name, kind: kind, openingBalance: opening, ownerId: ownerId)
+        let draft = AccountDraft(id: newAccountId, name: name, kind: kind, openingBalance: opening, ownerId: ownerId)
         if let issue = draft.issue { error = issue; return }
         isWorking = true
         defer { isWorking = false }
@@ -855,8 +857,7 @@ struct AccountFormView: View {
         } else {
             ok = await finance.createAccount(draft)
             // Las dos opciones nuevas se guardan después de crearla (el alta sólo lleva lo básico).
-            if ok, isDefault || !includeInNetWorth,
-               var created = finance.accounts.last(where: { $0.name == draft.trimmedName && $0.kind == kind }) {
+            if ok, isDefault || !includeInNetWorth, var created = finance.account(draft.id) {
                 created.isDefault = isDefault
                 created.includeInNetWorth = includeInNetWorth
                 await finance.updateAccount(created)

@@ -496,6 +496,8 @@ fun Pantalla12(nav: Nav) {
             CreditCardTerms(
                 cuenta.id, cuenta.householdId, limiteMinor, diaExtracto.toIntOrNull() ?: 0, diaCargo.toIntOrNull() ?: 0, retraso, modo, fija,
                 pct, suelo, revolving, plazos, pagaDesde, if (recordar) dias else null, if (avisar) aviso else null,
+                // La versión que se cargó con estos campos (nula: aún no había condiciones): se guarda sobre ella.
+                updatedAt = base?.updatedAt,
             ),
         )
         nav.back()

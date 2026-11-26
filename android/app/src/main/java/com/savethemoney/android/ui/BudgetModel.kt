@@ -173,8 +173,21 @@ class BudgetModel(val household: Household, private val service: FinanceService,
         load()
     }
 
+    /**
+     * Uno sin versión ([ExtraBudget.updatedAt]) aún no se ha leído del servidor: es un alta, con el id que le dio el
+     * formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
+     */
     suspend fun save(extra: ExtraBudget): Unit = escritura(::sinPantalla) {
-        val saved = service.saveExtraBudget(extra)
+        val saved = try {
+            service.saveExtraBudget(extra)
+        } catch (e: AppError) {
+            // Si otro dispositivo lo cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+            reloadAfterSave {
+                val turn = turns.next()
+                turns.store(::extraBudgets, service.extraBudgets(household.id), turn)
+            }
+            throw e
+        }
         turns.changed(::extraBudgets, extraBudgets.filter { it.id != saved.id } + saved)
         reloadAfterSave {
             val turn = turns.next()

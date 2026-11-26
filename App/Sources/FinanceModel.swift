@@ -162,18 +162,12 @@ final class FinanceModel: ServerModel {
 
     @discardableResult
     func createAccount(_ draft: AccountDraft) async -> Bool {
-        await perform {
-            _ = try await service.createAccount(draft, in: household.id)
-            await reloadAfterSave { try await reloadAccounts() }
-        }
+        await write({ _ = try await service.createAccount(draft, in: household.id) }, thenReload: reloadAccounts)
     }
 
     @discardableResult
     func updateAccount(_ account: Account) async -> Bool {
-        await perform {
-            _ = try await service.updateAccount(account)
-            await reloadAfterSave { try await reloadAccounts() }
-        }
+        await write({ _ = try await service.updateAccount(account) }, thenReload: reloadAccounts)
     }
 
     @discardableResult
@@ -324,22 +318,27 @@ final class FinanceModel: ServerModel {
         return result
     }
 
+    /// Una categoría sin versión (`updatedAt`) aún no se ha leído del servidor: es un alta, con el id que le dio el
+    /// formulario, y guardarla otra vez con el mismo no crea otra. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ category: BudgetCategory) async -> Bool {
         if let issue = category.issue(among: categories) {
             error = issue
             return false
         }
-        return await perform {
-            let saved = categories.contains(where: { $0.id == category.id })
-                ? try await service.updateCategory(category)
-                : try await service.createCategory(category)
-            // Se ve ya, aunque falle la recarga: así guardarla otra vez la cambia en vez de crear otra.
+        let ok = await perform {
+            let saved = category.updatedAt == nil
+                ? try await service.createCategory(category)
+                : try await service.updateCategory(category)
+            // Se ve ya, aunque falle la recarga.
             markChanged(\.categories)
             categories.removeAll { $0.id == category.id || $0.id == saved.id }
             categories.append(saved)
             await reloadAfterSave { try await reloadCategories() }
         }
+        // Si otro dispositivo la cambió antes, se recarga para que se vea lo nuevo detrás del aviso.
+        if !ok { await reloadAfterSave(reloadCategories) }
+        return ok
     }
 
     @discardableResult

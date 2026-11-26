@@ -1,6 +1,7 @@
 # Escrituras idempotentes y control de concurrencia
 
-Estado: aceptada (ORC-69). Alcance de este paso: los movimientos (`public.transactions`).
+Estado: aceptada (ORC-69 para los movimientos, `public.transactions`; ORC-142 la extiende al resto de
+tablas que se escriben desde un formulario, ver «El resto de tablas» más abajo).
 
 ## Problema
 
@@ -72,21 +73,58 @@ No cubre (se queda como estaba):
 - Importar un CSV: ya no duplica gracias a la huella (`account_id, import_hash`).
 - Confirmar un pago fijo, duplicar un movimiento y «Deshacer» un borrado: cada pulsación es un
   movimiento nuevo con identificador nuevo.
-- El resto de tablas (cuentas, categorías, presupuestos, pagos fijos, metas, tarjetas,
-  posiciones, planes de inversión): siguen sin identificador de la app ni comprobación de versión.
+- El presupuesto del periodo (`budgets`, `budget_lines`) y el calendario de cobro (`pay_schedules`):
+  se guardan enteros con `save_period_budget` y un upsert por persona; no tienen alta que se pueda
+  duplicar, pero tampoco comprobación de versión.
 - Las versiones anteriores de las apps: siguen usando `insert` y `update` directos, que
   conservan sus permisos. Funcionan, pero sin estas dos protecciones.
+
+## El resto de tablas (ORC-142)
+
+Mismo modelo, misma respuesta y mismos códigos (`STM01`, `STM05`, `23505`), en
+`20261126140000_orc142_escrituras_idempotentes.sql`:
+
+| Tabla | Alta | Cambio | Un alta repetida vale si coinciden |
+| -- | -- | -- | -- |
+| `accounts` | `create_account` | `update_account` | hogar, nombre, tipo, saldo inicial |
+| `goals` | `create_goal` | `update_goal` | hogar, nombre, tipo, objetivo |
+| `goal_contributions` | `create_goal_contribution` | — (no se cambian) | meta, importe, día |
+| `recurring_series` | `create_recurring_series` | `update_recurring_series` | hogar, nombre, tipo, importe, primer día |
+| `credit_cards` | `create_credit_card` | `update_credit_card` | hogar, límite, día de extracto, día de cargo, forma de pago |
+| `card_installments` | `create_card_installment` | `update_card_installment` | compra, plazo, interés |
+| `holdings` | `create_holding` | `update_holding` | hogar, nombre, tipo |
+| `investment_plans` | `create_investment_plan` | `update_investment_plan` | activo, importe, primer día |
+| `categories` | `create_category` | `update_category` | hogar, nombre, tipo |
+| `extra_budgets` | `create_extra_budget` | `update_extra_budget` | hogar, nombre, límite, primer día |
+| `recurring_charges` | — (en lote, `unique (series_id, due_on)`) | `update_recurring_charge` | — |
+
+En las apps:
+
+- Cada modelo trae `updatedAt` (el texto del servidor, sin convertir). **Sin versión es un alta, con
+  versión es un cambio**: así, guardar otra vez un formulario cuyo alta sí llegó al servidor repite el
+  alta (y recibe lo guardado) en vez de intentar un cambio sin versión.
+- El identificador se crea al abrir el formulario y se reutiliza en cada «Guardar». Lo que nace de
+  otro formulario hereda su identificador: el pago fijo y el aplazado de un gasto con tarjeta llevan
+  el del movimiento; la aportación mensual que se crea al comprar, el de la compra.
+- Las condiciones de una tarjeta no tienen identificador propio (su clave es la cuenta): el
+  formulario guarda la versión que cargó al abrirse.
+- Si un alta o un cambio falla, el modelo recarga esa lista: detrás del aviso se ve lo que hay en el
+  servidor. El aviso de `STM05` y el de `STM01` son los mismos que en los movimientos, con un texto
+  que ya no habla de «movimiento» ni de «pago».
+- Cambios indirectos que también cambian la versión: elegir otra cuenta predeterminada u otro
+  presupuesto extra favorito (el anterior pierde la marca), apuntar un precio (cambia el activo),
+  confirmar un cargo, y borrar una cuenta o una categoría (lo que la enlazaba se queda sin ella).
 
 ## Siguientes pasos hacia el modo sin conexión
 
 Ninguno está hecho. En este orden:
 
-1. Extender el mismo modelo (identificador de la app + versión) a las demás tablas que se
-   escriben desde el formulario.
+1. ~~Extender el mismo modelo (identificador de la app + versión) a las demás tablas que se
+   escriben desde el formulario.~~ Hecho en ORC-142.
 2. Borrado lógico (`deleted_at`) para que un borrado se pueda sincronizar, y lectura de cambios
    desde una versión (`updated_at > último visto`).
 3. Cola local de escrituras pendientes en cada app, que reintenta con el mismo identificador.
 4. Regla de conflictos visible para la persona cuando un cambio hecho sin conexión llega tarde
    (hoy: se rechaza y se recarga).
 5. Cuando ninguna versión antigua esté en uso, quitar el permiso de `insert`/`update` directo
-   sobre `transactions` para que toda escritura pase por las funciones.
+   sobre `transactions` y sobre las tablas de ORC-142, para que toda escritura pase por las funciones.

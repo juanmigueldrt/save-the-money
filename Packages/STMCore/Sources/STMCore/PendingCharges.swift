@@ -19,9 +19,12 @@ public struct RecurringCharge: Identifiable, Hashable, Codable, Sendable {
     public var status: ChargeStatus
     /// El movimiento que lo confirma.
     public var transactionId: UUID?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarlo.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, seriesId: UUID, dueOn: CalendarDay, amount: Money,
-                status: ChargeStatus = .pending, transactionId: UUID? = nil) {
+                status: ChargeStatus = .pending, transactionId: UUID? = nil, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.seriesId = seriesId
@@ -40,6 +43,7 @@ public struct RecurringCharge: Identifiable, Hashable, Codable, Sendable {
         case dueOn = "due_on"
         case amountMinor = "amount_minor"
         case transactionId = "transaction_id"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -51,6 +55,7 @@ public struct RecurringCharge: Identifiable, Hashable, Codable, Sendable {
         amount = Money(minor: try c.decode(Int.self, forKey: .amountMinor))
         status = try c.decode(ChargeStatus.self, forKey: .status)
         transactionId = try c.decodeIfPresent(UUID.self, forKey: .transactionId)
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     /// Las columnas que se insertan (el id lo pone el servidor).

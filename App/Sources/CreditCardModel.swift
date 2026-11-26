@@ -192,10 +192,19 @@ final class CreditCardModel: ServerModel {
                 if cut { truncatedAccounts.insert(saved.accountId) } else { truncatedAccounts.remove(saved.accountId) }
             }
         }
-        if ok { await recompute() }
+        // Si otro dispositivo las cambió antes, se recargan para que se vea lo nuevo detrás del aviso.
+        if !ok {
+            await reloadAfterSave {
+                let turn = nextTurn()
+                let list = try await service.creditCards(in: household.id)
+                store(Dictionary(list.map { ($0.accountId, $0) }, uniquingKeysWith: { first, _ in first }), in: \.terms, turn: turn)
+            }
+        }
+        await recompute()
         return ok
     }
 
+    /// Un aplazado nuevo lleva el id de su movimiento (hay uno por compra): repetirlo no crea otro.
     @discardableResult
     func deferPurchase(_ movement: Movement, months: Int, in account: Account) async -> Bool {
         let rate = terms[account.id]?.installmentRate ?? 14
@@ -203,7 +212,7 @@ final class CreditCardModel: ServerModel {
             var changed = existing
             changed.months = months
             return changed
-        } ?? CardInstallment(householdId: household.id, accountId: account.id, movementId: movement.id,
+        } ?? CardInstallment(id: movement.id, householdId: household.id, accountId: account.id, movementId: movement.id,
                              months: months, rate: rate)
         let ok = await perform {
             let saved = try await service.saveInstallment(plan)
@@ -213,7 +222,9 @@ final class CreditCardModel: ServerModel {
             installments.append(saved)
             await reloadAfterSave { try await reloadInstallments() }
         }
-        if ok { await recompute() }
+        // Si otro dispositivo lo cambió antes, o ya estaba guardado con otros datos, se recarga detrás del aviso.
+        if !ok { await reloadAfterSave { try await reloadInstallments() } }
+        await recompute()
         return ok
     }
 

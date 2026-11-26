@@ -48,11 +48,14 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
     public var isDefault: Bool
     /// Si suma en el patrimonio neto.
     public var includeInNetWorth: Bool
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarla.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: AccountKind = .checking,
                 currency: String = "EUR", openingBalance: Money = .zero, ownerId: UUID? = nil,
                 archivedAt: Date? = nil, isDefault: Bool = false, includeInNetWorth: Bool = true,
-                createdAt: Date? = nil) {
+                createdAt: Date? = nil, updatedAt: String? = nil) {
+        self.updatedAt = updatedAt
         self.id = id
         self.householdId = householdId
         self.name = name
@@ -77,6 +80,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         case createdAt = "created_at"
         case isDefault = "is_default"
         case includeInNetWorth = "include_in_net_worth"
+        case updatedAt = "updated_at"
     }
 
     public init(from decoder: Decoder) throws {
@@ -92,6 +96,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         createdAt = try c.decodeIfPresent(ServerDate.self, forKey: .createdAt)?.date
         isDefault = try c.decodeIfPresent(Bool.self, forKey: .isDefault) ?? false
         includeInNetWorth = try c.decodeIfPresent(Bool.self, forKey: .includeInNetWorth) ?? true
+        updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -107,6 +112,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         try c.encodeIfPresent(createdAt.map(ServerDate.init), forKey: .createdAt)
         try c.encode(isDefault, forKey: .isDefault)
         try c.encode(includeInNetWorth, forKey: .includeInNetWorth)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -129,21 +135,25 @@ public struct BudgetCategory: Identifiable, Hashable, Codable, Sendable, Named {
     public var kind: CategoryKind
     public var budgetGroup: BudgetGroup?
     public var icon: String?
+    /// Versión de la fila: el `updated_at` del servidor tal cual llegó (como `Movement.updatedAt`). Se devuelve igual al cambiarla.
+    public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: CategoryKind = .expense,
-                budgetGroup: BudgetGroup? = nil, icon: String? = nil) {
+                budgetGroup: BudgetGroup? = nil, icon: String? = nil, updatedAt: String? = nil) {
         self.id = id
         self.householdId = householdId
         self.name = name
         self.kind = kind
         self.budgetGroup = budgetGroup
         self.icon = icon
+        self.updatedAt = updatedAt
     }
 
     enum CodingKeys: String, CodingKey {
         case id, name, kind, icon
         case householdId = "household_id"
         case budgetGroup = "budget_group"
+        case updatedAt = "updated_at"
     }
 
     public static let maxNameLength = 40
@@ -339,12 +349,16 @@ public struct MovementDraft: Hashable, Sendable {
 }
 
 public struct AccountDraft: Hashable, Sendable, Named {
+    /// Lo genera la app una vez por formulario: reintentar el alta con el mismo no crea otra cuenta.
+    public var id: UUID
     public var name: String
     public var kind: AccountKind
     public var openingBalance: Money
     public var ownerId: UUID?
 
-    public init(name: String = "", kind: AccountKind = .checking, openingBalance: Money = .zero, ownerId: UUID? = nil) {
+    public init(id: UUID = UUID(), name: String = "", kind: AccountKind = .checking, openingBalance: Money = .zero,
+                ownerId: UUID? = nil) {
+        self.id = id
         self.name = name
         self.kind = kind
         self.openingBalance = openingBalance
