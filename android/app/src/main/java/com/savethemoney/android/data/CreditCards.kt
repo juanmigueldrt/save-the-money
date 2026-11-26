@@ -144,12 +144,27 @@ data class CreditCardSummary(
      * pedir que se les ponga categoría.
      */
     val uncategorizedCredits: List<String>,
+    /**
+     * Los movimientos de los extractos sin cobrar no se han podido cargar todos (hay más que el tope de una petición):
+     * los cargos, lo gastado en el ciclo y la deuda con intereses pueden salir más bajos de lo que son.
+     */
+    val movementsTruncated: Boolean = false,
 ) {
     val next: CardPayment? get() = payments.firstOrNull()
     val isOverAlert: Boolean get() = terms.alertPercent != null && usedFraction * 100 >= terms.alertPercent
 }
 
 object CreditCardCalculator {
+    /**
+     * Extracto (día en que se cierra) más antiguo cuyo cargo aún no ha pasado. Para calcular la tarjeta hacen falta todos
+     * sus movimientos desde [CreditCardTerms.cycleStart] de este extracto.
+     */
+    fun firstUnpaidStatement(terms: CreditCardTerms, today: LocalDate): LocalDate {
+        var closing = terms.statementClosing(today).minusMonths(1)
+        while (!terms.paymentDate(closing).isBefore(today)) closing = closing.minusMonths(1)
+        return closing.plusMonths(1)
+    }
+
     /**
      * @param balance saldo actual de la cuenta de la tarjeta (negativo = se debe).
      * @param movements movimientos de la tarjeta: los de los extractos sin cobrar y la compra de cada aplazado, por antigua que sea.
@@ -176,7 +191,6 @@ object CreditCardCalculator {
 
         val used = max(0, -balance)
         val openStatement = terms.statementClosing(today)
-        val lastClosed = openStatement.minusMonths(1)
 
         fun chargesIn(closing: LocalDate): Long {
             val start = terms.cycleStart(closing)
@@ -199,9 +213,7 @@ object CreditCardCalculator {
         }
 
         // Extractos cuyo cargo aún no ha pasado, del más antiguo al más nuevo.
-        var closing = lastClosed
-        while (!terms.paymentDate(closing).isBefore(today)) closing = closing.minusMonths(1)
-        closing = closing.plusMonths(1)
+        val closing = firstUnpaidStatement(terms, today)
         val statements = (0 until total).map { closing.plusMonths(it.toLong()) }
 
         // Capital de los aplazados cuyas cuotas aún no se han cobrado: se pagan aparte, en su cuota.

@@ -142,6 +142,15 @@ extension InMemoryBackend: FinanceService {
         return financeMovements.filter { $0.householdId == householdId && ids.contains($0.id) }
     }
 
+    public func movements(in householdId: UUID, accountId: UUID, since: CalendarDay, limit: Int) async throws -> [Movement] {
+        _ = try requireMember(of: householdId)
+        return financeMovements
+            .filter { $0.householdId == householdId && $0.accountId == accountId && $0.bookedOn >= since }
+            .sorted { $0.bookedOn > $1.bookedOn }
+            .prefix(limit)
+            .map { $0 }
+    }
+
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
         _ = try requireMember(of: householdId)
         return financeMovements.filter { $0.householdId == householdId }
