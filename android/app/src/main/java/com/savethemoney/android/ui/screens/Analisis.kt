@@ -445,7 +445,9 @@ fun Pantalla17(nav: Nav) {
     val saldos = finance.activeAccounts.map { it to finance.balance(it) }
     val hoy = NetWorth.current(finance.accounts, finance.balances, finance.today())
     val meses = listOf(2, 7, 13, tracking.monthsWithData)[range]
-    val historia = tracking.history(finance.accounts, meses)
+    // Rehacer el patrimonio recorre todos los movimientos: sólo cuando cambian sus datos, no en cada recomposición.
+    val dia = tracking.today()
+    val historia = remember(tracking.allMovements, finance.accounts, meses, dia) { tracking.history(finance.accounts, meses) }
     val cambio = (historia.lastOrNull()?.net ?: 0) - (historia.firstOrNull()?.net ?: 0)
     val tramo = listOf("en 1 mes", "en 6 meses", "en 1 año", "desde el principio")[range]
     val inversiones = saldos.filter { (a, b) -> a.kind == AccountKind.Investment && b > 0 }.sumOf { it.second }
@@ -476,7 +478,9 @@ fun Pantalla17(nav: Nav) {
                 plotHeight = 160.dp,
             )
         }
-        val prevision = if (session.capture || finance.accounts.isEmpty()) null else NetWorthProjection.of(tracking.history(finance.accounts, 7))
+        val prevision = remember(tracking.allMovements, finance.accounts, dia, session.capture) {
+            if (session.capture || finance.accounts.isEmpty()) null else NetWorthProjection.of(tracking.history(finance.accounts, 7))
+        }
         if (prevision != null) {
             Spacer(Modifier.height(16.dp))
             StmCard {
@@ -552,18 +556,26 @@ fun Pantalla18(nav: Nav) {
     val inicioMes = finance.household.monthStartDay
     val seis = ReportPeriod.Last6Months.range(hoy, inicioMes)
     val movimientos = tracking.allMovements
-    val ingresos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Income, monthStartDay = inicioMes)
-    val gastos = SpendingReport(movimientos, finance.categories, seis, ReportKind.Expense, monthStartDay = inicioMes)
+    val categorias = finance.categories
+    // Cada informe recorre todos los movimientos: se recuerdan y sólo se rehacen si cambian sus datos o los filtros.
+    val ingresos = remember(movimientos, categorias, seis, inicioMes) { SpendingReport(movimientos, categorias, seis, ReportKind.Income, monthStartDay = inicioMes) }
+    val gastos = remember(movimientos, categorias, seis, inicioMes) { SpendingReport(movimientos, categorias, seis, ReportKind.Expense, monthStartDay = inicioMes) }
     val tope = (ingresos.byMonth.map { it.amount } + gastos.byMonth.map { it.amount }).max().coerceAtLeast(1)
-    val informe = SpendingReport(movimientos, finance.categories, period.range(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
-    val anterior = SpendingReport(movimientos, finance.categories, period.previousRange(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
-    val sube = biggestRise(movimientos, finance.categories, monthContaining(hoy, inicioMes), inicioMes)
+    val informe = remember(movimientos, categorias, period, hoy, kind, categoria, inicioMes) {
+        SpendingReport(movimientos, categorias, period.range(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
+    }
+    val anterior = remember(movimientos, categorias, period, hoy, kind, categoria, inicioMes) {
+        SpendingReport(movimientos, categorias, period.previousRange(hoy, inicioMes), kind, setOfNotNull(categoria), inicioMes)
+    }
+    val sube = remember(movimientos, categorias, hoy, inicioMes) { biggestRise(movimientos, categorias, monthContaining(hoy, inicioMes), inicioMes) }
     val agrupacion = when (filter) {
         2 -> GroupedSpending.Grouping.Tag
         3 -> GroupedSpending.Grouping.Payee
         else -> null
     }
-    val agrupado = agrupacion?.let { GroupedSpending.report(it, movimientos, finance.categories, period.range(hoy)) }.orEmpty()
+    val agrupado = remember(agrupacion, movimientos, categorias, period, hoy) {
+        agrupacion?.let { GroupedSpending.report(it, movimientos, categorias, period.range(hoy)) }.orEmpty()
+    }
     val context = LocalContext.current
     val compartirInforme = {
         val texto = if (agrupacion != null) {
