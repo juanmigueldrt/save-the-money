@@ -53,6 +53,27 @@ final class BusquedaEnServidorTests: XCTestCase {
                        "description.ilike.\(gasto),notes.ilike.\(gasto),payee.ilike.\(gasto),amount_minor.eq.-1250")
     }
 
+    /// ORC-146: las mismas cadenas que el CI manda al Supabase local (supabase/tests/api/filtros_postgrest.py).
+    func testFiltrosCompartidosConAndroidYConElServidor() throws {
+        struct File: Decodable { var search: [Search]; var movements: [Fila] }
+        struct Search: Decodable { var name: String; var input: String; var filter: String }
+        struct Fila: Decodable { var key: String; var id: UUID; var bookedOn: String; var cursor: String }
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("testdata/vectors/postgrest_filters.json")
+        let file = try JSONDecoder().decode(File.self, from: Data(contentsOf: url))
+        XCTAssertFalse(file.search.isEmpty)
+        XCTAssertFalse(file.movements.isEmpty)
+        for vector in file.search {
+            XCTAssertEqual(try filtro(vector.input), vector.filter, vector.name)
+        }
+        for fila in file.movements {
+            let movement = Movement(id: fila.id, householdId: UUID(), accountId: UUID(),
+                                    bookedOn: try XCTUnwrap(CalendarDay(iso: fila.bookedOn)), amount: Money(minor: -1), description: "x")
+            XCTAssertEqual(SupabaseBackend.afterFilter(movement), fila.cursor, fila.key)
+        }
+    }
+
     func testCursorEsDiaAnteriorOMismoDiaYMenorId() throws {
         let movement = Movement(id: UUID(uuidString: "ABCDEF00-0000-0000-0000-000000000001")!, householdId: UUID(), accountId: UUID(),
                                 bookedOn: CalendarDay(year: 2021, month: 3, day: 5)!, amount: Money(minor: -1), description: "x")

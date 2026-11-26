@@ -65,6 +65,7 @@ import androidx.compose.ui.text.AnnotatedString
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.HouseholdInvite
 import com.savethemoney.android.data.HouseholdMember
 import com.savethemoney.android.data.InviteCode
@@ -75,6 +76,7 @@ import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.rememberAction
 import java.time.Duration
 import java.time.Instant
+import java.time.OffsetDateTime
 
 /** 01 Iniciar sesión: marca, usuario y contraseña, entrar o crear cuenta. */
 @Composable
@@ -251,10 +253,11 @@ fun Pantalla28(nav: Nav) {
     val session = LocalSession.current
     val me = session.profile?.id
     var recarga by remember { mutableIntStateOf(0) }
-    val members by produceState(emptyList<HouseholdMember>(), session.household, recarga) {
-        value = session.household?.let { h -> runCatching { session.backend.members(h.id) }.getOrDefault(emptyList()) }.orEmpty()
-            .sortedBy { it.profile.id != me }
+    val carga by produceState<Result<List<HouseholdMember>>?>(null, session.household, recarga) {
+        value = session.household?.let { h -> runCatching { session.backend.members(h.id) } }
     }
+    val members = carga?.getOrNull().orEmpty().sortedBy { it.profile.id != me }
+    val fallo = carga?.exceptionOrNull()?.let { (it as? AppError)?.message ?: "No se han podido cargar los miembros del hogar." }
     val soyDueno = members.any { it.profile.id == me && it.role == MemberRole.Owner }
     var quitando by remember { mutableStateOf<HouseholdMember?>(null) }
     var saliendo by remember { mutableStateOf(false) }
@@ -349,6 +352,12 @@ fun Pantalla28(nav: Nav) {
                 )
             }
         }
+        // Sin red la lista sale vacía: el aviso y «Reintentar» dicen que no es que el hogar no tenga miembros.
+        fallo?.let {
+            Spacer(Modifier.height(8.dp))
+            Text(it, Modifier.padding(horizontal = 16.dp), style = StmType.bodySmall, color = c.error)
+            Btn("Reintentar", { recarga++ }, kind = BtnKind.Text)
+        }
         Spacer(Modifier.height(16.dp))
         val shape = RoundedCornerShape(12.dp)
         StmCard(Modifier.fillMaxWidth().border(1.dp, c.outlineVariant, shape), color = c.surface) {
@@ -382,6 +391,7 @@ fun Pantalla29(nav: Nav) {
         }
     }
     val code = invite?.code?.let(InviteCode::parse)
+    val horas by produceState<Long?>(null, invite) { value = invite?.let { horasHasta(it.expiresAt) } }
     StmScreen(topBar = { TopBar("Invitar", navIcon = StmIcons.close, onNav = nav::back) }) {
         Spacer(Modifier.height(12.dp))
         Text(
@@ -410,8 +420,7 @@ fun Pantalla29(nav: Nav) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        val hours = invite?.let { Duration.between(Instant.now(), Instant.parse(it.expiresAt)).toHours().coerceAtLeast(1) }
-        Text(if (hours == null) "" else "Caduca en $hours ${if (hours == 1L) "hora" else "horas"}", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(if (horas == null) "" else "Caduca en $horas ${if (horas == 1L) "hora" else "horas"}", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.align(Alignment.CenterHorizontally), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Btn("Copiar código", code?.let { { clipboard.setText(AnnotatedString(it.value)) } }, kind = BtnKind.Tonal, icon = StmIcons.contentCopy)
@@ -425,6 +434,14 @@ fun Pantalla29(nav: Nav) {
         }
     }
 }
+
+/**
+ * Horas hasta la caducidad de la invitación. El servidor manda ISO 8601 con desfase y microsegundos
+ * («2026-11-26T10:00:00.123456+00:00»); si no se entiende, null y no se muestra nada.
+ */
+internal fun horasHasta(caduca: String, ahora: Instant = Instant.now()): Long? =
+    runCatching { OffsetDateTime.parse(caduca).toInstant() }.getOrNull()
+        ?.let { Duration.between(ahora, it).toHours().coerceAtLeast(1) }
 
 /**
  * QR real del enlace de invitación (zxing), en tinta sobre papel. Los tres buscadores se pintan
