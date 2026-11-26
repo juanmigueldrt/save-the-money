@@ -457,9 +457,12 @@ struct ServerDate: Codable {
         self.date = date
     }
 
+    /// Con milisegundos, para que una fecha leída del servidor vuelva igual al leerla otra vez.
     func encode(to encoder: Encoder) throws {
         var c = encoder.singleValueContainer()
-        try c.encode(ISO8601DateFormatter().string(from: date))
+        let fractional = ISO8601DateFormatter()
+        fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        try c.encode(fractional.string(from: date))
     }
 }
 

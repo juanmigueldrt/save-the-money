@@ -70,6 +70,11 @@ func decodeNumeric<K: CodingKey>(_ c: KeyedDecodingContainer<K>, _ key: K) throw
     return try c.decode(Decimal.self, forKey: key).rounded(scale: 8)
 }
 
+/// Como texto, que `decodeNumeric` vuelve a leer sin perder decimales.
+func encodeNumeric<K: CodingKey>(_ value: Decimal, _ c: inout KeyedEncodingContainer<K>, _ key: K) throws {
+    try c.encode(value.description, forKey: key)
+}
+
 // MARK: - Tipos
 
 public enum InvestmentKind: String, Codable, CaseIterable, Sendable {
@@ -240,20 +245,24 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (sin id, hogar ni moneda, que se fijan al crear).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(trimmedName, forKey: .name)
-        try c.encode(trimmedSymbol, forKey: .symbol)
+        try c.encode(id, forKey: .id)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(name, forKey: .name)
+        try c.encode(symbol, forKey: .symbol)
         try c.encode(kind, forKey: .kind)
         try c.encode(assetClass, forKey: .assetClass)
+        try c.encode(currency, forKey: .currency)
         try c.encode(accountId, forKey: .accountId)
         try c.encode(ownerId, forKey: .ownerId)
-        try c.encode(price, forKey: .price)
+        try encodeNumeric(price, &c, .price)
         try c.encode(priceOn, forKey: .priceOn)
-        try c.encode(feeRate, forKey: .feeRate)
+        try encodeNumeric(feeRate, &c, .feeRate)
         try c.encode(note, forKey: .note)
         try c.encode(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 
@@ -291,10 +300,11 @@ public struct HoldingPrice: Identifiable, Hashable, Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(householdId, forKey: .householdId)
         try c.encode(holdingId, forKey: .holdingId)
         try c.encode(pricedOn, forKey: .pricedOn)
-        try c.encode(price, forKey: .price)
+        try encodeNumeric(price, &c, .price)
     }
 }
 
@@ -391,12 +401,13 @@ public struct InvestmentTrade: Identifiable, Hashable, Codable, Sendable {
 
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(householdId, forKey: .householdId)
         try c.encode(holdingId, forKey: .holdingId)
         try c.encode(tradedOn, forKey: .tradedOn)
         try c.encode(side, forKey: .side)
-        try c.encode(quantity, forKey: .quantity)
-        try c.encode(price, forKey: .price)
+        try encodeNumeric(quantity, &c, .quantity)
+        try encodeNumeric(price, &c, .price)
         try c.encode(fee.minor, forKey: .feeMinor)
         try c.encode(note, forKey: .note)
     }
@@ -789,19 +800,23 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archiva
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (sin id, hogar ni activo, que se fijan al crear).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(holdingId, forKey: .holdingId)
         try c.encode(accountId, forKey: .accountId)
         try c.encode(amount.minor, forKey: .amountMinor)
         try c.encode(recurrence.every, forKey: .every)
         try c.encode(recurrence.unit, forKey: .unit)
         try c.encode(startsOn, forKey: .startsOn)
         try c.encode(endsOn, forKey: .endsOn)
-        try c.encode(expectedAnnualReturn, forKey: .expectedAnnualReturn)
+        try encodeNumeric(expectedAnnualReturn, &c, .expectedAnnualReturn)
         try c.encode(remindDaysBefore, forKey: .remindDaysBefore)
         try c.encode(pausedAt.map(ServerDate.init), forKey: .pausedAt)
         try c.encode(archivedAt.map(ServerDate.init), forKey: .archivedAt)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }
 

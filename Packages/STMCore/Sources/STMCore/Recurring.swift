@@ -363,10 +363,12 @@ extension RecurringSeries {
         updatedAt = try c.decodeIfPresent(String.self, forKey: .updatedAt)
     }
 
-    /// Codifica las columnas editables (sin id ni hogar, que pone quien inserta).
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encode(trimmedName, forKey: .name)
+        try c.encode(id, forKey: .id)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(name, forKey: .name)
         try c.encode(kind, forKey: .kind)
         try c.encode(amount.minor, forKey: .amountMinor)
         try c.encode(accountId, forKey: .accountId)
@@ -381,5 +383,6 @@ extension RecurringSeries {
         try c.encode(introCharges, forKey: .introCharges)
         try c.encode(createsPending, forKey: .createsPending)
         try c.encodeIfPresent(pendingFrom, forKey: .pendingFrom)
+        try c.encodeIfPresent(updatedAt, forKey: .updatedAt)
     }
 }

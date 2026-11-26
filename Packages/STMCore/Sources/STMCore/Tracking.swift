@@ -187,15 +187,15 @@ public struct CreditScore: Identifiable, Hashable, Codable, Sendable {
         note = try c.decodeIfPresent(String.self, forKey: .note)
     }
 
-    /// Sólo las columnas que se escriben; el dueño lo pone el servidor.
+    /// Codifica todas las columnas que lee `init(from:)`, para guardarlas y volver a leerlas igual.
     public func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
         try c.encode(score, forKey: .score)
         try c.encode(maxScore, forKey: .maxScore)
-        try c.encode(trimmedProvider, forKey: .provider)
+        try c.encode(provider, forKey: .provider)
         try c.encode(recordedOn, forKey: .recordedOn)
-        let cleanNote = note?.trimmingCharacters(in: .whitespacesAndNewlines)
-        try c.encode(cleanNote?.isEmpty == false ? cleanNote : nil, forKey: .note)
+        try c.encode(note, forKey: .note)
     }
 }
 

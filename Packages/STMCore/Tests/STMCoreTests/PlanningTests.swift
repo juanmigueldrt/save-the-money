@@ -136,8 +136,8 @@ final class PlanningTests: XCTestCase {
         XCTAssertEqual(series.remindDaysBefore, 2)
         let encoded = try JSONSerialization.jsonObject(with: JSONEncoder().encode(series)) as! [String: Any]
         XCTAssertEqual(encoded["amount_minor"] as? Int, 999)
-        XCTAssertNil(encoded["id"])
-        XCTAssertNil(encoded["household_id"])
+        XCTAssertEqual(encoded["id"] as? String, "7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0001")
+        XCTAssertEqual(encoded["household_id"] as? String, "7B0B4C53-5A1E-4D5B-9C1E-6B1E1A0F0002")
     }
 
     func testInMemoryKeepsHouseholdsApart() async throws {

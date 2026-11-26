@@ -78,7 +78,7 @@ extension SupabaseBackend: RecurringService, GoalService {
         guard !charges.isEmpty else { return [] }
         return try await mapped {
             try await client.from("recurring_charges")
-                .upsert(charges, onConflict: "series_id,due_on", ignoreDuplicates: true)
+                .upsert(charges.map(NewChargeRow.init), onConflict: "series_id,due_on", ignoreDuplicates: true)
                 .select(Self.chargeColumns)
                 .execute()
                 .value
@@ -196,6 +196,26 @@ extension SupabaseBackend: RecurringService, GoalService {
         try await mapped {
             try await client.from("goal_contributions").delete().eq("id", value: contributionId.uuidString).execute()
         }
+    }
+}
+
+/// Las columnas que se insertan de un cargo: el id, el estado y el movimiento los pone el servidor.
+struct NewChargeRow: Encodable, Sendable {
+    let charge: RecurringCharge
+
+    private enum CodingKeys: String, CodingKey {
+        case householdId = "household_id"
+        case seriesId = "series_id"
+        case dueOn = "due_on"
+        case amountMinor = "amount_minor"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(charge.householdId, forKey: .householdId)
+        try c.encode(charge.seriesId, forKey: .seriesId)
+        try c.encode(charge.dueOn, forKey: .dueOn)
+        try c.encode(charge.amount.minor, forKey: .amountMinor)
     }
 }
 

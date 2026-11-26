@@ -244,10 +244,10 @@ final class CreditCardTests: XCTestCase {
     func testCodableRoundTrip() throws {
         var t = terms(.fixed, fixed: 12_345)
         t.revolvingRate = Decimal(string: "21.5")!
-        // Sólo se envían las columnas que se pueden cambiar.
+        // ORC-104: se codifican todas las columnas que se leen; al servidor van los parámetros de `create_credit_card`.
         let sent = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(t)) as? [String: Any])
-        XCTAssertNil(sent["account_id"])
-        XCTAssertNil(sent["household_id"])
+        XCTAssertEqual(sent["account_id"] as? String, card.uuidString)
+        XCTAssertEqual(sent["household_id"] as? String, home.uuidString)
         XCTAssertEqual(sent["fixed_payment_minor"] as? Int, 12_345)
         let json = #"{"account_id":"\#(card.uuidString)","household_id":"\#(home.uuidString)","credit_limit_minor":300000,"statement_day":1,"payment_day":1,"payment_delay_months":1,"payment_mode":"minimum","fixed_payment_minor":null,"min_payment_percent":3.00,"min_payment_minor":1500,"revolving_rate":20.00,"installment_rate":14.00,"pay_from_account_id":null,"remind_days_before":2,"alert_percent":80}"#
         let decoded = try JSONDecoder().decode(CreditCardTerms.self, from: Data(json.utf8))
