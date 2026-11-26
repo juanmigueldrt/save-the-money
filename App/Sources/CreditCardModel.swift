@@ -44,6 +44,21 @@ final class CreditCardModel {
 
     var cardAccounts: [Account] { accounts.filter { $0.kind == .creditCard && !$0.isArchived } }
 
+    /// Lo que cambia lo que muestra la tarjeta: cuentas, saldos y movimientos. Guarda su propia copia de las cuentas,
+    /// así que hay que volver a cargarla cuando cambia cualquiera de estos (RootView lo hace con `.task(id:)`).
+    struct Inputs: Equatable {
+        let accounts: [Account]
+        let balances: [UUID: Money]
+        let recent: [Movement]
+
+        @MainActor
+        init(finance: FinanceModel) {
+            accounts = finance.accounts
+            balances = finance.balances
+            recent = finance.recent
+        }
+    }
+
     func summary(for account: Account) -> CreditCardSummary? { summaries[account.id] }
     func installment(for movement: Movement) -> CardInstallment? { installments.first { $0.movementId == movement.id } }
     func movements(of account: Account) -> [Movement] { movements[account.id] ?? [] }
