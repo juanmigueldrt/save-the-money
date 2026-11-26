@@ -27,8 +27,10 @@ struct CSVImportView: View {
     /// true si las columnas salen de un formato de banco ya usado.
     @State private var usedSavedFormat = false
 
-    /// Tamaño máximo del archivo: un extracto de varios años cabe de sobra.
-    private static let maxBytes = 10 * 1024 * 1024
+    /// La lectura en curso; se cancela si la hoja se cierra antes de terminar.
+    @State private var loadTask: Task<Void, Never>?
+    /// Mapa por defecto para el binding de las columnas: sólo se ve si hay mapeo (ver `body`).
+    private static let emptyMapping = CSVMapping(headerRow: nil, date: 0, description: 0, amount: .signed(0))
 
     /// Filas interpretadas; se recalculan sólo al cambiar archivo, columnas o cuenta.
     @State private var rows: [CSVImportRow] = []
@@ -89,7 +91,7 @@ struct CSVImportView: View {
                 }
             }
             if let table, mapping != nil {
-                MappingSection(table: table, mapping: Binding($mapping)!)
+                MappingSection(table: table, mapping: Binding(get: { mapping ?? Self.emptyMapping }, set: { mapping = $0 }))
             } else if table != nil {
                 Section {
                     ErrorText(message: "No he reconocido las columnas de fecha, concepto e importe de este archivo.")
@@ -134,6 +136,7 @@ struct CSVImportView: View {
         }
         .onChange(of: mapping) { _, _ in recompute() }
         .onChange(of: accountId) { _, _ in result = nil; recompute() }
+        .onDisappear { loadTask?.cancel() }
     }
 
     private var validDrafts: [MovementDraft] { reviewedRows.compactMap(\.draft) }
@@ -168,40 +171,44 @@ struct CSVImportView: View {
         result = nil
         createdSeries = 0
         guard case .success(let url) = picked else { return }
-        let scoped = url.startAccessingSecurityScopedResource()
-        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        do {
-            let values = try url.resourceValues(forKeys: [.fileSizeKey])
-            if let size = values.fileSize, size > Self.maxBytes {
-                error = "El archivo es demasiado grande (máximo 10 MB)."
-                return
-            }
-            let data = try Data(contentsOf: url)
-            guard let text = CSVTable.decode(data) else {
-                error = "No he podido leer el texto del archivo."
-                return
-            }
-            let saved = CSVSavedFormat.match(text: text, in: SavedCSVFormats.load())
-            let parsed = saved?.table ?? CSVTable.parse(text)
-            fileText = text
-            fileName = url.lastPathComponent
-            marks = [:]
-            review = CSVRowReview()
-            table = parsed
-            if let saved, let known = saved.format.mapping {
-                mapping = known
-                usedSavedFormat = true
-                if let account = saved.format.accountId, finance.activeAccounts.contains(where: { $0.id == account }) {
-                    accountId = account
-                }
-            } else {
-                mapping = CSVMapping.detect(in: parsed)
-                usedSavedFormat = false
-            }
-            recompute()
-        } catch {
-            self.error = "No he podido abrir el archivo."
+        loadTask?.cancel()
+        loadTask = Task { await open(url) }
+    }
+
+    /// Lee y analiza el archivo fuera del hilo principal; si se cierra la hoja antes de acabar, se cancela.
+    private func open(_ url: URL) async {
+        let reading = Task.detached(priority: .userInitiated) {
+            try CSVFileReader.read(url, savedFormats: SavedCSVFormats.load())
         }
+        do {
+            let file = try await withTaskCancellationHandler {
+                try await reading.value
+            } onCancel: {
+                reading.cancel()
+            }
+            guard !Task.isCancelled else { return }
+            apply(file)
+        } catch let failure as CSVOpenFailure {
+            guard !Task.isCancelled else { return }
+            error = failure.message
+        } catch {
+            // Cancelada: la hoja se ha cerrado y nadie debe ver nada.
+        }
+    }
+
+    /// Pone en pantalla lo leído. La cuenta del formato guardado sólo se usa si todavía existe.
+    private func apply(_ file: CSVLoadedFile) {
+        fileText = file.text
+        fileName = file.fileName
+        marks = [:]
+        review = CSVRowReview()
+        table = file.table
+        mapping = file.mapping
+        usedSavedFormat = file.usedSavedFormat
+        if let account = file.savedAccount, finance.activeAccounts.contains(where: { $0.id == account }) {
+            accountId = account
+        }
+        recompute()
     }
 
     /// Vuelve a leer el archivo con el separador elegido y a detectar las columnas.
@@ -236,6 +243,68 @@ struct CSVImportView: View {
         if let table, let mapping {
             SavedCSVFormats.remember(CSVSavedFormat(table: table, mapping: mapping, accountId: accountId))
         }
+    }
+}
+
+/// Lo que se saca de un archivo CSV, listo para la pantalla.
+struct CSVLoadedFile: Sendable {
+    let fileName: String
+    let text: String
+    let table: CSVTable
+    let mapping: CSVMapping?
+    /// true si las columnas salen de un formato de banco ya usado.
+    let usedSavedFormat: Bool
+    /// Cuenta que guardaba el formato, si lo hay.
+    let savedAccount: UUID?
+}
+
+/// Por qué no se puede abrir el archivo. El mensaje es el que ve el usuario.
+enum CSVOpenFailure: Error, Sendable {
+    case tooLarge
+    case unreadableText
+    case cannotOpen
+
+    var message: String {
+        switch self {
+        case .tooLarge: "El archivo es demasiado grande (máximo 10 MB)."
+        case .unreadableText: "No he podido leer el texto del archivo."
+        case .cannotOpen: "No he podido abrir el archivo."
+        }
+    }
+}
+
+/// Lectura y primer análisis del archivo elegido. No toca la pantalla: puede correr fuera del hilo principal.
+enum CSVFileReader {
+    /// Tamaño máximo del archivo: un extracto de varios años cabe de sobra.
+    static let maxBytes = 10 * 1024 * 1024
+
+    static func read(_ url: URL, savedFormats: [CSVSavedFormat]) throws -> CSVLoadedFile {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        let size: Int?
+        do {
+            size = try url.resourceValues(forKeys: [.fileSizeKey]).fileSize
+        } catch {
+            throw CSVOpenFailure.cannotOpen
+        }
+        if let size, size > maxBytes { throw CSVOpenFailure.tooLarge }
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            throw CSVOpenFailure.cannotOpen
+        }
+        try Task.checkCancellation()
+        guard let text = CSVTable.decode(data) else { throw CSVOpenFailure.unreadableText }
+        try Task.checkCancellation()
+        let saved = CSVSavedFormat.match(text: text, in: savedFormats)
+        let table = saved?.table ?? CSVTable.parse(text)
+        if let saved, let known = saved.format.mapping {
+            return CSVLoadedFile(fileName: url.lastPathComponent, text: text, table: table, mapping: known,
+                                 usedSavedFormat: true, savedAccount: saved.format.accountId)
+        }
+        return CSVLoadedFile(fileName: url.lastPathComponent, text: text, table: table,
+                             mapping: CSVMapping.detect(in: table), usedSavedFormat: false, savedAccount: nil)
     }
 }
 

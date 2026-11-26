@@ -37,7 +37,7 @@ struct GoalsView: View {
                         Text("Sin metas todavía")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.")
+                        EmptyHint(text: planning.isLoading ? "Cargando…" : "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.")
                         Button("Crear una meta") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }

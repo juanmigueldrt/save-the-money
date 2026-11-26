@@ -20,7 +20,7 @@ final class TrackingModel: ServerModel {
     @ObservationIgnored private var historyCache: [HistoryKey: [NetWorthPoint]] = [:]
     private(set) var creditScores: [CreditScore] = []
     private(set) var reportMovements: [Movement] = []
-    private(set) var isLoading = false
+    var isLoading = false
     var error: String?
     @ObservationIgnored var turns = ReadTurns()
 
@@ -132,8 +132,8 @@ final class TrackingModel: ServerModel {
         let budgets = budgets, id = household.id, range = reportRange, turn = nextTurn()
         // Se carga desde el principio del periodo anterior para poder comparar.
         let from = min(previousRange.lowerBound, range.lowerBound)
-        isLoading = true
-        defer { isLoading = false }
+        beginLoad()
+        defer { endLoad() }
         await perform(turn: turn) {
             let list = try await budgets.movements(in: id, from: from, through: range.upperBound)
             // Si se cambió de periodo mientras cargaba, no se pisa.

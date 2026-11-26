@@ -284,7 +284,6 @@ struct CategoriesView: View {
                 }
             }
             Section {
-                ErrorText(message: finance.error)
             } footer: {
                 Text("Las categorías se comparten con todo el hogar. El grupo decide en qué parte del 50/30/20 cuenta cada gasto.")
             }
@@ -438,6 +437,9 @@ struct ResetHouseholdView: View {
     @Environment(FinanceModel.self) private var finance
     @Environment(PlanningModel.self) private var planning
     @Environment(InvestmentModel.self) private var investments
+    @Environment(BudgetModel.self) private var budgets
+    @Environment(CreditCardModel.self) private var cards
+    @Environment(TrackingModel.self) private var tracking
     @Environment(\.dismiss) private var dismiss
     @State private var confirmation = ""
     @State private var isWorking = false
@@ -501,10 +503,9 @@ struct ResetHouseholdView: View {
             error = finance.error
             return
         }
-        // Recarga los pagos fijos y metas (y con ellos, los avisos del dispositivo).
-        await planning.load()
-        // El presupuesto y las tarjetas se recargan solos al cambiar los movimientos.
-        await investments.load()
+        // Lo mismo que ⌘R: el presupuesto y el resto se recargan aunque no hubiera movimientos que cambiaran.
+        await HouseholdReload(finance: finance, budgets: budgets, planning: planning, investments: investments,
+                              cards: cards, tracking: tracking).reload()
         dismiss()
     }
 }
