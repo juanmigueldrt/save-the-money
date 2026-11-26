@@ -13,6 +13,9 @@ import kotlin.math.abs
 // CSVImport.swift de STMCore. La huella debe salir igual que en iOS para no duplicar filas entre móviles.
 
 private fun Char.isSpace() = this == ' ' || this == '\t' || Character.getType(this) == Character.SPACE_SEPARATOR.toInt()
+
+/** Propiedad White_Space de Unicode, la de iOS: `isWhitespace` de Kotlin añade U+001C–001F y no tiene U+0085. */
+private fun Char.isWhiteSpace() = (isWhitespace() && this !in '\u001C'..'\u001F') || this == '\u0085'
 private fun String.trimSpaces() = trim { it.isSpace() }
 
 /** Tabla leída de un CSV: comillas, saltos dentro de comillas, BOM, CRLF y separadores ";", "," y tabulador. */
@@ -206,10 +209,27 @@ data class CsvMapping(
             return null
         }
 
-        /** Como `folding` de iOS con mayúsculas y acentos: "Ñandú" y "nandu" dan lo mismo. */
-        fun normalize(text: String): String =
-            Normalizer.normalize(text, Normalizer.Form.NFD).replace("\\p{Mn}".toRegex(), "")
-                .replace("ß", "ss").lowercase().trim()
+        /**
+         * Texto plegado de la huella de importación, el mismo que `CSVMapping.normalize` de iOS:
+         * NFD; fuera las marcas no espaciadas (Mn), salvo U+FE0F justo detrás de un emoji; minúsculas
+         * carácter a carácter (sin sigma final), ς→σ y ß→ss; fuera los espacios Unicode de los extremos.
+         * Sin NFC. Así "Ñandú" y "nandu" dan lo mismo.
+         */
+        fun normalize(text: String): String {
+            val kept = StringBuilder()
+            var previous = 0
+            Normalizer.normalize(text, Normalizer.Form.NFD).codePoints().forEach { cp ->
+                val drop = Character.getType(cp) == Character.NON_SPACING_MARK.toInt() && (cp != 0xFE0F || !isEmojiBase(previous))
+                previous = cp
+                if (!drop) kept.appendCodePoint(cp)
+            }
+            // lowercase() pone ς al final de palabra; con ς→σ queda carácter a carácter, como en iOS.
+            return kept.toString().lowercase().replace('ς', 'σ').replace("ß", "ss").trim { it.isWhiteSpace() }
+        }
+
+        /** Emoji que se escriben con U+FE0F detrás («❤️»): ahí el selector se conserva, como en iOS. */
+        private fun isEmojiBase(cp: Int): Boolean =
+            cp in 0x2000..0x2BFF || cp in 0x1F000..0x1FAFF || cp == 0x3030 || cp == 0x303D || cp == 0x3297 || cp == 0x3299
     }
 }
 
@@ -257,8 +277,13 @@ object CsvImporter {
                 continue
             }
 
-            val description = cell(mapping.description).split { it.isWhitespace() }.joinToString(" ")
-            val text = if (description.isEmpty()) "Sin concepto" else description.take(200)
+            val description = cell(mapping.description).split { it.isWhiteSpace() }.joinToString(" ")
+            // 200 puntos de código, lo que cuenta `char_length` en la base de datos; nunca medio emoji.
+            val text = when {
+                description.isEmpty() -> "Sin concepto"
+                description.codePointCount(0, description.length) <= 200 -> description
+                else -> description.substring(0, description.offsetByCodePoints(0, 200))
+            }
             val key = "$day|$amount|${CsvMapping.normalize(text)}"
             val occurrence = seen[key] ?: 0
             seen[key] = occurrence + 1
