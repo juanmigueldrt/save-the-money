@@ -147,7 +147,7 @@ extension InMemoryBackend: FinanceService {
         return financeMovements.filter { $0.householdId == householdId }
     }
 
-    private func validated(_ draft: MovementDraft, in householdId: UUID) throws -> Movement {
+    func validated(_ draft: MovementDraft, in householdId: UUID) throws -> Movement {
         if let issue = draft.issue { throw AppError.invalidInput(issue) }
         guard financeAccounts.contains(where: { $0.id == draft.accountId && $0.householdId == householdId }) else {
             throw AppError.unknown("cuenta de otro hogar")
