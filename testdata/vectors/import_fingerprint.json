@@ -1,5 +1,5 @@
 {
-  "_source": "Hash input written by hand from the documented format '<ISO day>|<amount minor>|<text folded: lowercase, no accents, ß→ss, spaces collapsed and trimmed; empty → \"Sin concepto\">|<occurrence of that key so far>'; digest with Python hashlib.sha256. A null hash is a row listed as not importable.",
+  "_source": "Hash input written by hand from the documented format '<ISO day>|<amount minor>|<text>|<occurrence of that key so far>'; digest with Python hashlib.sha256. A null hash is a row listed as not importable. <text> follows the rule in CSVImport.swift / CsvImport.kt: runs of Unicode White_Space become one space and the ends are trimmed (empty → \"Sin concepto\"); keep the first 200 Unicode code points; then NFD, drop every nonspacing mark (Mn) except U+FE0F right after an emoji (U+2000–2BFF, U+1F000–1FAFF, U+3030, U+303D, U+3297, U+3299), lowercase each code point, ς→σ, ß→ss, trim White_Space; no NFC. The last vector was computed with Python unicodedata from that rule.",
   "vectors": [
     {
       "name": "Banco inventado, separador ;",
@@ -150,6 +150,68 @@
         {
           "hashInput": "2026-03-08|700|cuatro|0",
           "importHash": "9e315a9ed542ab9ac400b7609dc7e2e5ed16c3ce3f5223b72a584832e6ba6385"
+        }
+      ]
+    },
+    {
+      "name": "Corte a 200 puntos de código y normalización común: emoji, acentos compuestos y descompuestos, ligaduras, sigma, ẞ, kana, espacios Unicode y letras fuera del BMP",
+      "csv": "Fecha;Concepto;Importe\n01/04/2026;aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀xyz;-1,00\n02/04/2026;bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb👍🏽 fin;-2,00\n03/04/2026;e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301e\u0301;-3,00\n04/04/2026;éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé;-4,00\n05/04/2026;Café Lúpulo;-5,00\n05/04/2026;Cafe\u0301 Lu\u0301pulo;-5,00\n06/04/2026;Cena ❤\ufe0f Ana;-6,00\n07/04/2026;Mesa 1\ufe0f\u20e3 Bar;-7,00\n08/04/2026;ﬁnca ﬂor;-8,00\n09/04/2026;ΟΔΟΣ ΚΑΙ ΣΑΣ;-9,00\n10/04/2026;STRAẞE;-10,00\n11/04/2026;ガスト;-11,00\n12/04/2026;Uno\u0085Dos\u00a0Tres;-12,00\n13/04/2026;𐐀𐐁 Deseret;-13,00\n",
+      "rows": [
+        {
+          "hashInput": "2026-04-01|-100|aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa😀|0",
+          "importHash": "8edce4a1f3200788cefe156df37aa7b164122ed49dc69f98c3ca162fa5937ccc"
+        },
+        {
+          "hashInput": "2026-04-02|-200|bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb👍|0",
+          "importHash": "1011443cc7a88bfde08d726887c47d0b6a3a24cc9b2a525cdfa84c52aa6acad4"
+        },
+        {
+          "hashInput": "2026-04-03|-300|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee|0",
+          "importHash": "4143568d3270a4ca5649e19551e9aa33ccfdbd44f2c3907068edb4e605400dfa"
+        },
+        {
+          "hashInput": "2026-04-04|-400|eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee|0",
+          "importHash": "00f87027b48d3f431ce4f10b16cdea802d93849c6612349beeace173584632f5"
+        },
+        {
+          "hashInput": "2026-04-05|-500|cafe lupulo|0",
+          "importHash": "31b0f16e2b4a5a03afe3814bbc694d5f818a65eb7ebce4a002bb35d7ba8ecc43"
+        },
+        {
+          "hashInput": "2026-04-05|-500|cafe lupulo|1",
+          "importHash": "ea4add3684c4063af8d56ec904e16ced77a700e9d71712a794056cb2cdf0d310"
+        },
+        {
+          "hashInput": "2026-04-06|-600|cena ❤\ufe0f ana|0",
+          "importHash": "84c7394d9706f01e2ff35f826dc1323887e4f00bf9e2804971dbef20152670cf"
+        },
+        {
+          "hashInput": "2026-04-07|-700|mesa 1\u20e3 bar|0",
+          "importHash": "625abc1a765da03b22c76f7399aaf6cd48f49b3cb9a06ef66ab0d947dc036044"
+        },
+        {
+          "hashInput": "2026-04-08|-800|ﬁnca ﬂor|0",
+          "importHash": "089de9ff2bc3286600e8413adecef042d1c94c5ac81530e96826afd230d09acd"
+        },
+        {
+          "hashInput": "2026-04-09|-900|οδοσ και σασ|0",
+          "importHash": "800c19d97cb54c611042bed34e7fc39f39b7de60a06e302155630f2e47cc4a5a"
+        },
+        {
+          "hashInput": "2026-04-10|-1000|strasse|0",
+          "importHash": "fc4eb336dca85e16e3a8cb15ff3ee2b8d122a7dba7009ddfad4629eb19c30127"
+        },
+        {
+          "hashInput": "2026-04-11|-1100|カスト|0",
+          "importHash": "4da8ba90e1583d7b0c5fc970708ac6337370f81455163dd816addbdbf04a14bd"
+        },
+        {
+          "hashInput": "2026-04-12|-1200|uno dos tres|0",
+          "importHash": "a0c2de4766030ad27fc4a9e50e2b3052da0fac3788e8fafc4aa20727e93d346a"
+        },
+        {
+          "hashInput": "2026-04-13|-1300|𐐨𐐩 deseret|0",
+          "importHash": "628f8ca9ba0495deb18603430676936ecf8114dfbdaeacda9d7ef3f727f42976"
         }
       ]
     }
