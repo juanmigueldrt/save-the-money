@@ -153,7 +153,8 @@ struct SignUpView: View {
     }
 }
 
-private extension View {
+// Sin `private`: el cambio de contraseña (MoreOptionsViews) usa newPasswordContentType.
+extension View {
     func nameContentType() -> some View {
         #if os(iOS)
         self.textContentType(.name)

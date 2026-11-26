@@ -33,6 +33,21 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    /// supabase-swift 2.55.8 no envía `current_password` y el proyecto puede pedir un inicio de sesión
+    /// reciente («secure password change»). Por eso se vuelve a iniciar sesión con la actual:
+    /// la comprueba (con el límite de intentos del servidor) y deja una sesión nueva con la que el
+    /// cambio vale con ese ajuste encendido o apagado. Si la actual no es, supabase-swift no toca la
+    /// sesión guardada. Tras el cambio, el servidor cierra todas las demás sesiones de la cuenta.
+    public func changePassword(currentPassword: String, newPassword: String) async throws {
+        guard let email = client.auth.currentSession?.user.email else { throw AppError.notSignedIn }
+        do {
+            _ = try await mapped { try await client.auth.signIn(email: email, password: currentPassword) }
+        } catch AppError.invalidCredentials {
+            throw AppError.wrongCurrentPassword
+        }
+        try await mapped { _ = try await client.auth.update(user: UserAttributes(password: newPassword)) }
+    }
+
     public func signOut() async throws {
         try await mapped { try await client.auth.signOut() }
     }
@@ -252,8 +267,15 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         if text.contains("already registered") || text.contains("user_already_exists") || text.contains("duplicate key") {
             return .usernameTaken
         }
+        // Antes que «password should be»: el mensaje de same_password también lo contiene.
+        if text.contains("same_password") || text.contains("should be different from the old") {
+            return .invalidInput(ChangePasswordForm.Issue.samePassword.message)
+        }
         if text.contains("weak_password") || text.contains("password should be") {
             return .weakPassword
+        }
+        if text.contains("over_request_rate_limit") || text.contains("rate limit") {
+            return .tooManyAttempts
         }
         if text.contains("session") && (text.contains("missing") || text.contains("not found")) {
             return .notSignedIn
