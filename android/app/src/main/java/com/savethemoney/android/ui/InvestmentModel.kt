@@ -53,21 +53,13 @@ class InvestmentModel(
     /** Qué lectura gana cuando dos se cruzan (ORC-144). */
     private val turns = ReadTurns()
 
-    // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
-    var selectedId by mutableStateOf<String?>(null)
-    var holdingToEdit: Holding? = null
-    var planToEdit: InvestmentPlan? = null
-
     val householdId: String get() = household.id
     val activeHoldings: List<Holding> get() = holdings.filter { !it.isArchived }
     val portfolio: Portfolio get() = Portfolio(holdings, trades)
-    val selected: Holding? get() = holdings.firstOrNull { it.id == selectedId }
     val livePlans: List<InvestmentPlan> get() = plans.filter { !it.isArchived }
     val monthlyPlanned: Long get() = plans.monthlyTotal(today())
     val planCounts: Pair<Int, Int> get() = plans.counts(today())
 
-    fun takeHoldingToEdit(): Holding? = holdingToEdit.also { holdingToEdit = null }
-    fun takePlanToEdit(): InvestmentPlan? = planToEdit.also { planToEdit = null }
     fun holding(id: String?): Holding? = holdings.firstOrNull { it.id == id }
     fun position(holding: Holding) = Position(holding, trades)
     fun trades(holding: Holding) = trades.filter { it.holdingId == holding.id }.sortedByDescending { it.day }

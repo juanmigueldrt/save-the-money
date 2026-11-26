@@ -53,23 +53,14 @@ class PlanningModel(
     /** Qué lectura gana cuando dos se cruzan (ORC-144). */
     private val turns = ReadTurns()
 
-    // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
-    var selectedGoalId by mutableStateOf<String?>(null)
-    var seriesToEdit: RecurringSeries? = null
-    var chargeToConfirm: PendingCharge? = null
-    var goalToEdit: Goal? = null
-
     val activeSeries: List<RecurringSeries> get() = series.filter { !it.isArchived }
     val upcoming: List<UpcomingCharge> get() = series.upcoming(today())
-    val selectedGoal: Goal? get() = goals.firstOrNull { it.id == selectedGoalId }
+    fun goal(id: String): Goal? = goals.firstOrNull { it.id == id }
 
     val progress: List<GoalProgress> get() = goals.filter { !it.isArchived }.map(::progress)
 
     fun progress(goal: Goal) = GoalProgress(goal, contributions, today())
     fun contributions(goal: Goal) = contributions.filter { it.goalId == goal.id }
-
-    fun takeSeries(): RecurringSeries? = seriesToEdit.also { seriesToEdit = null }
-    fun takeGoal(): Goal? = goalToEdit.also { goalToEdit = null }
 
     /** Cargos que han llegado y esperan que los confirmes. */
     val pending: List<PendingCharge> get() = PendingCharges.pending(charges, series)

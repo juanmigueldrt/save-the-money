@@ -35,7 +35,7 @@ import com.savethemoney.android.data.MovementsCsv
 import java.time.LocalDate
 import java.util.Locale
 
-/** Qué abre la pantalla 07: un movimiento a editar, una cuenta preelegida o una transferencia. */
+/** Lo que trae escrito la pantalla 07 (sale de su ruta): un movimiento a editar, una cuenta preelegida o una transferencia. */
 data class MovementForm(
     val movement: Movement? = null,
     val accountId: String? = null,
@@ -100,15 +100,11 @@ class FinanceModel(
     /** Lo que se acaba de borrar en la lista, para poder deshacerlo. */
     var lastDeleted by mutableStateOf<Movement?>(null)
 
-    // El Nav solo apila números de pantalla: estos campos dicen con qué abrirla.
-
-    /** El movimiento que se tocó, tal cual salía en su lista: la de una cuenta puede traer movimientos que no están en [recent]. */
+    /**
+     * El último movimiento que se tocó, tal cual salía en su lista: la de una cuenta puede traer movimientos que no están en
+     * [recent]. Qué movimiento abrir lo dice la ruta; esto solo guarda sus datos (ver [movement]).
+     */
     var tappedMovement by mutableStateOf<Movement?>(null)
-    var selectedAccountId by mutableStateOf<String?>(null)
-    var movementForm: MovementForm? = null
-    var accountToEdit: Account? = null
-    var newAccountKind: AccountKind? = null
-    var csvAccountId: String? = null
 
     val activeAccounts: List<Account> get() = accounts.filter { !it.isArchived }
     val archivedAccounts: List<Account> get() = accounts.filter { it.isArchived }
@@ -117,9 +113,9 @@ class FinanceModel(
     var movementFilter by mutableStateOf(MovementFilter())
     /** Patrimonio: saldo de las cuentas activas que cuentan en el patrimonio. */
     val totalBalance: Long get() = activeAccounts.filter { it.includeInNetWorth }.sumOf(::balance)
-    /** El tocado, con lo último de [recent] si está ahí; nunca otro. Nulo si no se tocó ninguno o se borró. */
-    val selectedMovement: Movement? get() = tappedMovement?.let { t -> recent.firstOrNull { it.id == t.id } ?: t }
-    val selectedAccount: Account? get() = accounts.firstOrNull { it.id == selectedAccountId }
+    /** El movimiento [id], con lo último de [recent] o de la lista si está ahí; nunca otro. Nulo si no está cargado o se borró. */
+    fun movement(id: String): Movement? =
+        recent.firstOrNull { it.id == id } ?: tappedMovement?.takeIf { it.id == id } ?: list.rows.firstOrNull { it.id == id }
 
     fun balance(account: Account): Long = balances[account.id] ?: account.openingMinor
     fun account(id: String?): Account? = accounts.firstOrNull { it.id == id }
@@ -150,10 +146,6 @@ class FinanceModel(
             .filter { it.day in period && it.isExpense && !it.excluded && category(it.categoryId)?.kind != CategoryKind.Transfer }
             .sumOf { it.amountMinor }
     }
-
-    fun takeMovementForm(): MovementForm = (movementForm ?: MovementForm()).also { movementForm = null }
-    fun takeAccountToEdit(): Account? = accountToEdit.also { accountToEdit = null }
-    fun takeCsvAccount(): String? = csvAccountId.also { csvAccountId = null }
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {

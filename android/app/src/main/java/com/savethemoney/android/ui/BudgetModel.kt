@@ -57,12 +57,6 @@ class BudgetModel(val household: Household, private val service: FinanceService,
     /** Qué lectura gana cuando dos se cruzan (ORC-144). */
     private val turns = ReadTurns()
 
-    /** El presupuesto extra que abre el formulario (nulo = uno nuevo). */
-    private var extraToEdit: ExtraBudget? = null
-
-    fun edit(extra: ExtraBudget?) { extraToEdit = extra }
-    fun takeExtra(): ExtraBudget? = extraToEdit.also { extraToEdit = null }
-
     /** Los 3 periodos anteriores, del más reciente al más antiguo. */
     val previousPeriods: List<BudgetPeriod>
         get() = generateSequence(schedule.periodBefore(period)) { schedule.periodBefore(it) }.take(3).toList()

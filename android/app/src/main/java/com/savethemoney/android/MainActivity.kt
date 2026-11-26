@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.focusProperties
@@ -59,6 +60,7 @@ import com.savethemoney.android.ui.LocalNotifier
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.PantallaBloqueo
+import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.borrarExportados
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.ScreenFor
@@ -230,16 +232,16 @@ class StmApp : android.app.Application() {
 @Composable
 fun App() {
     val session = LocalSession.current
-    val nav = remember { Nav(1) }
+    val nav = rememberSaveable(saver = Nav.Saver) { Nav(Route.IniciarSesion) }
     LaunchedEffect(Unit) { session.start() }
     LaunchedEffect(Unit) { session.watchSession() }
     LaunchedEffect(session.state) {
         when (session.state) {
             Session.State.Loading -> Unit
-            Session.State.SignedOut -> if (nav.current !in 1..2) nav.reset(1)
+            Session.State.SignedOut -> if (nav.current.screen !in 1..2) nav.reset(Route.IniciarSesion)
             is Session.State.Offline -> Unit
-            is Session.State.NeedsHousehold -> nav.reset(3)
-            is Session.State.Ready -> if (nav.current in 1..3) nav.reset(4)
+            is Session.State.NeedsHousehold -> nav.reset(Route.TuHogar)
+            is Session.State.Ready -> if (nav.current.screen in 1..3) nav.reset(Route.Inicio)
         }
     }
     // Se pide el permiso cuando hay algo de lo que avisar, no al abrir la app.
@@ -264,8 +266,8 @@ fun App() {
     Column(Modifier.fillMaxSize()) {
         if (session.isDemo) AvisoDemo()
         Box(Modifier.weight(1f)) {
-            AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { number ->
-                ScreenFor(number, nav)
+            AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { route ->
+                ScreenFor(route, nav)
             }
             // Un enlace de invitación con un hogar ya abierto: nunca se une solo, pregunta antes.
             if (session.state is Session.State.Ready && session.pendingInvite != null) UnirseDesdeEnlace()

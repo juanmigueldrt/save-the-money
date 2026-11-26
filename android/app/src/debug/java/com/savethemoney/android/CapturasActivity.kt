@@ -49,8 +49,8 @@ import com.savethemoney.android.data.RecurringSeries
 import com.savethemoney.android.data.Username
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.LocalSession
-import com.savethemoney.android.ui.MovementForm
 import com.savethemoney.android.ui.Nav
+import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.Session
 import com.savethemoney.android.ui.screens.SCREEN_COUNT
 import com.savethemoney.android.ui.screens.ScreenFor
@@ -105,50 +105,55 @@ internal fun sesionDeMuestra() = Session(InMemoryBackend(), InMemoryFinance(), i
 @Composable
 private fun Capturas(pantalla: Int) {
     val session = LocalSession.current
-    val nav = remember { Nav(pantalla) }
-    var listo by remember { mutableStateOf(false) }
+    var nav by remember { mutableStateOf<Nav?>(null) }
     LaunchedEffect(Unit) {
         seedSample(session)
         session.start()
-        session.finance?.let { prepararPantalla(it, pantalla) }
-        listo = true
+        nav = Nav(session.finance?.let { prepararPantalla(it, pantalla) } ?: rutaSinArgumentos(pantalla))
     }
-    if (!listo) {
+    val abierta = nav
+    if (abierta == null) {
         Box(Modifier.fillMaxSize().background(Stm.colors.surface))
         return
     }
-    BackHandler(enabled = nav.canGoBack) { nav.back() }
-    AnimatedContent(nav.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { number ->
-        ScreenFor(number, nav)
+    BackHandler(enabled = abierta.canGoBack) { abierta.back() }
+    AnimatedContent(abierta.current, transitionSpec = { fadeIn() togetherWith fadeOut() }, label = "pantalla") { route ->
+        ScreenFor(route, abierta)
     }
 }
 
-/** Lo que el diseño enseña ya elegido o abierto en cada pantalla, puesto en los modelos como lo haría la app al tocar. */
-internal suspend fun prepararPantalla(finance: FinanceModel, pantalla: Int) {
+/** La ruta de la pantalla [pantalla] con lo que el diseño enseña ya elegido o abierto, como la abriría la app al tocar. */
+internal suspend fun prepararPantalla(finance: FinanceModel, pantalla: Int): Route {
     val primero = finance.recent.first()
     finance.categories.firstOrNull { it.name == "Comida" }?.let { finance.movementFilter = finance.movementFilter.copy(categoryId = it.id) }
     val visa = finance.accounts.first { it.name == "Visa" }
-    when (pantalla) {
+    return when (pantalla) {
         5 -> {
             // El aviso «Movimiento eliminado» con «Deshacer».
             finance.add(MovementDraft(finance.activeAccounts.first().id, primero.categoryId, CAPTURE_DAY, -350, "Café"))
             finance.delete(finance.recent.first { it.description == "Café" })
+            Route.Movimientos
         }
-        6 -> finance.selectedAccountId = finance.activeAccounts.first().id
-        7 -> finance.movementForm = MovementForm(accountId = primero.accountId, amountMinor = -primero.amountMinor, description = primero.description)
-        8, 34 -> finance.tappedMovement = primero
-        9 -> finance.newAccountKind = AccountKind.Savings
-        11, 12 -> finance.cards.selectedId = visa.id
-        13 -> {
-            finance.cards.selectedId = visa.id
-            finance.cards.purchaseId = finance.recent.first { it.description == "Restaurante Sol" }.id
-        }
-        21 -> finance.planning.seriesToEdit = finance.planning.series.first { it.name == "Streaming" }
-        23 -> finance.planning.selectedGoalId = finance.planning.goals.first().id
-        24 -> finance.planning.goalToEdit = finance.planning.goals.first { it.name == "Viaje a Lisboa" }
-        26 -> finance.investments.selectedId = finance.investments.holdings.first { it.name == "Fondo indexado mundial" }.id
+        6 -> Route.Cuenta(finance.activeAccounts.first().id)
+        // La ruta no lleva importes ni textos: el formulario sale con la cuenta elegida y lo demás vacío.
+        7 -> Route.FormMovimiento(accountId = primero.accountId)
+        8 -> Route.AccionesMovimiento(primero.id)
+        34 -> Route.DetalleMovimiento(primero.id)
+        9 -> Route.FormCuenta(kind = AccountKind.Savings)
+        11 -> Route.Tarjeta(visa.id)
+        12 -> Route.CondicionesTarjeta(visa.id)
+        13 -> Route.AplazarCompra(visa.id, finance.recent.first { it.description == "Restaurante Sol" }.id)
+        21 -> Route.FormPagoFijo(finance.planning.series.first { it.name == "Streaming" }.id)
+        23 -> Route.Meta(finance.planning.goals.first().id)
+        24 -> Route.FormMeta(finance.planning.goals.first { it.name == "Viaje a Lisboa" }.id)
+        26 -> Route.Activo(finance.investments.holdings.first { it.name == "Fondo indexado mundial" }.id)
+        32 -> Route.ImportarCsv()
+        else -> rutaSinArgumentos(pantalla)
     }
 }
+
+/** Las pantallas que se abren sin elegir nada antes. */
+internal fun rutaSinArgumentos(pantalla: Int): Route = Route.decode("$pantalla") ?: Route.IniciarSesion
 
 /** Datos de muestra del diseño, solo en memoria: Ana y Leo comparten hogar y entra Ana. */
 internal suspend fun seedSample(session: Session) {

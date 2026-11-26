@@ -25,30 +25,30 @@ class SelectionTest {
         val model = FinanceModel(Household("h", "Casa"), service, { today })
         model.load()
 
-        assertNull("sin tocar nada no hay detalle", model.selectedMovement)
-
         // Se toca en la lista de la cuenta de ahorro, que no está en recent.
         val old = model.movements(quiet).single()
         assertEquals(500, model.recent.size)
         assertEquals(null, model.recent.firstOrNull { it.id == old.id })
+        assertNull("sin tocarlo no está cargado: la pantalla dice que no lo encuentra", model.movement(old.id))
         model.tappedMovement = old
-        assertEquals(old, model.selectedMovement)
+        assertEquals(old, model.movement(old.id))
+        assertNull("el tocado nunca responde por otro id", model.movement("otro"))
 
         // Editado: se ve el cambio. Borrado: ya no hay detalle, nunca otro movimiento.
         model.update(old.copy(description = "Antiguo editado"))
-        assertEquals("Antiguo editado", model.selectedMovement?.description)
-        model.delete(model.selectedMovement!!)
-        assertNull(model.selectedMovement)
+        assertEquals("Antiguo editado", model.movement(old.id)?.description)
+        model.delete(model.movement(old.id)!!)
+        assertNull(model.movement(old.id))
     }
 
     @Test
-    fun selectedAccountIsNeverAnotherOne() = runBlocking {
+    fun aCardThatIsGoneIsNeverAnotherOne() = runBlocking {
         val service = InMemoryFinance()
-        service.createAccount(AccountDraft("Corriente", AccountKind.Checking), "h")
+        val visa = service.createAccount(AccountDraft("Visa", AccountKind.CreditCard), "h")
         val model = FinanceModel(Household("h", "Casa"), service, { today })
         model.load()
-        assertNull(model.selectedAccount)
-        model.selectedAccountId = "borrada"
-        assertNull(model.selectedAccount)
+        assertEquals("sin id, la primera tarjeta", visa.id, model.cards.card(null)?.id)
+        assertEquals(visa.id, model.cards.card(visa.id)?.id)
+        assertNull("una ruta con una tarjeta borrada no abre otra", model.cards.card("borrada"))
     }
 }
