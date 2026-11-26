@@ -104,7 +104,7 @@ struct HouseholdOnboardingView: View {
             do {
                 try await action()
             } catch let appError as AppError {
-                error = appError.errorDescription
+                error = appError.text
             } catch {
                 self.error = AppError.unknown("").errorDescription
             }
@@ -242,7 +242,7 @@ struct HouseholdView: View {
             Button("Guardar") {
                 Task {
                     do { try await session.renameHousehold(household, to: newName) }
-                    catch { model.error = (error as? AppError)?.errorDescription ?? "No se ha podido cambiar el nombre." }
+                    catch { model.error = (error as? AppError)?.text ?? "No se ha podido cambiar el nombre." }
                 }
             }
         } message: {
@@ -356,7 +356,7 @@ extension HouseholdView {
             do {
                 try await action()
             } catch {
-                model.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+                model.error = (error as? AppError)?.text ?? AppError.unknown("").errorDescription
             }
         }
     }

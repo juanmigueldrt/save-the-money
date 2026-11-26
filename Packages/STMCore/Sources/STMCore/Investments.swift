@@ -188,14 +188,24 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         return String(letters).uppercased()
     }
 
-    public var issue: String? {
-        if trimmedName.isEmpty { return "Ponle un nombre." }
-        if trimmedName.count > 60 { return "El nombre es demasiado largo." }
-        if let symbol = trimmedSymbol, symbol.count > 20 { return "El código es demasiado largo." }
-        if price < 0 { return "El precio no puede ser negativo." }
-        if price.rounded(scale: 6) != price { return "Como mucho 6 decimales en el precio." }
-        if feeRate < 0 || feeRate > 10 { return "La comisión tiene que estar entre 0 y 10 %." }
-        if let note, note.count > 200 { return "La nota es demasiado larga." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+        case symbolTooLong
+        case negativePrice
+        case priceTooPrecise
+        case feeRateOutOfRange
+        case noteTooLong
+    }
+
+    public var issue: Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > 60 { return .nameTooLong }
+        if let symbol = trimmedSymbol, symbol.count > 20 { return .symbolTooLong }
+        if price < 0 { return .negativePrice }
+        if price.rounded(scale: 6) != price { return .priceTooPrecise }
+        if feeRate < 0 || feeRate > 10 { return .feeRateOutOfRange }
+        if let note, note.count > 200 { return .noteTooLong }
         return nil
     }
 
@@ -322,30 +332,40 @@ public struct InvestmentTrade: Identifiable, Hashable, Codable, Sendable {
     /// Lo que sale de la cuenta en una compra (más la comisión) o entra en una venta (menos la comisión).
     public var cashImpact: Money { side == .buy ? -(gross + fee) : gross - fee }
 
-    public var issue: String? {
-        if quantity <= 0 { return "Indica cuántas participaciones." }
-        if quantity.rounded(scale: 8) != quantity { return "Como mucho 8 decimales en las participaciones." }
-        if price < 0 { return "El precio no puede ser negativo." }
-        if price.rounded(scale: 6) != price { return "Como mucho 6 decimales en el precio." }
-        if fee.isNegative { return "La comisión no puede ser negativa." }
-        if let note, note.count > 200 { return "La nota es demasiado larga." }
+    public enum Issue: Equatable, Sendable {
+        case quantityNotPositive
+        case quantityTooPrecise
+        case negativePrice
+        case priceTooPrecise
+        case negativeFee
+        case noteTooLong
+        /// La venta deja la posición en negativo (en el servidor, STM02).
+        case notEnoughShares
+        /// Sin esta compra, una venta posterior se queda sin participaciones (en el servidor, STM03).
+        case neededByLaterSale
+    }
+
+    public var issue: Issue? {
+        if quantity <= 0 { return .quantityNotPositive }
+        if quantity.rounded(scale: 8) != quantity { return .quantityTooPrecise }
+        if price < 0 { return .negativePrice }
+        if price.rounded(scale: 6) != price { return .priceTooPrecise }
+        if fee.isNegative { return .negativeFee }
+        if let note, note.count > 200 { return .noteTooLong }
         return nil
     }
 
-    public static let notEnoughShares = "No tienes tantas participaciones para vender."
-    public static let neededByLaterSale = "No se puede borrar esta compra: una venta posterior se quedaría sin participaciones."
-
     /// Además de `issue`: una venta no puede dejar la posición en negativo en ninguna fecha,
     /// tampoco en las posteriores a la suya. Es la misma regla que aplica el servidor.
-    public func issue(given others: [InvestmentTrade]) -> String? {
+    public func issue(given others: [InvestmentTrade]) -> Issue? {
         if let issue { return issue }
         guard side == .sell else { return nil }
-        return Position.isOversold(holdingId, in: others.filter { $0.id != id } + [self]) ? Self.notEnoughShares : nil
+        return Position.isOversold(holdingId, in: others.filter { $0.id != id } + [self]) ? .notEnoughShares : nil
     }
 
     /// Por qué no se puede borrar, o nil: sin una compra, una venta posterior puede quedarse sin participaciones.
-    public func deletionIssue(given others: [InvestmentTrade]) -> String? {
-        side == .buy && Position.isOversold(holdingId, in: others.filter { $0.id != id }) ? Self.neededByLaterSale : nil
+    public func deletionIssue(given others: [InvestmentTrade]) -> Issue? {
+        side == .buy && Position.isOversold(holdingId, in: others.filter { $0.id != id }) ? .neededByLaterSale : nil
     }
 
     enum CodingKeys: String, CodingKey {
@@ -720,12 +740,20 @@ public struct InvestmentPlan: Identifiable, Hashable, Codable, Sendable, Archiva
         return Money(minor: Decimal(monthlyAmount.minor).multiplied(by: factor, scale: 0).intValue, currency: amount.currency)
     }
 
-    public var issue: String? {
-        if amount.minor <= 0 { return "El importe tiene que ser mayor que cero." }
-        if !(1...52).contains(recurrence.every) { return "La frecuencia no es válida." }
-        if let endsOn, endsOn < startsOn { return "No puede terminar antes de empezar." }
-        if expectedAnnualReturn < -50 || expectedAnnualReturn > 50 { return "La rentabilidad supuesta tiene que estar entre −50 y 50 %." }
-        if let days = remindDaysBefore, !(0...14).contains(days) { return "El aviso puede ser de 0 a 14 días antes." }
+    public enum Issue: Equatable, Sendable {
+        case amountNotPositive
+        case badFrequency
+        case endsBeforeStart
+        case returnOutOfRange
+        case reminderOutOfRange
+    }
+
+    public var issue: Issue? {
+        if amount.minor <= 0 { return .amountNotPositive }
+        if !(1...52).contains(recurrence.every) { return .badFrequency }
+        if let endsOn, endsOn < startsOn { return .endsBeforeStart }
+        if expectedAnnualReturn < -50 || expectedAnnualReturn > 50 { return .returnOutOfRange }
+        if let days = remindDaysBefore, !(0...14).contains(days) { return .reminderOutOfRange }
         return nil
     }
 

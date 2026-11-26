@@ -105,7 +105,7 @@ final class SessionModel {
         } catch {
             // Con un hogar ya abierto se queda donde estaba; quien llamó enseña el aviso.
             if case .ready = state { throw error }
-            state = .offline(((error as? AppError) ?? .unknown("")).errorDescription ?? "")
+            state = .offline(((error as? AppError) ?? .unknown("")).text ?? "")
             throw error
         }
     }
@@ -136,7 +136,7 @@ final class SessionModel {
         do {
             try await services.auth.signOut()
         } catch {
-            signOutError = "No se ha podido cerrar la sesión en el servidor. " + ((error as? AppError)?.errorDescription ?? "")
+            signOutError = "No se ha podido cerrar la sesión en el servidor. " + ((error as? AppError)?.text ?? "")
         }
         // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
         await clearLocalData()

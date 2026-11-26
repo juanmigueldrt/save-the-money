@@ -110,7 +110,7 @@ struct AccountFormView: View {
     private func save() async {
         guard let opening = parsedOpening else { error = "El saldo inicial no es un importe válido."; return }
         let draft = AccountDraft(id: newAccountId, name: name, kind: kind, openingBalance: opening, ownerId: ownerId)
-        if let issue = draft.issue { error = issue; return }
+        if let issue = draft.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         let ok: Bool

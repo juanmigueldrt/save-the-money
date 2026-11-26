@@ -95,7 +95,7 @@ struct PreviewSection: View {
         if !problems.isEmpty {
             Section("Filas que no se importarán (\(problems.count))") {
                 ForEach(problems.prefix(10)) { row in
-                    Text("Fila \(row.line): \(row.issue ?? "")")
+                    Text("Fila \(row.line): \(row.issue?.text ?? "")")
                         .font(Typography.footnote)
                         .foregroundStyle(Palette.negativeText)
                 }

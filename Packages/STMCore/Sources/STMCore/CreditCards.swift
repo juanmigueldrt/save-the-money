@@ -88,22 +88,35 @@ public struct CreditCardTerms: Identifiable, Hashable, Codable, Sendable {
         self.alertPercent = alertPercent
     }
 
-    /// Problema que impide guardarla, en español, o nil si es válida.
-    public var issue: String? {
-        if creditLimit.minor <= 0 { return "El límite tiene que ser mayor que cero." }
-        if !(1...28).contains(statementDay) { return "El día del extracto va del 1 al 28." }
-        if !(1...28).contains(paymentDay) { return "El día del cargo va del 1 al 28." }
-        if !(0...2).contains(paymentDelayMonths) { return "El cargo puede ser el mismo mes del extracto o hasta dos meses después." }
-        if paymentMode == .fixed, (fixedPayment?.minor ?? 0) <= 0 { return "Indica la cuota fija que pagas cada mes." }
-        if let fixedPayment, fixedPayment.minor <= 0 { return "La cuota fija tiene que ser mayor que cero." }
-        if minPaymentPercent < 0 || minPaymentPercent > 100 { return "El % del pago mínimo va de 0 a 100." }
-        if minPayment.minor < 0 { return "El pago mínimo no puede ser negativo." }
-        if revolvingRate < 0 || revolvingRate > 60 || installmentRate < 0 || installmentRate > 60 {
-            return "El interés tiene que estar entre 0 y 60 %."
-        }
-        if payFromAccountId == accountId { return "La tarjeta no se puede pagar a sí misma." }
-        if let remindDaysBefore, !(0...14).contains(remindDaysBefore) { return "El aviso puede ser de 0 a 14 días antes." }
-        if let alertPercent, !(1...100).contains(alertPercent) { return "El aviso del límite va del 1 al 100 %." }
+    public enum Issue: Equatable, Sendable {
+        case limitNotPositive
+        case statementDayOutOfRange
+        case paymentDayOutOfRange
+        case paymentDelayOutOfRange
+        case fixedPaymentMissing
+        case fixedPaymentNotPositive
+        case minPaymentPercentOutOfRange
+        case minPaymentNegative
+        case rateOutOfRange
+        case paysItself
+        case reminderOutOfRange
+        case alertPercentOutOfRange
+    }
+
+    /// Problema que impide guardarla, o nil si es válida. El texto lo pone la app.
+    public var issue: Issue? {
+        if creditLimit.minor <= 0 { return .limitNotPositive }
+        if !(1...28).contains(statementDay) { return .statementDayOutOfRange }
+        if !(1...28).contains(paymentDay) { return .paymentDayOutOfRange }
+        if !(0...2).contains(paymentDelayMonths) { return .paymentDelayOutOfRange }
+        if paymentMode == .fixed, (fixedPayment?.minor ?? 0) <= 0 { return .fixedPaymentMissing }
+        if let fixedPayment, fixedPayment.minor <= 0 { return .fixedPaymentNotPositive }
+        if minPaymentPercent < 0 || minPaymentPercent > 100 { return .minPaymentPercentOutOfRange }
+        if minPayment.minor < 0 { return .minPaymentNegative }
+        if revolvingRate < 0 || revolvingRate > 60 || installmentRate < 0 || installmentRate > 60 { return .rateOutOfRange }
+        if payFromAccountId == accountId { return .paysItself }
+        if let remindDaysBefore, !(0...14).contains(remindDaysBefore) { return .reminderOutOfRange }
+        if let alertPercent, !(1...100).contains(alertPercent) { return .alertPercentOutOfRange }
         return nil
     }
 
@@ -210,9 +223,14 @@ public struct CardInstallment: Identifiable, Hashable, Codable, Sendable {
     /// Plazos que se ofrecen en la app. La base de datos admite de 2 a 48.
     public static let commonMonths = [3, 6, 9, 12]
 
-    public var issue: String? {
-        if !(2...48).contains(months) { return "Se puede aplazar de 2 a 48 meses." }
-        if rate < 0 || rate > 60 { return "El interés tiene que estar entre 0 y 60 %." }
+    public enum Issue: Equatable, Sendable {
+        case monthsOutOfRange
+        case rateOutOfRange
+    }
+
+    public var issue: Issue? {
+        if !(2...48).contains(months) { return .monthsOutOfRange }
+        if rate < 0 || rate > 60 { return .rateOutOfRange }
         return nil
     }
 

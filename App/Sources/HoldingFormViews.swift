@@ -123,7 +123,7 @@ struct HoldingFormView: View {
         item.feeRate = feeValue
         item.note = trimmedNote.isEmpty ? nil : trimmedNote
         if holding == nil { item.price = priceValue; item.priceOn = priceValue > 0 ? CalendarDay() : nil }
-        if let issue = item.issue { error = issue; return }
+        if let issue = item.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         guard let saved = await investments.save(item) else { error = investments.error; return }

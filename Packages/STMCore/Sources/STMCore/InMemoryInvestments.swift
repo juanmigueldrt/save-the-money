@@ -39,7 +39,7 @@ extension InMemoryBackend: InvestmentService {
 
     public func createHolding(_ holding: Holding) async throws -> Holding {
         let user = try requireInvestmentMember(of: holding.householdId)
-        if let issue = holding.issue { throw AppError.invalidInput(issue) }
+        if let issue = holding.issue { throw AppError.validation(.holding(issue)) }
         try checkHoldingReferences(holding, in: holding.householdId, by: user)
         // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
         if let stored = try replayed(holdingList.first(where: { $0.id == holding.id }), by: user, same: {
@@ -55,7 +55,7 @@ extension InMemoryBackend: InvestmentService {
     }
 
     public func updateHolding(_ holding: Holding) async throws -> Holding {
-        if let issue = holding.issue { throw AppError.invalidInput(issue) }
+        if let issue = holding.issue { throw AppError.validation(.holding(issue)) }
         guard let index = holdingList.firstIndex(where: { $0.id == holding.id }) else { throw AppError.movementChanged }
         let householdId = holdingList[index].householdId
         let user = try requireCurrent(holding.id, seen: holding.updatedAt, stored: holdingList[index].updatedAt, in: householdId)
@@ -132,7 +132,7 @@ extension InMemoryBackend: InvestmentService {
             }
             return stored
         }
-        if let issue = trade.issue(given: tradeList) { throw AppError.invalidInput(issue) }
+        if let issue = trade.issue(given: tradeList) { throw AppError.validation(.trade(issue)) }
         if let cash {
             let movement = try validated(MovementDraft(accountId: cash.accountId, categoryId: cash.categoryId,
                                                        bookedOn: trade.tradedOn, amount: cash.amount,
@@ -153,7 +153,7 @@ extension InMemoryBackend: InvestmentService {
         guard let trade = tradeList.first(where: { $0.id == tradeId }) else { return }
         let user = try requireInvestmentMember(of: trade.householdId)
         guard isMine(tradeId, in: trade.householdId, user: user) else { return }
-        if let issue = trade.deletionIssue(given: tradeList) { throw AppError.invalidInput(issue) }
+        if let issue = trade.deletionIssue(given: tradeList) { throw AppError.validation(.trade(issue)) }
         tradeList.removeAll { $0.id == tradeId }
     }
 
@@ -166,7 +166,7 @@ extension InMemoryBackend: InvestmentService {
 
     public func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
         let user = try requireInvestmentMember(of: plan.householdId)
-        if let issue = plan.issue { throw AppError.invalidInput(issue) }
+        if let issue = plan.issue { throw AppError.validation(.plan(issue)) }
         _ = try holding(plan.holdingId, in: plan.householdId, by: user)
         if let account = plan.accountId,
            !financeAccounts.contains(where: { $0.id == account && $0.householdId == plan.householdId })
@@ -185,7 +185,7 @@ extension InMemoryBackend: InvestmentService {
     }
 
     public func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
-        if let issue = plan.issue { throw AppError.invalidInput(issue) }
+        if let issue = plan.issue { throw AppError.validation(.plan(issue)) }
         guard let index = planList.firstIndex(where: { $0.id == plan.id }) else { throw AppError.movementChanged }
         let original = planList[index]
         let user = try requireCurrent(plan.id, seen: plan.updatedAt, stored: original.updatedAt, in: original.householdId)

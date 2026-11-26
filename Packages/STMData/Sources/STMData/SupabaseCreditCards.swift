@@ -19,7 +19,7 @@ extension SupabaseBackend: CreditCardService {
     }
 
     public func saveCreditCard(_ terms: CreditCardTerms) async throws -> CreditCardTerms {
-        if let issue = terms.issue { throw AppError.invalidInput(issue) }
+        if let issue = terms.issue { throw AppError.validation(.cardTerms(issue)) }
         return try await saved(Self.saveCreditCardCall(terms), columns: Self.cardColumns)
     }
 
@@ -53,7 +53,7 @@ extension SupabaseBackend: CreditCardService {
     }
 
     public func saveInstallment(_ installment: CardInstallment) async throws -> CardInstallment {
-        if let issue = installment.issue { throw AppError.invalidInput(issue) }
+        if let issue = installment.issue { throw AppError.validation(.installment(issue)) }
         return try await saved(Self.saveInstallmentCall(installment), columns: Self.installmentColumns)
     }
 

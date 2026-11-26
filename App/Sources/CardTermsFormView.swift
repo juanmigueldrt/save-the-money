@@ -138,7 +138,7 @@ struct CardTermsFormView: View {
             minPaymentPercent: percent, minPayment: minimum, revolvingRate: revolving, installmentRate: installment,
             payFromAccountId: payFrom, remindDaysBefore: reminds ? remindDays : nil, alertPercent: alerts ? alertPercent : nil,
             updatedAt: seenVersion)
-        if let issue = terms.issue { error = issue; return }
+        if let issue = terms.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         if await cards.save(terms) { dismiss() } else { error = cards.error }

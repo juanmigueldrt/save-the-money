@@ -155,11 +155,19 @@ public struct CreditScore: Identifiable, Hashable, Codable, Sendable {
         return text.isEmpty ? nil : text
     }
 
-    public var issue: String? {
-        if !(100...1000).contains(maxScore) { return "La escala tiene que estar entre 100 y 1000." }
-        if score < 0 || score > maxScore { return "El score tiene que estar entre 0 y \(maxScore)." }
-        if let provider = trimmedProvider, provider.count > 60 { return "El nombre del proveedor es demasiado largo." }
-        if let note, note.count > 200 { return "La nota es demasiado larga." }
+    public enum Issue: Equatable, Sendable {
+        case scaleOutOfRange
+        /// Con el máximo de la escala.
+        case scoreOutOfRange(max: Int)
+        case providerTooLong
+        case noteTooLong
+    }
+
+    public var issue: Issue? {
+        if !(100...1000).contains(maxScore) { return .scaleOutOfRange }
+        if score < 0 || score > maxScore { return .scoreOutOfRange(max: maxScore) }
+        if let provider = trimmedProvider, provider.count > 60 { return .providerTooLong }
+        if let note, note.count > 200 { return .noteTooLong }
         return nil
     }
 

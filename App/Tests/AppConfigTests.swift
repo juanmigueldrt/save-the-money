@@ -159,7 +159,7 @@ final class FinanceModelTests: XCTestCase {
 
         let failed = await finance.add(MovementDraft(accountId: account.id, bookedOn: day, amount: .zero, description: "Nada"))
         XCTAssertFalse(failed)
-        XCTAssertEqual(finance.error, "El importe no puede ser cero.")
+        XCTAssertEqual(finance.error, MovementDraft.Issue.amountZero.text)
     }
 }
 

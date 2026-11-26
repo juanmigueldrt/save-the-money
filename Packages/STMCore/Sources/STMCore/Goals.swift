@@ -2,20 +2,6 @@ import Foundation
 
 public enum GoalKind: String, Codable, CaseIterable, Sendable {
     case savings, debt
-
-    public var title: String {
-        switch self {
-        case .savings: "Ahorro"
-        case .debt: "Pagar una deuda"
-        }
-    }
-
-    public var systemImage: String {
-        switch self {
-        case .savings: "banknote"
-        case .debt: "creditcard"
-        }
-    }
 }
 
 /// Una meta del hogar: juntar una cantidad o terminar de pagar una deuda.
@@ -58,12 +44,21 @@ public struct Goal: Identifiable, Hashable, Codable, Sendable, Named, Archivable
         self.archivedAt = archivedAt
     }
 
-    public var issue: String? {
-        if trimmedName.isEmpty { return "Ponle un nombre a la meta." }
-        if trimmedName.count > 60 { return "El nombre es demasiado largo." }
-        if target.minor <= 0 { return kind == .debt ? "Indica cuánto se debe." : "Indica cuánto quieres juntar." }
-        if starting.isNegative { return "Lo que ya tienes no puede ser negativo." }
-        if let monthlyPlan, monthlyPlan.isNegative { return "La aportación mensual no puede ser negativa." }
+    public enum Issue: Equatable, Sendable {
+        case nameMissing
+        case nameTooLong
+        /// Sin objetivo; el texto cambia si es una deuda.
+        case targetNotPositive(GoalKind)
+        case startingNegative
+        case monthlyPlanNegative
+    }
+
+    public var issue: Issue? {
+        if trimmedName.isEmpty { return .nameMissing }
+        if trimmedName.count > 60 { return .nameTooLong }
+        if target.minor <= 0 { return .targetNotPositive(kind) }
+        if starting.isNegative { return .startingNegative }
+        if let monthlyPlan, monthlyPlan.isNegative { return .monthlyPlanNegative }
         return nil
     }
 
@@ -131,9 +126,14 @@ public struct GoalContribution: Identifiable, Hashable, Codable, Sendable {
         self.note = note
     }
 
-    public var issue: String? {
-        if amount.minor == 0 { return "El importe no puede ser cero." }
-        if let note, note.count > 200 { return "La nota es demasiado larga." }
+    public enum Issue: Equatable, Sendable {
+        case amountZero
+        case noteTooLong
+    }
+
+    public var issue: Issue? {
+        if amount.minor == 0 { return .amountZero }
+        if let note, note.count > 200 { return .noteTooLong }
         return nil
     }
 

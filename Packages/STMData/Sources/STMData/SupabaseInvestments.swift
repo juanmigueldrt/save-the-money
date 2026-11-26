@@ -23,12 +23,12 @@ extension SupabaseBackend: InvestmentService {
     }
 
     public func createHolding(_ holding: Holding) async throws -> Holding {
-        if let issue = holding.issue { throw AppError.invalidInput(issue) }
+        if let issue = holding.issue { throw AppError.validation(.holding(issue)) }
         return try await saved(Self.createHoldingCall(holding), columns: Self.holdingColumns)
     }
 
     public func updateHolding(_ holding: Holding) async throws -> Holding {
-        if let issue = holding.issue { throw AppError.invalidInput(issue) }
+        if let issue = holding.issue { throw AppError.validation(.holding(issue)) }
         return try await saved(Self.updateHoldingCall(holding), columns: Self.holdingColumns)
     }
 
@@ -99,10 +99,10 @@ extension SupabaseBackend: InvestmentService {
     /// `create_trade` guarda la operación y su movimiento en una sola transacción y no repite una ya guardada.
     /// Que haya participaciones para vender lo comprueba el servidor, con todas las operaciones del activo.
     public func addTrade(_ trade: InvestmentTrade, cash: TradeCash?) async throws -> InvestmentTrade {
-        if let issue = trade.issue { throw AppError.invalidInput(issue) }
+        if let issue = trade.issue { throw AppError.validation(.trade(issue)) }
         if let cash, let issue = MovementDraft(accountId: cash.accountId, bookedOn: trade.tradedOn, amount: cash.amount,
                                                description: cash.description).issue {
-            throw AppError.invalidInput(issue)
+            throw AppError.validation(.movement(issue))
         }
         let rows: [InvestmentTrade] = try await mapped {
             try await client.rpc("create_trade", params: TradeParams(trade: trade, cash: cash))
@@ -133,12 +133,12 @@ extension SupabaseBackend: InvestmentService {
     }
 
     public func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
-        if let issue = plan.issue { throw AppError.invalidInput(issue) }
+        if let issue = plan.issue { throw AppError.validation(.plan(issue)) }
         return try await saved(Self.createPlanCall(plan), columns: Self.planColumns)
     }
 
     public func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan {
-        if let issue = plan.issue { throw AppError.invalidInput(issue) }
+        if let issue = plan.issue { throw AppError.validation(.plan(issue)) }
         return try await saved(Self.updatePlanCall(plan), columns: Self.planColumns)
     }
 

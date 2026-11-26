@@ -369,7 +369,7 @@ struct RecurringFormView: View {
 
     private func save() async {
         guard let item = build() else { return }
-        if let issue = item.issue { error = issue; return }
+        if let issue = item.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }
         if await planning.save(item) { dismiss() } else { error = planning.error }

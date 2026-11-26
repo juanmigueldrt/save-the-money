@@ -30,7 +30,7 @@ extension InMemoryBackend: RecurringService, GoalService {
 
     public func createRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
         let user = try requirePlanningMember(of: series.householdId)
-        if let issue = series.issue { throw AppError.invalidInput(issue) }
+        if let issue = series.issue { throw AppError.validation(.recurring(issue)) }
         try checkReferences(account: series.accountId, category: series.categoryId, in: series.householdId, by: user)
         // Repetir el alta solo vale con el mismo hogar, nombre, tipo, importe y primer día.
         if let stored = try replayed(recurring.first(where: { $0.id == series.id }), by: user, same: {
@@ -46,7 +46,7 @@ extension InMemoryBackend: RecurringService, GoalService {
     }
 
     public func updateRecurring(_ series: RecurringSeries) async throws -> RecurringSeries {
-        if let issue = series.issue { throw AppError.invalidInput(issue) }
+        if let issue = series.issue { throw AppError.validation(.recurring(issue)) }
         guard let index = recurring.firstIndex(where: { $0.id == series.id }) else { throw AppError.movementChanged }
         let householdId = recurring[index].householdId
         let user = try requireCurrent(series.id, seen: series.updatedAt, stored: recurring[index].updatedAt, in: householdId)
@@ -134,7 +134,7 @@ extension InMemoryBackend: RecurringService, GoalService {
 
     public func createGoal(_ goal: Goal) async throws -> Goal {
         let user = try requirePlanningMember(of: goal.householdId)
-        if let issue = goal.issue { throw AppError.invalidInput(issue) }
+        if let issue = goal.issue { throw AppError.validation(.goal(issue)) }
         try checkReferences(account: goal.accountId, category: nil, in: goal.householdId, by: user)
         // Repetir el alta solo vale con el mismo hogar, nombre, tipo y objetivo.
         if let stored = try replayed(goalList.first(where: { $0.id == goal.id }), by: user, same: {
@@ -150,7 +150,7 @@ extension InMemoryBackend: RecurringService, GoalService {
     }
 
     public func updateGoal(_ goal: Goal) async throws -> Goal {
-        if let issue = goal.issue { throw AppError.invalidInput(issue) }
+        if let issue = goal.issue { throw AppError.validation(.goal(issue)) }
         guard let index = goalList.firstIndex(where: { $0.id == goal.id }) else { throw AppError.movementChanged }
         let householdId = goalList[index].householdId
         let user = try requireCurrent(goal.id, seen: goal.updatedAt, stored: goalList[index].updatedAt, in: householdId)
@@ -178,7 +178,7 @@ extension InMemoryBackend: RecurringService, GoalService {
 
     public func addContribution(_ contribution: GoalContribution) async throws -> GoalContribution {
         let user = try requirePlanningMember(of: contribution.householdId)
-        if let issue = contribution.issue { throw AppError.invalidInput(issue) }
+        if let issue = contribution.issue { throw AppError.validation(.contribution(issue)) }
         guard goalList.contains(where: { $0.id == contribution.goalId && $0.householdId == contribution.householdId }),
               isMine(contribution.goalId, in: contribution.householdId, user: user) else {
             throw AppError.unknown("meta de otro hogar")

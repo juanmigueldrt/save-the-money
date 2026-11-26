@@ -267,7 +267,7 @@ struct MovementFormView: View {
                                   amount: signed, description: concept,
                                   notes: trimmedNotes.isEmpty ? nil : trimmedNotes,
                                   excluded: excluded, payee: Payee.clean(payee), tags: MovementTags.normalize(tagsText))
-        if let issue = draft.issue { error = issue; return }
+        if let issue = draft.issue { error = issue.text; return }
 
         isWorking = true
         defer { isWorking = false }

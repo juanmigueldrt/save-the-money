@@ -27,7 +27,7 @@ extension InMemoryBackend: BudgetService {
 
     public func savePaySchedule(_ schedule: PaySchedule) async throws -> PaySchedule {
         let user = try requireUser()
-        if let issue = schedule.issue { throw AppError.invalidInput(issue) }
+        if let issue = schedule.issue { throw AppError.validation(.paySchedule(issue)) }
         paySchedules[user] = schedule
         return schedule
     }
@@ -40,7 +40,7 @@ extension InMemoryBackend: BudgetService {
 
     public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
         let user = try requireBudgetMember(of: budget.householdId)
-        if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        if let issue = budget.issue { throw AppError.validation(.extraBudget(issue)) }
         let stored = extraBudgetList.first { $0.id == budget.id }
         if budget.updatedAt == nil {
             // Alta: repetirla solo vale con el mismo hogar, nombre, límite y primer día.
@@ -81,7 +81,7 @@ extension InMemoryBackend: BudgetService {
 
     public func saveBudget(_ budget: Budget) async throws -> Budget {
         let user = try requireBudgetMember(of: budget.householdId)
-        if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        if let issue = budget.issue { throw AppError.validation(.budget(issue)) }
         let ownCategories = Set(financeCategories.filter {
             $0.householdId == budget.householdId && isMine($0.id, in: budget.householdId, user: user)
         }.map(\.id))

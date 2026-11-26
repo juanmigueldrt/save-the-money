@@ -83,7 +83,7 @@ struct ChangePasswordView: View {
                 onChanged()
                 dismiss()
             } catch let appError as AppError {
-                error = appError.errorDescription
+                error = appError.text
             } catch {
                 self.error = AppError.unknown("").errorDescription
             }

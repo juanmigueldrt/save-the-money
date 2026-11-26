@@ -37,7 +37,7 @@ extension SupabaseBackend: BudgetService {
     }
 
     public func saveBudget(_ budget: Budget) async throws -> Budget {
-        if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        if let issue = budget.issue { throw AppError.validation(.budget(issue)) }
         let params = SaveBudgetParams(budget)
         try await mapped {
             try await client.rpc("save_period_budget", params: params).execute()
@@ -57,7 +57,7 @@ extension SupabaseBackend: BudgetService {
     }
 
     public func savePaySchedule(_ schedule: PaySchedule) async throws -> PaySchedule {
-        if let issue = schedule.issue { throw AppError.invalidInput(issue) }
+        if let issue = schedule.issue { throw AppError.validation(.paySchedule(issue)) }
         let row = PayScheduleRow(schedule)
         try await mapped {
             // La fila es de quien llama (user_id por defecto = auth.uid()).
@@ -80,7 +80,7 @@ extension SupabaseBackend: BudgetService {
     }
 
     public func saveExtraBudget(_ budget: ExtraBudget) async throws -> ExtraBudget {
-        if let issue = budget.issue { throw AppError.invalidInput(issue) }
+        if let issue = budget.issue { throw AppError.validation(.extraBudget(issue)) }
         return try await saved(Self.saveExtraBudgetCall(budget), columns: Self.extraColumns)
     }
 

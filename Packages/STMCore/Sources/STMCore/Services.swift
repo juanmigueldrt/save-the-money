@@ -16,6 +16,8 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
     case alreadyMember
     case network
     case invalidInput(String)
+    /// Un dato que no pasa la validación de su modelo. El texto lo pone la app (ORC-103).
+    case validation(ValidationIssue)
     /// Lo que se quería cambiar (un movimiento o cualquier otra fila con versión, ORC-142) ya no es lo que se leyó:
     /// otro dispositivo lo cambió o lo borró antes.
     case movementChanged
@@ -35,11 +37,33 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
         case .alreadyMember: "Ya formas parte de ese hogar."
         case .network: "No hay conexión. Inténtalo de nuevo en un momento."
         case .invalidInput(let message): message
+        // Sin texto en el dominio: la app lo resuelve antes de enseñarlo. Este es solo el de reserva.
+        case .validation: "Algún dato no es válido. Revisa el formulario."
         case .movementChanged:
             "Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta."
         case .unknown: "Algo ha fallado. Inténtalo de nuevo."
         }
     }
+}
+
+/// El problema de validación de cada modelo, para llevarlo tipado dentro de `AppError.validation`.
+public enum ValidationIssue: Equatable, Sendable {
+    case paySchedule(PaySchedule.Issue)
+    case extraBudget(ExtraBudget.Issue)
+    case budget(Budget.Issue)
+    case cardTerms(CreditCardTerms.Issue)
+    case installment(CardInstallment.Issue)
+    case category(BudgetCategory.Issue)
+    case movement(MovementDraft.Issue)
+    case account(AccountDraft.Issue)
+    case transfer(TransferDraft.Issue)
+    case goal(Goal.Issue)
+    case contribution(GoalContribution.Issue)
+    case holding(Holding.Issue)
+    case trade(InvestmentTrade.Issue)
+    case plan(InvestmentPlan.Issue)
+    case creditScore(CreditScore.Issue)
+    case recurring(RecurringSeries.Issue)
 }
 
 /// Registro e inicio de sesión.
@@ -177,11 +201,17 @@ public struct TransferDraft: Hashable, Sendable {
                        description: toDescription)]
     }
 
-    /// Problema que impide guardarla, en español, o nil si es válida.
-    public var issue: String? {
-        if fromAccountId == toAccountId { return "Elige dos cuentas distintas." }
-        if amount.minor <= 0 { return "El importe tiene que ser mayor que cero." }
-        return legs.lazy.compactMap(\.issue).first
+    public enum Issue: Equatable, Sendable {
+        case sameAccount
+        case amountNotPositive
+        case leg(MovementDraft.Issue)
+    }
+
+    /// Problema que impide guardarla, o nil si es válida. El texto lo pone la app.
+    public var issue: Issue? {
+        if fromAccountId == toAccountId { return .sameAccount }
+        if amount.minor <= 0 { return .amountNotPositive }
+        return legs.lazy.compactMap(\.issue).first.map(Issue.leg)
     }
 }
 
@@ -299,9 +329,9 @@ public protocol InvestmentService: Sendable {
     /// Guarda una compra o venta y, con `cash`, su movimiento en la cuenta: los dos o ninguno.
     /// Repetir la llamada con el mismo `trade.id` devuelve la operación ya guardada y no apunta nada nuevo;
     /// con otros datos falla con `TransferDraft.storedWithOtherData`. Una venta que deje la posición
-    /// en negativo en cualquier fecha falla con `InvestmentTrade.notEnoughShares`.
+    /// en negativo en cualquier fecha falla con `InvestmentTrade.Issue.notEnoughShares`.
     func addTrade(_ trade: InvestmentTrade, cash: TradeCash?) async throws -> InvestmentTrade
-    /// Borrar una compra de la que depende una venta posterior falla con `InvestmentTrade.neededByLaterSale`.
+    /// Borrar una compra de la que depende una venta posterior falla con `InvestmentTrade.Issue.neededByLaterSale`.
     func deleteTrade(_ tradeId: UUID) async throws
 
     func investmentPlans(in householdId: UUID) async throws -> [InvestmentPlan]

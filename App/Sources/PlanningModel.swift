@@ -158,7 +158,7 @@ final class PlanningModel: ServerModel {
     /// formulario, y guardarlo otra vez con el mismo no crea otro. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ item: RecurringSeries) async -> Bool {
-        if let issue = item.issue { error = issue; return false }
+        if let issue = item.issue { error = issue.text; return false }
         let isNew = item.updatedAt == nil
         let ok = await perform {
             let saved = isNew ? try await recurringService.createRecurring(item) : try await recurringService.updateRecurring(item)
@@ -216,7 +216,7 @@ final class PlanningModel: ServerModel {
     /// formulario, y guardarla otra vez con el mismo no crea otra. Con versión es un cambio sobre esa versión.
     @discardableResult
     func save(_ goal: Goal) async -> Bool {
-        if let issue = goal.issue { error = issue; return false }
+        if let issue = goal.issue { error = issue.text; return false }
         let isNew = goal.updatedAt == nil
         let ok = await perform {
             let saved = isNew ? try await goalService.createGoal(goal) : try await goalService.updateGoal(goal)
@@ -258,7 +258,7 @@ final class PlanningModel: ServerModel {
         let trimmed = note?.trimmingCharacters(in: .whitespacesAndNewlines)
         let item = GoalContribution(id: id, householdId: household.id, goalId: goal.id, amount: amount, madeOn: day,
                                     note: trimmed?.isEmpty == false ? trimmed : nil)
-        if let issue = item.issue { error = issue; return false }
+        if let issue = item.issue { error = issue.text; return false }
         let ok = await perform {
             let saved = try await goalService.addContribution(item)
             markChanged(\.contributions)

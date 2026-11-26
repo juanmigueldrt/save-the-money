@@ -100,7 +100,7 @@ final class PaymentCalendarTests: XCTestCase {
             row(5, day(2026, 10, 28), 200_000, "NOMINA EMPRESA FICTICIA"),
             row(6, day(2026, 11, 3), -1_299, "streaming ejemplo"),
             row(7, day(2026, 10, 9), -900, "CAFETERIA"),
-            CSVImportRow(line: 8, draft: nil, issue: "Importe vacío o no válido"),
+            CSVImportRow(line: 8, draft: nil, issue: .invalidAmount)
         ]
         let existing = [RecurringSeries(householdId: household, name: "Cafetería", amount: Money(minor: 900),
                                         startsOn: day(2026, 1, 1))]

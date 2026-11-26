@@ -32,7 +32,7 @@ struct JoinFromLinkModifier: ViewModifier {
             do {
                 try await session.join(code)
             } catch {
-                self.error = (error as? AppError)?.errorDescription ?? AppError.unknown("").errorDescription
+                self.error = (error as? AppError)?.text ?? AppError.unknown("").errorDescription
             }
         }
     }

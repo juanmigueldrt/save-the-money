@@ -77,10 +77,10 @@ final class InvestmentTests: XCTestCase {
         // Con una venta ya apuntada el 1 de junio, otra con fecha anterior no puede dejarla sin participaciones.
         let sold = trade(holding, .sell, "2", at: "11", on: day(2026, 6, 1))
         let earlier = trade(holding, .sell, "1", at: "11", on: day(2026, 5, 15))
-        XCTAssertEqual(earlier.issue(given: bought + [sold]), InvestmentTrade.notEnoughShares, "2,5 − 1 − 2 = −0,5 el 1 de junio")
+        XCTAssertEqual(earlier.issue(given: bought + [sold]), .notEnoughShares, "2,5 − 1 − 2 = −0,5 el 1 de junio")
         XCTAssertNil(trade(holding, .sell, "0.5", at: "11", on: day(2026, 5, 15)).issue(given: bought + [sold]))
         // Ni se borra la compra de la que depende; la venta sí.
-        XCTAssertEqual(bought[0].deletionIssue(given: bought + [sold]), InvestmentTrade.neededByLaterSale)
+        XCTAssertEqual(bought[0].deletionIssue(given: bought + [sold]), .neededByLaterSale)
         XCTAssertNil(sold.deletionIssue(given: bought + [sold]))
         XCTAssertNil(bought[0].deletionIssue(given: bought))
         XCTAssertNotNil(trade(holding, .buy, "0", at: "11", on: day(2026, 6, 1)).issue)
@@ -275,17 +275,17 @@ final class InvestmentTests: XCTestCase {
             let balance = try await backend.balances(in: house.id)[account.id]?.minor ?? 0
             return [trades, balance]
         }
-        func assertRejected(_ message: String, _ operation: () async throws -> Void) async {
+        func assertRejected(_ expected: AppError, _ operation: () async throws -> Void) async {
             do {
                 try await operation()
-                XCTFail("tenía que fallar: \(message)")
+                XCTFail("tenía que fallar: \(expected)")
             } catch {
-                XCTAssertEqual(error as? AppError, .invalidInput(message))
+                XCTAssertEqual(error as? AppError, expected)
             }
         }
 
         // Si el movimiento no vale o no se guarda, tampoco queda la operación.
-        await assertRejected("Escribe un concepto.") {
+        await assertRejected(.validation(.movement(.descriptionMissing))) {
             _ = try await backend.addTrade(buy, cash: TradeCash(accountId: account.id, amount: Money(minor: -10_000), description: "  "))
         }
         await backend.failCalls("addMovement(_:in:)")
@@ -305,17 +305,17 @@ final class InvestmentTests: XCTestCase {
         XCTAssertEqual(now, [1, 90_000])
         var changed = buy
         changed.quantity = 11
-        await assertRejected(TransferDraft.storedWithOtherData) { _ = try await backend.addTrade(changed, cash: cash) }
-        await assertRejected(TransferDraft.storedWithOtherData) { _ = try await backend.addTrade(buy, cash: nil) }
-        await assertRejected(TransferDraft.storedWithOtherData) {
+        await assertRejected(.invalidInput(TransferDraft.storedWithOtherData)) { _ = try await backend.addTrade(changed, cash: cash) }
+        await assertRejected(.invalidInput(TransferDraft.storedWithOtherData)) { _ = try await backend.addTrade(buy, cash: nil) }
+        await assertRejected(.invalidInput(TransferDraft.storedWithOtherData)) {
             _ = try await backend.addTrade(buy, cash: TradeCash(accountId: account.id, amount: Money(minor: -9_000), description: "Compra"))
         }
 
         // La venta ingresa en la cuenta; la compra de la que depende no se puede borrar.
         let sell = InvestmentTrade(householdId: house.id, holdingId: holding.id, tradedOn: day(2026, 11, 4), side: .sell, quantity: 4, price: 12)
         _ = try await backend.addTrade(sell, cash: TradeCash(accountId: account.id, amount: sell.cashImpact, description: "Venta de Fondo global"))
-        await assertRejected(InvestmentTrade.neededByLaterSale) { try await backend.deleteTrade(buy.id) }
-        await assertRejected(InvestmentTrade.notEnoughShares) {
+        await assertRejected(.validation(.trade(.neededByLaterSale))) { try await backend.deleteTrade(buy.id) }
+        await assertRejected(.validation(.trade(.notEnoughShares))) {
             _ = try await backend.addTrade(InvestmentTrade(householdId: house.id, holdingId: holding.id, tradedOn: day(2026, 11, 3),
                                                            side: .sell, quantity: 7, price: 12))
         }

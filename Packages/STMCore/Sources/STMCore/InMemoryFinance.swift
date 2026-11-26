@@ -24,7 +24,7 @@ extension InMemoryBackend: FinanceService {
 
     public func createAccount(_ draft: AccountDraft, in householdId: UUID) async throws -> Account {
         let user = try requireMember(of: householdId)
-        if let issue = draft.issue { throw AppError.invalidInput(issue) }
+        if let issue = draft.issue { throw AppError.validation(.account(issue)) }
         if let owner = draft.ownerId, !isMember(owner, of: householdId) {
             throw AppError.invalidInput("Esa persona no es del hogar.")
         }
@@ -102,7 +102,7 @@ extension InMemoryBackend: FinanceService {
         let user = try requireMember(of: category.householdId)
         // Como el índice único del servidor: el nombre no se repite entre las categorías propias.
         let own = financeCategories.filter { creators[$0.id] == user }
-        if let issue = category.issue(among: own) { throw AppError.invalidInput(issue) }
+        if let issue = category.issue(among: own) { throw AppError.validation(.category(issue)) }
         // Repetir el alta solo vale con el mismo hogar, nombre y tipo.
         if let stored = try replayed(financeCategories.first(where: { $0.id == category.id }), by: user, same: {
             $0.householdId == category.householdId && $0.name == category.trimmedName && $0.kind == category.kind
@@ -125,7 +125,7 @@ extension InMemoryBackend: FinanceService {
         updated.name = category.trimmedName
         updated.budgetGroup = current.kind == .expense ? category.budgetGroup : nil
         updated.icon = category.icon
-        if let issue = updated.issue(among: financeCategories.filter({ creators[$0.id] == user })) { throw AppError.invalidInput(issue) }
+        if let issue = updated.issue(among: financeCategories.filter({ creators[$0.id] == user })) { throw AppError.validation(.category(issue)) }
         financeCategories[index] = updated
         return updated
     }
@@ -220,7 +220,7 @@ extension InMemoryBackend: FinanceService {
 
     /// La cuenta y la categoría tienen que ser de `user` y de ese hogar, como pide el RLS al apuntar.
     func validated(_ draft: MovementDraft, in householdId: UUID, by user: UUID) throws -> Movement {
-        if let issue = draft.issue { throw AppError.invalidInput(issue) }
+        if let issue = draft.issue { throw AppError.validation(.movement(issue)) }
         guard financeAccounts.contains(where: { $0.id == draft.accountId && $0.householdId == householdId }),
               isMine(draft.accountId, in: householdId, user: user) else {
             throw AppError.unknown("cuenta de otro hogar")
@@ -258,7 +258,7 @@ extension InMemoryBackend: FinanceService {
 
     public func addTransfer(_ transfer: TransferDraft, in householdId: UUID) async throws -> [Movement] {
         let user = try requireMember(of: householdId)
-        if let issue = transfer.issue { throw AppError.invalidInput(issue) }
+        if let issue = transfer.issue { throw AppError.validation(.transfer(issue)) }
         if let stored = transferLegs[transfer.id] {
             // Como el servidor: si las patas son de otra persona, ese id ya está usado.
             guard stored.allSatisfy({ creators[$0] == user }) else { throw AppError.idUsedBySomeoneElse }

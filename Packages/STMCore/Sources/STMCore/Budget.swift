@@ -52,10 +52,16 @@ public struct Budget: Hashable, Sendable {
         return copy
     }
 
-    public var issue: String? {
-        if expectedIncome.isNegative { return "Los ingresos previstos no pueden ser negativos." }
-        if limits.values.contains(where: \.isNegative) { return "Los límites no pueden ser negativos." }
-        if !(50...100).contains(warnPercent) { return "El aviso tiene que estar entre el 50 % y el 100 %." }
+    public enum Issue: Equatable, Sendable {
+        case negativeIncome
+        case negativeLimit
+        case warnPercentOutOfRange
+    }
+
+    public var issue: Issue? {
+        if expectedIncome.isNegative { return .negativeIncome }
+        if limits.values.contains(where: \.isNegative) { return .negativeLimit }
+        if !(50...100).contains(warnPercent) { return .warnPercentOutOfRange }
         return nil
     }
 }

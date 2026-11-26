@@ -73,7 +73,7 @@ struct AccountDetailView: View {
             } catch is CancellationError {
                 return
             } catch {
-                chartError = "No se han podido cargar los movimientos del gráfico. " + ((error as? AppError)?.errorDescription ?? "")
+                chartError = "No se han podido cargar los movimientos del gráfico. " + ((error as? AppError)?.text ?? "")
             }
         }
     }
