@@ -80,6 +80,7 @@ import com.savethemoney.android.ui.components.MerchantLogo
 import com.savethemoney.android.data.MovementText
 import com.savethemoney.android.data.MovementDraft
 import com.savethemoney.android.data.monthEndBalances
+import com.savethemoney.android.ui.Bloqueo
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
 import com.savethemoney.android.ui.LocalSession
@@ -1271,6 +1272,8 @@ fun Vacio(texto: String) {
 @Composable
 fun SelectorFecha(inicial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: () -> Unit) {
     val state = rememberDatePickerState(initialSelectedDateMillis = inicial.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli())
+    // Bloqueada, el diálogo (otra ventana) no se pinta; la fecha elegida se conserva y vuelve al desbloquear.
+    if (Bloqueo.app.bloqueada) return
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {

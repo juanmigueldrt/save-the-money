@@ -38,7 +38,8 @@ struct NewExpenseIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        QuickActionRouter.shared.open(.newExpense)
+        // Con la app bloqueada, espera a que se desbloquee.
+        AppLockModel.shared.whenUnlocked { QuickActionRouter.shared.open(.newExpense) }
         return .result()
     }
 }

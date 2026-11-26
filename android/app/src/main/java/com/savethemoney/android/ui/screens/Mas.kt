@@ -80,6 +80,7 @@ import com.savethemoney.android.data.ImportResult
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.FinanceModel
+import com.savethemoney.android.ui.AjusteBloqueo
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.iconoCategoria
@@ -439,6 +440,11 @@ fun Pantalla30(nav: Nav) {
                 "Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.",
                 Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
             )
+        }
+        // Bloqueo con huella, cara o código (ORC-111). Sólo en este dispositivo.
+        if (!session.capture) {
+            Spacer(Modifier.height(16.dp))
+            AjusteBloqueo()
         }
         Spacer(Modifier.height(16.dp))
         ListCard {

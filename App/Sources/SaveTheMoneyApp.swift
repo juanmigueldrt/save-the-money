@@ -17,6 +17,9 @@ struct SaveTheMoneyApp: App {
         _session = State(initialValue: SessionModel(services: services))
     }
 
+    /// Fase de toda la app (no la de cada ventana), para el bloqueo.
+    @Environment(\.scenePhase) private var scenePhase
+
     var body: some Scene {
         WindowGroup {
             AppRootView()
@@ -30,7 +33,9 @@ struct SaveTheMoneyApp: App {
                     #endif
                     await session.start()
                 }
-                .onOpenURL { session.handle(url: $0) }
+                // Con la app bloqueada, el enlace espera a que se desbloquee.
+                .onOpenURL { url in AppLockModel.shared.whenUnlocked { session.handle(url: url) } }
+                .modifier(AppLockModifier(appPhase: scenePhase))
         }
         .commands { AppCommands() }
         #if os(macOS)
