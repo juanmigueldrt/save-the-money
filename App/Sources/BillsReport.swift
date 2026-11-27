@@ -17,7 +17,7 @@ struct BillsReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                CapsuleSegmented("Mes", selection: $monthOffset, options: [0, 1]) { $0 == 0 ? "Este mes" : "El mes que viene" }
+                CapsuleSegmented(String(localized: "Mes"), selection: $monthOffset, options: [0, 1]) { $0 == 0 ? String(localized: "Este mes") : String(localized: "El mes que viene") }
 
                 BillsSummary(bills: bills, today: CalendarDay())
                     .card()
@@ -52,7 +52,7 @@ struct BillsReportView: View {
             let name = if case .ready(_, let household) = session.state { household.name } else { finance.household.name }
             pdf = try BillsPDF.render(bills, householdName: name, today: CalendarDay())
         } catch {
-            self.error = "No se ha podido crear el PDF."
+            self.error = String(localized: "No se ha podido crear el PDF.")
         }
     }
 }
@@ -64,7 +64,7 @@ struct BillsSummary: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
-            Eyebrow("Pagos de \(bills.month.title.lowercased())")
+            Eyebrow(String(localized: "Pagos de \(bills.month.title.lowercased())"))
             Text(bills.total.formatted())
                 .titleFont(.largeTitle)
                 .foregroundStyle(Palette.label)
@@ -74,7 +74,7 @@ struct BillsSummary: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             if bills.lines.isEmpty {
-                EmptyHint(text: "No hay pagos fijos este mes. Añádelos en Pagos fijos.")
+                EmptyHint(text: String(localized: "No hay pagos fijos este mes. Añádelos en Pagos fijos."))
             }
             ForEach(bills.lines) { line in
                 HStack(alignment: .firstTextBaseline) {
@@ -119,7 +119,7 @@ struct BillsPDFPage: View {
             }
 
             VStack(spacing: 0) {
-                row(day: "Día", name: "Concepto", account: "Cuenta", amount: "Importe", paid: "Pagado", header: true)
+                row(day: String(localized: "Día"), name: String(localized: "Concepto"), account: String(localized: "Cuenta"), amount: String(localized: "Importe"), paid: String(localized: "Pagado"), header: true)
                 ForEach(bills.lines) { line in
                     Divider().overlay(Palette.separator)
                     row(day: line.due.longTitle, name: line.name, account: line.accountName ?? "",

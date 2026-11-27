@@ -97,7 +97,7 @@ extension InMemoryBackend: RecurringService, GoalService {
         guard let user = currentUser, isMine(chargeId, in: chargeList[index].householdId, user: user) else {
             throw AppError.unknown("no existe")
         }
-        guard chargeList[index].isPending else { throw AppError.invalidInput("Ese cargo ya no está pendiente.") }
+        guard chargeList[index].isPending else { throw AppError.invalidInput(localized("Ese cargo ya no está pendiente.")) }
         let movement = try await addMovement(draft, in: chargeList[index].householdId)
         chargeList[index].status = .confirmed
         chargeList[index].transactionId = movement.id

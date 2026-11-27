@@ -65,8 +65,8 @@ final class InvestmentModel: ServerModel {
 
     /// "Ana" o "Compartido", para el subtítulo de un activo o plan.
     func ownerName(_ id: UUID?) -> String {
-        guard let id else { return "Compartido" }
-        return members.first { $0.profile.id == id }?.profile.name ?? "Otro miembro"
+        guard let id else { return String(localized: "Compartido") }
+        return members.first { $0.profile.id == id }?.profile.name ?? String(localized: "Otro miembro")
     }
 
     // MARK: Carga

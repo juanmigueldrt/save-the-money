@@ -1,0 +1,3457 @@
+{
+  "sourceLanguage" : "es",
+  "strings" : {
+    " %lld pagos recurrentes creados." : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : " %lld pagos recurrentes creados."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : " %lld pago recurrente creado."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : " %lld pagos recurrentes creados."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    " %lld ya estaban y no se han repetido." : {
+
+    },
+    " Además, no se han podido volver a cargar los datos: " : {
+
+    },
+    " El pago mínimo es el % de la deuda más los intereses, y nunca menos del importe mínimo." : {
+
+    },
+    " este mes" : {
+
+    },
+    " frente a " : {
+
+    },
+    " vs. " : {
+
+    },
+    " y %lld en pausa" : {
+
+    },
+    " · %@, cada mes" : {
+
+    },
+    " · Compra con %@" : {
+
+    },
+    " · Excluido" : {
+
+    },
+    " · de momento, puede subir con nuevas compras" : {
+
+    },
+    " · en curso" : {
+
+    },
+    "%@ %@: %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@: %3$@"
+          }
+        }
+      }
+    },
+    "%@ (incluye %@ de intereses)" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ (incluye %2$@ de intereses)"
+          }
+        }
+      }
+    },
+    "%@ al día de media · %lld movimientos" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ al día de media · %2$lld movimientos"
+          }
+        }
+      }
+    },
+    "%@ de %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ de %2$@"
+          }
+        }
+      }
+    },
+    "%@ en %lld meses · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ en %2$lld meses · %3$@"
+          }
+        }
+      }
+    },
+    "%@ en los próximos 12 meses" : {
+
+    },
+    "%@ participaciones · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ participaciones · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "%@ · %@ a %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · %2$@ a %3$@"
+          }
+        }
+      }
+    },
+    "%@ · No se importará" : {
+
+    },
+    "%@ · comisión %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · comisión %2$@"
+          }
+        }
+      }
+    },
+    "%@ · compartida" : {
+
+    },
+    "%@ · desde %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ · desde %2$@"
+          }
+        }
+      }
+    },
+    "%@ · oferta" : {
+
+    },
+    "%@, %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@, %2$@"
+          }
+        }
+      }
+    },
+    "%@. Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato." : {
+
+    },
+    "%@. Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia." : {
+
+    },
+    "%@/mes" : {
+
+    },
+    "%lld" : {
+
+    },
+    "%lld %%" : {
+
+    },
+    "%lld %% del límite" : {
+
+    },
+    "%lld %% menos que la semana anterior" : {
+
+    },
+    "%lld %% más que la semana anterior" : {
+
+    },
+    "%lld %% · %lld movimientos" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld %% · %2$lld movimientos"
+          }
+        }
+      }
+    },
+    "%lld categorías" : {
+
+    },
+    "%lld de %lld · %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld de %2$lld · %3$@"
+          }
+        }
+      }
+    },
+    "%lld días" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld días"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld día"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld días"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld días antes" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld días antes"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld día antes"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld días antes"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld elegidas." : {
+
+    },
+    "%lld meses" : {
+
+    },
+    "%lld movimientos" : {
+
+    },
+    "%lld movimientos importados." : {
+
+    },
+    "%lld movimientos · ingresos %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$lld movimientos · ingresos %2$@"
+          }
+        }
+      }
+    },
+    "%lld planes activos" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld planes activos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld plan activo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld planes activos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld plazos" : {
+
+    },
+    "%lld seleccionados" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld seleccionados"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld seleccionado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld seleccionados"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "%lld sin importar" : {
+
+    },
+    "(%@)" : {
+
+    },
+    "(tú)" : {
+
+    },
+    ", con pagos" : {
+
+    },
+    "1 día antes" : {
+
+    },
+    "1 movimiento" : {
+
+    },
+    "10" : {
+
+    },
+    "3 días antes" : {
+
+    },
+    "4K9 Q2X" : {
+
+    },
+    "500,00" : {
+
+    },
+    "=" : {
+
+    },
+    "A %@ al mes, la alcanzas en %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "A %1$@ al mes, la alcanzas en %2$@"
+          }
+        }
+      }
+    },
+    "A final de año" : {
+
+    },
+    "A las %lld:00" : {
+
+    },
+    "Abonos (ingresos)" : {
+
+    },
+    "Abre Save the Money en la pantalla de nuevo gasto, vacía." : {
+
+    },
+    "Aceptar" : {
+
+    },
+    "Activo" : {
+
+    },
+    "Actualizar" : {
+
+    },
+    "Actualizar saldo" : {
+
+    },
+    "Además se crea un pago fijo con esta tarjeta. Los próximos cargos saldrán como pendientes de confirmar." : {
+
+    },
+    "Ahora llevan: " : {
+
+    },
+    "Ahora no" : {
+
+    },
+    "Ahora suma %lld %%. Tiene que sumar 100 %%." : {
+
+    },
+    "Ahorro" : {
+
+    },
+    "Ahorro medio" : {
+
+    },
+    "Ahorro previsto" : {
+
+    },
+    "Ahorro: %lld %%" : {
+
+    },
+    "Ajuste" : {
+
+    },
+    "Al" : {
+
+    },
+    "Al abrir la app y al volver tras más de un minuto fuera. " : {
+
+    },
+    "Al menos %lld caracteres" : {
+
+    },
+    "Al pasar del %lld %%" : {
+
+    },
+    "Al ritmo de hoy gastarás" : {
+
+    },
+    "Algún importe no es válido." : {
+
+    },
+    "Alquiler, luz, agua, internet o la compra del mes: lo que se paga sí o sí." : {
+
+    },
+    "Anular" : {
+
+    },
+    "Apariencia" : {
+
+    },
+    "Aplazar" : {
+
+    },
+    "Aplazar una compra" : {
+
+    },
+    "Aportaciones" : {
+
+    },
+    "Aportaciones automáticas" : {
+
+    },
+    "Aportación" : {
+
+    },
+    "Aportación mensual prevista (opcional)" : {
+
+    },
+    "Apunta al QR de tu pareja." : {
+
+    },
+    "Apunta el score que te da tu banco o tu proveedor para ver cómo evoluciona." : {
+
+    },
+    "Apunta primero el precio de hoy para calcular la compra." : {
+
+    },
+    "Apunta tus suscripciones (música, vídeo, gimnasio...) para ver cuánto suman y recibir un aviso antes de cada cobro." : {
+
+    },
+    "Apuntar" : {
+
+    },
+    "Apuntar el pago de la tarjeta" : {
+
+    },
+    "Apuntar mi score" : {
+
+    },
+    "Apuntar precio" : {
+
+    },
+    "Apuntar score" : {
+
+    },
+    "Apuntar un pago" : {
+
+    },
+    "Apuntarlo como pendiente al llegar el día" : {
+
+    },
+    "Archivadas (%lld)" : {
+
+    },
+    "Archivados" : {
+
+    },
+    "Archivar" : {
+
+    },
+    "Archivar (ya no se paga)" : {
+
+    },
+    "Archivo" : {
+
+    },
+    "Arrastre y avisos" : {
+
+    },
+    "Avisarme al %lld %% del límite" : {
+
+    },
+    "Avisarme al acercarme al límite" : {
+
+    },
+    "Avisarme antes del cargo" : {
+
+    },
+    "Aviso" : {
+
+    },
+    "Avisos" : {
+
+    },
+    "Avisos de límites del presupuesto" : {
+
+    },
+    "Avisos de pagos fijos" : {
+
+    },
+    "Ayer" : {
+
+    },
+    "Añade antes un activo en la cartera." : {
+
+    },
+    "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco." : {
+
+    },
+    "Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes." : {
+
+    },
+    "Añade tus cuentas para ver cómo evoluciona tu patrimonio." : {
+
+    },
+    "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker." : {
+
+    },
+    "Añade una tarjeta de crédito en Cuentas para marcar compras con tarjeta." : {
+
+    },
+    "Añadir" : {
+
+    },
+    "Añadir aportación" : {
+
+    },
+    "Añadir etiqueta %@" : {
+
+    },
+    "Añadir etiquetas, p. ej. viaje" : {
+
+    },
+    "Añadir otro activo" : {
+
+    },
+    "Añadir tarjeta" : {
+
+    },
+    "Añadir un activo" : {
+
+    },
+    "Aún no cuentan en tus saldos ni en el presupuesto." : {
+
+    },
+    "Aún no has apuntado ningún precio" : {
+
+    },
+    "Aún no hay gastos en los periodos anteriores para proponer límites." : {
+
+    },
+    "Aún no hay presupuesto para este periodo. Mientras tanto, se reparten los ingresos reales con 50/30/20." : {
+
+    },
+    "Aún no hay presupuesto para este periodo. Puedes partir del de %@." : {
+
+    },
+    "Aún no hay tarjetas" : {
+
+    },
+    "Base del reparto (ingresos reales)" : {
+
+    },
+    "Beneficiario (opcional)" : {
+
+    },
+    "Beneficiario (vacío lo quita)" : {
+
+    },
+    "Bloqueada, esconde todas sus ventanas. " : {
+
+    },
+    "Borra lo que creaste tú: cuentas, tarjetas, movimientos, presupuestos, pagos fijos, metas e inversiones. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo." : {
+
+    },
+    "Borra tu usuario y todo lo que has apuntado. Pide la contraseña y no se puede deshacer." : {
+
+    },
+    "Borrar" : {
+
+    },
+    "Borrar activo" : {
+
+    },
+    "Borrar activo y sus operaciones" : {
+
+    },
+    "Borrar aportación" : {
+
+    },
+    "Borrar categoría" : {
+
+    },
+    "Borrar cuenta y movimientos" : {
+
+    },
+    "Borrar cuenta y sus movimientos" : {
+
+    },
+    "Borrar datos" : {
+
+    },
+    "Borrar datos y empezar de cero" : {
+
+    },
+    "Borrar los dos movimientos" : {
+
+    },
+    "Borrar meta" : {
+
+    },
+    "Borrar meta y aportaciones" : {
+
+    },
+    "Borrar mi cuenta" : {
+
+    },
+    "Borrar mi cuenta para siempre" : {
+
+    },
+    "Borrar movimiento" : {
+
+    },
+    "Borrar plan" : {
+
+    },
+    "Borrar presupuesto extra" : {
+
+    },
+    "Borrar todo" : {
+
+    },
+    "Borrar transferencia" : {
+
+    },
+    "Borrarlo con sus pendientes" : {
+
+    },
+    "Buscar concepto, beneficiario, #etiqueta o importe" : {
+
+    },
+    "Cada" : {
+
+    },
+    "Cada día" : {
+
+    },
+    "Cada etiqueta debe tener entre 1 y %lld caracteres." : {
+
+    },
+    "Cada hogar tiene sus propias cuentas y presupuestos. Este dispositivo recuerda cuál abriste." : {
+
+    },
+    "Caduca %@" : {
+
+    },
+    "Caduca %@ y sirve una sola vez." : {
+
+    },
+    "Calcular" : {
+
+    },
+    "Calendario de aportaciones del mes" : {
+
+    },
+    "Calendario de pagos" : {
+
+    },
+    "Cambiar el beneficiario" : {
+
+    },
+    "Cambiar el nombre del hogar" : {
+
+    },
+    "Cambiar la categoría" : {
+
+    },
+    "Cambiar la contraseña" : {
+
+    },
+    "Cambiar la cuenta" : {
+
+    },
+    "Cambiar la fecha" : {
+
+    },
+    "Cambiar nombre" : {
+
+    },
+    "Cancelar" : {
+
+    },
+    "Cargando…" : {
+
+    },
+    "Cargar más movimientos" : {
+
+    },
+    "Cargo el día %lld" : {
+
+    },
+    "Cargos (gastos)" : {
+
+    },
+    "Cargos y abonos en columnas separadas" : {
+
+    },
+    "Cartera y aportaciones automáticas" : {
+
+    },
+    "Casa de %@" : {
+
+    },
+    "Categoría" : {
+
+    },
+    "Categoría que más sube" : {
+
+    },
+    "Categorías" : {
+
+    },
+    "Categorías del hogar" : {
+
+    },
+    "Cerrar" : {
+
+    },
+    "Cerrar sesión" : {
+
+    },
+    "Clase" : {
+
+    },
+    "Cobro" : {
+
+    },
+    "Columna %lld" : {
+
+    },
+    "Columnas" : {
+
+    },
+    "Columnas como la última vez con este banco." : {
+
+    },
+    "Coma (,)" : {
+
+    },
+    "Comisión" : {
+
+    },
+    "Comisión (%@)" : {
+
+    },
+    "Comisión de compra en %, p. ej. 0,2" : {
+
+    },
+    "Comisión en € (opcional)" : {
+
+    },
+    "Como mucho %lld etiquetas por movimiento." : {
+
+    },
+    "Como mucho 6 decimales en el precio." : {
+
+    },
+    "Como mucho 8 decimales en las participaciones." : {
+
+    },
+    "Compartida con el hogar" : {
+
+    },
+    "Compartido" : {
+
+    },
+    "Compartir %@" : {
+
+    },
+    "Compartir enlace" : {
+
+    },
+    "Compartir o imprimir el PDF" : {
+
+    },
+    "Completadas" : {
+
+    },
+    "Compra" : {
+
+    },
+    "Compra apuntada: %@ participaciones." : {
+
+    },
+    "Compra con %@" : {
+
+    },
+    "Compra con tarjeta" : {
+
+    },
+    "Comprar" : {
+
+    },
+    "Comprar %@" : {
+
+    },
+    "Comprar activo" : {
+
+    },
+    "Comprar por" : {
+
+    },
+    "Compras a plazos" : {
+
+    },
+    "Con el arrastre, lo que sobre en una categoría se suma a su límite del siguiente periodo, y lo que te pases se resta." : {
+
+    },
+    "Con fecha de fin" : {
+
+    },
+    "Concepto" : {
+
+    },
+    "Concepto (opcional)" : {
+
+    },
+    "Condiciones" : {
+
+    },
+    "Condiciones de %@" : {
+
+    },
+    "Configurar tarjeta" : {
+
+    },
+    "Confirmar" : {
+
+    },
+    "Contar en el patrimonio" : {
+
+    },
+    "Contraseña" : {
+
+    },
+    "Contraseña actual" : {
+
+    },
+    "Contraseña cambiada. Esta sesión sigue abierta; en tus otros dispositivos tendrás que volver a entrar." : {
+
+    },
+    "Copiar código" : {
+
+    },
+    "Crea tu cuenta para empezar." : {
+
+    },
+    "Crea tu hogar o únete al de tu pareja con su código." : {
+
+    },
+    "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás." : {
+
+    },
+    "Creado con Save the Money el %@ de %@." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Creado con Save the Money el %1$@ de %2$@."
+          }
+        }
+      }
+    },
+    "Crear" : {
+
+    },
+    "Crear PDF" : {
+
+    },
+    "Crear cuenta" : {
+
+    },
+    "Crear hogar" : {
+
+    },
+    "Crear presupuesto" : {
+
+    },
+    "Crear un hogar" : {
+
+    },
+    "Crear una cuenta" : {
+
+    },
+    "Crear una meta" : {
+
+    },
+    "Cuando añadas pagos fijos o suscripciones verás aquí los próximos." : {
+
+    },
+    "Cuanto más oscuro, más gastaste ese día. Las últimas 6 semanas." : {
+
+    },
+    "Cuenta" : {
+
+    },
+    "Cuenta asociada" : {
+
+    },
+    "Cuenta corriente" : {
+
+    },
+    "Cuenta predeterminada" : {
+
+    },
+    "Cuentas" : {
+
+    },
+    "Cuentas, tarjetas, movimientos, categorías propias, presupuestos, pagos fijos, metas e inversiones que creaste tú. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo. Las categorías de partida vuelven a estar. Los miembros y las invitaciones se quedan." : {
+
+    },
+    "Cuota al mes" : {
+
+    },
+    "Cuota al mes, p. ej. 200" : {
+
+    },
+    "Cuánto quieres juntar" : {
+
+    },
+    "Cuánto se debía al empezar" : {
+
+    },
+    "Código QR para unirse al hogar" : {
+
+    },
+    "Código copiado" : {
+
+    },
+    "Código de 6 caracteres" : {
+
+    },
+    "Cómo te verá tu pareja" : {
+
+    },
+    "Datos" : {
+
+    },
+    "De quién es" : {
+
+    },
+    "Dejar de pagarlo desde hoy" : {
+
+    },
+    "Del" : {
+
+    },
+    "Del %@ al %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Del %1$@ al %2$@"
+          }
+        }
+      }
+    },
+    "Demasiadas categorías o cuentas." : {
+
+    },
+    "Desarchivar" : {
+
+    },
+    "Desbloquea Save the Money" : {
+
+    },
+    "Desbloquear" : {
+
+    },
+    "Descarga los movimientos desde la web o la app de tu banco en formato CSV. El archivo no se sube: sólo se guardan los movimientos." : {
+
+    },
+    "Desde" : {
+
+    },
+    "Desde " : {
+
+    },
+    "Desde el %@, sin fecha de fin" : {
+
+    },
+    "Deseos: %lld %%" : {
+
+    },
+    "Deshacer" : {
+
+    },
+    "Deuda con intereses" : {
+
+    },
+    "Deudas" : {
+
+    },
+    "Dinero" : {
+
+    },
+    "Dinos cuándo cobras en Presupuesto › Día de cobro." : {
+
+    },
+    "Disponible" : {
+
+    },
+    "Distribución" : {
+
+    },
+    "Dos meses después" : {
+
+    },
+    "Duplicar" : {
+
+    },
+    "Durante %lld cargos" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Durante %lld cargos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Durante %lld cargo"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Durante %lld cargos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Día" : {
+
+    },
+    "Día %lld" : {
+
+    },
+    "Día a día" : {
+
+    },
+    "Día de cobro" : {
+
+    },
+    "Día de inicio del mes" : {
+
+    },
+    "Dónde está" : {
+
+    },
+    "Editar" : {
+
+    },
+    "Editar %lld movimientos" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Editar %lld movimientos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Editar %lld movimiento"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Editar %lld movimientos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Editar activo" : {
+
+    },
+    "Editar categoría" : {
+
+    },
+    "Editar cuenta" : {
+
+    },
+    "Editar meta" : {
+
+    },
+    "Editar movimiento" : {
+
+    },
+    "Editar pago fijo" : {
+
+    },
+    "Editar plan" : {
+
+    },
+    "Editar presupuesto" : {
+
+    },
+    "Efectivo" : {
+
+    },
+    "El % del pago mínimo va de 0 a 100." : {
+
+    },
+    "El %@%@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "El %1$@%2$@"
+          }
+        }
+      }
+    },
+    "El archivo es demasiado grande (máximo 10 MB)." : {
+
+    },
+    "El aviso del límite va del 1 al 100 %." : {
+
+    },
+    "El aviso lo lanza este dispositivo a las 9:00. Puedes apagar todos los avisos en Más opciones." : {
+
+    },
+    "El aviso puede ser de 0 a 14 días antes." : {
+
+    },
+    "El aviso tiene que estar entre el 50 % y el 100 %." : {
+
+    },
+    "El beneficiario es demasiado largo (máximo 80 caracteres)." : {
+
+    },
+    "El cargo puede ser el mismo mes del extracto o hasta dos meses después." : {
+
+    },
+    "El concepto es demasiado largo (máximo 200 caracteres)." : {
+
+    },
+    "El código es demasiado largo." : {
+
+    },
+    "El código tiene 6 letras o números, como 4K9 Q2X." : {
+
+    },
+    "El día %lld" : {
+
+    },
+    "El día de cobro tiene que estar entre 1 y 31." : {
+
+    },
+    "El día del cargo aparece en Resumen para confirmarlo con el importe real. Hasta entonces no cuenta en saldos ni presupuesto, y si llega antes por CSV se empareja solo." : {
+
+    },
+    "El día del cargo va del 1 al 28." : {
+
+    },
+    "El día del extracto va del 1 al 28." : {
+
+    },
+    "El gasto se ha guardado, pero no se ha podido aplazar: %@" : {
+
+    },
+    "El gasto se ha guardado, pero no se ha podido crear el pago fijo: %@" : {
+
+    },
+    "El importe no es válido." : {
+
+    },
+    "El importe no puede ser cero." : {
+
+    },
+    "El importe tiene que ser mayor que cero." : {
+
+    },
+    "El interés tiene que estar entre 0 y 60 %." : {
+
+    },
+    "El límite de %@ no es un importe válido." : {
+
+    },
+    "El límite no es un importe válido." : {
+
+    },
+    "El límite tiene que ser mayor que cero." : {
+
+    },
+    "El mes del hogar empieza el día %lld." : {
+
+    },
+    "El mes del hogar empieza el día %lld. Solo quien creó el hogar puede cambiarlo." : {
+
+    },
+    "El mes que viene" : {
+
+    },
+    "El mes siguiente" : {
+
+    },
+    "El mismo día" : {
+
+    },
+    "El mismo mes del extracto" : {
+
+    },
+    "El nombre del proveedor es demasiado largo." : {
+
+    },
+    "El nombre es demasiado largo (máximo %lld letras)." : {
+
+    },
+    "El nombre es demasiado largo (máximo 60 caracteres)." : {
+
+    },
+    "El nombre es demasiado largo." : {
+
+    },
+    "El pago mínimo no es un importe válido." : {
+
+    },
+    "El pago mínimo no puede ser negativo." : {
+
+    },
+    "El pago se apunta como transferencia de la cuenta a la tarjeta, así el gasto no cuenta dos veces." : {
+
+    },
+    "El precio de oferta no es válido." : {
+
+    },
+    "El precio de oferta tiene que ser mayor que cero." : {
+
+    },
+    "El precio lo apuntas tú: búscalo en tu bróker o banco cuando quieras actualizarlo." : {
+
+    },
+    "El precio no puede ser negativo." : {
+
+    },
+    "El presupuesto va de un cobro al día antes del siguiente. Si cobras un día 31 y el mes es más corto, cuenta el último día. Sólo lo ves tú." : {
+
+    },
+    "El reparto tiene que sumar 100 %." : {
+
+    },
+    "El saldo inicial es lo que había en la cuenta antes del primer movimiento que apuntes o importes." : {
+
+    },
+    "El saldo inicial no es un importe válido." : {
+
+    },
+    "El score tiene que estar entre 0 y %@." : {
+
+    },
+    "El segundo día de cobro tiene que ir después del primero." : {
+
+    },
+    "Elegir archivo CSV" : {
+
+    },
+    "Elegir otro archivo" : {
+
+    },
+    "Elige dos cuentas distintas." : {
+
+    },
+    "Elige en Condiciones la cuenta desde la que se paga la tarjeta para saber si hay saldo." : {
+
+    },
+    "Elige la cuenta del cargo." : {
+
+    },
+    "Elige la cuenta desde la que pagas." : {
+
+    },
+    "Elige un activo." : {
+
+    },
+    "Elige un día en que hayas cobrado." : {
+
+    },
+    "Elige una compra" : {
+
+    },
+    "Elige una cuenta" : {
+
+    },
+    "Elige una cuenta." : {
+
+    },
+    "Elige uno" : {
+
+    },
+    "Empezar de cero" : {
+
+    },
+    "En pausa" : {
+
+    },
+    "En qué se fue" : {
+
+    },
+    "Entra" : {
+
+    },
+    "Entre" : {
+
+    },
+    "Es como te ven los demás miembros. Vacío, se usa tu usuario (%@); como mucho 60 caracteres." : {
+
+    },
+    "Escala" : {
+
+    },
+    "Escanear QR" : {
+
+    },
+    "Escribe %@ para confirmar" : {
+
+    },
+    "Escribe el importe y la rentabilidad con números." : {
+
+    },
+    "Escribe el importe, por ejemplo 12,99." : {
+
+    },
+    "Escribe el precio con coma para los decimales, p. ej. 12,50." : {
+
+    },
+    "Escribe el saldo, por ejemplo 1.250,00." : {
+
+    },
+    "Escribe el score con números." : {
+
+    },
+    "Escribe la comisión con números, p. ej. 0,2." : {
+
+    },
+    "Escribe la comisión con números." : {
+
+    },
+    "Escribe las participaciones con coma para los decimales, p. ej. 0,125." : {
+
+    },
+    "Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125." : {
+
+    },
+    "Escribe un concepto." : {
+
+    },
+    "Escribe un importe mayor que cero." : {
+
+    },
+    "Escribe un importe, por ejemplo 12,50." : {
+
+    },
+    "Escribe un límite, por ejemplo 800,00." : {
+
+    },
+    "Esta meta ya no existe." : {
+
+    },
+    "Esta semana" : {
+
+    },
+    "Estado" : {
+
+    },
+    "Este activo ya no existe." : {
+
+    },
+    "Este mes" : {
+
+    },
+    "Este mes no hay aportaciones." : {
+
+    },
+    "Esto no es asesoramiento de inversión. La compra se apunta en la app; tu bróker no recibe ninguna orden." : {
+
+    },
+    "Esto no es asesoramiento de inversión. Los valores salen de los precios que apuntas a mano." : {
+
+    },
+    "Etiqueta" : {
+
+    },
+    "Etiquetas" : {
+
+    },
+    "Etiquetas, p. ej. viaje, regalos" : {
+
+    },
+    "Evolución" : {
+
+    },
+    "Excluido del presupuesto" : {
+
+    },
+    "Excluir" : {
+
+    },
+    "Excluir del presupuesto" : {
+
+    },
+    "Excluir del presupuesto e informes" : {
+
+    },
+    "Exportar CSV para Excel" : {
+
+    },
+    "Exportar mis movimientos (CSV)" : {
+
+    },
+    "Extracto el día %lld" : {
+
+    },
+    "Faltan %@. Añade una aportación o un plan mensual para ver cuándo llegarás" : {
+
+    },
+    "Favorito (sale en Resumen)" : {
+
+    },
+    "Fecha" : {
+
+    },
+    "Fecha no reconocida: «%@»" : {
+
+    },
+    "Fecha objetivo" : {
+
+    },
+    "Fechas" : {
+
+    },
+    "Fila %lld: %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Fila %1$lld: %2$@"
+          }
+        }
+      }
+    },
+    "Filas que no se importarán (%lld)" : {
+
+    },
+    "Filtrar" : {
+
+    },
+    "Filtros (%lld)" : {
+
+    },
+    "Flexible" : {
+
+    },
+    "Flujo" : {
+
+    },
+    "Flujo de caja" : {
+
+    },
+    "Forma de pago" : {
+
+    },
+    "Formato de fecha" : {
+
+    },
+    "Frecuencia" : {
+
+    },
+    "Ganancia ya hecha con ventas: %@" : {
+
+    },
+    "Gastado" : {
+
+    },
+    "Gastado de más" : {
+
+    },
+    "Gastado de más en lo flexible" : {
+
+    },
+    "Gastado en este extracto" : {
+
+    },
+    "Gastado en lo flexible" : {
+
+    },
+    "Gastado en pagos fijos" : {
+
+    },
+    "Gastado este mes" : {
+
+    },
+    "Gasto" : {
+
+    },
+    "Gasto esencial" : {
+
+    },
+    "Gastos" : {
+
+    },
+    "Gastos " : {
+
+    },
+    "Gastos esenciales" : {
+
+    },
+    "Gastos más grandes" : {
+
+    },
+    "Gastos sin categoría" : {
+
+    },
+    "Gastos sin grupo" : {
+
+    },
+    "Gastos: %@" : {
+
+    },
+    "Grupo del 50/30/20" : {
+
+    },
+    "Gráfico de ingresos y gastos de los últimos 6 meses" : {
+
+    },
+    "Gráfico de la evolución de la cartera" : {
+
+    },
+    "Gráfico de la evolución del score" : {
+
+    },
+    "Gráfico del patrimonio neto, %@" : {
+
+    },
+    "Gráfico del precio" : {
+
+    },
+    "Gráfico por meses" : {
+
+    },
+    "Guardar" : {
+
+    },
+    "Guardar día de inicio" : {
+
+    },
+    "Guardar nombre" : {
+
+    },
+    "Hacer propietario" : {
+
+    },
+    "Hacer propietario a %@" : {
+
+    },
+    "Hacia" : {
+
+    },
+    "Hacia " : {
+
+    },
+    "Has pasado del %lld %% del límite. Te quedan %@." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Has pasado del %1$lld %% del límite. Te quedan %2$@."
+          }
+        }
+      }
+    },
+    "Hasta" : {
+
+    },
+    "Hay %lld abonos sin categoría" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld abonos sin categoría"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld abono sin categoría"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld abonos sin categoría"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Hay %lld movimientos con el mismo concepto" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld movimientos con el mismo concepto"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld movimiento con el mismo concepto"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hay %lld movimientos con el mismo concepto"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Historial" : {
+
+    },
+    "Hogar" : {
+
+    },
+    "Hogar abierto" : {
+
+    },
+    "Hogar: %@" : {
+
+    },
+    "Hogares anteriores" : {
+
+    },
+    "Hola, %@" : {
+
+    },
+    "Hoy" : {
+
+    },
+    "Icono" : {
+
+    },
+    "Igual que %@" : {
+
+    },
+    "Igual que a final del mes pasado" : {
+
+    },
+    "Importando…" : {
+
+    },
+    "Importar" : {
+
+    },
+    "Importar %lld movimientos" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Importar %lld movimientos"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Importar %lld movimiento"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Importar %lld movimientos"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Importar CSV" : {
+
+    },
+    "Importar CSV del banco" : {
+
+    },
+    "Importar CSV del banco…" : {
+
+    },
+    "Importar esta fila" : {
+
+    },
+    "Importe" : {
+
+    },
+    "Importe vacío o no válido" : {
+
+    },
+    "Importe, p. ej. 100" : {
+
+    },
+    "Importe, p. ej. 12,50 o 25+7,40" : {
+
+    },
+    "Importe, p. ej. 12,99" : {
+
+    },
+    "Importe, p. ej. 150" : {
+
+    },
+    "Importe, p. ej. 200" : {
+
+    },
+    "Importe, p. ej. 9,99" : {
+
+    },
+    "Incluye %@ de menos del periodo anterior" : {
+
+    },
+    "Incluye %@ que sobró del periodo anterior" : {
+
+    },
+    "Indica cuántas participaciones." : {
+
+    },
+    "Indica cuánto quieres juntar." : {
+
+    },
+    "Indica cuánto se debe." : {
+
+    },
+    "Indica cuánto se debía." : {
+
+    },
+    "Indica el precio de oferta y cuántos cargos dura." : {
+
+    },
+    "Indica la cuota fija que pagas cada mes." : {
+
+    },
+    "Informe" : {
+
+    },
+    "Informes" : {
+
+    },
+    "Ingresar en" : {
+
+    },
+    "Ingreso" : {
+
+    },
+    "Ingreso fijo" : {
+
+    },
+    "Ingresos" : {
+
+    },
+    "Ingresos " : {
+
+    },
+    "Ingresos del periodo" : {
+
+    },
+    "Ingresos en verde" : {
+
+    },
+    "Ingresos fijos" : {
+
+    },
+    "Ingresos fijos previstos: %@" : {
+
+    },
+    "Ingresos previstos" : {
+
+    },
+    "Ingresos previstos, p. ej. 2.400,00" : {
+
+    },
+    "Ingresos y gastos" : {
+
+    },
+    "Iniciar sesión" : {
+
+    },
+    "Inicio del mes" : {
+
+    },
+    "Intereses" : {
+
+    },
+    "Intereses (%@ TIN)" : {
+
+    },
+    "Intereses en estos cargos" : {
+
+    },
+    "Interés (TIN %)" : {
+
+    },
+    "Interés de las compras a plazos (TIN %)" : {
+
+    },
+    "Inversiones" : {
+
+    },
+    "Inversión" : {
+
+    },
+    "Invertido con el plan" : {
+
+    },
+    "Invertido: %@" : {
+
+    },
+    "Invita a tu pareja" : {
+
+    },
+    "Invitaciones pendientes" : {
+
+    },
+    "Invitar a tu pareja" : {
+
+    },
+    "Ir" : {
+
+    },
+    "La aportación mensual no puede ser negativa." : {
+
+    },
+    "La comisión no puede ser negativa." : {
+
+    },
+    "La comisión tiene que estar entre 0 y 10 %." : {
+
+    },
+    "La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas." : {
+
+    },
+    "La compra se queda en el extracto como un cargo normal. Puedes volver a aplazarla cuando quieras." : {
+
+    },
+    "La cuenta no está completa" : {
+
+    },
+    "La cuota fija tiene que ser mayor que cero." : {
+
+    },
+    "La cuota no es un importe válido." : {
+
+    },
+    "La cuota no llega a cubrir los intereses: la deuda no baja. Sube la cuota o paga todo a fin de mes." : {
+
+    },
+    "La cuota se suma a cada cargo de la tarjeta." : {
+
+    },
+    "La cámara no está disponible o no tiene permiso. Puedes escribir el código a mano." : {
+
+    },
+    "La escala tiene que estar entre 100 y 1000." : {
+
+    },
+    "La fecha de fin no puede ser anterior a la de inicio." : {
+
+    },
+    "La frecuencia no es válida." : {
+
+    },
+    "La meta bajará en lo que sumaba esta aportación. No se puede deshacer." : {
+
+    },
+    "La nota es demasiado larga." : {
+
+    },
+    "La nómina u otros ingresos que llegan cada mes." : {
+
+    },
+    "La oferta puede durar de 1 a 36 cargos." : {
+
+    },
+    "La pasada" : {
+
+    },
+    "La predeterminada sale elegida al apuntar un movimiento. Sin «Contar en el patrimonio», la cuenta sigue con su saldo pero no suma en el patrimonio neto." : {
+
+    },
+    "La propuesta usa lo que gastaste de media en cada categoría en los 3 periodos anteriores. Puedes cambiarla antes de guardar." : {
+
+    },
+    "La rentabilidad supuesta sólo sirve para la proyección." : {
+
+    },
+    "La rentabilidad supuesta tiene que estar entre −50 y 50 %." : {
+
+    },
+    "La semana anterior no hubo gastos." : {
+
+    },
+    "La semana pasada · %@" : {
+
+    },
+    "La tarjeta no se puede pagar a sí misma." : {
+
+    },
+    "La usan %lld movimientos recientes. Se quedarán sin categoría." : {
+
+    },
+    "Las categorías se comparten con todo el hogar. El grupo decide en qué parte del 50/30/20 cuenta cada gasto." : {
+
+    },
+    "Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al %@ TIN. La cuota se suma a cada cargo." : {
+
+    },
+    "Las compras que ya apuntaste no se borran." : {
+
+    },
+    "Las etiquetas sirven para juntar gastos de distintas categorías, como un viaje. Sepáralas con comas." : {
+
+    },
+    "Las etiquetas sólo pueden tener letras, números, «-» y «_»." : {
+
+    },
+    "Las notas son demasiado largas (máximo 500 caracteres)." : {
+
+    },
+    "Las transferencias se borran con sus dos movimientos, el de cada cuenta. No se puede deshacer." : {
+
+    },
+    "Leer QR de una imagen" : {
+
+    },
+    "Listo" : {
+
+    },
+    "Lo flexible es todo lo que no son pagos fijos ni ahorro: compra, ocio, restaurantes… Los gastos cuyas categorías usan tus pagos fijos cuentan como fijos." : {
+
+    },
+    "Lo mismo que la semana anterior." : {
+
+    },
+    "Lo que apuntaste allí se guarda hasta el %@ y después se borra. Hasta entonces puedes exportar tus movimientos." : {
+
+    },
+    "Lo que cuesta aplazar" : {
+
+    },
+    "Lo que debes" : {
+
+    },
+    "Lo que gastas entra en el extracto del día %lld, que se cobra %@." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Lo que gastas entra en el extracto del día %1$lld, que se cobra %2$@."
+          }
+        }
+      }
+    },
+    "Lo que pagarás" : {
+
+    },
+    "Lo que te queda cada mes" : {
+
+    },
+    "Lo que tienes" : {
+
+    },
+    "Lo que tienes menos lo que debes. Toca para ver cómo evoluciona." : {
+
+    },
+    "Lo que ya has pagado (opcional)" : {
+
+    },
+    "Lo que ya tienes ahorrado (opcional)" : {
+
+    },
+    "Lo que ya tienes no puede ser negativo." : {
+
+    },
+    "Lo verán todos los miembros." : {
+
+    },
+    "Los avisos los lanza este dispositivo. Puedes apagar todos los avisos en Más opciones." : {
+
+    },
+    "Los domingos" : {
+
+    },
+    "Los extractos sin cobrar tienen %@ movimientos o más y puede que no se hayan cargado todos: los cargos y lo gastado pueden salir más bajos de lo que son." : {
+
+    },
+    "Los ficheros se crean en este dispositivo y sólo salen de él si tú los compartes." : {
+
+    },
+    "Los ingresos previstos no pueden ser negativos." : {
+
+    },
+    "Los ingresos previstos no son un importe válido." : {
+
+    },
+    "Los lanza este dispositivo: antes de cada pago fijo, cargo de tarjeta o aportación, y cuando una categoría o grupo del presupuesto llega al 80 % o se pasa." : {
+
+    },
+    "Los límites no pueden ser negativos." : {
+
+    },
+    "Los movimientos no se borran." : {
+
+    },
+    "Los primeros cargos desde el primer cargo van con el precio de oferta; después, el importe de arriba." : {
+
+    },
+    "Límite, p. ej. 3.000" : {
+
+    },
+    "Límite, p. ej. 800,00" : {
+
+    },
+    "Límites de %@ (opcional)" : {
+
+    },
+    "Límites por encima de lo previsto" : {
+
+    },
+    "Marcar como" : {
+
+    },
+    "Marcar revisado" : {
+
+    },
+    "Marcar revisados" : {
+
+    },
+    "Marcar sin revisar" : {
+
+    },
+    "Media de %@ al mes" : {
+
+    },
+    "Menos" : {
+
+    },
+    "Mes" : {
+
+    },
+    "Mes anterior" : {
+
+    },
+    "Mes siguiente" : {
+
+    },
+    "Metas" : {
+
+    },
+    "Miembros" : {
+
+    },
+    "Modo demo: los datos se borran al cerrar la app." : {
+
+    },
+    "Modo incógnito (ocultar importes)" : {
+
+    },
+    "Mostrar" : {
+
+    },
+    "Mostrar + en los ingresos" : {
+
+    },
+    "Mostrar importes" : {
+
+    },
+    "Movimiento eliminado" : {
+
+    },
+    "Movimientos" : {
+
+    },
+    "Muchos contratos sólo aplazan compras de 50 € o más. La cuota se suma a cada cargo de la tarjeta." : {
+
+    },
+    "Más" : {
+
+    },
+    "Más opciones" : {
+
+    },
+    "Máx. 1 año" : {
+
+    },
+    "Mín. 1 año" : {
+
+    },
+    "Míralo en tu contrato. Por ejemplo: extracto el día 1 y cargo el día 1 del mes siguiente quiere decir que lo gastado en enero se cobra el 1 de marzo." : {
+
+    },
+    "Nada coincide con la búsqueda." : {
+
+    },
+    "Necesidades: %lld %%" : {
+
+    },
+    "Ninguna" : {
+
+    },
+    "Ninguna cuenta" : {
+
+    },
+    "Ninguno" : {
+
+    },
+    "No" : {
+
+    },
+    "No apuntar en ninguna cuenta" : {
+
+    },
+    "No borra el movimiento de la cuenta, si lo había." : {
+
+    },
+    "No cambiar" : {
+
+    },
+    "No disponible: configura un código en el dispositivo para poder usarlo." : {
+
+    },
+    "No disponible: este Mac no tiene Touch ID ni contraseña de usuario." : {
+
+    },
+    "No hay cargos en los próximos 30 días." : {
+
+    },
+    "No hay gastos esta semana." : {
+
+    },
+    "No hay metas en esta sección." : {
+
+    },
+    "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento." : {
+
+    },
+    "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento." : {
+
+    },
+    "No hay movimientos en este periodo." : {
+
+    },
+    "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero." : {
+
+    },
+    "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones." : {
+
+    },
+    "No hay más pagos previstos. Añade tus pagos fijos y suscripciones para verlos aquí." : {
+
+    },
+    "No hay pagos este día." : {
+
+    },
+    "No hay pagos fijos este mes. Añádelos en Pagos fijos." : {
+
+    },
+    "No he podido abrir el archivo." : {
+
+    },
+    "No he podido leer el texto del archivo." : {
+
+    },
+    "No he reconocido las columnas de fecha, concepto e importe de este archivo." : {
+
+    },
+    "No llega para el próximo cargo de %@." : {
+
+    },
+    "No puede terminar antes de empezar." : {
+
+    },
+    "No se encontró un QR de invitación en esa imagen." : {
+
+    },
+    "No se ha cobrado" : {
+
+    },
+    "No se ha podido anular la invitación. " : {
+
+    },
+    "No se ha podido cambiar el nombre." : {
+
+    },
+    "No se ha podido cerrar la sesión en el servidor. " : {
+
+    },
+    "No se ha podido crear el PDF." : {
+
+    },
+    "No se ha podido crear el fichero." : {
+
+    },
+    "No se han podido cargar las compras de %lld aplazados" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "No se han podido cargar las compras de %lld aplazados"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "No se ha podido cargar la compra de %lld aplazado"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "No se han podido cargar las compras de %lld aplazados"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "No se han podido cargar los movimientos del gráfico. " : {
+
+    },
+    "No se han podido cargar los movimientos. " : {
+
+    },
+    "No se han podido exportar los movimientos." : {
+
+    },
+    "No se puede borrar esta compra: una venta posterior se quedaría sin participaciones." : {
+
+    },
+    "No se puede deshacer." : {
+
+    },
+    "No se puede deshacer. Si quieres guardar una copia, exporta antes el CSV." : {
+
+    },
+    "No te has podido unir" : {
+
+    },
+    "No tienes tantas participaciones para vender." : {
+
+    },
+    "Nombre del hogar" : {
+
+    },
+    "Nombre visible" : {
+
+    },
+    "Nombre, p. ej. Cuenta nómina" : {
+
+    },
+    "Nombre, p. ej. Fondo indexado mundial" : {
+
+    },
+    "Nombre, p. ej. Mascotas" : {
+
+    },
+    "Nombre, p. ej. Plataforma de música" : {
+
+    },
+    "Nombre, p. ej. Préstamo del coche" : {
+
+    },
+    "Nombre, p. ej. Vacaciones" : {
+
+    },
+    "Nombre, p. ej. Viaje de verano" : {
+
+    },
+    "Nota (opcional)" : {
+
+    },
+    "Notas (opcional)" : {
+
+    },
+    "Nueva categoría" : {
+
+    },
+    "Nueva contraseña" : {
+
+    },
+    "Nueva cuenta" : {
+
+    },
+    "Nueva meta" : {
+
+    },
+    "Nueva tarjeta" : {
+
+    },
+    "Nuevo activo" : {
+
+    },
+    "Nuevo gasto" : {
+
+    },
+    "Nuevo movimiento" : {
+
+    },
+    "Nuevo pago fijo" : {
+
+    },
+    "Nuevo plan" : {
+
+    },
+    "Nuevo presupuesto extra" : {
+
+    },
+    "Ocultar importes" : {
+
+    },
+    "Operaciones" : {
+
+    },
+    "Otra" : {
+
+    },
+    "Otro miembro" : {
+
+    },
+    "PDF de pagos del mes" : {
+
+    },
+    "Pagado" : {
+
+    },
+    "Pagado %@ de %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Pagado %1$@ de %2$@"
+          }
+        }
+      }
+    },
+    "Pagar una deuda" : {
+
+    },
+    "Pago de %@" : {
+
+    },
+    "Pago de la deuda" : {
+
+    },
+    "Pago mínimo: % de la deuda" : {
+
+    },
+    "Pago mínimo: al menos (€)" : {
+
+    },
+    "Pagos de %@" : {
+
+    },
+    "Pagos del mes" : {
+
+    },
+    "Pagos fijos" : {
+
+    },
+    "Pagos fijos (de Pagos fijos)" : {
+
+    },
+    "Pagos fijos al mes" : {
+
+    },
+    "Pagos fijos, suscripciones, cargos de tarjeta y aportaciones a inversiones." : {
+
+    },
+    "Para aplazar otra compra tiene que ser de 50 € o más y del extracto abierto." : {
+
+    },
+    "Para controlar un gasto concreto aparte del presupuesto: unas vacaciones, una reforma o los regalos de Navidad." : {
+
+    },
+    "Para el %@ de %@, %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Para el %1$@ de %2$@, %3$@"
+          }
+        }
+      }
+    },
+    "Para lo flexible" : {
+
+    },
+    "Participaciones" : {
+
+    },
+    "Participaciones (tienes %@)" : {
+
+    },
+    "Pasar lo que sobre al siguiente periodo" : {
+
+    },
+    "Patrimonio" : {
+
+    },
+    "Patrimonio neto" : {
+
+    },
+    "Pedir Face ID, Touch ID o código" : {
+
+    },
+    "Pendientes de confirmar" : {
+
+    },
+    "Periodo" : {
+
+    },
+    "Periodo anterior" : {
+
+    },
+    "Periodo de hoy" : {
+
+    },
+    "Periodo siguiente" : {
+
+    },
+    "Pide la contraseña actual. Al cambiarla se cierra la sesión en tus otros dispositivos." : {
+
+    },
+    "Planificación" : {
+
+    },
+    "Plazo" : {
+
+    },
+    "Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos." : {
+
+    },
+    "Ponerles la misma categoría" : {
+
+    },
+    "Ponle un nombre a la categoría." : {
+
+    },
+    "Ponle un nombre a la cuenta." : {
+
+    },
+    "Ponle un nombre a la meta." : {
+
+    },
+    "Ponle un nombre." : {
+
+    },
+    "Ponles categoría en Movimientos para que cuenten en su grupo." : {
+
+    },
+    "Por" : {
+
+    },
+    "Por beneficiario" : {
+
+    },
+    "Por categoría" : {
+
+    },
+    "Por ejemplo, 3 meses a 6,99 y luego 11,99." : {
+
+    },
+    "Por etiqueta" : {
+
+    },
+    "Precio" : {
+
+    },
+    "Precio actual por participación" : {
+
+    },
+    "Precio apuntado el %@" : {
+
+    },
+    "Precio de oferta al principio" : {
+
+    },
+    "Precio de oferta, p. ej. 6,99" : {
+
+    },
+    "Precio medio" : {
+
+    },
+    "Precio por participación" : {
+
+    },
+    "Predicción del patrimonio hasta diciembre" : {
+
+    },
+    "Presupuesto" : {
+
+    },
+    "Presupuesto e informes" : {
+
+    },
+    "Presupuestos extra" : {
+
+    },
+    "Presupuestos, informes y «este mes» cuentan desde este día. No se cambia ni se borra ningún movimiento." : {
+
+    },
+    "Primer cargo" : {
+
+    },
+    "Primer día: %lld" : {
+
+    },
+    "Primera aportación" : {
+
+    },
+    "Proponer límites (media de 3 periodos)" : {
+
+    },
+    "Protege la pantalla de este dispositivo, no los datos: tu hogar los sigue viendo en los suyos." : {
+
+    },
+    "Proveedor (opcional)" : {
+
+    },
+    "Préstamo" : {
+
+    },
+    "Próxima" : {
+
+    },
+    "Próximo cargo" : {
+
+    },
+    "Próximo cargo, límite y aplazados" : {
+
+    },
+    "Próximo cargo, límite y compras a plazos" : {
+
+    },
+    "Próximos 30 días" : {
+
+    },
+    "Próximos cargos" : {
+
+    },
+    "Próximos cargos de todas las tarjetas" : {
+
+    },
+    "Próximos pagos" : {
+
+    },
+    "Puedes gastar hoy" : {
+
+    },
+    "Punto y coma (;)" : {
+
+    },
+    "Que escanee el QR con su móvil o escriba el código al unirse." : {
+
+    },
+    "Queda por presupuestar" : {
+
+    },
+    "Quedan %@ por pagar" : {
+
+    },
+    "Quitar" : {
+
+    },
+    "Quitar a %@ del hogar" : {
+
+    },
+    "Quitar del hogar" : {
+
+    },
+    "Quitar el aplazado" : {
+
+    },
+    "Quitar etiquetas" : {
+
+    },
+    "Quitar filtros" : {
+
+    },
+    "Qué" : {
+
+    },
+    "Reactivar" : {
+
+    },
+    "Recordarme apuntar gastos" : {
+
+    },
+    "Recordatorios" : {
+
+    },
+    "Recurrente" : {
+
+    },
+    "Reintentar" : {
+
+    },
+    "Rentabilidad" : {
+
+    },
+    "Rentabilidad anual supuesta en %" : {
+
+    },
+    "Rentabilidad del activo" : {
+
+    },
+    "Reparto" : {
+
+    },
+    "Repetir cada mes" : {
+
+    },
+    "Repite la contraseña" : {
+
+    },
+    "Repite la nueva contraseña" : {
+
+    },
+    "Resultado: " : {
+
+    },
+    "Resumen" : {
+
+    },
+    "Resumen semanal" : {
+
+    },
+    "Resumen semanal los lunes" : {
+
+    },
+    "Revisa fila a fila" : {
+
+    },
+    "Revisa los intereses y el pago mínimo." : {
+
+    },
+    "Revisado" : {
+
+    },
+    "Sacar dinero de la meta" : {
+
+    },
+    "Saldo" : {
+
+    },
+    "Saldo de la cuenta en los últimos 6 meses" : {
+
+    },
+    "Saldo en la app" : {
+
+    },
+    "Saldo inicial, p. ej. 1.250,00" : {
+
+    },
+    "Saldo real, p. ej. 1.250,00" : {
+
+    },
+    "Sale" : {
+
+    },
+    "Sale de" : {
+
+    },
+    "Salen los cargos de suscripciones y gastos esenciales que tienes en Pagos fijos. El PDF se crea en este dispositivo." : {
+
+    },
+    "Salir del hogar" : {
+
+    },
+    "Save the Money" : {
+
+    },
+    "Save the Money está bloqueada" : {
+
+    },
+    "Score" : {
+
+    },
+    "Score crediticio" : {
+
+    },
+    "Score, p. ej. 720" : {
+
+    },
+    "Se apunta como un movimiento normal. Si el importe ha cambiado, pon el que te han cobrado de verdad." : {
+
+    },
+    "Se apunta un movimiento «Ajuste de saldo» por la diferencia, hoy. No cuenta como gasto ni como ingreso." : {
+
+    },
+    "Se apuntan dos movimientos con la categoría de transferencia. No cuentan como gasto ni como ingreso." : {
+
+    },
+    "Se apuntan dos movimientos de transferencia: la salida de la cuenta y la entrada en la tarjeta." : {
+
+    },
+    "Se borra para todo el hogar. Los movimientos se quedan sin categoría y su límite del presupuesto desaparece." : {
+
+    },
+    "Se borran también sus aportaciones, para todo el hogar. No se puede deshacer." : {
+
+    },
+    "Se borran también sus precios, operaciones y aportaciones automáticas, para todo el hogar. No se puede deshacer." : {
+
+    },
+    "Se borran también todos sus movimientos, para todo el hogar. No se puede deshacer." : {
+
+    },
+    "Se borrará lo que creaste en «%@»" : {
+
+    },
+    "Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan." : {
+
+    },
+    "Se cobra" : {
+
+    },
+    "Se comparte con todo el hogar." : {
+
+    },
+    "Se guarda en tu perfil. «Automático» sigue el modo claro u oscuro del dispositivo." : {
+
+    },
+    "Se paga desde" : {
+
+    },
+    "Se paga desde %@" : {
+
+    },
+    "Se paga entero en el próximo cargo de la tarjeta." : {
+
+    },
+    "Se puede aplazar de 2 a 48 meses." : {
+
+    },
+    "Se repite" : {
+
+    },
+    "Se usa al aplazar una compra en 3, 6, 9 o 12 meses." : {
+
+    },
+    "Seguimiento" : {
+
+    },
+    "Seguirás en %@: pertenecerás a los dos hogares y podrás cambiar de uno a otro en Hogar." : {
+
+    },
+    "Segundo día: %lld" : {
+
+    },
+    "Seguridad" : {
+
+    },
+    "Seleccionar" : {
+
+    },
+    "Semana" : {
+
+    },
+    "Semana anterior" : {
+
+    },
+    "Separador" : {
+
+    },
+    "Sesión iniciada como %@." : {
+
+    },
+    "Si dejas de pagarlo, se guarda con fecha de fin y no habrá más cargos ni avisos. Si lo borras, desaparece con sus cargos pendientes. Los movimientos ya apuntados no se tocan en ningún caso." : {
+
+    },
+    "Si eliges una cuenta, se apunta allí lo que recibes." : {
+
+    },
+    "Si las columnas salen mal, prueba con otro separador." : {
+
+    },
+    "Si lo dejas vacío, el reparto se hace con lo que entre de verdad este mes." : {
+
+    },
+    "Si no eliges ninguna, cuenta todo el gasto." : {
+
+    },
+    "Si no eliges ninguna, cuentan todas." : {
+
+    },
+    "Si rinde un %@ %% al año, lo aportado en 1 año valdría unos %@ y en 5 años unos %@. Es una estimación, no una promesa." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Si rinde un %1$@ %% al año, lo aportado en 1 año valdría unos %2$@ y en 5 años unos %3$@. Es una estimación, no una promesa."
+          }
+        }
+      }
+    },
+    "Si sigue como los últimos meses (%@ al mes de media). Es una estimación, no una promesa." : {
+
+    },
+    "Si ya habías apuntado un precio ese día, se sustituye." : {
+
+    },
+    "Sin aportación prevista, la proyección usa la media de tus aportaciones de los últimos 3 meses. La meta se comparte con todo el hogar." : {
+
+    },
+    "Sin aviso" : {
+
+    },
+    "Sin cargos" : {
+
+    },
+    "Sin categoría" : {
+
+    },
+    "Sin compras ni ventas todavía." : {
+
+    },
+    "Sin compras nuevas, terminarías de pagar en %lld meses y pagarías %@ de intereses. Pagando todo a fin de mes no pagarías ninguno." : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sin compras nuevas, terminarías de pagar en %1$lld meses y pagarías %2$@ de intereses. Pagando todo a fin de mes no pagarías ninguno."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sin compras nuevas, terminarías de pagar en %1$lld mes y pagarías %2$@ de intereses. Pagando todo a fin de mes no pagarías ninguno."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Sin compras nuevas, terminarías de pagar en %1$lld meses y pagarías %2$@ de intereses. Pagando todo a fin de mes no pagarías ninguno."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "Sin contar traspasos entre tus cuentas." : {
+
+    },
+    "Sin cuenta" : {
+
+    },
+    "Sin céntimos" : {
+
+    },
+    "Sin elegir" : {
+
+    },
+    "Sin grupo" : {
+
+    },
+    "Sin inversiones todavía" : {
+
+    },
+    "Sin límite" : {
+
+    },
+    "Sin marcar" : {
+
+    },
+    "Sin metas todavía" : {
+
+    },
+    "Sin revisar" : {
+
+    },
+    "Sobre %lld" : {
+
+    },
+    "Suma 100 %." : {
+
+    },
+    "Suscripciones" : {
+
+    },
+    "Suscripción" : {
+
+    },
+    "Sólo compras de 50 € o más del extracto que aún está abierto, como en la mayoría de contratos." : {
+
+    },
+    "Sólo en este dispositivo. El modo incógnito también se activa con el ojo del Resumen; los PDF y CSV llevan siempre los importes completos." : {
+
+    },
+    "Sólo este" : {
+
+    },
+    "Sólo lo ves tú. No se comparte con el hogar." : {
+
+    },
+    "Sólo lo ves tú: no se comparte con el resto del hogar. Los tramos son orientativos." : {
+
+    },
+    "Sólo los gastos van en un grupo del 50/30/20." : {
+
+    },
+    "TIN %@" : {
+
+    },
+    "Tabulador" : {
+
+    },
+    "También tapa la app en el selector de apps. " : {
+
+    },
+    "Tarjeta de crédito" : {
+
+    },
+    "Tarjetas" : {
+
+    },
+    "Te has pasado %@ · faltan %@ para cobrar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Te has pasado %1$@ · faltan %2$@ para cobrar"
+          }
+        }
+      }
+    },
+    "Te queda" : {
+
+    },
+    "Te queda para lo flexible" : {
+
+    },
+    "Te quedan %@ · faltan %@ para cobrar" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Te quedan %1$@ · faltan %2$@ para cobrar"
+          }
+        }
+      }
+    },
+    "Tema" : {
+
+    },
+    "Terminado" : {
+
+    },
+    "Terminar selección" : {
+
+    },
+    "Ticker o ISIN (opcional)" : {
+
+    },
+    "Tiene cargo y abono a la vez" : {
+
+    },
+    "Tiene fecha de fin" : {
+
+    },
+    "Tiene fecha objetivo" : {
+
+    },
+    "Tipo" : {
+
+    },
+    "Tipo de compra" : {
+
+    },
+    "Tipo de presupuesto" : {
+
+    },
+    "Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta)." : {
+
+    },
+    "Todas" : {
+
+    },
+    "Todas las categorías" : {
+
+    },
+    "Todas las cuentas" : {
+
+    },
+    "Todas las etiquetas" : {
+
+    },
+    "Todavía no hay aportaciones." : {
+
+    },
+    "Todavía no hay movimientos." : {
+
+    },
+    "Todavía no tienes participaciones. Apunta tu primera compra." : {
+
+    },
+    "Todo el hogar ve las inversiones, como las cuentas." : {
+
+    },
+    "Todos" : {
+
+    },
+    "Total" : {
+
+    },
+    "Total del día" : {
+
+    },
+    "Total: %@" : {
+
+    },
+    "Tramo" : {
+
+    },
+    "Transferencia" : {
+
+    },
+    "Tu cartera" : {
+
+    },
+    "Tu nombre" : {
+
+    },
+    "Tu nombre (opcional)" : {
+
+    },
+    "Tu posición" : {
+
+    },
+    "Tu presupuesto, compartido en casa." : {
+
+    },
+    "Tu score crediticio" : {
+
+    },
+    "Tus activos" : {
+
+    },
+    "Tus hogares" : {
+
+    },
+    "Un aviso para no olvidar apuntar lo gastado y, cada lunes a las 9:00, otro con el resumen de la semana anterior." : {
+
+    },
+    "Un día que cobraste" : {
+
+    },
+    "Un movimiento con varias etiquetas cuenta en cada una. No se incluyen transferencias ni excluidos." : {
+
+    },
+    "Un movimiento excluido sigue contando en el saldo de la cuenta, pero no en el presupuesto, los informes ni el flujo de caja." : {
+
+    },
+    "Un plan no compra nada solo: te avisa el día que toca y tú confirmas la compra en la app." : {
+
+    },
+    "Una tarjeta de crédito no puede cambiar de tipo." : {
+
+    },
+    "Unirme" : {
+
+    },
+    "Unirme con el código %@" : {
+
+    },
+    "Unirme con un código" : {
+
+    },
+    "Unos %@ al día durante %lld días" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Unos %1$@ al día durante %2$lld días"
+          }
+        }
+      }
+    },
+    "Usado %@" : {
+
+    },
+    "Usuario" : {
+
+    },
+    "Vaciar límites" : {
+
+    },
+    "Valor" : {
+
+    },
+    "Vender" : {
+
+    },
+    "Ver las %lld filas" : {
+
+    },
+    "Ver todos" : {
+
+    },
+    "Vista" : {
+
+    },
+    "Volver a 50/30/20" : {
+
+    },
+    "Volver a contar" : {
+
+    },
+    "Volver a contar en el presupuesto" : {
+
+    },
+    "Vuelve al periodo de hoy" : {
+
+    },
+    "Y %lld más." : {
+
+    },
+    "Ya hay una categoría de %@ con ese nombre." : {
+
+    },
+    "Ya no estás en %@" : {
+
+    },
+    "Ya tengo cuenta" : {
+
+    },
+    "al mes en %@%@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "al mes en %1$@%2$@"
+          }
+        }
+      }
+    },
+    "aplazados %@" : {
+
+    },
+    "compras %@" : {
+
+    },
+    "con aviso" : {
+
+    },
+    "créalo en Pagos fijos." : {
+
+    },
+    "cuota %@" : {
+
+    },
+    "de %@" : {
+
+    },
+    "de %lld" : {
+
+    },
+    "el día %lld de ese mes" : {
+
+    },
+    "el día %lld del mes siguiente" : {
+
+    },
+    "el día %lld, %lld meses después" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "el día %1$lld, %2$lld meses después"
+          }
+        }
+      }
+    },
+    "estimado" : {
+
+    },
+    "inténtalo desde la tarjeta." : {
+
+    },
+    "luego %@" : {
+
+    },
+    "necesitas %@ al mes" : {
+
+    },
+    "oferta hasta %@" : {
+
+    },
+    "próximo: %@" : {
+
+    },
+    "saldo actual" : {
+
+    },
+    "se cobra el %@" : {
+
+    },
+    "tarjeta" : {
+
+    },
+    "tu-usuario" : {
+
+    },
+    "una categoría" : {
+
+    },
+    "vas bien" : {
+
+    },
+    "¡Deuda pagada!" : {
+
+    },
+    "¡Meta conseguida!" : {
+
+    },
+    "¿Borrar %lld movimientos?" : {
+      "localizations" : {
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "¿Borrar %lld movimientos?"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "¿Borrar %lld movimiento?"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "¿Borrar %lld movimientos?"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "¿Borrar esta aportación?" : {
+
+    },
+    "¿Borrar esta categoría?" : {
+
+    },
+    "¿Borrar esta cuenta?" : {
+
+    },
+    "¿Borrar esta meta?" : {
+
+    },
+    "¿Borrar esta operación?" : {
+
+    },
+    "¿Borrar este activo?" : {
+
+    },
+    "¿Borrar este plan?" : {
+
+    },
+    "¿Borrar este score?" : {
+
+    },
+    "¿Borrar la transferencia?" : {
+
+    },
+    "¿Borrar «%@»?" : {
+
+    },
+    "¿Hacer propietario a %@?" : {
+
+    },
+    "¿No tienes cuenta? Crear una" : {
+
+    },
+    "¿Quieres cambiar también su categoría a «%@»?" : {
+
+    },
+    "¿Quitar a %@ del hogar?" : {
+
+    },
+    "¿Quitar este aplazado?" : {
+
+    },
+    "¿Qué quieres hacer con este pago fijo?" : {
+
+    },
+    "¿Salir de %@?" : {
+
+    },
+    "¿Unirte a otro hogar?" : {
+
+    },
+    "Último cargo" : {
+
+    },
+    "Últimos 6 meses" : {
+
+    },
+    "Últimos movimientos" : {
+
+    },
+    "Únete a %@ en Save the Money con el código %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Únete a %1$@ en Save the Money con el código %2$@"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

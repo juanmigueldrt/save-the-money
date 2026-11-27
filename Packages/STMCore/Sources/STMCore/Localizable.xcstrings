@@ -1,0 +1,609 @@
+{
+  "sourceLanguage" : "es",
+  "strings" : {
+    " (de momento; puede subir con nuevas compras)." : {
+
+    },
+    " En la cuenta de pago sólo hay %@." : {
+
+    },
+    " Es el último cargo con precio de oferta; después serán %@." : {
+
+    },
+    "%@ %@ el %@.%@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@ %2$@ el %3$@.%4$@"
+          }
+        }
+      }
+    },
+    "%@: aportación a %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: aportación a %2$@"
+          }
+        }
+      }
+    },
+    "%@: cargo de %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: cargo de %2$@"
+          }
+        }
+      }
+    },
+    "%@: has usado el %lld %% del límite" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: has usado el %2$lld %% del límite"
+          }
+        }
+      }
+    },
+    "%@: ya llevas el %lld %%" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: ya llevas el %2$lld %%"
+          }
+        }
+      }
+    },
+    "%lld minutos" : {
+
+    },
+    ", el %lld/%lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : ", el %1$lld/%2$lld"
+          }
+        }
+      }
+    },
+    ", un %lld %% menos que la semana anterior" : {
+
+    },
+    ", un %lld %% más que la semana anterior" : {
+
+    },
+    ". Lo que más: %@" : {
+
+    },
+    "1 minuto" : {
+
+    },
+    "1A" : {
+
+    },
+    "1M" : {
+
+    },
+    "6M" : {
+
+    },
+    "A plazos" : {
+
+    },
+    "Acción" : {
+
+    },
+    "Ahorro" : {
+
+    },
+    "Algo ha fallado. Inténtalo de nuevo." : {
+
+    },
+    "Algún dato no es válido. Revisa el formulario." : {
+
+    },
+    "Apunta lo que has gastado hoy; es un momento." : {
+
+    },
+    "Automático" : {
+
+    },
+    "Año-mes-día" : {
+
+    },
+    "Bono" : {
+
+    },
+    "Bueno" : {
+
+    },
+    "Cada %lld años" : {
+
+    },
+    "Cada %lld meses" : {
+
+    },
+    "Cada %lld semanas" : {
+
+    },
+    "Cada año" : {
+
+    },
+    "Cada dos semanas" : {
+
+    },
+    "Cada mes" : {
+
+    },
+    "Cada mes, desde el día 1" : {
+
+    },
+    "Cada mes, el día %lld" : {
+
+    },
+    "Cada semana" : {
+
+    },
+    "Cada semestre" : {
+
+    },
+    "Cada trimestre" : {
+
+    },
+    "Claro" : {
+
+    },
+    "Compra" : {
+
+    },
+    "Compra con tarjeta" : {
+
+    },
+    "Cripto" : {
+
+    },
+    "Cualquier fecha" : {
+
+    },
+    "Cuota fija" : {
+
+    },
+    "Dejará de tener acceso a este hogar. Sus datos se guardan %lld días para que pueda exportarlos y después se borran. Si le vuelves a invitar antes, los recupera." : {
+
+    },
+    "Del saldo" : {
+
+    },
+    "Demasiados intentos seguidos. Inténtalo de nuevo más tarde." : {
+
+    },
+    "Deseos" : {
+
+    },
+    "Dos días al mes" : {
+
+    },
+    "Día/mes/año" : {
+
+    },
+    "ETF" : {
+
+    },
+    "El mes del hogar puede empezar entre el día 1 y el 28." : {
+
+    },
+    "El mes pasado" : {
+
+    },
+    "El nombre del hogar tiene que tener entre 1 y 80 letras." : {
+
+    },
+    "El precio no puede ser negativo." : {
+
+    },
+    "El usuario empieza y termina con una letra o un número." : {
+
+    },
+    "El usuario necesita al menos 3 caracteres." : {
+
+    },
+    "El usuario puede tener como mucho 30 caracteres." : {
+
+    },
+    "En %lld días" : {
+
+    },
+    "Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás." : {
+
+    },
+    "Eres el único miembro: el hogar también se borrará." : {
+
+    },
+    "Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta." : {
+
+    },
+    "Esa persona no es del hogar." : {
+
+    },
+    "Esa persona no es miembro del hogar." : {
+
+    },
+    "Escribe tu contraseña actual." : {
+
+    },
+    "Ese cargo ya no está pendiente." : {
+
+    },
+    "Ese código no es válido o ha caducado. Pide uno nuevo." : {
+
+    },
+    "Ese nombre de usuario ya existe. Prueba con otro." : {
+
+    },
+    "Este año" : {
+
+    },
+    "Este mes" : {
+
+    },
+    "Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta." : {
+
+    },
+    "Esto ya se guardó con otros datos. Cierra el formulario y revisa lo guardado antes de repetirlo." : {
+
+    },
+    "Excelente" : {
+
+    },
+    "Excluidos" : {
+
+    },
+    "Fechas a medida" : {
+
+    },
+    "Fondo" : {
+
+    },
+    "Gastaste %@" : {
+
+    },
+    "Gastos" : {
+
+    },
+    "Has gastado %@ de %@. Quedan %@." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Has gastado %1$@ de %2$@. Quedan %3$@."
+          }
+        }
+      }
+    },
+    "Has llegado al límite en %@" : {
+
+    },
+    "Has probado demasiados códigos. Vuelve a intentarlo dentro de %@." : {
+
+    },
+    "Hoy" : {
+
+    },
+    "Ingreso fijo" : {
+
+    },
+    "Ingresos" : {
+
+    },
+    "Inversión" : {
+
+    },
+    "La contraseña actual no es correcta." : {
+
+    },
+    "La contraseña es demasiado débil. Usa al menos %lld caracteres." : {
+
+    },
+    "La contraseña necesita al menos %lld caracteres." : {
+
+    },
+    "La cuenta no es una tarjeta de crédito." : {
+
+    },
+    "La nueva contraseña tiene que ser distinta de la actual." : {
+
+    },
+    "Las contraseñas no coinciden." : {
+
+    },
+    "Liquidez" : {
+
+    },
+    "Llevas %@ de %@ en este periodo." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Llevas %1$@ de %2$@ en este periodo."
+          }
+        }
+      }
+    },
+    "Los días %lld y %lld" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Los días %1$lld y %2$lld"
+          }
+        }
+      }
+    },
+    "Mañana" : {
+
+    },
+    "Mejorable" : {
+
+    },
+    "Mes/día/año" : {
+
+    },
+    "Miembro" : {
+
+    },
+    "Mira en qué se fue el dinero la semana pasada." : {
+
+    },
+    "Necesidades" : {
+
+    },
+    "No hay conexión. Inténtalo de nuevo en un momento." : {
+
+    },
+    "No puedes quitarte a ti mismo." : {
+
+    },
+    "No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados." : {
+
+    },
+    "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo." : {
+
+    },
+    "Normal" : {
+
+    },
+    "Oscuro" : {
+
+    },
+    "Otro" : {
+
+    },
+    "Otros" : {
+
+    },
+    "Pagas el extracto entero cada mes, sin intereses." : {
+
+    },
+    "Pagas la misma cantidad cada mes; lo que queda genera intereses." : {
+
+    },
+    "Pagas lo mínimo que pide el banco; lo que queda genera intereses." : {
+
+    },
+    "Pago fijo" : {
+
+    },
+    "Pago mínimo" : {
+
+    },
+    "Plan de pensiones" : {
+
+    },
+    "Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. Tú pasarás a ser miembro." : {
+
+    },
+    "Por beneficiario" : {
+
+    },
+    "Por etiqueta" : {
+
+    },
+    "Propietario" : {
+
+    },
+    "Recurrente" : {
+
+    },
+    "Regular" : {
+
+    },
+    "Renta fija" : {
+
+    },
+    "Renta variable" : {
+
+    },
+    "Revisados" : {
+
+    },
+    "Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer." : {
+
+    },
+    "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «Exportar CSV para Excel», en Más opciones." : {
+
+    },
+    "Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes." : {
+
+    },
+    "Se cobran" : {
+
+    },
+    "Se cobran %@ el %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Se cobran %1$@ el %2$@"
+          }
+        }
+      }
+    },
+    "Se ingresan" : {
+
+    },
+    "Sin categoría" : {
+
+    },
+    "Sin gastar" : {
+
+    },
+    "Sin marcar" : {
+
+    },
+    "Sin revisar" : {
+
+    },
+    "Solo el propietario puede traspasar el hogar." : {
+
+    },
+    "Solo quien creó el hogar puede cambiar el día en que empieza el mes." : {
+
+    },
+    "Solo quien creó el hogar puede cambiarle el nombre." : {
+
+    },
+    "Solo quien creó el hogar puede quitar a un miembro." : {
+
+    },
+    "Suscripción" : {
+
+    },
+    "Sólo se puede aplazar una compra de esta tarjeta." : {
+
+    },
+    "Tarjeta de crédito" : {
+
+    },
+    "Te has pasado en %@" : {
+
+    },
+    "Te quedan %@ de %@. El aviso salta al %lld %%." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Te quedan %1$@ de %2$@. El aviso salta al %3$lld %%."
+          }
+        }
+      }
+    },
+    "Toca invertir %@ el %@. Abre la app para confirmar la compra." : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Toca invertir %1$@ el %2$@. Abre la app para confirmar la compra."
+          }
+        }
+      }
+    },
+    "Todo" : {
+
+    },
+    "Todo a fin de mes" : {
+
+    },
+    "Todos" : {
+
+    },
+    "Transferencias" : {
+
+    },
+    "Tu resumen de la semana" : {
+
+    },
+    "Tu sesión ha caducado. Vuelve a iniciar sesión." : {
+
+    },
+    "Tómate un minuto para repasar los gastos de la semana." : {
+
+    },
+    "Usa solo letras sin tilde, números, punto, guion o guion bajo." : {
+
+    },
+    "Usuario o contraseña incorrectos." : {
+
+    },
+    "Varias monedas" : {
+
+    },
+    "Venta" : {
+
+    },
+    "Ya formas parte de ese hogar." : {
+
+    },
+    "Ya hay un registro igual guardado. Revisa el formulario." : {
+
+    },
+    "Ya no hay datos que exportar de ese hogar." : {
+
+    },
+    "desde el principio" : {
+
+    },
+    "el año pasado a estas alturas" : {
+
+    },
+    "el mes anterior" : {
+
+    },
+    "el mes pasado a estas alturas" : {
+
+    },
+    "en 1 año" : {
+
+    },
+    "en 1 mes" : {
+
+    },
+    "en 6 meses" : {
+
+    },
+    "los 12 meses anteriores" : {
+
+    },
+    "los 3 meses anteriores" : {
+
+    },
+    "los 6 meses anteriores" : {
+
+    },
+    "¿Has apuntado tus gastos?" : {
+
+    },
+    "Últimos 12 meses" : {
+
+    },
+    "Últimos 3 meses" : {
+
+    },
+    "Últimos 30 días" : {
+
+    },
+    "Últimos 6 meses" : {
+
+    },
+    "Últimos 90 días" : {
+
+    }
+  },
+  "version" : "1.0"
+}

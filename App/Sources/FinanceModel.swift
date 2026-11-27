@@ -140,7 +140,7 @@ final class FinanceModel: ServerModel {
             store(nil, in: \.listError, turn: turn)
         } catch {
             guard let message = Self.message(for: error) else { return }
-            store("No se han podido cargar los movimientos. " + message, in: \.listError, turn: turn)
+            store(String(localized: "No se han podido cargar los movimientos. ") + message, in: \.listError, turn: turn)
         }
     }
 
@@ -293,8 +293,8 @@ final class FinanceModel: ServerModel {
     @discardableResult
     func transfer(id: UUID = UUID(), from: Account, to: Account, amount: Money, on day: CalendarDay,
                   description: String, toDescription: String? = nil) async -> Bool {
-        guard from.id != to.id else { error = "Elige dos cuentas distintas."; return false }
-        guard amount.minor > 0 else { error = "El importe tiene que ser mayor que cero."; return false }
+        guard from.id != to.id else { error = String(localized: "Elige dos cuentas distintas."); return false }
+        guard amount.minor > 0 else { error = String(localized: "El importe tiene que ser mayor que cero."); return false }
         let category = categories(for: .transfer).first?.id
         let text = description.trimmingCharacters(in: .whitespacesAndNewlines)
         let title = text.isEmpty ? "Transferencia" : text

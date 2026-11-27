@@ -38,17 +38,17 @@ public enum ReminderPlanner {
 
     static func title(for series: RecurringSeries, daysBefore: Int) -> String {
         let when = switch daysBefore {
-        case 0: "Hoy"
-        case 1: "Mañana"
-        default: "En \(daysBefore) días"
+        case 0: localized("Hoy")
+        case 1: localized("Mañana")
+        default: localized("En \(daysBefore) días")
         }
         return "\(when): \(series.trimmedName)"
     }
 
     static func body(for series: RecurringSeries, due: CalendarDay) -> String {
-        let verb = series.kind == .income ? "Se ingresan" : "Se cobran"
+        let verb = series.kind == .income ? localized("Se ingresan") : localized("Se cobran")
         let price = series.amount(on: due)
-        let change = series.introEndsOn == due ? " Es el último cargo con precio de oferta; después serán \(series.amount.formatted())." : ""
-        return "\(verb) \(price.formatted()) el \(due.longTitle).\(change)"
+        let change = series.introEndsOn == due ? localized(" Es el último cargo con precio de oferta; después serán \(series.amount.formatted()).") : ""
+        return localized("\(verb) \(price.formatted()) el \(due.longTitle).\(change)")
     }
 }

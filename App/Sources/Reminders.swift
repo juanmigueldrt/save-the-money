@@ -58,9 +58,9 @@ struct HabitSettings {
 
         var title: String {
             switch self {
-            case .off: "No"
-            case .daily: "Cada día"
-            case .weekly: "Los domingos"
+            case .off: String(localized: "No")
+            case .daily: String(localized: "Cada día")
+            case .weekly: String(localized: "Los domingos")
             }
         }
     }

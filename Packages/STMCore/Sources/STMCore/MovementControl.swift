@@ -178,7 +178,7 @@ public struct GroupedSpending: Hashable, Sendable, Identifiable {
     public enum Grouping: String, CaseIterable, Sendable, Identifiable {
         case tag, payee
         public var id: String { rawValue }
-        public var title: String { self == .tag ? "Por etiqueta" : "Por beneficiario" }
+        public var title: String { self == .tag ? localized("Por etiqueta") : localized("Por beneficiario") }
     }
 
     /// Gasto e ingreso por etiqueta o por beneficiario en el periodo. Sin transferencias ni excluidos.

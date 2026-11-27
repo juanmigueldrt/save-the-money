@@ -53,7 +53,7 @@ struct RecurringView: View {
 
     private var totals: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
-            Eyebrow("Pagos fijos al mes")
+            Eyebrow(String(localized: "Pagos fijos al mes"))
             let fixed = planning.monthlyTotal(of: .subscription) + planning.monthlyTotal(of: .essential)
             Text(fixed.formatted())
                 .titleFont(.largeTitle)
@@ -85,7 +85,7 @@ struct RecurringView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if planning.upcoming.isEmpty {
-                EmptyHint(text: planning.isLoading ? "Cargando…" : "No hay cargos en los próximos 30 días.")
+                EmptyHint(text: planning.isLoading ? String(localized: "Cargando…") : String(localized: "No hay cargos en los próximos 30 días."))
             }
             ForEach(planning.upcoming.prefix(12)) { charge in
                 HStack {
@@ -97,7 +97,7 @@ struct RecurringView: View {
                         Text(charge.signedAmount.formatted())
                             .font(Typography.subheadlineEmphasis)
                             .foregroundStyle(Palette.label)
-                        Text(charge.isIntro ? "\(charge.due.shortText) · oferta" : charge.due.shortText)
+                        Text(charge.isIntro ? String(localized: "\(charge.due.shortText) · oferta") : charge.due.shortText)
                             .font(Typography.footnote)
                             .foregroundStyle(Palette.labelSecondary)
                     }
@@ -125,9 +125,9 @@ struct RecurringView: View {
 
     private func hint(for kind: RecurringKind) -> String {
         switch kind {
-        case .subscription: "Apunta tus suscripciones (música, vídeo, gimnasio...) para ver cuánto suman y recibir un aviso antes de cada cobro."
-        case .essential: "Alquiler, luz, agua, internet o la compra del mes: lo que se paga sí o sí."
-        case .income: "La nómina u otros ingresos que llegan cada mes."
+        case .subscription: String(localized: "Apunta tus suscripciones (música, vídeo, gimnasio...) para ver cuánto suman y recibir un aviso antes de cada cobro.")
+        case .essential: String(localized: "Alquiler, luz, agua, internet o la compra del mes: lo que se paga sí o sí.")
+        case .income: String(localized: "La nómina u otros ingresos que llegan cada mes.")
         }
     }
 }
@@ -173,12 +173,12 @@ struct RecurringRow: View {
     private var detail: String {
         var parts = [series.recurrence.title]
         if !series.isArchived, let next = series.nextDue(onOrAfter: CalendarDay()) {
-            parts.append("próximo: \(next.shortText)")
+            parts.append(String(localized: "próximo: \(next.shortText)"))
             if series.isIntro(on: next), let end = series.introEndsOn {
-                parts.append("oferta hasta \(end.shortText)")
+                parts.append(String(localized: "oferta hasta \(end.shortText)"))
             }
         }
-        if series.remindDaysBefore != nil { parts.append("con aviso") }
+        if series.remindDaysBefore != nil { parts.append(String(localized: "con aviso")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -306,14 +306,13 @@ struct RecurringFormView: View {
     }
 
     private var introText: String {
-        introCharges == 1 ? "Durante 1 cargo" : "Durante \(introCharges) cargos"
+        String(localized: "Durante \(introCharges) cargos")
     }
 
     private var remindText: String {
         switch remindDays {
-        case 0: "El mismo día"
-        case 1: "1 día antes"
-        default: "\(remindDays) días antes"
+        case 0: String(localized: "El mismo día")
+        default: String(localized: "\(remindDays) días antes")
         }
     }
 
@@ -338,7 +337,7 @@ struct RecurringFormView: View {
 
     private func build() -> RecurringSeries? {
         guard let money = Money(entered: amount), money.minor > 0 else {
-            error = "El importe no es válido."
+            error = String(localized: "El importe no es válido.")
             return nil
         }
         var item = series ?? RecurringSeries(id: newSeriesId, householdId: planning.household.id, name: name, amount: money,
@@ -355,7 +354,7 @@ struct RecurringFormView: View {
         item.createsPending = createsPending
         if hasIntro && kind != .income {
             guard let intro = Money(entered: introAmount), intro.minor > 0 else {
-                error = "El precio de oferta no es válido."
+                error = String(localized: "El precio de oferta no es válido.")
                 return nil
             }
             item.introAmount = intro

@@ -7,6 +7,8 @@ options:
     iOS: "17.0"
     macOS: "14.0"
   createIntermediateGroups: true
+  # El español es el idioma de origen del catálogo de textos (ORC-110).
+  developmentLanguage: es
 configFiles:
   Debug: Config/App.xcconfig
   Release: Config/App.xcconfig
@@ -15,6 +17,9 @@ settings:
     SWIFT_VERSION: "5.10"
     MARKETING_VERSION: "0.1.0"
     CURRENT_PROJECT_VERSION: "1"
+    # El compilador extrae los textos al catálogo: scripts/catalogo-textos.sh.
+    SWIFT_EMIT_LOC_STRINGS: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
 packages:
   STMCore:
     path: Packages/STMCore
@@ -29,6 +34,7 @@ targets:
     sources:
       - App/Sources
       - App/Assets.xcassets
+      - App/Localizable.xcstrings
     info:
       path: App/Info.plist
       properties:

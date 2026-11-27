@@ -26,7 +26,7 @@ extension InMemoryBackend: CreditCardService {
         }
         guard financeAccounts.contains(where: { $0.id == terms.accountId && $0.householdId == terms.householdId && $0.kind == .creditCard }),
               isMine(terms.accountId, in: terms.householdId, user: user)
-        else { throw AppError.invalidInput("La cuenta no es una tarjeta de crédito.") }
+        else { throw AppError.invalidInput(localized("La cuenta no es una tarjeta de crédito.")) }
         if let payFrom = terms.payFromAccountId,
            !financeAccounts.contains(where: { $0.id == payFrom && $0.householdId == terms.householdId })
             || !isMine(payFrom, in: terms.householdId, user: user) {
@@ -71,7 +71,7 @@ extension InMemoryBackend: CreditCardService {
         guard creditCardList.contains(where: { $0.accountId == installment.accountId && $0.householdId == installment.householdId }),
               isMine(installment.accountId, in: installment.householdId, user: user),
               financeMovements.contains(where: { $0.id == installment.movementId && $0.accountId == installment.accountId })
-        else { throw AppError.invalidInput("Sólo se puede aplazar una compra de esta tarjeta.") }
+        else { throw AppError.invalidInput(localized("Sólo se puede aplazar una compra de esta tarjeta.")) }
         // Alta: repetirla solo vale con la misma compra, plazo e interés.
         if let stored = try replayed(installmentList.first(where: { $0.id == installment.id }), by: user, same: {
             $0.movementId == installment.movementId && $0.months == installment.months && $0.rate == installment.rate

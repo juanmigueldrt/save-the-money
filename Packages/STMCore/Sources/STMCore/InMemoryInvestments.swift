@@ -93,7 +93,7 @@ extension InMemoryBackend: InvestmentService {
         let user = try requireInvestmentMember(of: holding.householdId)
         // Como el servidor: un activo ajeno no se ve.
         guard isMine(holdingId, in: holding.householdId, user: user) else { throw AppError.unknown("no existe") }
-        if price < 0 { throw AppError.invalidInput("El precio no puede ser negativo.") }
+        if price < 0 { throw AppError.invalidInput(localized("El precio no puede ser negativo.")) }
         if let existing = holdingPriceList.firstIndex(where: { $0.holdingId == holdingId && $0.pricedOn == day }) {
             holdingPriceList[existing].price = price
         } else {

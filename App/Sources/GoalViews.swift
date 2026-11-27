@@ -14,9 +14,9 @@ struct GoalsView: View {
 
         var title: String {
             switch self {
-            case .savings: "Ahorro"
-            case .debt: "Deudas"
-            case .completed: "Completadas"
+            case .savings: String(localized: "Ahorro")
+            case .debt: String(localized: "Deudas")
+            case .completed: String(localized: "Completadas")
             }
         }
 
@@ -37,17 +37,17 @@ struct GoalsView: View {
                         Text("Sin metas todavía")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: planning.isLoading ? "Cargando…" : "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.")
+                        EmptyHint(text: planning.isLoading ? String(localized: "Cargando…") : String(localized: "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás."))
                         Button("Crear una meta") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
                     .card()
                 }
                 if !planning.progress.isEmpty {
-                    CapsuleSegmented("Mostrar", selection: $filter, options: GoalFilter.allCases) { $0.title }
+                    CapsuleSegmented(String(localized: "Mostrar"), selection: $filter, options: GoalFilter.allCases) { $0.title }
                     let items = planning.progress.filter(filter.includes)
                     if items.isEmpty {
-                        EmptyHint(text: "No hay metas en esta sección.")
+                        EmptyHint(text: String(localized: "No hay metas en esta sección."))
                     }
                     ForEach(items) { progress in
                         NavigationLink(value: progress.goal) {
@@ -121,22 +121,22 @@ struct ProgressBar: View {
 enum GoalText {
     static func amounts(_ progress: GoalProgress) -> String {
         switch progress.goal.kind {
-        case .savings: "\(progress.saved.formatted()) de \(progress.goal.target.formatted())"
-        case .debt: "Pagado \(progress.saved.formatted()) de \(progress.goal.target.formatted())"
+        case .savings: String(localized: "\(progress.saved.formatted()) de \(progress.goal.target.formatted())")
+        case .debt: String(localized: "Pagado \(progress.saved.formatted()) de \(progress.goal.target.formatted())")
         }
     }
 
     static func projection(_ progress: GoalProgress) -> String {
-        if progress.isReached { return progress.goal.kind == .savings ? "¡Meta conseguida!" : "¡Deuda pagada!" }
+        if progress.isReached { return progress.goal.kind == .savings ? String(localized: "¡Meta conseguida!") : String(localized: "¡Deuda pagada!") }
         var parts: [String] = []
         if let pace = progress.monthlyPace, let month = progress.projectedMonth {
-            parts.append("A \(pace.formatted()) al mes, la alcanzas en \(month.title.lowercased())")
+            parts.append(String(localized: "A \(pace.formatted()) al mes, la alcanzas en \(month.title.lowercased())"))
         } else {
-            parts.append("Faltan \(progress.remaining.formatted()). Añade una aportación o un plan mensual para ver cuándo llegarás")
+            parts.append(String(localized: "Faltan \(progress.remaining.formatted()). Añade una aportación o un plan mensual para ver cuándo llegarás"))
         }
         if let needed = progress.neededMonthly, let date = progress.goal.targetOn {
-            let verdict = progress.isOnTrack == true ? "vas bien" : "necesitas \(needed.formatted()) al mes"
-            parts.append("Para el \(date.longTitle) de \(date.year), \(verdict)")
+            let verdict = progress.isOnTrack == true ? String(localized: "vas bien") : String(localized: "necesitas \(needed.formatted()) al mes")
+            parts.append(String(localized: "Para el \(date.longTitle) de \(String(date.year)), \(verdict)"))
         }
         return parts.joined(separator: ". ") + "."
     }
@@ -158,7 +158,7 @@ struct GoalDetailView: View {
             if let goal {
                 content(goal)
             } else {
-                EmptyHint(text: "Esta meta ya no existe.")
+                EmptyHint(text: String(localized: "Esta meta ya no existe."))
                     .padding(Spacing.s16)
             }
         }
@@ -323,11 +323,11 @@ struct GoalFormView: View {
 
     private func save() async {
         guard let targetMoney = Money(entered: target), targetMoney.minor > 0 else {
-            error = kind == .savings ? "Indica cuánto quieres juntar." : "Indica cuánto se debía."
+            error = kind == .savings ? String(localized: "Indica cuánto quieres juntar.") : String(localized: "Indica cuánto se debía.")
             return
         }
         guard let startingMoney = amount(starting), let plan = amount(monthlyPlan) else {
-            error = "Algún importe no es válido."
+            error = String(localized: "Algún importe no es válido.")
             return
         }
         var item = goal ?? Goal(id: newGoalId, householdId: planning.household.id, name: name, target: targetMoney)
@@ -397,7 +397,7 @@ struct ContributionFormView: View {
 
     private func save() async {
         guard let money = Money(entered: amount), money.minor > 0 else {
-            error = "El importe no es válido."
+            error = String(localized: "El importe no es válido.")
             return
         }
         isWorking = true

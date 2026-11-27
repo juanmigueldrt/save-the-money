@@ -26,7 +26,7 @@ extension InMemoryBackend: FinanceService {
         let user = try requireMember(of: householdId)
         if let issue = draft.issue { throw AppError.validation(.account(issue)) }
         if let owner = draft.ownerId, !isMember(owner, of: householdId) {
-            throw AppError.invalidInput("Esa persona no es del hogar.")
+            throw AppError.invalidInput(localized("Esa persona no es del hogar."))
         }
         // Repetir el alta solo vale con el mismo hogar, nombre, tipo y saldo inicial.
         if let saved = try replayed(financeAccounts.first(where: { $0.id == draft.id }), by: user, same: {
@@ -324,7 +324,7 @@ extension InMemoryBackend: FinanceService {
 
     /// Como el trigger del servidor: el importe y el día de una pata cambian también en la otra.
     private func keepTransferLegsTogether(_ updated: Movement, transferId: UUID, before: Movement, user: UUID) throws {
-        let invalid = AppError.invalidInput("Algún dato no es válido. Revisa el formulario.")
+        let invalid = AppError.invalidInput(localized("Algún dato no es válido. Revisa el formulario."))
         // La salida sigue siendo negativa y la entrada positiva.
         guard updated.amount.isNegative == before.amount.isNegative else { throw invalid }
         // Si la otra pata ya no existe, la que queda es un movimiento normal.
@@ -386,5 +386,5 @@ extension InMemoryBackend: FinanceService {
 
 extension AppError {
     /// Lo que devuelve la app ante el 23505 del servidor: ese id ya lo usó otra persona.
-    static let idUsedBySomeoneElse = AppError.invalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
+    static let idUsedBySomeoneElse = AppError.invalidInput(localized("Ya hay un registro igual guardado. Revisa el formulario."))
 }

@@ -62,7 +62,7 @@ struct MovementsView: View {
             }
             if source.isEmpty {
                 if finance.listError == nil {
-                    EmptyHint(text: finance.isLoading || finance.isLoadingList || !isThisList ? "Cargando…" : emptyText)
+                    EmptyHint(text: finance.isLoading || finance.isLoadingList || !isThisList ? String(localized: "Cargando…") : emptyText)
                 }
             } else if isFiltering {
                 Section {
@@ -143,7 +143,7 @@ struct MovementsView: View {
         }
         .searchable(text: $filter.search, prompt: "Buscar concepto, beneficiario, #etiqueta o importe")
         .brandBackground()
-        .navigationTitle(account?.name ?? "Movimientos")
+        .navigationTitle(account?.name ?? String(localized: "Movimientos"))
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Nuevo movimiento", systemImage: "plus") { adding = true }
@@ -167,7 +167,7 @@ struct MovementsView: View {
         .sheet(isPresented: $bulkEditing) {
             BulkEditView(movements: selectedMovements) { selection = []; selecting = false }
         }
-        .confirmationDialog(selection.count == 1 ? "¿Borrar 1 movimiento?" : "¿Borrar \(selection.count) movimientos?",
+        .confirmationDialog("¿Borrar \(selection.count) movimientos?",
                             isPresented: $confirmingBulkDelete, titleVisibility: .visible) {
             Button("Borrar", role: .destructive) {
                 Task {
@@ -215,8 +215,8 @@ struct MovementsView: View {
                 .font(Typography.subheadlineEmphasis)
                 .foregroundStyle(Palette.label)
             HStack(spacing: Spacing.s16) {
-                Text("Gastos " + spent.signedText())
-                Text("Ingresos " + earned.signedText())
+                Text(String(localized: "Gastos ") + spent.signedText())
+                Text(String(localized: "Ingresos ") + earned.signedText())
             }
             .font(Typography.footnote)
             .foregroundStyle(Palette.labelSecondary)
@@ -304,7 +304,7 @@ struct MovementsView: View {
         let chosen = selectedMovements
         return VStack(spacing: Spacing.s8) {
             HStack {
-                Text(chosen.count == 1 ? "1 seleccionado" : "\(chosen.count) seleccionados")
+                Text("\(chosen.count) seleccionados")
                     .font(Typography.subheadlineEmphasis)
                     .foregroundStyle(Palette.label)
                 Spacer()
@@ -336,8 +336,8 @@ struct MovementsView: View {
 
     private var emptyText: String {
         filter.search.trimmingCharacters(in: .whitespaces).isEmpty
-            ? "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones."
-            : "Nada coincide con la búsqueda."
+            ? String(localized: "No hay movimientos. Apunta uno con + o importa un CSV desde Más opciones.")
+            : String(localized: "Nada coincide con la búsqueda.")
     }
 
     /// Al final de la lista: la página siguiente se pide al llegar aquí (y con el botón, si no se ha pedido sola).

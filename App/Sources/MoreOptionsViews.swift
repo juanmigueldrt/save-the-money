@@ -232,7 +232,7 @@ struct MoreView: View {
         do {
             csvFile = try ExportFiles.write(data, named: MovementsCSV.fileName())
         } catch {
-            exportError = "No se ha podido crear el fichero."
+            exportError = String(localized: "No se ha podido crear el fichero.")
         }
     }
 }

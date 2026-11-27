@@ -17,12 +17,12 @@ struct CashFlowView: View {
                 PeriodSwitcher()
                 VStack(alignment: .leading, spacing: Spacing.s16) {
                     HStack {
-                        SummaryLine(title: "Entra", amount: report.income)
+                        SummaryLine(title: String(localized: "Entra"), amount: report.income)
                         Divider().frame(height: 20)
-                        SummaryLine(title: "Sale", amount: report.totalSpent)
+                        SummaryLine(title: String(localized: "Sale"), amount: report.totalSpent)
                     }
                     if flow.isEmpty {
-                        EmptyHint(text: budgets.isLoading ? "Cargando…" : "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.")
+                        EmptyHint(text: budgets.isLoading ? String(localized: "Cargando…") : String(localized: "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero."))
                     } else {
                         SankeyDiagram(flow: flow)
                             .chartHeight(max(320, CGFloat(flow.nodes.filter { $0.column == 2 }.count) * 34))

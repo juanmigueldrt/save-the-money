@@ -30,7 +30,7 @@ struct TransferFormView: View {
                     }
                 }
                 Section {
-                    AmountField("Importe, p. ej. 200", text: $amount)
+                    AmountField(String(localized: "Importe, p. ej. 200"), text: $amount)
                     TextField("Concepto (opcional)", text: $concept)
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
                         .environment(\.locale, AppRegion.locale)
@@ -55,11 +55,11 @@ struct TransferFormView: View {
     private func save() async {
         error = nil
         guard let source = from.flatMap(finance.account), let target = to.flatMap(finance.account), source.id != target.id else {
-            error = "Elige dos cuentas distintas."
+            error = String(localized: "Elige dos cuentas distintas.")
             return
         }
         guard let money = Money(entered: amount), money.minor > 0 else {
-            error = "Escribe un importe mayor que cero."
+            error = String(localized: "Escribe un importe mayor que cero.")
             return
         }
         isWorking = true

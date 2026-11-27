@@ -18,7 +18,7 @@ struct InvestmentPlansView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s8) {
-                    Eyebrow("Aportaciones automáticas")
+                    Eyebrow(String(localized: "Aportaciones automáticas"))
                     Text(investments.monthlyPlanned.formatted())
                         .titleFont(.largeTitle)
                         .foregroundStyle(Palette.label)
@@ -40,7 +40,7 @@ struct InvestmentPlansView: View {
                             .buttonStyle(PrimaryButtonStyle())
                             .disabled(investments.activeHoldings.isEmpty)
                         if investments.activeHoldings.isEmpty {
-                            EmptyHint(text: "Añade antes un activo en la cartera.")
+                            EmptyHint(text: String(localized: "Añade antes un activo en la cartera."))
                         }
                     }
                 }
@@ -66,9 +66,9 @@ struct InvestmentPlansView: View {
     }
 
     private func summary(_ counts: (active: Int, paused: Int)) -> String {
-        let active = counts.active == 1 ? "1 plan activo" : "\(counts.active) planes activos"
-        let paused = counts.paused == 0 ? "" : " y \(counts.paused) en pausa"
-        return "al mes en \(active)\(paused)"
+        let active = String(localized: "\(counts.active) planes activos")
+        let paused = counts.paused == 0 ? "" : String(localized: " y \(counts.paused) en pausa")
+        return String(localized: "al mes en \(active)\(paused)")
     }
 
     private func calendarCard(month: MonthKey, charges: [PlanCharge]) -> some View {
@@ -77,7 +77,7 @@ struct InvestmentPlansView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if charges.isEmpty {
-                EmptyHint(text: "Este mes no hay aportaciones.")
+                EmptyHint(text: String(localized: "Este mes no hay aportaciones."))
             } else {
                 Chart(charges) { charge in
                     BarMark(x: .value("Día", charge.due.date(), unit: .day), y: .value("Importe", charge.plan.amount.decimal))
@@ -129,7 +129,7 @@ struct PlanCard: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(holding?.trimmedName ?? "Activo")
+                    Text(holding?.trimmedName ?? String(localized: "Activo"))
                         .font(Typography.headline)
                         .foregroundStyle(Palette.label)
                     Text(subtitle(holding))
@@ -144,13 +144,13 @@ struct PlanCard: View {
             }
             Grid(alignment: .leading, horizontalSpacing: Spacing.s16, verticalSpacing: Spacing.s12) {
                 GridRow {
-                    figure("Aportación", "\(plan.amount.formatted()) · \(plan.recurrence.title.lowercased())")
-                    figure(plan.isPaused ? "Estado" : "Próxima",
-                           plan.isPaused ? "En pausa" : plan.nextDue(onOrAfter: investments.day)?.longTitle ?? "Terminado")
+                    figure(String(localized: "Aportación"), "\(plan.amount.formatted()) · \(plan.recurrence.title.lowercased())")
+                    figure(plan.isPaused ? String(localized: "Estado") : String(localized: "Próxima"),
+                           plan.isPaused ? String(localized: "En pausa") : plan.nextDue(onOrAfter: investments.day)?.longTitle ?? String(localized: "Terminado"))
                 }
                 GridRow {
-                    figure("Invertido con el plan", plan.invested(trades: investments.trades, through: investments.day).formatted())
-                    figure("Rentabilidad del activo", position?.gainFraction.map(InvestmentText.percent) ?? "—",
+                    figure(String(localized: "Invertido con el plan"), plan.invested(trades: investments.trades, through: investments.day).formatted())
+                    figure(String(localized: "Rentabilidad del activo"), position?.gainFraction.map(InvestmentText.percent) ?? "—",
                            color: position.map { InvestmentText.gainColor($0.gain) } ?? Palette.label)
                 }
             }
@@ -164,7 +164,7 @@ struct PlanCard: View {
     private func subtitle(_ holding: Holding?) -> String {
         let who = investments.ownerName(holding?.ownerId)
         guard let id = plan.accountId, let account = finance.account(id) else { return who }
-        return "\(who) · desde \(account.name)"
+        return String(localized: "\(who) · desde \(account.name)")
     }
 
     private func figure(_ title: String, _ value: String, color: Color = Palette.label) -> some View {

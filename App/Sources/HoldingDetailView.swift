@@ -21,7 +21,7 @@ struct HoldingDetailView: View {
             if let holding = investments.holding(holdingId) {
                 content(holding)
             } else {
-                EmptyHint(text: "Este activo ya no existe.")
+                EmptyHint(text: String(localized: "Este activo ya no existe."))
                     .pageLayout()
             }
         }
@@ -81,7 +81,7 @@ struct HoldingDetailView: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             if points.count >= 2 {
-                CapsuleSegmented("Periodo", selection: $priceRange, options: ChartRange.price) { $0.title }
+                CapsuleSegmented(String(localized: "Periodo"), selection: $priceRange, options: ChartRange.price) { $0.title }
                 Chart(points) { point in
                     LineMark(x: .value("Día", point.day.date()), y: .value("Precio", point.price))
                         .foregroundStyle(Palette.accent)
@@ -96,9 +96,9 @@ struct HoldingDetailView: View {
             }
             if let range = investments.yearRange(of: holding) {
                 HStack {
-                    figure("Mín. 1 año", InvestmentText.price(range.lowerBound, currency: holding.currency))
-                    figure("Máx. 1 año", InvestmentText.price(range.upperBound, currency: holding.currency))
-                    figure("Comisión", InvestmentText.rate(holding.feeRate))
+                    figure(String(localized: "Mín. 1 año"), InvestmentText.price(range.lowerBound, currency: holding.currency))
+                    figure(String(localized: "Máx. 1 año"), InvestmentText.price(range.upperBound, currency: holding.currency))
+                    figure(String(localized: "Comisión"), InvestmentText.rate(holding.feeRate))
                 }
             }
             Button("Apuntar precio") { recordingPrice = true }
@@ -115,19 +115,19 @@ struct HoldingDetailView: View {
             if position.quantity > 0 {
                 Grid(alignment: .leading, horizontalSpacing: Spacing.s16, verticalSpacing: Spacing.s16) {
                     GridRow {
-                        figure("Participaciones", InvestmentText.quantity(position.quantity))
-                        figure("Precio medio", InvestmentText.price(position.averagePrice, currency: position.holding.currency))
+                        figure(String(localized: "Participaciones"), InvestmentText.quantity(position.quantity))
+                        figure(String(localized: "Precio medio"), InvestmentText.price(position.averagePrice, currency: position.holding.currency))
                     }
                     GridRow {
-                        figure("Valor", position.value.formatted())
-                        figure("Rentabilidad", [InvestmentText.signed(position.gain),
+                        figure(String(localized: "Valor"), position.value.formatted())
+                        figure(String(localized: "Rentabilidad"), [InvestmentText.signed(position.gain),
                                                 position.gainFraction.map(InvestmentText.percent)]
                             .compactMap { $0 }.joined(separator: " · "),
                                color: InvestmentText.gainColor(position.gain))
                     }
                 }
             } else {
-                EmptyHint(text: investments.isLoading ? "Cargando…" : "Todavía no tienes participaciones. Apunta tu primera compra.")
+                EmptyHint(text: investments.isLoading ? String(localized: "Cargando…") : String(localized: "Todavía no tienes participaciones. Apunta tu primera compra."))
             }
             if position.realized.minor != 0 {
                 Text("Ganancia ya hecha con ventas: \(InvestmentText.signed(position.realized))")
@@ -151,7 +151,7 @@ struct HoldingDetailView: View {
                         .font(Typography.subheadlineEmphasis)
                 }
             }
-            if list.isEmpty { EmptyHint(text: "Sin compras ni ventas todavía.") }
+            if list.isEmpty { EmptyHint(text: String(localized: "Sin compras ni ventas todavía.")) }
             ForEach(list) { trade in
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
@@ -159,7 +159,7 @@ struct HoldingDetailView: View {
                             .font(Typography.subheadline)
                             .foregroundStyle(Palette.label)
                             .lineLimit(1)
-                        Text(trade.fee.minor > 0 ? "\(trade.tradedOn.shortText) · comisión \(trade.fee.formatted())" : trade.tradedOn.shortText)
+                        Text(trade.fee.minor > 0 ? String(localized: "\(trade.tradedOn.shortText) · comisión \(trade.fee.formatted())") : trade.tradedOn.shortText)
                             .font(Typography.footnote)
                             .foregroundStyle(Palette.labelSecondary)
                     }

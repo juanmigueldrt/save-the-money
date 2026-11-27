@@ -15,10 +15,10 @@ struct ReportsView: View {
 
         var title: String {
             switch self {
-            case .incomeAndExpenses: "Ingresos y gastos"
-            case .byCategory: "Por categoría"
-            case .byTag: "Por etiqueta"
-            case .byPayee: "Por beneficiario"
+            case .incomeAndExpenses: String(localized: "Ingresos y gastos")
+            case .byCategory: String(localized: "Por categoría")
+            case .byTag: String(localized: "Por etiqueta")
+            case .byPayee: String(localized: "Por beneficiario")
             }
         }
     }
@@ -26,7 +26,7 @@ struct ReportsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                CapsuleSegmented("Informe", selection: $mode, options: ReportMode.allCases) { $0.title }
+                CapsuleSegmented(String(localized: "Informe"), selection: $mode, options: ReportMode.allCases) { $0.title }
                 switch mode {
                 case .incomeAndExpenses: incomeAndExpenses
                 case .byCategory: byCategory
@@ -65,8 +65,8 @@ struct ReportsView: View {
                                     monthStartDay: startDay)
         let spending = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .expense,
                                       monthStartDay: startDay)
-        let bars = income.byMonth.map { MonthBar(month: $0.month, kind: "Ingresos", amount: $0.amount) }
-            + spending.byMonth.map { MonthBar(month: $0.month, kind: "Gastos", amount: $0.amount) }
+        let bars = income.byMonth.map { MonthBar(month: $0.month, kind: String(localized: "Ingresos"), amount: $0.amount) }
+            + spending.byMonth.map { MonthBar(month: $0.month, kind: String(localized: "Gastos"), amount: $0.amount) }
         let saving = income.averagePerMonth - spending.averagePerMonth
         let rise = BiggestRise.find(movements: movements, categories: finance.categories,
                                     month: MonthKey.containing(CalendarDay(), startDay: startDay), monthStartDay: startDay)
@@ -88,7 +88,7 @@ struct ReportsView: View {
                     .position(by: .value("Tipo", bar.kind))
                     .cornerRadius(4)
             }
-            .chartForegroundStyleScale(["Ingresos": Palette.positive, "Gastos": Palette.accent])
+            .chartForegroundStyleScale([String(localized: "Ingresos"): Palette.positive, String(localized: "Gastos"): Palette.accent])
             .chartXAxis {
                 AxisMarks(values: .stride(by: .month)) { _ in
                     AxisValueLabel(format: .dateTime.month(.abbreviated))
@@ -121,7 +121,7 @@ struct ReportsView: View {
                     Text("Categoría que más sube")
                         .font(Typography.headline)
                         .foregroundStyle(Palette.label)
-                    Text(rise.title + (rise.percent.map { ", +\($0) %" } ?? "") + " vs. " + rise.previous.title.lowercased())
+                    Text(rise.title + (rise.percent.map { ", +\($0) %" } ?? "") + String(localized: " vs. ") + rise.previous.title.lowercased())
                         .font(Typography.footnote)
                         .foregroundStyle(Palette.labelSecondary)
                 }
@@ -139,7 +139,7 @@ struct ReportsView: View {
         let report = tracking.report(categories: finance.categories)
         let previous = tracking.previousReport(categories: finance.categories)
         VStack(alignment: .leading, spacing: Spacing.s16) {
-            CapsuleSegmented("Qué", selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
+            CapsuleSegmented(String(localized: "Qué"), selection: $tracking.kind, options: SpendingReport.Kind.allCases) { $0.title }
             HStack {
                 Picker("Periodo", selection: $tracking.period) {
                     ForEach(ReportPeriod.allCases) { Text($0.title).tag($0) }
@@ -186,7 +186,7 @@ struct ReportsView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if report.byCategory.isEmpty {
-                EmptyHint(text: tracking.isLoading ? "Cargando…" : "No hay movimientos en este periodo.")
+                EmptyHint(text: tracking.isLoading ? String(localized: "Cargando…") : String(localized: "No hay movimientos en este periodo."))
             }
             ForEach(report.byCategory) { row in
                 VStack(alignment: .leading, spacing: Spacing.s8) {
@@ -230,9 +230,9 @@ struct ReportsView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if rows.isEmpty {
-                EmptyHint(text: tracking.isLoading ? "Cargando…" : grouping == .tag
-                          ? "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento."
-                          : "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento.")
+                EmptyHint(text: tracking.isLoading ? String(localized: "Cargando…") : grouping == .tag
+                          ? String(localized: "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento.")
+                          : String(localized: "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento."))
             }
             ForEach(rows) { row in
                 VStack(alignment: .leading, spacing: Spacing.s8) {
@@ -271,8 +271,8 @@ struct ReportsView: View {
             let good = tracking.kind == .expense ? !up : up
             let percent = change.percent.map { ($0 > 0 ? "+" : "") + "\($0) % · " } ?? ""
             Text(change.difference.minor == 0
-                 ? "Igual que \(tracking.period.previousTitle)"
-                 : percent + change.difference.signedText() + " frente a " + tracking.period.previousTitle)
+                 ? String(localized: "Igual que \(tracking.period.previousTitle)")
+                 : percent + change.difference.signedText() + String(localized: " frente a ") + tracking.period.previousTitle)
                 .font(Typography.subheadlineEmphasis)
                 .foregroundStyle(change.difference.minor == 0 ? Palette.labelSecondary : (good ? Palette.positiveText : Palette.negativeText))
         }

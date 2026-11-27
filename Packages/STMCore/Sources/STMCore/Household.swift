@@ -16,13 +16,13 @@ public struct Household: Identifiable, Hashable, Codable, Sendable {
 
     /// El servidor no deja cambiar la moneda de un hogar que ya tiene importes (ORC-71): no se convierten.
     public static let currencyLocked =
-        "No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados."
+        localized("No se puede cambiar la moneda del hogar mientras tenga cuentas, presupuestos u otros importes guardados.")
 
     /// Días en que puede empezar el mes del hogar: del 1 al 28, que existen en todos los meses (igual que el servidor).
     public static let monthStartDays = 1...28
-    public static let monthStartDayInvalid = "El mes del hogar puede empezar entre el día 1 y el 28."
-    public static let monthStartDayOwnerOnly = "Solo quien creó el hogar puede cambiar el día en que empieza el mes."
-    public static let renameOwnerOnly = "Solo quien creó el hogar puede cambiarle el nombre."
+    public static let monthStartDayInvalid = localized("El mes del hogar puede empezar entre el día 1 y el 28.")
+    public static let monthStartDayOwnerOnly = localized("Solo quien creó el hogar puede cambiar el día en que empieza el mes.")
+    public static let renameOwnerOnly = localized("Solo quien creó el hogar puede cambiarle el nombre.")
 
     enum CodingKeys: String, CodingKey {
         case id, name
@@ -36,9 +36,9 @@ public enum AppTheme: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .system: "Automático"
-        case .light: "Claro"
-        case .dark: "Oscuro"
+        case .system: localized("Automático")
+        case .light: localized("Claro")
+        case .dark: localized("Oscuro")
         }
     }
 }
@@ -75,7 +75,7 @@ public struct Profile: Identifiable, Hashable, Codable, Sendable {
 public enum MemberRole: String, Codable, Sendable {
     case owner, member
 
-    public var title: String { self == .owner ? "Propietario" : "Miembro" }
+    public var title: String { self == .owner ? localized("Propietario") : localized("Miembro") }
 }
 
 /// Fila de household_members.
@@ -200,28 +200,32 @@ public struct RemovedHouseholdExport: Hashable, Decodable, Sendable {
 
 public enum DeletingAccount {
     /// Lo que la app avisa antes de borrar la cuenta.
-    public static let warning =
-        "Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; "
-        + "si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. "
-        + "Si quieres conservar tus movimientos, expórtalos antes."
+    public static let warning = localized("""
+        Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; \
+        si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. \
+        Si quieres conservar tus movimientos, expórtalos antes.
+        """)
 }
 
 public enum LeavingHousehold {
     /// Lo que la app avisa antes de salir de un hogar.
-    public static let leaveWarning =
-        "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, "
-        + "inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «Exportar CSV para Excel», en Más opciones."
+    public static let leaveWarning = localized("""
+        Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, \
+        inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «Exportar CSV para Excel», en Más opciones.
+        """)
     /// Lo que se añade a ese aviso cuando quien sale es el único miembro (ORC-59).
-    public static let lastMemberWarning = "Eres el único miembro: el hogar también se borrará."
+    public static let lastMemberWarning = localized("Eres el único miembro: el hogar también se borrará.")
     /// El propietario no puede salir con otros miembros dentro: el hogar se quedaría sin nadie que lo gestione.
     public static let ownerMustTransfer =
-        "Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás."
+        localized("Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás.")
     /// Lo que la app avisa antes de traspasar el hogar.
-    public static let transferWarning =
-        "Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. "
-        + "Tú pasarás a ser miembro."
+    public static let transferWarning = localized("""
+        Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. \
+        Tú pasarás a ser miembro.
+        """)
     /// Lo que la app avisa antes de quitar a un miembro.
-    public static let removeWarning =
-        "Dejará de tener acceso a este hogar. Sus datos se guardan \(RemovedHousehold.exportDays) días para que pueda "
-        + "exportarlos y después se borran. Si le vuelves a invitar antes, los recupera."
+    public static let removeWarning = localized("""
+        Dejará de tener acceso a este hogar. Sus datos se guardan \(RemovedHousehold.exportDays) días para que pueda \
+        exportarlos y después se borran. Si le vuelves a invitar antes, los recupera.
+        """)
 }

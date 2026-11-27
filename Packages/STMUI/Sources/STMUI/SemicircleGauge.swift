@@ -24,7 +24,7 @@ public struct SemicircleGauge: View {
                     .stroke(Palette.fill, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
                 SemicircleArc(fraction: progress.fraction)
                     .stroke(tint, style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                Text("\(Int((progress.fraction * 100).rounded())) %")
+                Text("\(Int((progress.fraction * 100).rounded())) %", bundle: .module)
                     .font(Typography.subheadlineEmphasis.monospacedDigit())
                     .foregroundStyle(Palette.label)
             }
@@ -37,7 +37,7 @@ public struct SemicircleGauge: View {
                 Text(progress.spent.formatted())
                     .font(Typography.footnote.monospacedDigit())
                     .foregroundStyle(Palette.label)
-                Text("de \(progress.allocated.formatted())")
+                Text("de \(progress.allocated.formatted())", bundle: .module)
                     .font(Typography.caption1.monospacedDigit())
                     .foregroundStyle(Palette.labelSecondary)
             }
@@ -46,7 +46,7 @@ public struct SemicircleGauge: View {
             .minimumScaleFactor(0.75)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(progress.group.title): \(progress.spent.formatted()) gastados de \(progress.allocated.formatted())")
+        .accessibilityLabel(Text("\(progress.group.title): \(progress.spent.formatted()) gastados de \(progress.allocated.formatted())", bundle: .module))
     }
 }
 

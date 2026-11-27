@@ -32,7 +32,7 @@ struct HouseholdOnboardingView: View {
                         Text("Crear un hogar")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        LabeledField(label: "Nombre del hogar") {
+                        LabeledField(label: String(localized: "Nombre del hogar")) {
                             TextField("Casa de \(profile.name)", text: $householdName)
                         }
                         Button("Crear hogar", action: create)
@@ -45,7 +45,7 @@ struct HouseholdOnboardingView: View {
                         Text("Unirme con un código")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        LabeledField(label: "Código de 6 caracteres") {
+                        LabeledField(label: String(localized: "Código de 6 caracteres")) {
                             TextField("4K9 Q2X", text: $code)
                                 .plainIdentifierInput()
                                 .onSubmit(join)
@@ -103,7 +103,7 @@ struct HouseholdOnboardingView: View {
 
     private func join() {
         guard let invite = InviteCode(code) else {
-            error = "El código tiene 6 letras o números, como 4K9 Q2X."
+            error = String(localized: "El código tiene 6 letras o números, como 4K9 Q2X.")
             return
         }
         run { try await session.join(invite) }
@@ -269,7 +269,7 @@ struct HouseholdView: View {
             Button("Guardar") {
                 Task {
                     do { try await session.renameHousehold(household, to: newName) }
-                    catch { model.error = (error as? AppError)?.text ?? "No se ha podido cambiar el nombre." }
+                    catch { model.error = (error as? AppError)?.text ?? String(localized: "No se ha podido cambiar el nombre.") }
                 }
             }
         } message: {
@@ -357,7 +357,7 @@ extension HouseholdView {
             Text("Tu nombre")
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
-            LabeledField(label: "Nombre visible") {
+            LabeledField(label: String(localized: "Nombre visible")) {
                 TextField(profile.username, text: $displayName)
                     .accessibilityLabel("Nombre visible")
                     .onSubmit(saveDisplayName)

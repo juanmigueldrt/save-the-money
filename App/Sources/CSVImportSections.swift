@@ -13,7 +13,7 @@ struct MappingSection: View {
         let names = mapping.headerRow.map { table.rows[$0] } ?? []
         return (0..<width).map { index in
             let name = names.indices.contains(index) ? names[index] : ""
-            return name.isEmpty ? "Columna \(index + 1)" : name
+            return name.isEmpty ? String(localized: "Columna \(index + 1)") : name
         }
     }
 
@@ -32,18 +32,18 @@ struct MappingSection: View {
 
     var body: some View {
         Section("Columnas") {
-            columnPicker("Fecha", selection: $mapping.date)
+            columnPicker(String(localized: "Fecha"), selection: $mapping.date)
             Picker("Formato de fecha", selection: $mapping.dateOrder) {
                 ForEach(DateOrder.allCases, id: \.self) { Text($0.title).tag($0) }
             }
-            columnPicker("Concepto", selection: $mapping.description)
+            columnPicker(String(localized: "Concepto"), selection: $mapping.description)
             Toggle("Cargos y abonos en columnas separadas", isOn: usesSplitAmount)
             switch mapping.amount {
             case .signed(let column):
-                columnPicker("Importe", selection: Binding { column } set: { mapping.amount = .signed($0) })
+                columnPicker(String(localized: "Importe"), selection: Binding { column } set: { mapping.amount = .signed($0) })
             case .split(let debit, let credit):
-                columnPicker("Cargos (gastos)", selection: Binding { debit } set: { mapping.amount = .split(debit: $0, credit: credit) })
-                columnPicker("Abonos (ingresos)", selection: Binding { credit } set: { mapping.amount = .split(debit: debit, credit: $0) })
+                columnPicker(String(localized: "Cargos (gastos)"), selection: Binding { debit } set: { mapping.amount = .split(debit: $0, credit: credit) })
+                columnPicker(String(localized: "Abonos (ingresos)"), selection: Binding { credit } set: { mapping.amount = .split(debit: debit, credit: $0) })
             }
         }
     }
@@ -186,10 +186,10 @@ struct PreviewRow: View {
     }
 
     private var detail: String {
-        if isSkipped { return "\(draft.bookedOn.shortText) · No se importará" }
+        if isSkipped { return String(localized: "\(draft.bookedOn.shortText) · No se importará") }
         var base = draft.bookedOn.shortText
         if let name = categories.first(where: { $0.id == draft.categoryId })?.name { base += " · " + name }
-        if draft.excluded { base += " · Excluido" }
+        if draft.excluded { base += String(localized: " · Excluido") }
         return base + markText
     }
 
@@ -197,9 +197,9 @@ struct PreviewRow: View {
         switch mark {
         case .none: return ""
         case .creditCard(let id):
-            let name = cards.first { $0.id == id }?.name ?? "tarjeta"
-            return " · Compra con \(name)"
-        default: return " · \(mark.title), cada mes"
+            let name = cards.first { $0.id == id }?.name ?? String(localized: "tarjeta")
+            return String(localized: " · Compra con \(name)")
+        default: return String(localized: " · \(mark.title), cada mes")
         }
     }
 }

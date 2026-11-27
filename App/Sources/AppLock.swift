@@ -23,9 +23,9 @@ enum AppLock {
         var error: NSError?
         if LAContext().canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) { return nil }
         #if os(macOS)
-        return "No disponible: este Mac no tiene Touch ID ni contraseña de usuario."
+        return String(localized: "No disponible: este Mac no tiene Touch ID ni contraseña de usuario.")
         #else
-        return "No disponible: configura un código en el dispositivo para poder usarlo."
+        return String(localized: "No disponible: configura un código en el dispositivo para poder usarlo.")
         #endif
     }
 
@@ -62,7 +62,7 @@ final class AppLockModel {
     init(isEnabled: @escaping () -> Bool = {
             UserDefaults.standard.bool(forKey: AppLock.enabledKey) && AppLock.unavailableReason() == nil
          },
-         authenticate: @escaping () async -> Bool = { await AppLock.authenticate(reason: "Desbloquea Save the Money") }) {
+         authenticate: @escaping () async -> Bool = { await AppLock.authenticate(reason: String(localized: "Desbloquea Save the Money")) }) {
         self.isEnabled = isEnabled
         self.authenticate = authenticate
         isLocked = isEnabled()
@@ -301,11 +301,11 @@ struct AppLockSection: View {
 
     private static var footer: String {
         #if os(macOS)
-        let cover = "Bloqueada, esconde todas sus ventanas. "
+        let cover = String(localized: "Bloqueada, esconde todas sus ventanas. ")
         #else
-        let cover = "También tapa la app en el selector de apps. "
+        let cover = String(localized: "También tapa la app en el selector de apps. ")
         #endif
-        return "Al abrir la app y al volver tras más de un minuto fuera. " + cover
-            + "Protege la pantalla de este dispositivo, no los datos: tu hogar los sigue viendo en los suyos."
+        return String(localized: "Al abrir la app y al volver tras más de un minuto fuera. ") + cover
+            + String(localized: "Protege la pantalla de este dispositivo, no los datos: tu hogar los sigue viendo en los suyos.")
     }
 }

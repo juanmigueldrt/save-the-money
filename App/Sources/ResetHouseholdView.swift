@@ -25,7 +25,7 @@ struct ResetHouseholdView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.s24) {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
-                        Eyebrow("Empezar de cero")
+                        Eyebrow(String(localized: "Empezar de cero"))
                         Text("Se borrará lo que creaste en «\(household.name)»")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
@@ -38,7 +38,7 @@ struct ResetHouseholdView: View {
                     }
                     .card()
 
-                    LabeledField(label: "Escribe \(Self.word) para confirmar") {
+                    LabeledField(label: String(localized: "Escribe \(Self.word) para confirmar")) {
                         TextField(Self.word, text: $confirmation)
                             .plainIdentifierInput()
                     }

@@ -104,11 +104,11 @@ struct HoldingFormView: View {
         let trimmedPrice = price.trimmingCharacters(in: .whitespaces)
         let trimmedFee = feeRate.trimmingCharacters(in: .whitespaces)
         guard let priceValue = trimmedPrice.isEmpty ? 0 : Decimal(parsing: trimmedPrice, maxFractionDigits: 6) else {
-            error = "Escribe el precio con coma para los decimales, p. ej. 12,50."
+            error = String(localized: "Escribe el precio con coma para los decimales, p. ej. 12,50.")
             return
         }
         guard let feeValue = trimmedFee.isEmpty ? 0 : Decimal(parsing: trimmedFee, maxFractionDigits: 3) else {
-            error = "Escribe la comisión con números, p. ej. 0,2."
+            error = String(localized: "Escribe la comisión con números, p. ej. 0,2.")
             return
         }
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -182,7 +182,7 @@ struct RecordPriceView: View {
 
     private func save() async {
         guard let value = Decimal(parsing: price, maxFractionDigits: 6), value > 0 else {
-            error = "Escribe el precio con coma para los decimales, p. ej. 12,50."
+            error = String(localized: "Escribe el precio con coma para los decimales, p. ej. 12,50.")
             return
         }
         isWorking = true
@@ -249,12 +249,12 @@ struct SellView: View {
 
     private func save() async {
         guard let amount = Decimal(parsing: quantity), let priceValue = Decimal(parsing: price, maxFractionDigits: 6) else {
-            error = "Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125."
+            error = String(localized: "Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125.")
             return
         }
         let trimmedFee = fee.trimmingCharacters(in: .whitespaces)
         guard let feeValue = trimmedFee.isEmpty ? Money.zero : Money(entered: trimmedFee) else {
-            error = "Escribe la comisión con números."
+            error = String(localized: "Escribe la comisión con números.")
             return
         }
         let day = CalendarDay(soldOn)

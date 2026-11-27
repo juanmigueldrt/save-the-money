@@ -82,14 +82,14 @@ public enum InvestmentKind: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .fund: "Fondo"
-        case .etf: "ETF"
-        case .stock: "Acción"
-        case .bond: "Bono"
-        case .crypto: "Cripto"
-        case .pension: "Plan de pensiones"
-        case .cash: "Liquidez"
-        case .other: "Otro"
+        case .fund: localized("Fondo")
+        case .etf: localized("ETF")
+        case .stock: localized("Acción")
+        case .bond: localized("Bono")
+        case .crypto: localized("Cripto")
+        case .pension: localized("Plan de pensiones")
+        case .cash: localized("Liquidez")
+        case .other: localized("Otro")
         }
     }
 
@@ -113,11 +113,11 @@ public enum AssetClass: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .equity: "Renta variable"
-        case .fixedIncome: "Renta fija"
-        case .crypto: "Cripto"
-        case .cash: "Liquidez"
-        case .other: "Otros"
+        case .equity: localized("Renta variable")
+        case .fixedIncome: localized("Renta fija")
+        case .crypto: localized("Cripto")
+        case .cash: localized("Liquidez")
+        case .other: localized("Otros")
         }
     }
 }
@@ -127,8 +127,8 @@ public enum TradeSide: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .buy: "Compra"
-        case .sell: "Venta"
+        case .buy: localized("Compra")
+        case .sell: localized("Venta")
         }
     }
 }
@@ -893,13 +893,13 @@ extension ReminderPlanner {
                 let fire = due.adding(days: -before)
                 guard fire >= today, fire <= end else { continue }
                 let when = switch before {
-                case 0: "Hoy"
-                case 1: "Mañana"
-                default: "En \(before) días"
+                case 0: localized("Hoy")
+                case 1: localized("Mañana")
+                default: localized("En \(before) días")
                 }
                 result.append(PlannedReminder(id: "\(investmentPrefix)\(plan.id.uuidString).\(due.iso)", fireOn: fire,
-                                              hour: hour, title: "\(when): aportación a \(name)",
-                                              body: "Toca invertir \(plan.amount.formatted()) el \(due.longTitle). Abre la app para confirmar la compra."))
+                                              hour: hour, title: localized("\(when): aportación a \(name)"),
+                                              body: localized("Toca invertir \(plan.amount.formatted()) el \(due.longTitle). Abre la app para confirmar la compra.")))
             }
         }
         return Array(result.sorted { $0.fireOn != $1.fireOn ? $0.fireOn < $1.fireOn : $0.id < $1.id }.prefix(limit))

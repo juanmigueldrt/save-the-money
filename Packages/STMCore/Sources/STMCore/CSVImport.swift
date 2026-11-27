@@ -97,9 +97,9 @@ public enum DateOrder: String, CaseIterable, Hashable, Sendable {
 
     public var title: String {
         switch self {
-        case .dayMonthYear: "Día/mes/año"
-        case .yearMonthDay: "Año-mes-día"
-        case .monthDayYear: "Mes/día/año"
+        case .dayMonthYear: localized("Día/mes/año")
+        case .yearMonthDay: localized("Año-mes-día")
+        case .monthDayYear: localized("Mes/día/año")
         }
     }
 

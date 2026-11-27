@@ -62,9 +62,9 @@ private struct RemovedHouseholdRow: View {
             let data = MovementsCSV.data(export.movements, accounts: export.accounts, categories: export.categories)
             csvFile = try ExportFiles.write(data, named: MovementsCSV.fileName())
         } catch let appError as AppError {
-            error = appError.text ?? "No se han podido exportar los movimientos."
+            error = appError.text ?? String(localized: "No se han podido exportar los movimientos.")
         } catch {
-            self.error = "No se ha podido crear el fichero."
+            self.error = String(localized: "No se ha podido crear el fichero.")
         }
     }
 }

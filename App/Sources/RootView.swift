@@ -10,19 +10,19 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     var title: String {
         switch self {
-        case .summary: "Resumen"
-        case .movements: "Movimientos"
-        case .creditCards: "Tarjetas"
-        case .budget: "Presupuesto"
-        case .cashFlow: "Flujo"
-        case .netWorth: "Patrimonio"
-        case .reports: "Informes"
-        case .creditScore: "Score crediticio"
-        case .subscriptions: "Pagos fijos"
-        case .goals: "Metas"
-        case .investments: "Inversiones"
-        case .household: "Hogar"
-        case .more: "Más opciones"
+        case .summary: String(localized: "Resumen")
+        case .movements: String(localized: "Movimientos")
+        case .creditCards: String(localized: "Tarjetas")
+        case .budget: String(localized: "Presupuesto")
+        case .cashFlow: String(localized: "Flujo")
+        case .netWorth: String(localized: "Patrimonio")
+        case .reports: String(localized: "Informes")
+        case .creditScore: String(localized: "Score crediticio")
+        case .subscriptions: String(localized: "Pagos fijos")
+        case .goals: String(localized: "Metas")
+        case .investments: String(localized: "Inversiones")
+        case .household: String(localized: "Hogar")
+        case .more: String(localized: "Más opciones")
         }
     }
 
@@ -49,10 +49,10 @@ enum AppSection: String, CaseIterable, Identifiable, Hashable {
 
     /// Barra lateral de Mac, agrupada como en el diseño.
     static let sidebarGroups: [(title: String, sections: [AppSection])] = [
-        ("Dinero", [.summary, .movements, .creditCards, .budget, .cashFlow]),
-        ("Seguimiento", [.netWorth, .reports, .creditScore]),
-        ("Planificación", [.subscriptions, .goals, .investments]),
-        ("Hogar", [.household, .more]),
+        (String(localized: "Dinero"), [.summary, .movements, .creditCards, .budget, .cashFlow]),
+        (String(localized: "Seguimiento"), [.netWorth, .reports, .creditScore]),
+        (String(localized: "Planificación"), [.subscriptions, .goals, .investments]),
+        (String(localized: "Hogar"), [.household, .more])
     ]
 }
 
@@ -222,7 +222,7 @@ struct RootView: View {
                 NavigationStack {
                     screen(for: section)
                 }
-                .tabItem { Label(section == .more ? "Más" : section.title, systemImage: section.systemImage) }
+                .tabItem { Label(section == .more ? String(localized: "Más") : section.title, systemImage: section.systemImage) }
                 .tag(Optional(section))
             }
         }

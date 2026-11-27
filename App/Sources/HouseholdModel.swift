@@ -54,7 +54,7 @@ final class HouseholdModel: ServerModel {
     /// Anula y vuelve a cargar. Si la anulación falla se avisa, aunque la recarga vaya bien.
     func revoke(_ invite: HouseholdInvite) async {
         let revoked = await perform { try await service.revokeInvite(invite.id) }
-        if !revoked, let message = error { error = "No se ha podido anular la invitación. " + message }
+        if !revoked, let message = error { error = String(localized: "No se ha podido anular la invitación. ") + message }
         await reloadAfterSave { try await fetch(turn: nextTurn()) }
     }
 

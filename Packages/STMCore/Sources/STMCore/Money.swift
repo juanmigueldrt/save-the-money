@@ -113,7 +113,7 @@ extension Money {
     /// ISO (la base solo admite tres mayúsculas), así que ninguna cuenta puede tenerla.
     public static let mixedCurrency = "*"
     /// Lo que se enseña en vez de un importe cuando se han mezclado monedas.
-    public static let mixedText = "Varias monedas"
+    public static let mixedText = localized("Varias monedas")
     /// «No es un importe»: lo devuelven `+` y `-` con monedas distintas, y se contagia a lo que se le sume.
     public static let mixed = Money(minor: 0, currency: mixedCurrency)
 

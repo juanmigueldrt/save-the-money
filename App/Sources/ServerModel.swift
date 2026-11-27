@@ -67,7 +67,7 @@ extension ServerModel {
             Self.record(error, in: function)
             guard let message = Self.message(for: error) else { return }
             if let saveError = self.error, saveError != message {
-                self.error = saveError + " Además, no se han podido volver a cargar los datos: " + message
+                self.error = saveError + String(localized: " Además, no se han podido volver a cargar los datos: ") + message
             } else {
                 self.error = message
             }

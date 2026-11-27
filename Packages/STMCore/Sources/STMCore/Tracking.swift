@@ -141,10 +141,10 @@ public struct CreditScore: Identifiable, Hashable, Codable, Sendable {
 
         public var title: String {
             switch self {
-            case .excellent: "Excelente"
-            case .good: "Bueno"
-            case .fair: "Regular"
-            case .poor: "Mejorable"
+            case .excellent: localized("Excelente")
+            case .good: localized("Bueno")
+            case .fair: localized("Regular")
+            case .poor: localized("Mejorable")
             }
         }
     }
@@ -219,8 +219,8 @@ public struct SpendingReport: Hashable, Sendable {
 
         public var title: String {
             switch self {
-            case .expense: "Gastos"
-            case .income: "Ingresos"
+            case .expense: localized("Gastos")
+            case .income: localized("Ingresos")
             }
         }
     }
@@ -298,7 +298,7 @@ public struct SpendingReport: Hashable, Sendable {
             // Gastos en positivo; una devolución dentro de una categoría de gasto lo resta.
             let value = kind == .expense ? -movement.amount.minor : movement.amount.minor
             let key = category?.id.uuidString ?? "sin-categoria"
-            var entry = totals[key] ?? (title: category?.name ?? "Sin categoría", icon: category?.icon, minor: 0, count: 0)
+            var entry = totals[key] ?? (title: category?.name ?? localized("Sin categoría"), icon: category?.icon, minor: 0, count: 0)
             entry.minor += value
             entry.count += 1
             totals[key] = entry
@@ -331,12 +331,12 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .thisMonth: "Este mes"
-        case .lastMonth: "El mes pasado"
-        case .last3Months: "Últimos 3 meses"
-        case .last6Months: "Últimos 6 meses"
-        case .thisYear: "Este año"
-        case .last12Months: "Últimos 12 meses"
+        case .thisMonth: localized("Este mes")
+        case .lastMonth: localized("El mes pasado")
+        case .last3Months: localized("Últimos 3 meses")
+        case .last6Months: localized("Últimos 6 meses")
+        case .thisYear: localized("Este año")
+        case .last12Months: localized("Últimos 12 meses")
         }
     }
 
@@ -370,12 +370,12 @@ public enum ReportPeriod: String, CaseIterable, Sendable, Identifiable {
     /// "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación.
     public var previousTitle: String {
         switch self {
-        case .thisMonth: "el mes pasado a estas alturas"
-        case .lastMonth: "el mes anterior"
-        case .last3Months: "los 3 meses anteriores"
-        case .last6Months: "los 6 meses anteriores"
-        case .thisYear: "el año pasado a estas alturas"
-        case .last12Months: "los 12 meses anteriores"
+        case .thisMonth: localized("el mes pasado a estas alturas")
+        case .lastMonth: localized("el mes anterior")
+        case .last3Months: localized("los 3 meses anteriores")
+        case .last6Months: localized("los 6 meses anteriores")
+        case .thisYear: localized("el año pasado a estas alturas")
+        case .last12Months: localized("los 12 meses anteriores")
         }
     }
 
@@ -491,12 +491,12 @@ public enum BudgetAlertPlanner {
         let percent = spent.minor * 100 / limit.minor
         guard let reached = thresholds.last(where: { percent >= $0 }) else { return nil }
         if reached >= 100 {
-            let title = spent.minor > limit.minor ? "Te has pasado en \(name)" : "Has llegado al límite en \(name)"
+            let title = spent.minor > limit.minor ? localized("Te has pasado en \(name)") : localized("Has llegado al límite en \(name)")
             return BudgetAlert(id: "\(id).\(reached)", title: title,
-                               body: "Llevas \(spent.formatted()) de \(limit.formatted()) en este periodo.")
+                               body: localized("Llevas \(spent.formatted()) de \(limit.formatted()) en este periodo."))
         }
-        return BudgetAlert(id: "\(id).\(reached)", title: "\(name): ya llevas el \(percent) %",
-                           body: "Has gastado \(spent.formatted()) de \(limit.formatted()). Quedan \((limit - spent).formatted()).")
+        return BudgetAlert(id: "\(id).\(reached)", title: localized("\(name): ya llevas el \(percent) %"),
+                           body: localized("Has gastado \(spent.formatted()) de \(limit.formatted()). Quedan \((limit - spent).formatted())."))
     }
 }
 
@@ -510,20 +510,20 @@ public enum NetWorthRange: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .oneMonth: "1M"
-        case .sixMonths: "6M"
-        case .oneYear: "1A"
-        case .all: "Todo"
+        case .oneMonth: localized("1M")
+        case .sixMonths: localized("6M")
+        case .oneYear: localized("1A")
+        case .all: localized("Todo")
         }
     }
 
     /// Para la frase del cambio: "+120 € en 6 meses".
     public var caption: String {
         switch self {
-        case .oneMonth: "en 1 mes"
-        case .sixMonths: "en 6 meses"
-        case .oneYear: "en 1 año"
-        case .all: "desde el principio"
+        case .oneMonth: localized("en 1 mes")
+        case .sixMonths: localized("en 6 meses")
+        case .oneYear: localized("en 1 año")
+        case .all: localized("desde el principio")
         }
     }
 

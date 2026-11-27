@@ -51,7 +51,7 @@ struct CreditCardDetailView: View {
                     payFrom(summary).card()
                 } else {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
-                        EmptyHint(text: "Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos.")
+                        EmptyHint(text: String(localized: "Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos."))
                         Button("Configurar tarjeta") { editingTerms = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -120,13 +120,13 @@ struct CreditCardDetailView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             HStack(alignment: .top) {
-                CardFigure(title: "Deuda con intereses", value: summary.revolvingBalance,
-                           detail: "TIN \(CardText.percent(summary.terms.revolvingRate))")
-                CardFigure(title: "Intereses en estos cargos", value: summary.interestInPayments,
-                           detail: "\(summary.payments.count) meses")
+                CardFigure(title: String(localized: "Deuda con intereses"), value: summary.revolvingBalance,
+                           detail: String(localized: "TIN \(CardText.percent(summary.terms.revolvingRate))"))
+                CardFigure(title: String(localized: "Intereses en estos cargos"), value: summary.interestInPayments,
+                           detail: String(localized: "\(summary.payments.count) meses"))
             }
             if let payoff = summary.payoff {
-                Text("Sin compras nuevas, terminarías de pagar en \(payoff.months) \(payoff.months == 1 ? "mes" : "meses") y pagarías \(payoff.interest.formatted()) de intereses. Pagando todo a fin de mes no pagarías ninguno.")
+                Text("Sin compras nuevas, terminarías de pagar en \(payoff.months) meses y pagarías \(payoff.interest.formatted()) de intereses. Pagando todo a fin de mes no pagarías ninguno.")
                     .font(Typography.subheadline)
                     .foregroundStyle(Palette.label)
             } else if summary.revolvingBalance.minor > 0 {
@@ -154,7 +154,7 @@ struct CreditCardDetailView: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             if plans.isEmpty {
-                EmptyHint(text: "Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al \(CardText.percent(summary.terms.installmentRate)) TIN. La cuota se suma a cada cargo.")
+                EmptyHint(text: String(localized: "Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al \(CardText.percent(summary.terms.installmentRate)) TIN. La cuota se suma a cada cargo."))
             }
             ForEach(plans) { plan in
                 if let movement = cards.movements(of: account).first(where: { $0.id == plan.movementId }) {
@@ -184,14 +184,14 @@ struct CreditCardDetailView: View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
             if let id = summary.terms.payFromAccountId, let from = finance.account(id) {
                 let balance = finance.balance(of: from)
-                CardFigure(title: "Se paga desde \(from.name)", value: balance, detail: "saldo actual")
+                CardFigure(title: String(localized: "Se paga desde \(from.name)"), value: balance, detail: String(localized: "saldo actual"))
                 if let next = summary.next, balance < next.amount {
                     Label("No llega para el próximo cargo de \(next.amount.formatted()).", systemImage: "exclamationmark.circle")
                         .font(Typography.footnote)
                         .foregroundStyle(Palette.negativeText)
                 }
             } else {
-                EmptyHint(text: "Elige en Condiciones la cuenta desde la que se paga la tarjeta para saber si hay saldo.")
+                EmptyHint(text: String(localized: "Elige en Condiciones la cuenta desde la que se paga la tarjeta para saber si hay saldo."))
             }
             Button("Apuntar el pago de la tarjeta") { recordingPayment = true }
                 .buttonStyle(SecondaryButtonStyle())
@@ -209,9 +209,9 @@ extension CardText {
 
     static func delay(_ terms: CreditCardTerms) -> String {
         switch terms.paymentDelayMonths {
-        case 0: "el día \(terms.paymentDay) de ese mes"
-        case 1: "el día \(terms.paymentDay) del mes siguiente"
-        default: "el día \(terms.paymentDay), \(terms.paymentDelayMonths) meses después"
+        case 0: String(localized: "el día \(terms.paymentDay) de ese mes")
+        case 1: String(localized: "el día \(terms.paymentDay) del mes siguiente")
+        default: String(localized: "el día \(terms.paymentDay), \(terms.paymentDelayMonths) meses después")
         }
     }
 }
