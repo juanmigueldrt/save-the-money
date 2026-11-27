@@ -112,9 +112,10 @@ select is(
   0, 'y sus invitaciones pendientes dejan de valer'
 );
 select pg_temp.login('00000000-0000-0000-0000-00000000059a');
-select throws_ok(
-  $$ select public.accept_invite((select code from invitaciones where para = 'sobrante')) $$,
-  'P0002', null, 'nadie puede entrar en un hogar sin miembros'
+-- accept_invite no lanza con un código que ya no vale: devuelve null (ORC-58).
+select is(
+  public.accept_invite((select code from invitaciones where para = 'sobrante')), null,
+  'nadie puede entrar en un hogar sin miembros'
 );
 select pg_temp.logout();
 
