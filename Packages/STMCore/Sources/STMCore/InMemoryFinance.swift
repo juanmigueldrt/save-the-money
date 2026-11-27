@@ -154,6 +154,12 @@ extension InMemoryBackend: FinanceService {
     /// Como el servidor: borra solo lo tuyo de ese hogar y te repone tus categorías de partida.
     public func resetHousehold(_ householdId: UUID) async throws {
         let user = try requireMember(of: householdId)
+        purgeData(of: user, in: householdId)
+        seedCategories(in: householdId, for: user)
+    }
+
+    /// Borra todo lo que `user` creó en ese hogar, como `private.purge_member_data` en el servidor.
+    func purgeData(of user: UUID, in householdId: UUID) {
         let mine = { (id: UUID) in self.creators[id] == user }
         let holdingIds = Set(holdingList.filter { $0.householdId == householdId && mine($0.id) }.map(\.id))
         holdingPriceList.removeAll { holdingIds.contains($0.holdingId) }
@@ -173,7 +179,6 @@ extension InMemoryBackend: FinanceService {
         financeMovements.removeAll { $0.householdId == householdId && mine($0.id) }
         financeAccounts.removeAll { $0.householdId == householdId && mine($0.id) }
         financeCategories.removeAll { $0.householdId == householdId && mine($0.id) }
-        seedCategories(in: householdId, for: user)
     }
 
     public func movements(in householdId: UUID, accountId: UUID?, limit: Int) async throws -> [Movement] {

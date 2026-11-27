@@ -232,6 +232,20 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    public func removedHouseholds() async throws -> [RemovedHousehold] {
+        try await mapped {
+            try await client.rpc("removed_households").execute().value
+        }
+    }
+
+    public func removedHouseholdExport(_ householdId: UUID) async throws -> RemovedHouseholdExport {
+        try await mapped {
+            try await client.rpc("removed_household_export", params: ["target_household": householdId.uuidString])
+                .execute()
+                .value
+        }
+    }
+
     // MARK: Errores
 
     /// Ejecuta la llamada y convierte cualquier error en un AppError con mensaje en español.

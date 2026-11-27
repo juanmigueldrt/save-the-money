@@ -24,6 +24,8 @@ final class SessionModel {
     private(set) var models: HouseholdModels?
     /// Los hogares de quien ha entrado, para elegir cuál abrir cuando hay más de uno.
     private(set) var households: [Household] = []
+    /// Hogares de los que le han quitado y de los que aún puede exportar sus datos (ORC-56).
+    private(set) var removedHouseholds: [RemovedHousehold] = []
     /// Código recibido por enlace o QR, pendiente de usar.
     var pendingInvite: InviteCode?
 
@@ -91,6 +93,8 @@ final class SessionModel {
             let profile = try await services.households.myProfile()
             let households = try await services.households.households()
             self.households = households
+            // Si falla (sin red, o un servidor que aún no tiene la función) no se bloquea la entrada: no se enseña la lista.
+            removedHouseholds = (try? await services.households.removedHouseholds()) ?? []
             let chosen = defaults.string(forKey: Self.openHouseholdKey(profile.id)).flatMap(UUID.init(uuidString:))
             if let home = households.first(where: { $0.id == chosen })
                 ?? households.first(where: { $0.id == profile.defaultHouseholdId }) ?? households.first {
@@ -141,6 +145,7 @@ final class SessionModel {
         // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
         await clearLocalData()
         households = []
+        removedHouseholds = []
         state = .signedOut
     }
 

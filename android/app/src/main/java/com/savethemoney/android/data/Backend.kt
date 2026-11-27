@@ -31,6 +31,7 @@ interface Backend {
     suspend fun createInvite(householdId: String): HouseholdInvite
     suspend fun revokeInvite(inviteId: String)
     suspend fun acceptInvite(code: InviteCode): Household
+    /** Sale del hogar y borra todo lo que esa persona apuntó en él (ORC-56). No se puede deshacer. */
     suspend fun leave(householdId: String)
     /** Cambia el nombre del hogar. Sólo puede quien lo creó. */
     suspend fun renameHousehold(householdId: String, name: String): Household
@@ -39,9 +40,23 @@ interface Backend {
      * No toca ningún dato guardado: solo cambia qué días cuentan en cada mes de presupuestos e informes.
      */
     suspend fun setMonthStartDay(householdId: String, day: Int): Household
-    /** Solo el dueño del hogar puede quitar a otro miembro. */
+    /** Solo el dueño del hogar puede quitar a otro miembro. Sus datos se guardan [RemovedHousehold.EXPORT_DAYS] días. */
     suspend fun removeMember(householdId: String, userId: String)
+    /** Los hogares de los que han quitado a quien tiene la sesión y de los que aún puede exportar. */
+    suspend fun removedHouseholds(): List<RemovedHousehold>
+    /** Sus datos de uno de esos hogares. Fuera de plazo, o si no le quitaron de ese hogar, falla. */
+    suspend fun removedHouseholdExport(householdId: String): RemovedHouseholdExport
 }
+
+/** Lo que la app avisa antes de salir de un hogar (ORC-56). «CSV para Excel» es la fila de Más opciones > Datos. */
+const val LEAVE_HOUSEHOLD_WARNING =
+    "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, inversiones y pagos fijos. " +
+        "No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «CSV para Excel», en Más opciones."
+
+/** Lo que la app avisa antes de quitar a un miembro. */
+const val REMOVE_MEMBER_WARNING =
+    "Dejará de tener acceso a este hogar. Sus datos se guardan ${RemovedHousehold.EXPORT_DAYS} días para que pueda exportarlos y después se borran. " +
+        "Si le vuelves a invitar antes, los recupera."
 
 const val HOUSEHOLD_NAME_ISSUE = "El nombre del hogar tiene que tener entre 1 y 80 letras."
 
@@ -68,6 +83,13 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
     private val householdsById = mutableMapOf<String, Household>()
     private val memberships = mutableListOf<Membership>()
     private val invites = mutableListOf<HouseholdInvite>()
+
+    /** A quién han quitado de qué hogar y cuándo, como `private.removed_members` en el servidor. */
+    private data class Removal(val householdId: String, val userId: String)
+    private val removals = mutableMapOf<Removal, Instant>()
+
+    /** Donde están los datos de los hogares: [InMemoryFinance] se apunta aquí al crearse con este backend. */
+    internal var finance: InMemoryFinance? = null
     private var currentUser: String? = null
 
     private fun id() = UUID.randomUUID().toString()
@@ -187,6 +209,9 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
             ?: throw AppError.InvalidOrExpiredInvite
         if (isMember(user, household.id)) throw AppError.AlreadyMember
         memberships += Membership(id(), household.id, user, MemberRole.Member)
+        // Si vuelve dentro del plazo recupera lo suyo; fuera de plazo ya no queda nada.
+        purgeExpiredRemovals()
+        removals -= Removal(household.id, user)
         invites[i] = invites[i].copy(status = InviteStatus.Accepted)
         setDefaultIfMissing(user, household.id)
         return household
@@ -194,8 +219,33 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
 
     override suspend fun leave(householdId: String) {
         val user = requireUser()
-        memberships.removeAll { it.userId == user && it.householdId == householdId }
+        if (!memberships.removeAll { it.userId == user && it.householdId == householdId }) return
+        finance?.purgeData(user, householdId)
         users[user]?.let { if (it.profile.defaultHouseholdId == householdId) it.profile = it.profile.copy(defaultHouseholdId = null) }
+    }
+
+    override suspend fun removedHouseholds(): List<RemovedHousehold> {
+        val user = requireUser()
+        purgeExpiredRemovals()
+        return removals.filterKeys { it.userId == user }.entries.sortedByDescending { it.value }.mapNotNull { (removal, at) ->
+            householdsById[removal.householdId]?.let { RemovedHousehold(it.id, it.name, exportUntil(at).toString()) }
+        }
+    }
+
+    override suspend fun removedHouseholdExport(householdId: String): RemovedHouseholdExport {
+        val user = requireUser()
+        purgeExpiredRemovals()
+        if (Removal(householdId, user) !in removals) throw AppError.InvalidInput("Ya no hay datos que exportar de ese hogar.")
+        return finance?.exportOf(user, householdId) ?: RemovedHouseholdExport(emptyList(), emptyList(), emptyList())
+    }
+
+    private fun exportUntil(removedAt: Instant) = removedAt.plus(Duration.ofDays(RemovedHousehold.EXPORT_DAYS.toLong()))
+
+    /** La purga diaria del servidor, hecha aquí al consultar. */
+    private fun purgeExpiredRemovals() {
+        val expired = removals.filterValues { exportUntil(it) <= now() }.keys
+        expired.forEach { finance?.purgeData(it.userId, it.householdId) }
+        removals -= expired
     }
 
     override suspend fun removeMember(householdId: String, userId: String) {
@@ -203,7 +253,10 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         if (memberships.none { it.userId == user && it.householdId == householdId && it.role == MemberRole.Owner }) {
             throw AppError.InvalidInput("Solo quien creó el hogar puede quitar a alguien.")
         }
-        memberships.removeAll { it.userId == userId && it.householdId == householdId }
+        // Como el trigger del servidor: borrar la fila propia es salir, no ser quitado.
+        if (userId == user) return leave(householdId)
+        if (!memberships.removeAll { it.userId == userId && it.householdId == householdId }) return
+        removals[Removal(householdId, userId)] = now()
         users[userId]?.let { if (it.profile.defaultHouseholdId == householdId) it.profile = it.profile.copy(defaultHouseholdId = null) }
     }
 

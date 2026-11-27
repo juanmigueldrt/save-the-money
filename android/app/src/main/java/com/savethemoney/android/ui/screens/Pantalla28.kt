@@ -22,8 +22,10 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.HouseholdMember
+import com.savethemoney.android.data.LEAVE_HOUSEHOLD_WARNING
 import com.savethemoney.android.data.MONTH_START_DAYS
 import com.savethemoney.android.data.MemberRole
+import com.savethemoney.android.data.REMOVE_MEMBER_WARNING
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Route
@@ -87,7 +89,7 @@ fun Pantalla28(nav: Nav) {
             {
                 StmDialog(
                     "¿Quitar a ${m.profile.name} del hogar?",
-                    "Dejará de tener acceso a este hogar. Puedes volver a invitarle.",
+                    REMOVE_MEMBER_WARNING,
                     icon = StmIcons.personRemove,
                     onDismiss = { quitando = null },
                     actions = {
@@ -128,7 +130,7 @@ fun Pantalla28(nav: Nav) {
             {
                 StmDialog(
                     "¿Salir del hogar?",
-                    "Dejarás de ver este hogar. Para volver, alguien tendrá que invitarte otra vez.",
+                    LEAVE_HOUSEHOLD_WARNING,
                     icon = StmIcons.logout,
                     onDismiss = { saliendo = false },
                     actions = {

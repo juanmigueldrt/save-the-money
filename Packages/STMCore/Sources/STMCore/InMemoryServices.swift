@@ -9,6 +9,9 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     private var householdsById: [UUID: Household] = [:]
     private var memberships: [Membership] = []
     private var invites: [HouseholdInvite] = []
+    /// A quién han quitado de qué hogar y cuándo, como `private.removed_members` en el servidor.
+    private struct Removal: Hashable { var householdId: UUID; var userId: UUID }
+    private var removals: [Removal: Date] = [:]
     private(set) var currentUser: UUID?
     let now: @Sendable () -> Date
 
@@ -240,7 +243,10 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         }
         guard !isMember(user, of: household.id) else { throw AppError.alreadyMember }
         memberships.append(Membership(householdId: household.id, userId: user, role: .member))
-        seedCategories(in: household.id, for: user)
+        // Si vuelve dentro del plazo recupera lo suyo: ya tiene sus categorías.
+        if removals.removeValue(forKey: Removal(householdId: household.id, userId: user)) == nil {
+            seedCategories(in: household.id, for: user)
+        }
         invites[index].status = .accepted
         if users[user]?.profile.defaultHouseholdId == nil {
             users[user]?.profile.defaultHouseholdId = household.id
@@ -250,9 +256,49 @@ public actor InMemoryBackend: AuthService, HouseholdService {
 
     public func leave(householdId: UUID) async throws {
         let user = try requireUser()
+        guard isMember(user, of: householdId) else { return }
         memberships.removeAll { $0.userId == user && $0.householdId == householdId }
+        purgeData(of: user, in: householdId)
         if users[user]?.profile.defaultHouseholdId == householdId {
             users[user]?.profile.defaultHouseholdId = nil
+        }
+    }
+
+    public func removedHouseholds() async throws -> [RemovedHousehold] {
+        let user = try requireUser()
+        purgeExpiredRemovals()
+        return removals
+            .filter { $0.key.userId == user }
+            .compactMap { removal, date in
+                householdsById[removal.householdId].map {
+                    RemovedHousehold(householdId: $0.id, name: $0.name, exportUntil: Self.exportUntil(date))
+                }
+            }
+            .sorted { $0.exportUntil > $1.exportUntil }
+    }
+
+    public func removedHouseholdExport(_ householdId: UUID) async throws -> RemovedHouseholdExport {
+        let user = try requireUser()
+        purgeExpiredRemovals()
+        guard removals[Removal(householdId: householdId, userId: user)] != nil else {
+            throw AppError.invalidInput("Ya no hay datos que exportar de ese hogar.")
+        }
+        let mine = { (id: UUID) in self.creators[id] == user }
+        return RemovedHouseholdExport(
+            accounts: financeAccounts.filter { $0.householdId == householdId && mine($0.id) },
+            categories: financeCategories.filter { $0.householdId == householdId && mine($0.id) },
+            movements: financeMovements.filter { $0.householdId == householdId && mine($0.id) })
+    }
+
+    private static func exportUntil(_ removedAt: Date) -> Date {
+        removedAt.addingTimeInterval(TimeInterval(RemovedHousehold.exportDays) * 86_400)
+    }
+
+    /// La purga diaria del servidor, hecha aquí al consultar.
+    private func purgeExpiredRemovals() {
+        for (removal, date) in removals where Self.exportUntil(date) <= now() {
+            removals[removal] = nil
+            purgeData(of: removal.userId, in: removal.householdId)
         }
     }
 
@@ -288,7 +334,9 @@ public actor InMemoryBackend: AuthService, HouseholdService {
             throw AppError.invalidInput("Solo quien creó el hogar puede quitar a un miembro.")
         }
         guard userId != user else { throw AppError.invalidInput("No puedes quitarte a ti mismo.") }
+        guard isMember(userId, of: householdId) else { return }
         memberships.removeAll { $0.userId == userId && $0.householdId == householdId }
+        removals[Removal(householdId: householdId, userId: userId)] = now()
         if users[userId]?.profile.defaultHouseholdId == householdId {
             users[userId]?.profile.defaultHouseholdId = nil
         }
