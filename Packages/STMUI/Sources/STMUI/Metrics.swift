@@ -119,7 +119,7 @@ private struct TitleFontModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         // El valor no se usa: basta con depender de él.
-        let _ = dynamicTypeSize
+        _ = dynamicTypeSize
         return content.font(size.font).tracking(size.tracking)
     }
 }
