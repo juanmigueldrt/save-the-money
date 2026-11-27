@@ -166,7 +166,20 @@ Lo que no cambia: Patrimonio sigue bajando una fila por movimiento, y las dos ap
 
 ### Medición
 
-Pendiente de la ejecución del workflow «Medición de carga» sobre esta rama (ver la tabla del PR de ORC-149). El script mide ahora también la petición de Patrimonio y las dos de Informes.
+Workflow «Medición de carga» sobre la rama de ORC-149, mediana de tres ejecuciones. «Antes» es la descarga completa con quince columnas, que es lo que pedían las dos pantallas. Bytes del cuerpo sin comprimir.
+
+| Movimientos | Petición | Filas | Bytes antes | Bytes después | Tiempo antes | Tiempo después |
+|---:|---|---:|---:|---:|---:|---:|
+| 10.000 | Patrimonio | 10.000 | 4,4 MB | 1,5 MB | 0,08 s | 0,04 s |
+| 10.000 | Informes, iOS (6 meses) | 825 | 4,4 MB | 0,36 MB | 0,08 s | 0,007 s |
+| 10.000 | Informes, Android (ventana) | 3.447 | 4,4 MB | 1,5 MB | 0,07 s | 0,03 s |
+| 50.000 | Patrimonio | 50.000 | 21,8 MB | 7,4 MB | 0,40 s | 0,21 s |
+| 50.000 | Informes, iOS (6 meses) | 4.255 | 21,8 MB | 1,9 MB | 0,40 s | 0,04 s |
+| 50.000 | Informes, Android (ventana) | 17.314 | 21,8 MB | 7,6 MB | 0,37 s | 0,13 s |
+
+Ejecución: [45957693327](https://github.com/juanmigueldrt/save-the-money/actions/runs/45957693327), 27-11-2026.
+
+Patrimonio pesa un tercio. Lo que bajan los Informes depende de cómo se reparten los movimientos en el tiempo: los de prueba están repartidos por igual en seis años, así que seis meses son un 8 % de las filas y la ventana de Android un 35 %. En un hogar con más de seis años de datos la proporción será menor.
 
 ### El resto de políticas y los dos índices: no se tocan
 
