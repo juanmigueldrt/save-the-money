@@ -28,7 +28,7 @@ public struct Account: Identifiable, Hashable, Codable, Sendable, Named, Archiva
     public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, kind: AccountKind = .checking,
-                currency: String = "EUR", openingBalance: Money = .zero, ownerId: UUID? = nil,
+                currency: String = AppRegion.currency, openingBalance: Money = .zero, ownerId: UUID? = nil,
                 archivedAt: Date? = nil, isDefault: Bool = false, includeInNetWorth: Bool = true,
                 createdAt: Date? = nil, updatedAt: String? = nil) {
         self.updatedAt = updatedAt

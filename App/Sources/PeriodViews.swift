@@ -111,7 +111,7 @@ struct PayScheduleView: View {
                         Stepper("Segundo día: \(day2)", value: $day2, in: 2...31)
                     case .weekly, .biweekly, .yearly:
                         DatePicker("Un día que cobraste", selection: $anchor, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "es_ES"))
+                            .environment(\.locale, AppRegion.locale)
                     }
                 } footer: {
                     Text("El presupuesto va de un cobro al día antes del siguiente. Si cobras un día 31 y el mes es más corto, cuenta el último día. Sólo lo ves tú.")
@@ -271,7 +271,7 @@ struct ExtraBudgetFormView: View {
                         DatePicker("Hasta", selection: $end, in: start..., displayedComponents: .date)
                     }
                 }
-                .environment(\.locale, Locale(identifier: "es_ES"))
+                .environment(\.locale, AppRegion.locale)
                 Section {
                     ForEach(finance.categories(for: .expense)) { category in
                         Toggle(category.name, isOn: binding(category.id, in: $categoryIds))

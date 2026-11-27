@@ -28,7 +28,7 @@ class Merchant(val name: String, val domain: String?, val category: String, keyw
 
 /** Texto de los movimientos tal como se enseña: siempre en mayúsculas. Lo guardado no cambia. */
 object MovementText {
-    private val es = Locale.forLanguageTag("es-ES")
+    private val es = Region.locale
     fun display(description: String): String = description.uppercase(es)
 }
 

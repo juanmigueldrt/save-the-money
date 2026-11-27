@@ -28,7 +28,7 @@ struct SaveTheMoneyApp: App {
                 .environment(session)
                 .tint(Palette.accent)
                 // La app está en español: fechas, meses de los gráficos y selectores, aunque el dispositivo no lo esté.
-                .environment(\.locale, Locale(identifier: "es_ES"))
+                .environment(\.locale, AppRegion.locale)
                 .task {
                     #if DEBUG
                     if ScreenshotMode.isActive { await ScreenshotMode.prepare(session); return }

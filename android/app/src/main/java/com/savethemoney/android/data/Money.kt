@@ -68,7 +68,7 @@ object Money {
     }
 
     /** Un importe con su moneda, para sumar sin mezclar monedas ([total]). */
-    data class Amount(val minor: Long, val currency: String = "EUR")
+    data class Amount(val minor: Long, val currency: String = Region.CURRENCY)
 
     /** Lo que se enseña en vez de un importe cuando se han mezclado monedas (`Money.mixedText` en iOS). */
     const val MIXED = "Varias monedas"

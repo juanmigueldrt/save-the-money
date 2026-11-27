@@ -33,7 +33,7 @@ struct TransferFormView: View {
                     AmountField("Importe, p. ej. 200", text: $amount)
                     TextField("Concepto (opcional)", text: $concept)
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "es_ES"))
+                        .environment(\.locale, AppRegion.locale)
                 } footer: {
                     Text("Se apuntan dos movimientos con la categoría de transferencia. No cuentan como gasto ni como ingreso.")
                 }

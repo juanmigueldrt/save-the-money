@@ -6,10 +6,10 @@ import STMUI
 // MARK: - Formatos
 
 enum InvestmentText {
-    private static let spain = Locale(identifier: "es_ES")
+    private static let spain = AppRegion.locale
 
     /// "12,5034 €": precio por participación, de 2 a 4 decimales.
-    static func price(_ value: Decimal, currency: String = "EUR") -> String {
+    static func price(_ value: Decimal, currency: String = AppRegion.currency) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.locale = spain

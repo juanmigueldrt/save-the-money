@@ -85,14 +85,14 @@ extension CalendarDay {
         let today = CalendarDay()
         if self == today { return "Hoy" }
         if self == today.adding(days: -1) { return "Ayer" }
-        let style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "es_ES"))
+        let style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).locale(AppRegion.locale)
         let text = date().formatted(year == today.year ? style : style.year())
         return text.prefix(1).uppercased() + text.dropFirst()
     }
 
     /// "3 oct" para las filas.
     var shortText: String {
-        date().formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "es_ES")))
+        date().formatted(.dateTime.day().month(.abbreviated).locale(AppRegion.locale))
     }
 }
 

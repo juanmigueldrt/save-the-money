@@ -156,7 +156,7 @@ public enum PendingCharges {
     }
 
     static func normalized(_ text: String) -> String {
-        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "es_ES"))
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: AppRegion.locale)
     }
 
     /// Palabras del nombre que sirven para reconocerlo (de 3 letras o más).

@@ -89,7 +89,7 @@ data class Holding(
     val symbol: String? = null,
     val kind: InvestmentKind = InvestmentKind.Fund,
     @SerialName("asset_class") val assetClass: AssetClass = kind.defaultAssetClass,
-    val currency: String = "EUR",
+    val currency: String = Region.CURRENCY,
     @SerialName("account_id") val accountId: String? = null,
     @SerialName("owner_id") val ownerId: String? = null,
     val price: Numeric = BigDecimal.ZERO,
@@ -495,12 +495,12 @@ object InvestmentReminders {
 
 /** Formatos de cifras de inversión, como InvestmentText de iOS. */
 object InvestmentText {
-    private val spain = DecimalFormatSymbols(Locale("es", "ES"))
+    private val spain = DecimalFormatSymbols(Region.locale)
     private fun format(value: BigDecimal, pattern: String, grouping: Boolean = true) =
         DecimalFormat(pattern, spain).apply { roundingMode = RoundingMode.HALF_EVEN; isGroupingUsed = grouping }.format(value)
 
     /** "12,5034 €": de 2 a 4 decimales. */
-    fun price(value: BigDecimal, currency: String = "EUR") = format(value, "#,##0.00##") + if (currency == "EUR") " €" else " $currency"
+    fun price(value: BigDecimal, currency: String = Region.CURRENCY) = format(value, "#,##0.00##") + if (currency == "EUR") " €" else " $currency"
     /** "12,5" participaciones, hasta 6 decimales. */
     fun quantity(value: BigDecimal) = format(value, "#,##0.######")
     /** "+12,3 %" o "−4,0 %". */

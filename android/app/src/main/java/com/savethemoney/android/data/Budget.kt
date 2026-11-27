@@ -3,7 +3,6 @@ package com.savethemoney.android.data
 import java.text.Collator
 import java.time.LocalDate
 import java.time.YearMonth
-import java.util.Locale
 
 // Budget.swift, BudgetTemplate.swift y CashFlow.swift de STMCore.
 
@@ -204,7 +203,7 @@ class BudgetReport(
             GroupProgress(group, allocation[group] ?: 0, spent)
         }
 
-        val collator = Collator.getInstance(Locale("es", "ES"))
+        val collator = Collator.getInstance(Region.locale)
         lines = categories.filter { it.kind == CategoryKind.Expense }
             .mapNotNull { category ->
                 val limit = budget?.limits?.get(category.id)

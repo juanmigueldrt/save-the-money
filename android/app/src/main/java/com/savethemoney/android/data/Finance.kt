@@ -27,7 +27,7 @@ data class Account(
     @SerialName("household_id") val householdId: String,
     val name: String,
     val kind: AccountKind = AccountKind.Checking,
-    val currency: String = "EUR",
+    val currency: String = Region.CURRENCY,
     @SerialName("opening_balance_minor") val openingMinor: Long = 0,
     @SerialName("owner_id") val ownerId: String? = null,
     @SerialName("archived_at") val archivedAt: String? = null,
