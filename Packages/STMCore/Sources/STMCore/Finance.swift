@@ -277,6 +277,40 @@ public struct Movement: Identifiable, Hashable, Codable, Sendable {
     }
 }
 
+/// Lo que el patrimonio necesita de un movimiento: en qué cuenta, qué día y cuánto.
+public protocol AccountAmount {
+    var accountId: UUID { get }
+    var bookedOn: CalendarDay { get }
+    var amount: Money { get }
+}
+
+extension Movement: AccountAmount {}
+
+/// Un movimiento con sólo lo que usa el patrimonio (ORC-149): la descarga completa pesa un tercio que con todas
+/// las columnas. `id` sólo sirve para pedir la página siguiente.
+public struct MovementAmount: AccountAmount, Identifiable, Hashable, Codable, Sendable {
+    public let id: UUID
+    public var accountId: UUID
+    public var bookedOn: CalendarDay
+    public var amountMinor: Int
+
+    public var amount: Money { Money(minor: amountMinor) }
+
+    public init(_ movement: Movement) {
+        id = movement.id
+        accountId = movement.accountId
+        bookedOn = movement.bookedOn
+        amountMinor = movement.amount.minor
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case accountId = "account_id"
+        case bookedOn = "booked_on"
+        case amountMinor = "amount_minor"
+    }
+}
+
 /// Lo que se apunta o se importa, antes de guardarlo. `id` lo genera la app una vez por formulario,
 /// para que reintentar tras un fallo de red no apunte el movimiento dos veces.
 public struct MovementDraft: Hashable, Sendable {

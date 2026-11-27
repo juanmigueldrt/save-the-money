@@ -55,7 +55,7 @@ fun Pantalla17(nav: Nav) {
     val meses = listOf(2, 7, 13, tracking.monthsWithData)[range]
     // Rehacer el patrimonio recorre todos los movimientos: sólo cuando cambian sus datos, no en cada recomposición.
     val dia = tracking.today()
-    val historia = remember(tracking.allMovements, finance.accounts, meses, dia) { tracking.history(finance.accounts, meses) }
+    val historia = remember(tracking.amounts, finance.accounts, meses, dia) { tracking.history(finance.accounts, meses) }
     val cambio = (historia.lastOrNull()?.net ?: 0) - (historia.firstOrNull()?.net ?: 0)
     val tramo = listOf("en 1 mes", "en 6 meses", "en 1 año", "desde el principio")[range]
     val inversiones = saldos.filter { (a, b) -> a.kind == AccountKind.Investment && b > 0 }.sumOf { it.second }
@@ -81,7 +81,7 @@ fun Pantalla17(nav: Nav) {
         StmCard {
             LineChart(normalizar(historia.map { it.net }), plotHeight = 160.dp)
         }
-        val prevision = remember(tracking.allMovements, finance.accounts, dia) {
+        val prevision = remember(tracking.amounts, finance.accounts, dia) {
             if (finance.accounts.isEmpty()) null else NetWorthProjection.of(tracking.history(finance.accounts, 7))
         }
         if (prevision != null) {

@@ -343,6 +343,23 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         }
     }
 
+    /** Las mismas filas con cuatro columnas (ORC-149), en orden ascendente como la descarga de iOS. */
+    @OptIn(SupabaseExperimental::class)
+    override suspend fun movementAmounts(householdId: String): List<MovementAmount> = backend.mapped {
+        allPagesByCursor<MovementAmount> { last ->
+            client.from("transactions").select(Columns.raw(MOVEMENT_AMOUNT)) {
+                filter {
+                    eq("household_id", householdId)
+                    if (last != null) gte("booked_on", last.bookedOn)
+                }
+                if (last != null) params["or"] = listOf("(${movementAmountAfterFilter(last)})")
+                order("booked_on", Order.ASCENDING)
+                order("id", Order.ASCENDING)
+                limit(PAGE_SIZE.toLong())
+            }.decodeList<MovementAmount>()
+        }
+    }
+
     // MARK: pagos fijos y metas. household_id solo al insertar: el servidor no deja cambiarlo después.
 
     override suspend fun recurringSeries(householdId: String): List<RecurringSeries> = backend.mapped {
@@ -644,6 +661,8 @@ class SupabaseFinance(private val backend: SupabaseBackend) : FinanceService {
         const val CATEGORY = "id,household_id,name,kind,budget_group,icon,updated_at"
         const val MOVEMENT = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,updated_at,transfer_id"
 
+        const val MOVEMENT_AMOUNT = "id,account_id,booked_on,amount_minor"
+
         /** Filas por petición al importar, para no mandar un CSV enorme de golpe. */
         const val IMPORT_BATCH = 500
     }
@@ -791,6 +810,10 @@ internal fun movementSearchFilter(search: MovementSearch): String {
  */
 internal fun movementDownloadAfterFilter(after: Movement): String =
     "booked_on.lt.${after.bookedOn},id.gt.${after.id.lowercase()}"
+
+/** Junto a `booked_on >= día`, las filas que van detrás de [after] en orden ascendente: un día posterior o un id mayor. */
+internal fun movementAmountAfterFilter(after: MovementAmount): String =
+    "booked_on.gt.${after.bookedOn},id.gt.${after.id.lowercase()}"
 
 /** Las filas que van detrás de [after] en el orden de la lista: un día anterior, o el mismo día y un id menor. */
 internal fun movementAfterFilter(after: Movement): String =

@@ -89,6 +89,9 @@ final class SharedVectorsTests: XCTestCase {
             XCTAssertEqual(history.map(\.assets.minor), v.assets, v.name)
             XCTAssertEqual(history.map(\.liabilities.minor), v.liabilities, v.name)
             XCTAssertEqual(history.map(\.net.minor), v.net, v.name)
+            // ORC-149: con los movimientos reducidos sale el mismo patrimonio.
+            XCTAssertEqual(NetWorth.history(accounts: accounts, amounts: movements.map(MovementAmount.init), months: v.months,
+                                            through: MonthKey(year: through.year, month: through.month)), history, v.name)
         }
     }
 

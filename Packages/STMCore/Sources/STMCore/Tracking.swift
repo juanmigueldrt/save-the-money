@@ -46,6 +46,17 @@ public enum NetWorth {
     ///   de mes y el dinero de una cartera puede estar ya en una cuenta de inversión (se contaría dos veces).
     public static func history(accounts: [Account], movements: [Movement], months: Int = 12,
                                through: MonthKey) -> [NetWorthPoint] {
+        rebuilt(accounts: accounts, movements: movements, months: months, through: through)
+    }
+
+    /// Lo mismo con los movimientos reducidos de `FinanceService.movementAmounts`.
+    public static func history(accounts: [Account], amounts: [MovementAmount], months: Int = 12,
+                               through: MonthKey) -> [NetWorthPoint] {
+        rebuilt(accounts: accounts, movements: amounts, months: months, through: through)
+    }
+
+    private static func rebuilt<M: AccountAmount>(accounts: [Account], movements: [M], months: Int,
+                                                  through: MonthKey) -> [NetWorthPoint] {
         let counted = accounts.filter(\.includeInNetWorth)
         let ids = Set(counted.map(\.id))
         let byAccount = Dictionary(grouping: movements.filter { ids.contains($0.accountId) }, by: \.accountId)

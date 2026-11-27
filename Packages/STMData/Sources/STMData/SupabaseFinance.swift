@@ -236,10 +236,23 @@ extension SupabaseBackend: FinanceService {
     /// Por cursor y no por `range` (ORC-70): con `range` cada página obligaba al servidor a recorrer las anteriores.
     /// `booked_on >= día` va aparte del `or` para que el servidor empiece a leer el índice en ese día.
     public func allMovements(in householdId: UUID) async throws -> [Movement] {
-        try await Self.allPagesByCursor { (last: Movement?) -> [Movement] in
+        try await download(Self.movementColumns, in: householdId)
+    }
+
+    /// Las mismas filas con cuatro columnas (ORC-149): el patrimonio no usa las demás.
+    public func movementAmounts(in householdId: UUID) async throws -> [MovementAmount] {
+        try await download(Self.movementAmountColumns, in: householdId)
+    }
+
+    static let movementAmountColumns = "id,account_id,booked_on,amount_minor"
+
+    private func download<Row: Decodable & Sendable & AccountAmount & Identifiable>(
+        _ columns: String, in householdId: UUID
+    ) async throws -> [Row] where Row.ID == UUID {
+        try await Self.allPagesByCursor { (last: Row?) -> [Row] in
             try await mapped {
                 var query = client.from("transactions")
-                    .select(Self.movementColumns)
+                    .select(columns)
                     .eq("household_id", value: householdId.uuidString)
                 if let last {
                     query = query.gte("booked_on", value: last.bookedOn.iso).or(Self.downloadAfterFilter(last))
@@ -256,7 +269,7 @@ extension SupabaseBackend: FinanceService {
 
     /// Junto a `booked_on >= día`, las filas que van detrás de `after` en la descarga completa (día e id ascendentes):
     /// un día posterior, o (ya dentro del mismo día) un id mayor.
-    static func downloadAfterFilter(_ after: Movement) -> String {
+    static func downloadAfterFilter<Row: AccountAmount & Identifiable>(_ after: Row) -> String where Row.ID == UUID {
         "booked_on.gt.\(after.bookedOn.iso),id.gt.\(after.id.uuidString.lowercased())"
     }
 

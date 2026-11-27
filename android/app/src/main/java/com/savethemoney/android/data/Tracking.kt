@@ -37,7 +37,7 @@ object NetWorth {
      * - Las inversiones no suman: su valor no es el saldo de ninguna cuenta, no hay precio de cada fin
      *   de mes y el dinero de una cartera puede estar ya en una cuenta de inversión (se contaría dos veces).
      */
-    fun history(accounts: List<Account>, movements: List<Movement>, months: Int, through: YearMonth): List<NetWorthPoint> {
+    fun history(accounts: List<Account>, movements: List<AccountAmount>, months: Int, through: YearMonth): List<NetWorthPoint> {
         val counted = accounts.filter { it.includeInNetWorth }
         val byAccount = movements.groupBy { it.accountId }
         return (months - 1 downTo 0).map { offset ->
@@ -175,6 +175,13 @@ enum class ReportPeriod(val title: String) {
         }
     }
 }
+
+/**
+ * Primer día que puede pintar la pantalla de informes: el más antiguo de todos los periodos y de sus anteriores,
+ * con el mes del hogar y con el mes natural (los gastos por etiqueta y por comercio aún usan el natural).
+ */
+fun reportWindowStart(today: LocalDate, monthStartDay: Int): LocalDate =
+    ReportPeriod.entries.minOf { p -> minOf(p.previousRange(today, monthStartDay).start, p.previousRange(today).start) }
 
 /** Informe de gastos o ingresos de un periodo, por categoría y por mes. */
 class SpendingReport(

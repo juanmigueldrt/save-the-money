@@ -108,6 +108,17 @@ class BusquedaEnServidorTest {
         assertEquals("booked_on.lt.2021-03-05,id.gt.abcdef00-0000-0000-0000-000000000001", movementDownloadAfterFilter(ultimo))
     }
 
+    /** ORC-149: el patrimonio pide cuatro columnas, en orden ascendente; el día mínimo viaja aparte, como `booked_on=gte.`. */
+    @Test
+    fun movimientoReducidoSeLeeSinLasDemasColumnasYSuCursorEsDiaPosteriorOMayorId() {
+        val fila = Json.decodeFromString<MovementAmount>(
+            """{"id":"ABCDEF00-0000-0000-0000-000000000001","account_id":"a1","booked_on":"2021-03-05","amount_minor":-1250}""",
+        )
+        assertEquals(MovementAmount(Movement("ABCDEF00-0000-0000-0000-000000000001", "h1", "a1", null, "2021-03-05", -1250, "x")), fila)
+        assertEquals(java.time.LocalDate.of(2021, 3, 5), fila.day)
+        assertEquals("booked_on.gt.2021-03-05,id.gt.abcdef00-0000-0000-0000-000000000001", movementAmountAfterFilter(fila))
+    }
+
     @Test
     fun busquedaQuitaEspaciosYControlesYSeRecortaA100() {
         assertNull(MovementSearch.of("   \n\t ", emptyList()))

@@ -87,5 +87,15 @@ final class BusquedaEnServidorTests: XCTestCase {
                                 bookedOn: CalendarDay(year: 2021, month: 3, day: 5)!, amount: Money(minor: -1), description: "x")
         XCTAssertEqual(SupabaseBackend.downloadAfterFilter(movement),
                        "booked_on.gt.2021-03-05,id.gt.abcdef00-0000-0000-0000-000000000001")
+        XCTAssertEqual(SupabaseBackend.downloadAfterFilter(MovementAmount(movement)), SupabaseBackend.downloadAfterFilter(movement))
+    }
+
+    /// ORC-149: la fila de cuatro columnas que pide el patrimonio se lee tal cual llega.
+    func testMovimientoReducidoSeLeeDeSusCuatroColumnas() throws {
+        XCTAssertEqual(SupabaseBackend.movementAmountColumns, "id,account_id,booked_on,amount_minor")
+        let json = #"{"id":"ABCDEF00-0000-0000-0000-000000000001","account_id":"ABCDEF00-0000-0000-0000-000000000002","booked_on":"2021-03-05","amount_minor":-1250}"#
+        let row = try JSONDecoder().decode(MovementAmount.self, from: Data(json.utf8))
+        XCTAssertEqual(row.bookedOn, CalendarDay(year: 2021, month: 3, day: 5))
+        XCTAssertEqual(row.amount, Money(minor: -1250))
     }
 }

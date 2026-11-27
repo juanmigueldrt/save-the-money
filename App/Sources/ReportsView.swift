@@ -40,10 +40,10 @@ struct ReportsView: View {
         .background(Palette.bgGrouped)
         .navigationTitle("Informes")
         .task(id: tracking.period) { await tracking.loadReport() }
-        .task(id: finance.recent) { await tracking.loadHistory() }
+        .task(id: finance.recent) { await tracking.loadSixMonths() }
         .refreshable {
             await tracking.loadReport()
-            await tracking.loadHistory()
+            await tracking.loadSixMonths()
         }
     }
 
@@ -60,7 +60,7 @@ struct ReportsView: View {
     private var incomeAndExpenses: some View {
         let startDay = tracking.household.monthStartDay
         let range = ReportPeriod.last6Months.range(monthStartDay: startDay)
-        let movements = tracking.allMovements
+        let movements = tracking.sixMonthMovements
         let income = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .income,
                                     monthStartDay: startDay)
         let spending = SpendingReport(movements: movements, categories: finance.categories, range: range, kind: .expense,

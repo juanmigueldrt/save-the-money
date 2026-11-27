@@ -285,6 +285,7 @@ struct HouseholdReload {
         await investments.load()
         // El seguimiento (patrimonio, informes e historial de crédito) lo cargan las vistas al cambiar sus datos.
         await tracking.loadHistory()
+        await tracking.loadSixMonths()
         await tracking.loadScores()
         await tracking.loadReport()
     }

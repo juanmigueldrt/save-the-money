@@ -104,4 +104,45 @@ class TrackingTest {
         assertEquals(BiggestRise("Ocio", null, YearMonth.of(2026, 10)), biggestRise(movements.drop(2), listOf(food, fun_), YearMonth.of(2026, 11)))
         assertNull(biggestRise(movements.take(1), listOf(food, fun_), YearMonth.of(2026, 11)))
     }
+
+    /** ORC-149: los informes piden los movimientos desde [reportWindowStart] y dan los mismos totales que con todos. */
+    @Test fun reportWindowGivesTheSameTotalsAsEveryMovement() {
+        val a = account("común")
+        val food = category("Supermercado")
+        val salary = category("Nómina", CategoryKind.Income)
+        val categories = listOf(food, salary)
+        // Un gasto y un ingreso cada 5 días durante cuatro años.
+        val all = (0L until 4 * 365 step 5).flatMap { d ->
+            val on = day(2023, 1, 1).plusDays(d)
+            listOf(move(a, -1_000 - d, on, food).copy(payee = "Tienda", tags = listOf("casa")), move(a, 5_000 + d, on, salary))
+        }
+        for (today in listOf(day(2026, 11, 27), day(2026, 1, 1), day(2026, 3, 31), day(2025, 12, 31))) {
+            for (startDay in listOf(1, 15, 28)) {
+                val from = reportWindowStart(today, startDay)
+                val window = all.filter { !it.day.isBefore(from) }
+                assertEquals("$today, día $startDay: la ventana deja fuera movimientos", true, window.size < all.size)
+                for (period in ReportPeriod.entries) {
+                    for (range in listOf(period.range(today, startDay), period.previousRange(today, startDay))) {
+                        for (kind in ReportKind.entries) {
+                            val name = "$today, día $startDay, $period, $range, $kind"
+                            val whole = SpendingReport(all, categories, range, kind, monthStartDay = startDay)
+                            val part = SpendingReport(window, categories, range, kind, monthStartDay = startDay)
+                            assertEquals(name, whole.total, part.total)
+                            assertEquals(name, whole.byCategory, part.byCategory)
+                            assertEquals(name, whole.byMonth, part.byMonth)
+                        }
+                    }
+                    for (grouping in GroupedSpending.Grouping.entries) {
+                        assertEquals(
+                            "$today, $period, $grouping",
+                            GroupedSpending.report(grouping, all, categories, period.range(today)),
+                            GroupedSpending.report(grouping, window, categories, period.range(today)),
+                        )
+                    }
+                }
+                val month = monthContaining(today, startDay)
+                assertEquals(biggestRise(all, categories, month, startDay), biggestRise(window, categories, month, startDay))
+            }
+        }
+    }
 }
