@@ -2,11 +2,15 @@ package com.savethemoney.android.ui.screens
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -20,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.ChangePasswordForm
+import com.savethemoney.android.data.DELETE_ACCOUNT_WARNING
 import com.savethemoney.android.data.HabitSettings
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.MovementsCsv
@@ -31,6 +36,7 @@ import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.Vista
 import com.savethemoney.android.ui.compartir
+import com.savethemoney.android.ui.components.BottomSheet
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
 import com.savethemoney.android.ui.components.ListCard
@@ -39,6 +45,7 @@ import com.savethemoney.android.ui.components.ListItem
 import com.savethemoney.android.ui.components.NavBar
 import com.savethemoney.android.ui.components.OutlinedField
 import com.savethemoney.android.ui.components.SelectorSheet
+import com.savethemoney.android.ui.components.SheetItem
 import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.StmDialog
 import com.savethemoney.android.ui.components.StmIcon
@@ -74,6 +81,7 @@ fun Pantalla30(nav: Nav) {
     var eligeHabito by remember { mutableStateOf(false) }
     var cambiaClave by remember { mutableStateOf(false) }
     var claveCambiada by remember { mutableStateOf(false) }
+    var borraCuenta by remember { mutableStateOf(false) }
     val cambiaHabitos = { nuevos: HabitSettings ->
         habitos = nuevos
         finance?.planning?.habits = nuevos
@@ -98,6 +106,8 @@ fun Pantalla30(nav: Nav) {
             }
         } else if (cambiaClave) {
             { DialogoContrasena({ claveCambiada = true }) { cambiaClave = false } }
+        } else if (borraCuenta) {
+            { HojaBorrarCuenta { borraCuenta = false } }
         } else {
             null
         },
@@ -228,6 +238,15 @@ fun Pantalla30(nav: Nav) {
             MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
         }
         Spacer(Modifier.height(16.dp))
+        // Borrar la cuenta (ORC-74): en rojo, como las demás acciones que no se pueden deshacer.
+        ListCard {
+            SheetItem(StmIcons.deleteForever, "Borrar mi cuenta", Stm.colors.error, Stm.colors.error) { borraCuenta = true }
+        }
+        Text(
+            "Borra tu usuario y todo lo que has apuntado. Pide la contraseña y no se puede deshacer.",
+            Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
     }
 }
 
@@ -281,5 +300,33 @@ private fun BoxScope.DialogoContrasena(onChanged: () -> Unit, onDismiss: () -> U
             error = mismatch || action.error != null,
             supporting = action.error ?: if (mismatch) "Las contraseñas no coinciden." else if (nueva.isNotEmpty() && nueva == actual) ChangePasswordForm.SAME_PASSWORD else null,
         )
+    }
+}
+
+/** Borrar la cuenta (ORC-74): el aviso de lo que se borra, la contraseña actual y un botón que dice lo que hace. */
+@Composable
+internal fun BoxScope.HojaBorrarCuenta(onDismiss: () -> Unit) {
+    val c = Stm.colors
+    val session = LocalSession.current
+    val action = rememberAction()
+    var clave by remember { mutableStateOf("") }
+    BottomSheet("Borrar mi cuenta", onDismiss = onDismiss) {
+        // Con letra grande o pantalla pequeña el aviso no cabe: se desplaza y los botones siguen al alcance.
+        Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+            Text(DELETE_ACCOUNT_WARNING, style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            Spacer(Modifier.height(24.dp))
+            OutlinedField(
+                "Contraseña actual", clave, { clave = it }, password = true, labelBackground = c.surfaceContainerLow,
+                error = action.error != null, supporting = action.error,
+            )
+            Spacer(Modifier.height(16.dp))
+            // Al terminar, la sesión pasa a «sin sesión» y esta hoja desaparece con la pantalla.
+            Btn(
+                "Borrar mi cuenta para siempre", { action.run { session.deleteAccount(clave) } }, Modifier.fillMaxWidth(),
+                kind = BtnKind.Error, enabled = clave.isNotEmpty() && !action.busy,
+            )
+            Spacer(Modifier.height(8.dp))
+            Btn("Cancelar", onDismiss, Modifier.fillMaxWidth(), kind = BtnKind.Text)
+        }
     }
 }

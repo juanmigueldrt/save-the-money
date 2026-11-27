@@ -198,6 +198,14 @@ public struct RemovedHouseholdExport: Hashable, Decodable, Sendable {
     }
 }
 
+public enum DeletingAccount {
+    /// Lo que la app avisa antes de borrar la cuenta.
+    public static let warning =
+        "Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; "
+        + "si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. "
+        + "Si quieres conservar tus movimientos, expórtalos antes."
+}
+
 public enum LeavingHousehold {
     /// Lo que la app avisa antes de salir de un hogar.
     public static let leaveWarning =

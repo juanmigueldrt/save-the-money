@@ -232,4 +232,62 @@ class DatosAlSalirTest {
         now = start
         assertEquals("con el plazo vencido el hogar se borró", AppError.InvalidOrExpiredInvite, runCatching { backend.acceptInvite(spare) }.exceptionOrNull())
     }
+
+    /**
+     * ORC-74, lo mismo que `supabase/tests/database/27_orc74_borrar_cuenta.test.sql` y
+     * `testBorrarLaCuentaSeLlevaLoMioYNoLoDeLosDemas` de HouseholdFlowTests.swift. Datos inventados.
+     */
+    @Test
+    fun borrarLaCuentaSeLlevaLoMioYNoLoDeLosDemas() = runBlocking {
+        val backend = InMemoryBackend()
+        val finance = InMemoryFinance(backend)
+        val day = LocalDate.of(2026, 11, 2)
+
+        suspend fun note(name: String, home: String) {
+            val account = finance.createAccount(AccountDraft("Cuenta de $name"), home)
+            finance.addMovement(MovementDraft(account.id, null, day, -4500, "Compra de $name"), home)
+        }
+
+        // Ana es propietaria de un hogar con Bruno dentro y de otro en el que está sola.
+        backend.signUp(user("ana"), password, null)
+        val shared = backend.createHousehold("Casa compartida").id
+        val alone = backend.createHousehold("Casa de Ana").id
+        note("Ana", shared)
+        note("Ana", alone)
+        val invite = InviteCode.parse(backend.createInvite(shared).code)!!
+        val aloneInvite = InviteCode.parse(backend.createInvite(alone).code)!!
+        backend.signOut()
+        backend.signUp(user("bruno"), password, null)
+        backend.acceptInvite(invite)
+        note("Bruno", shared)
+        backend.signOut()
+
+        backend.signIn(user("ana"), password)
+        assertEquals(
+            "con la contraseña equivocada no se borra nada",
+            AppError.WrongCurrentPassword,
+            runCatching { backend.deleteAccount("otra-contrasena") }.exceptionOrNull(),
+        )
+        assertEquals(listOf("Cuenta de Ana"), finance.accounts(shared).map { it.name })
+        backend.deleteAccount(password)
+        assertNull("tras borrar la cuenta no queda sesión", backend.currentUserId())
+        assertEquals(
+            "la cuenta borrada ya no existe",
+            AppError.InvalidCredentials,
+            runCatching { backend.signIn(user("ana"), password) }.exceptionOrNull(),
+        )
+
+        // Bruno se queda con el hogar compartido y con lo suyo; el otro hogar ya no existe.
+        backend.signIn(user("bruno"), password)
+        val members = backend.members(shared)
+        assertEquals(listOf("bruno"), members.map { it.profile.username })
+        assertEquals(listOf(MemberRole.Owner), members.map { it.role })
+        assertEquals(listOf("Cuenta de Bruno"), finance.accounts(shared).map { it.name })
+        assertEquals(listOf("Compra de Bruno"), finance.movements(shared, null, 100).map { it.description })
+        assertEquals(
+            "el hogar en el que Ana estaba sola se borró",
+            AppError.InvalidOrExpiredInvite,
+            runCatching { backend.acceptInvite(aloneInvite) }.exceptionOrNull(),
+        )
+    }
 }

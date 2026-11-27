@@ -101,12 +101,7 @@ class Session(
     suspend fun watchSession() {
         backend.sessionEnded.collect {
             if (state == State.Loading || state == State.SignedOut) return@collect
-            notifier.replaceReminders(emptyList())
-            borrarLocal()
-            finance = null
-            households = emptyList()
-            removedHouseholds = emptyList()
-            state = State.SignedOut
+            salirEnEsteDispositivo()
             signOutNotice = AppError.NotSignedIn.message
         }
     }
@@ -213,6 +208,22 @@ class Session(
             signOutNotice = "No se ha podido cerrar la sesión en el servidor. " + ((e as? AppError)?.message ?: AppError.Unknown("app").message)
         }
         // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
+        salirEnEsteDispositivo()
+    }
+
+    /**
+     * Borra la cuenta en el servidor y, si ha ido bien, lo que queda de ella en este dispositivo (ORC-74).
+     * Si falla (contraseña equivocada, sin red) no se borra nada y la sesión sigue como estaba.
+     */
+    suspend fun deleteAccount(currentPassword: String) {
+        backend.deleteAccount(currentPassword)
+        salirEnEsteDispositivo()
+        // Si [watchSession] vio antes la sesión borrada, que no quede su aviso de «sesión caducada».
+        signOutNotice = null
+    }
+
+    /** Lo que queda de la cuenta en este dispositivo: avisos, exportados y lo cargado en memoria. Deja la app sin sesión. */
+    private fun salirEnEsteDispositivo() {
         notifier.replaceReminders(emptyList())
         borrarLocal()
         finance = null

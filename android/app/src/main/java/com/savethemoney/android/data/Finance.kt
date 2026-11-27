@@ -1270,4 +1270,11 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         val user = me()
         scores.removeAll { it.id == scoreId && creators[it.id] == user }
     }
+
+    /** Lo que es de la persona y no de un hogar: scores, calendario de cobro y presupuestos. Se va con su cuenta (ORC-74). */
+    internal fun purgeUser(user: String) {
+        scores.removeAll { creators[it.id] == user }
+        schedules.remove(user)
+        budgets.remove(user)
+    }
 }

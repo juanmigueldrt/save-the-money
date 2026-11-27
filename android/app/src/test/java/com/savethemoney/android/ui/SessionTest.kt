@@ -400,4 +400,85 @@ class SessionTest {
         session.signOut()
         assertTrue(session.removedHouseholds.isEmpty())
     }
+
+    // ORC-74: borrar la cuenta.
+
+    @Test
+    fun borrarLaCuentaConOtraContrasenaDejaLaSesionComoEstaba() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de prueba")
+        var borrados = 0
+        val session = Session(memory, InMemoryFinance(memory), isDemo = true, borrarLocal = { borrados++ })
+        session.refresh()
+        val antes = session.state
+        assertTrue(antes is Session.State.Ready)
+
+        try {
+            session.deleteAccount("no-es-esta")
+            fail("con otra contraseña no debería borrar la cuenta")
+        } catch (e: AppError.WrongCurrentPassword) {
+            // Se avisa junto al campo de la contraseña.
+        }
+
+        assertEquals(antes, session.state)
+        assertTrue("las finanzas del hogar siguen abiertas", session.finance != null)
+        assertEquals(listOf("Casa de prueba"), session.households.map { it.name })
+        assertEquals("no se borra nada del dispositivo", 0, borrados)
+        assertEquals(session.profile?.id, memory.currentUserId())
+    }
+
+    @Test
+    fun borrarLaCuentaBorraLoLocalYAcabaSinSesion() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de prueba")
+        var borrados = 0
+        val session = Session(memory, InMemoryFinance(memory), isDemo = true, borrarLocal = { borrados++ })
+        session.refresh()
+
+        session.deleteAccount("secreto123")
+
+        assertEquals(Session.State.SignedOut, session.state)
+        assertNull(session.finance)
+        assertTrue(session.households.isEmpty())
+        assertEquals(1, borrados)
+        assertNull(session.signOutNotice)
+        assertNull(memory.currentUserId())
+        // La cuenta ya no existe: no se puede volver a entrar con ella.
+        try {
+            session.signIn("ana", "secreto123")
+            fail("la cuenta borrada no debería poder entrar")
+        } catch (e: AppError.InvalidCredentials) {
+            assertEquals(Session.State.SignedOut, session.state)
+        }
+    }
+
+    /** Como SupabaseBackend: al borrar la sesión guardada, la librería avisa de que ya no hay sesión. No es una sesión caducada. */
+    @Test
+    fun borrarLaCuentaNoDejaElAvisoDeSesionCaducada() = runBlocking {
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("ana").getOrThrow(), "secreto123", null)
+        memory.createHousehold("Casa de prueba")
+        val perdida = MutableSharedFlow<Unit>()
+        val backend = object : Backend by memory {
+            override val sessionEnded = perdida
+
+            override suspend fun deleteAccount(currentPassword: String) {
+                memory.deleteAccount(currentPassword)
+                perdida.emit(Unit)
+                yield()
+            }
+        }
+        val session = Session(backend, InMemoryFinance(memory), isDemo = true)
+        session.start()
+        val vigilancia = launch { session.watchSession() }
+        yield()
+
+        session.deleteAccount("secreto123")
+        vigilancia.cancel()
+
+        assertEquals(Session.State.SignedOut, session.state)
+        assertNull(session.signOutNotice)
+    }
 }

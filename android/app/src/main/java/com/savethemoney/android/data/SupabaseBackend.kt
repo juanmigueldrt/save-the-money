@@ -17,10 +17,12 @@ import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
@@ -78,6 +80,13 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
      * session_not_found). Tras el cambio, el servidor cierra todas las demás sesiones de la cuenta.
      */
     override suspend fun changePassword(currentPassword: String, newPassword: String) = mapped {
+        comprobarContrasena(currentPassword)
+        client.auth.updateUser { password = newPassword }
+        Unit
+    }
+
+    /** Vuelve a iniciar sesión con la contraseña actual; si no es, [AppError.WrongCurrentPassword] y la sesión guardada no se toca. */
+    private suspend fun comprobarContrasena(currentPassword: String) {
         val email = client.auth.currentUserOrNull()?.email ?: throw AppError.NotSignedIn
         try {
             client.auth.signInWith(Email) {
@@ -88,7 +97,21 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             val error = authError(listOfNotNull(e.error, e.description, e.message).joinToString(" "))
             throw if (error == AppError.InvalidCredentials) AppError.WrongCurrentPassword else error
         }
-        client.auth.updateUser { password = newPassword }
+    }
+
+    /*
+     * Tras `delete_my_account` el usuario ya no existe en el servidor. En supabase-kt 3.2.6 `signOut` llama a
+     * /logout con cualquier SignOutScope (también LOCAL) y esa llamada fallaría; `clearSession` no llama al
+     * servidor: borra la sesión guardada (SesionCifrada.deleteSession) y la de memoria.
+     */
+    override suspend fun deleteAccount(currentPassword: String) = mapped {
+        comprobarContrasena(currentPassword)
+        // Pedido el borrado, se termina aunque se cierre la pantalla: no debe quedar guardada la sesión de una cuenta que ya no existe.
+        withContext(NonCancellable) {
+            client.postgrest.rpc("delete_my_account")
+            // Si el borrado local fallara, la cuenta ya no existe igualmente: la app sale a «sin sesión».
+            runCatching { client.auth.clearSession() }
+        }
         Unit
     }
 
