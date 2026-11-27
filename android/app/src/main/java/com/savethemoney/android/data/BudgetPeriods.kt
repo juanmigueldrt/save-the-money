@@ -11,12 +11,12 @@ import kotlin.math.roundToLong
 // presupuesto inteligente y presupuestos extra.
 
 /** Cada cuánto cobra una persona. [raw] es el valor de la base de datos. */
-enum class PayFrequency(val raw: String, val title: String) {
-    Weekly("weekly", "Cada semana"),
-    Biweekly("biweekly", "Cada dos semanas"),
-    TwiceMonthly("twice_monthly", "Dos días al mes"),
-    Monthly("monthly", "Cada mes"),
-    Yearly("yearly", "Cada año");
+enum class PayFrequency(val raw: String) {
+    Weekly("weekly"),
+    Biweekly("biweekly"),
+    TwiceMonthly("twice_monthly"),
+    Monthly("monthly"),
+    Yearly("yearly");
 
     /** Si usa una fecha de cobro de referencia en vez de días del mes. */
     val usesAnchor: Boolean get() = this == Weekly || this == Biweekly || this == Yearly

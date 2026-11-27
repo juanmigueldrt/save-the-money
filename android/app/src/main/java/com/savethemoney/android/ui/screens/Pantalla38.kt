@@ -12,8 +12,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CreditScore
 import com.savethemoney.android.ui.Fechas
@@ -45,33 +48,34 @@ fun Pantalla38(nav: Nav) {
     var eligeFecha by remember { mutableStateOf(false) }
     var eligeEscala by remember { mutableStateOf(false) }
     val action = rememberAction()
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
-        val valor = score.trim().toIntOrNull() ?: throw AppError.InvalidInput("Escribe el score con números.")
+        val valor = score.trim().toIntOrNull() ?: throw AppError.InvalidInput(resources.getString(R.string.apuntar_score_escribe_el_score_con_numeros))
         tracking.add(CreditScore("", valor, escala, proveedor, fecha.toString(), nota))
         nav.back()
     }
 
     StmScreen(
         topBar = {
-            TopBar("Apuntar score", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(stringResource(R.string.apuntar_score_apuntar_score), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = if (eligeEscala) {
-            { SelectorSheet("Escala", listOf(850, 900, 999, 1000, 100).map { e -> "Sobre $e" to { escala = e } }) { eligeEscala = false } }
+            { SelectorSheet(stringResource(R.string.apuntar_score_escala), listOf(850, 900, 999, 1000, 100).map { e -> stringResource(R.string.apuntar_score_sobre, e) to { escala = e } }) { eligeEscala = false } }
         } else {
             null
         },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Score", score, { score = it }, keyboard = KeyboardType.Number, autoFocus = true)
-            FilledField("Escala", "Sobre $escala", trailing = StmIcons.arrowDropDown, onClick = { eligeEscala = true })
-            FilledField("Proveedor (opcional)", proveedor, { proveedor = it })
-            FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
-            FilledField("Nota (opcional)", nota, { nota = it })
-            Text("Sólo lo ves tú. No se comparte con el hogar.", style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant)
+            FilledField(stringResource(R.string.apuntar_score_score), score, { score = it }, keyboard = KeyboardType.Number, autoFocus = true)
+            FilledField(stringResource(R.string.apuntar_score_escala), stringResource(R.string.apuntar_score_sobre, escala), trailing = StmIcons.arrowDropDown, onClick = { eligeEscala = true })
+            FilledField(stringResource(R.string.apuntar_score_proveedor_opcional), proveedor, { proveedor = it })
+            FilledField(stringResource(R.string.comun_fecha), Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+            FilledField(stringResource(R.string.comun_nota_opcional), nota, { nota = it })
+            Text(stringResource(R.string.apuntar_score_solo_lo_ves_tu_no_se), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant)
         }
     }
     if (eligeFecha) SelectorFecha(fecha, { if (!it.isAfter(finance.today())) fecha = it }) { eligeFecha = false }

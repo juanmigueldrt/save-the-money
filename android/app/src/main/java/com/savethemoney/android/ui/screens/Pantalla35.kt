@@ -11,8 +11,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.GoalKind
 import com.savethemoney.android.data.Money
@@ -46,30 +49,31 @@ fun Pantalla35(nav: Nav, goalId: String) {
     val idAportacion = rememberSaveable { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
     val ahorro = goal.kind == GoalKind.Savings
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
-        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("El importe no es válido.")
+        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: throw AppError.InvalidInput(resources.getString(R.string.comun_el_importe_no_es_valido))
         planning.contribute(if (sacar) -dinero else dinero, goal, fecha, nota, idAportacion)
         nav.back()
     }
 
     StmScreen(
         topBar = {
-            TopBar(if (ahorro) "Aportación" else "Pago de la deuda", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (ahorro) stringResource(R.string.aportar_aportacion) else stringResource(R.string.aportar_pago_de_la_deuda), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Importe", amount, { amount = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.comun_importe), amount, { amount = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
             if (ahorro) {
                 ListCard {
-                    ListItem("Sacar dinero de la meta", trailing = { StmSwitch(sacar) { sacar = it } })
+                    ListItem(stringResource(R.string.aportar_sacar_dinero_de_la_meta), trailing = { StmSwitch(sacar) { sacar = it } })
                 }
             }
-            FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
-            FilledField("Nota (opcional)", nota, { nota = it })
+            FilledField(stringResource(R.string.comun_fecha), Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+            FilledField(stringResource(R.string.comun_nota_opcional), nota, { nota = it })
         }
     }
     if (eligeFecha) SelectorFecha(fecha, { fecha = it }) { eligeFecha = false }

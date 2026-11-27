@@ -52,6 +52,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.runtime.LaunchedEffect
@@ -74,6 +75,7 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.horizontalScroll
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AmountExpression
 import com.savethemoney.android.data.Money
 import androidx.compose.ui.text.TextStyle
@@ -176,7 +178,7 @@ fun TopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     Row(Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (navIcon != null) IconBtn(navIcon, onNav, contentDescription = "Atrás") else Spacer(Modifier.width(4.dp))
+        if (navIcon != null) IconBtn(navIcon, onNav, contentDescription = stringResource(R.string.comun_atras)) else Spacer(Modifier.width(4.dp))
         Text(
             title.orEmpty(), Modifier.weight(1f).padding(start = 8.dp, end = 8.dp), style = StmType.appBarTitle,
             color = Stm.colors.onSurface, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -501,13 +503,13 @@ fun Calculadora(value: String, onValueChange: (String) -> Unit, teclas: Boolean)
     val conCuenta = AmountExpression.hasOperation(value)
     val resultado = if (conCuenta) AmountExpression.evaluate(value) else null
     if (conCuenta) {
-        Supporting(resultado?.let { "= " + Money.format(it, options = Money.Display.Standard) } ?: "La cuenta no está completa", resultado == null)
+        Supporting(resultado?.let { "= " + Money.format(it, options = Money.Display.Standard) } ?: stringResource(R.string.calculadora_la_cuenta_no_esta_completa), resultado == null)
     }
     if (!teclas) return
     Row(Modifier.padding(top = 8.dp).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        listOf("+" to "Más", "−" to "Menos", "×" to "Por", "÷" to "Entre", "(" to "Abrir paréntesis", ")" to "Cerrar paréntesis")
+        listOf("+" to stringResource(R.string.calculadora_mas), "−" to stringResource(R.string.calculadora_menos), "×" to stringResource(R.string.calculadora_por), "÷" to stringResource(R.string.calculadora_entre), "(" to stringResource(R.string.calculadora_abrir_parentesis), ")" to stringResource(R.string.calculadora_cerrar_parentesis))
             .forEach { (simbolo, nombre) -> TeclaCalculadora(simbolo, nombre) { onValueChange(value + simbolo) } }
-        if (resultado != null) TeclaCalculadora("=", "Calcular") { onValueChange(Money.input(resultado)) }
+        if (resultado != null) TeclaCalculadora("=", stringResource(R.string.calculadora_calcular)) { onValueChange(Money.input(resultado)) }
     }
 }
 
@@ -676,7 +678,7 @@ fun Progress(fraction: Float, modifier: Modifier = Modifier.fillMaxWidth(), colo
 
 // ───────────────────────── Navegación ─────────────────────────
 
-enum class Tab(val label: String, val route: Route) { Inicio("Inicio", Route.Inicio), Presupuesto("Presupuesto", Route.Presupuesto), Flujo("Flujo", Route.Flujo), Metas("Metas", Route.Metas), Mas("Más", Route.Mas) }
+enum class Tab(@androidx.annotation.StringRes val label: Int, val route: Route) { Inicio(R.string.nav_inicio, Route.Inicio), Presupuesto(R.string.nav_presupuesto, Route.Presupuesto), Flujo(R.string.nav_flujo, Route.Flujo), Metas(R.string.nav_metas, Route.Metas), Mas(R.string.nav_mas, Route.Mas) }
 
 private val Tab.icon: ImageVector
     get() = when (this) {
@@ -710,7 +712,7 @@ fun NavBar(selected: Tab?, onSelect: (Tab) -> Unit, badgeOnMore: Boolean = false
                     }
                     Spacer(Modifier.height(4.dp))
                     // «Presupuesto» mide 74,75 dp en una celda de 79: sin límite para que no se recorte por redondeo
-                    Text(tab.label, Modifier.wrapContentWidth(unbounded = true), style = StmType.labelMedium, color = if (on) c.secondary else c.onSurfaceVariant, maxLines = 1, softWrap = false)
+                    Text(stringResource(tab.label), Modifier.wrapContentWidth(unbounded = true), style = StmType.labelMedium, color = if (on) c.secondary else c.onSurfaceVariant, maxLines = 1, softWrap = false)
                 }
             }
         }

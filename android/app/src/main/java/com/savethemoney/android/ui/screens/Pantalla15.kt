@@ -29,11 +29,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BudgetTemplate
@@ -82,13 +85,14 @@ fun Pantalla15(nav: Nav) {
     val base = Money.entered(income)?.coerceAtLeast(0) ?: 0
     val reparto = template.allocate(base)
     val gastos = finance.categories(CategoryKind.Expense)
+    val resources = LocalResources.current
     val guardar = {
         action.run {
             val expected = if (income.isBlank()) 0L else Money.entered(income)?.takeIf { it >= 0 }
-                ?: throw AppError.InvalidInput("Los ingresos previstos no son un importe válido.")
+                ?: throw AppError.InvalidInput(resources.getString(R.string.editar_presupuesto_los_ingresos_previstos_no_son_un))
             val parsed = limites.filterValues { it.isNotBlank() }.mapValues { (id, text) ->
                 Money.entered(text)?.takeIf { it >= 0 }
-                    ?: throw AppError.InvalidInput("El límite de ${finance.category(id)?.name ?: "una categoría"} no es un importe válido.")
+                    ?: throw AppError.InvalidInput(resources.getString(R.string.editar_presupuesto_el_limite_no_es_valido, finance.category(id)?.name ?: resources.getString(R.string.editar_presupuesto_una_categoria)))
             }.filterValues { it > 0 }
             budgets.save(inicial.copy(expectedIncome = expected, template = template, limits = parsed, carryOver = arrastre, warnPercent = aviso))
             nav.back()
@@ -97,21 +101,21 @@ fun Pantalla15(nav: Nav) {
     LaunchedEffect(Unit) { if (budgets.budget == null && budgets.proposal == null) budgets.load() }
     StmScreen(
         topBar = {
-            TopBar("Presupuesto · ${inicial.period.title}", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", guardar, kind = BtnKind.Text, enabled = !action.busy)
+            TopBar(stringResource(R.string.editar_presupuesto_presupuesto, inicial.period.title), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), guardar, kind = BtnKind.Text, enabled = !action.busy)
             }
         },
         snackbar = (action.error ?: propuesta)?.let { e -> { Snackbar(e) } },
     ) {
         Spacer(Modifier.height(8.dp))
-        Segmented(listOf("Por categorías", "Flexible"), mode, { mode = it })
+        Segmented(listOf(stringResource(R.string.editar_presupuesto_por_categorias), stringResource(R.string.editar_presupuesto_flexible)), mode, { mode = it })
         Spacer(Modifier.height(16.dp))
-        FilledField("Ingresos previstos", income, { income = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+        FilledField(stringResource(R.string.editar_presupuesto_ingresos_previstos), income, { income = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         Spacer(Modifier.height(16.dp))
         StmCard(color = c.surfaceContainerHighest) {
             Row(Modifier.fillMaxWidth().height(32.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Reparto ${template.needs}/${template.wants}/${template.savings}", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
-                SmallTonalBtn("Aplicar") { template = BudgetTemplate.FiftyThirtyTwenty }
+                Text(stringResource(R.string.editar_presupuesto_reparto, template.needs, template.wants, template.savings), Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                SmallTonalBtn(stringResource(R.string.editar_presupuesto_aplicar)) { template = BudgetTemplate.FiftyThirtyTwenty }
             }
             Spacer(Modifier.height(8.dp))
             Text(
@@ -121,37 +125,37 @@ fun Pantalla15(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Arrastre y avisos")
-            ListItem("Pasar lo que sobre al siguiente periodo", trailing = { StmSwitch(arrastre) { arrastre = it } })
+            ListHeader(stringResource(R.string.editar_presupuesto_arrastre_y_avisos))
+            ListItem(stringResource(R.string.editar_presupuesto_pasar_lo_que_sobre_al_siguiente), trailing = { StmSwitch(arrastre) { arrastre = it } })
             Divider(inset = 16.dp)
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Avisarme al", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
-                Stepper("$aviso % del límite", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
+                Text(stringResource(R.string.editar_presupuesto_avisarme_al), Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                Stepper(stringResource(R.string.editar_presupuesto_del_limite, aviso), { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
             }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "Con el arrastre, lo que sobre en una categoría se suma a su límite del siguiente periodo, y lo que te pases se resta.",
+            stringResource(R.string.editar_presupuesto_con_el_arrastre_lo_que_sobre),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
         if (mode == 0) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SmallTonalBtn("Proponer límites (media de 3 periodos)") {
+                SmallTonalBtn(stringResource(R.string.editar_presupuesto_proponer_limites_media_de_3)) {
                     val sugeridos = budgets.suggestedLimits(finance.categories)
                     if (sugeridos.isEmpty()) {
-                        propuesta = "Aún no hay gastos en los periodos anteriores para proponer límites."
+                        propuesta = resources.getString(R.string.editar_presupuesto_aun_no_hay_gastos_en_los)
                     } else {
                         propuesta = null
                         limites.clear()
                         sugeridos.forEach { (k, v) -> limites[k] = Money.input(v) }
                     }
                 }
-                if (limites.values.any { it.isNotBlank() }) SmallTonalBtn("Vaciar límites") { limites.clear() }
+                if (limites.values.any { it.isNotBlank() }) SmallTonalBtn(stringResource(R.string.editar_presupuesto_vaciar_limites)) { limites.clear() }
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "La propuesta usa lo que gastaste de media en cada categoría en los 3 periodos anteriores. Puedes cambiarla antes de guardar.",
+                stringResource(R.string.editar_presupuesto_la_propuesta_usa_lo_que_gastaste),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
             Spacer(Modifier.height(16.dp))
@@ -174,20 +178,20 @@ fun Pantalla15(nav: Nav) {
         } else {
             val flex = FlexBudget(budgets.report(finance.categories), finance.planning.series, finance.today())
             ListCard {
-                ListHeader("Flexible")
-                ListItem("Entra", trailingText = Money.format(flex.income))
+                ListHeader(stringResource(R.string.editar_presupuesto_flexible))
+                ListItem(stringResource(R.string.editar_presupuesto_entra), trailingText = Money.format(flex.income))
                 Divider()
-                ListItem("Pagos fijos", trailingText = Money.format(-flex.fixed))
+                ListItem(stringResource(R.string.pagos_fijos_pagos_fijos), trailingText = Money.format(-flex.fixed))
                 Divider()
-                ListItem("Ahorro", trailingText = Money.format(-flex.savings))
+                ListItem(stringResource(R.string.editar_presupuesto_ahorro), trailingText = Money.format(-flex.savings))
                 Divider()
-                ListItem("Para todo lo demás", trailingText = Money.format(flex.flexible))
+                ListItem(stringResource(R.string.editar_presupuesto_para_todo_lo_demas), trailingText = Money.format(flex.flexible))
                 Divider()
-                ListItem("Gastado", trailingText = Money.format(flex.flexibleSpent))
+                ListItem(stringResource(R.string.editar_presupuesto_gastado), trailingText = Money.format(flex.flexibleSpent))
                 Divider()
                 ListItem(
-                    if (flex.remaining < 0) "Gastado de más" else "Queda",
-                    flex.perDay?.let { "${Money.format(it)} al día" },
+                    if (flex.remaining < 0) stringResource(R.string.editar_presupuesto_gastado_de_mas) else stringResource(R.string.editar_presupuesto_queda),
+                    flex.perDay?.let { stringResource(R.string.editar_presupuesto_al_dia, Money.format(it)) },
                     trailingText = Money.format(flex.remaining),
                 )
             }
@@ -209,14 +213,15 @@ private fun LeadIconGrupo(icon: ImageVector, group: BudgetGroup) {
 private fun CampoLimite(categoria: String, value: String, onChange: (String) -> Unit) {
     val c = Stm.colors
     val style = StmType.bodyMediumTight.copy(color = c.onSurfaceVariant, textAlign = TextAlign.End)
+    val descripcion = stringResource(R.string.editar_presupuesto_limite_de, categoria)
     Row(verticalAlignment = Alignment.CenterVertically) {
         BasicTextField(
-            value, onChange, Modifier.width(88.dp).semantics { contentDescription = "Límite de $categoria" },
+            value, onChange, Modifier.width(88.dp).semantics { contentDescription = descripcion },
             textStyle = style, singleLine = true, cursorBrush = SolidColor(c.primary),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             decorationBox = { inner ->
                 Box(contentAlignment = Alignment.CenterEnd) {
-                    if (value.isEmpty()) Text("Sin límite", style = style)
+                    if (value.isEmpty()) Text(stringResource(R.string.editar_presupuesto_sin_limite), style = style)
                     inner()
                 }
             },

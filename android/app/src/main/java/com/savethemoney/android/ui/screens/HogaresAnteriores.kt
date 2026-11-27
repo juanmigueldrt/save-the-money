@@ -8,7 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.MovementsCsv
 import com.savethemoney.android.data.RemovedHousehold
 import com.savethemoney.android.ui.Fechas
@@ -45,17 +47,17 @@ private fun HogarAnterior(quitado: RemovedHousehold) {
     val session = LocalSession.current
     val context = LocalContext.current
     val action = rememberAction()
-    val hasta = quitado.exportDay()?.let { "${it.dayOfMonth} de ${Fechas.mes(it)} de ${it.year}" } ?: quitado.exportUntil.take(10)
+    val hasta = quitado.exportDay()?.let { stringResource(R.string.comun_dia_de_mes_de_ano, it.dayOfMonth, Fechas.mes(it), it.year) } ?: quitado.exportUntil.take(10)
     StmCard {
-        Text("Ya no estás en ${quitado.name}", style = StmType.titleMedium, color = c.onSurface)
+        Text(stringResource(R.string.hogares_anteriores_ya_no_estas_en, quitado.name), style = StmType.titleMedium, color = c.onSurface)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Lo que apuntaste allí se guarda hasta el $hasta y después se borra. Hasta entonces puedes exportar tus movimientos.",
+            stringResource(R.string.hogares_anteriores_lo_que_apuntaste_alli_se_guarda, hasta),
             style = StmType.bodyMedium, color = c.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
         // Igual que «CSV para Excel» de Más opciones, con lo que devuelve el servidor a quien ya no es miembro.
-        Btn("Exportar mis movimientos (CSV)", {
+        Btn(stringResource(R.string.hogares_anteriores_exportar_mis_movimientos_csv), {
             action.run {
                 val datos = session.backend.removedHouseholdExport(quitado.householdId)
                 val fichero = ficheroExportar(context, MovementsCsv.fileName(LocalDate.now()))

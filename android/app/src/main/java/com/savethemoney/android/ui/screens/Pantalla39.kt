@@ -14,8 +14,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.AssetClass
 import com.savethemoney.android.data.Holding
@@ -36,6 +39,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import java.math.BigDecimal
 import java.time.Instant
 
@@ -62,10 +66,11 @@ fun Pantalla39(nav: Nav, holdingId: String?) {
     // Identificador del activo nuevo, uno por formulario: reintentar el alta con el mismo no crea otro.
     val idActivo = rememberSaveable { java.util.UUID.randomUUID().toString() }
     val action = rememberAction()
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
-        val valor = if (precio.isBlank()) BigDecimal.ZERO else parseDecimal(precio, maxFractionDigits = 6) ?: throw AppError.InvalidInput("Escribe el precio con coma para los decimales, p. ej. 12,50.")
-        val tasa = if (comision.isBlank()) BigDecimal.ZERO else parseDecimal(comision, maxFractionDigits = 3) ?: throw AppError.InvalidInput("Escribe la comisión con números, p. ej. 0,2.")
+        val valor = if (precio.isBlank()) BigDecimal.ZERO else parseDecimal(precio, maxFractionDigits = 6) ?: throw AppError.InvalidInput(resources.getString(R.string.form_activo_escribe_el_precio_con_coma_para))
+        val tasa = if (comision.isBlank()) BigDecimal.ZERO else parseDecimal(comision, maxFractionDigits = 3) ?: throw AppError.InvalidInput(resources.getString(R.string.form_activo_escribe_la_comision_con_numeros_p))
         val hoy = finance.today()
         val cambiaPrecio = editando?.let { it.price.compareTo(valor) != 0 } ?: (valor.signum() > 0)
         val base = editando ?: Holding(
@@ -83,8 +88,8 @@ fun Pantalla39(nav: Nav, holdingId: String?) {
 
     StmScreen(
         topBar = {
-            TopBar(if (editando == null) "Nuevo activo" else "Editar activo", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (editando == null) stringResource(R.string.form_activo_nuevo_activo) else stringResource(R.string.form_activo_editar_activo), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -92,12 +97,12 @@ fun Pantalla39(nav: Nav, holdingId: String?) {
             borrando -> {
                 {
                     BottomSheet(
-                        "¿Borrar este activo?", "Se borran también sus precios, operaciones y aportaciones automáticas, para todo el hogar. No se puede deshacer.",
+                        stringResource(R.string.form_activo_borrar_este_activo), stringResource(R.string.form_activo_se_borran_tambien_sus_precios),
                         onDismiss = { borrando = false },
                     ) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                            Btn("Cancelar", { borrando = false }, kind = BtnKind.Text)
-                            Btn("Borrar activo", {
+                            Btn(stringResource(R.string.comun_cancelar), { borrando = false }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.form_activo_borrar_activo), {
                                 action.run {
                                     inv.delete(editando!!)
                                     nav.back()
@@ -112,15 +117,15 @@ fun Pantalla39(nav: Nav, holdingId: String?) {
                 {
                     val cerrar = { selector = null }
                     when (selector) {
-                        "tipo" -> SelectorSheet("Tipo", InvestmentKind.entries.map { k ->
-                            k.title to {
+                        "tipo" -> SelectorSheet(stringResource(R.string.form_activo_tipo), InvestmentKind.entries.map { k ->
+                            stringResource(k.titulo) to {
                                 tipo = k
                                 if (editando == null) clase = k.defaultAssetClass
                             }
                         }, cerrar)
-                        "clase" -> SelectorSheet("Clase", AssetClass.entries.map { a -> a.title to { clase = a } }, cerrar)
-                        "dueno" -> SelectorSheet("De quién es", listOf<Pair<String, () -> Unit>>("Compartido" to { dueno = null }) + inv.members.map { m -> m.profile.name to { dueno = m.profile.id } }, cerrar)
-                        else -> SelectorSheet("Dónde está", listOf<Pair<String, () -> Unit>>("Ninguna cuenta" to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
+                        "clase" -> SelectorSheet(stringResource(R.string.form_activo_clase), AssetClass.entries.map { a -> stringResource(a.titulo) to { clase = a } }, cerrar)
+                        "dueno" -> SelectorSheet(stringResource(R.string.form_activo_de_quien_es), listOf<Pair<String, () -> Unit>>(stringResource(R.string.inversiones_compartido) to { dueno = null }) + inv.members.map { m -> m.profile.name to { dueno = m.profile.id } }, cerrar)
+                        else -> SelectorSheet(stringResource(R.string.form_activo_donde_esta), listOf<Pair<String, () -> Unit>>(stringResource(R.string.form_activo_ninguna_cuenta) to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
                     }
                 }
             }
@@ -128,25 +133,25 @@ fun Pantalla39(nav: Nav, holdingId: String?) {
         },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Nombre", nombre, { nombre = it }, autoFocus = editando == null)
-            FilledField("Ticker o ISIN (opcional)", simbolo, { simbolo = it })
-            FilledField("Tipo", tipo.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "tipo" })
-            FilledField("Clase", clase.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "clase" })
-            FilledField("Precio actual por participación", precio, { precio = it }, keyboard = KeyboardType.Decimal)
-            FilledField("Comisión de compra en %", comision, { comision = it }, keyboard = KeyboardType.Decimal)
-            Text("El precio lo apuntas tú: búscalo en tu bróker o banco cuando quieras actualizarlo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
-            FilledField("De quién es", inv.ownerName(dueno), trailing = StmIcons.arrowDropDown, onClick = { selector = "dueno" })
-            FilledField("Dónde está", finance.account(cuenta)?.name ?: "Ninguna cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
-            FilledField("Nota (opcional)", nota, { nota = it })
-            Text("Todo el hogar ve las inversiones, como las cuentas.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            FilledField(stringResource(R.string.comun_nombre), nombre, { nombre = it }, autoFocus = editando == null)
+            FilledField(stringResource(R.string.form_activo_ticker_o_isin_opcional), simbolo, { simbolo = it })
+            FilledField(stringResource(R.string.form_activo_tipo), stringResource(tipo.titulo), trailing = StmIcons.arrowDropDown, onClick = { selector = "tipo" })
+            FilledField(stringResource(R.string.form_activo_clase), stringResource(clase.titulo), trailing = StmIcons.arrowDropDown, onClick = { selector = "clase" })
+            FilledField(stringResource(R.string.form_activo_precio_actual_por_participacion), precio, { precio = it }, keyboard = KeyboardType.Decimal)
+            FilledField(stringResource(R.string.form_activo_comision_de_compra_en), comision, { comision = it }, keyboard = KeyboardType.Decimal)
+            Text(stringResource(R.string.form_activo_el_precio_lo_apuntas_tu_buscalo), style = StmType.bodySmall, color = c.onSurfaceVariant)
+            FilledField(stringResource(R.string.form_activo_de_quien_es), nombreDueno(inv, dueno), trailing = StmIcons.arrowDropDown, onClick = { selector = "dueno" })
+            FilledField(stringResource(R.string.form_activo_donde_esta), finance.account(cuenta)?.name ?: stringResource(R.string.form_activo_ninguna_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+            FilledField(stringResource(R.string.comun_nota_opcional), nota, { nota = it })
+            Text(stringResource(R.string.form_activo_todo_el_hogar_ve_las_inversiones), style = StmType.bodySmall, color = c.onSurfaceVariant)
             if (editando != null) {
-                Btn(if (editando.isArchived) "Desarchivar" else "Archivar", {
+                Btn(if (editando.isArchived) stringResource(R.string.comun_desarchivar) else stringResource(R.string.comun_archivar), {
                     action.run {
                         inv.save(editando.copy(archivedAt = if (editando.isArchived) null else Instant.now().toString()))
                         nav.back()
                     }
                 }, Modifier.fillMaxWidth(), kind = BtnKind.Outlined)
-                Btn("Borrar activo y sus operaciones", { borrando = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
+                Btn(stringResource(R.string.form_activo_borrar_activo_y_sus_operaciones), { borrando = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
             }
         }
     }

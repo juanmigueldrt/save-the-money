@@ -30,8 +30,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CardInstallment
 import com.savethemoney.android.data.Money
@@ -69,9 +72,10 @@ fun Pantalla13(nav: Nav, cardId: String?, movementId: String?) {
     var plazo by rememberSaveable(compraId) { mutableIntStateOf(plan?.let { meses.indexOf(it.months).coerceAtLeast(0) } ?: 0) }
     var tin by rememberSaveable(compraId) { mutableStateOf(tasa(plan?.rate ?: resumen?.terms?.installmentRate ?: 14.0)) }
     val action = rememberAction()
+    val resources = LocalResources.current
     val valida = compra != null && (plan != null || candidatas.any { it.id == compra.id })
     StmScreen(
-        topBar = { DetalleBar(nav, cuenta, cuenta?.name ?: "Tarjeta") },
+        topBar = { DetalleBar(nav, cuenta, cuenta?.name ?: stringResource(R.string.aplazar_compra_tarjeta)) },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = {
             when {
@@ -80,11 +84,11 @@ fun Pantalla13(nav: Nav, cardId: String?, movementId: String?) {
                     val rate = leerTasa(tin)
                     val cuota = rate?.let { CardInstallment.payment(total, meses[plazo], it) }
                     HojaAplazar(
-                        "Aplazar ${MovementText.display(compra.description)}", "${Money.format(total)} · ${Fechas.corto(compra.day)}", plazo, { plazo = it }, tin, { tin = it },
-                        cuota?.let { "${Money.format(it)}/mes" } ?: "—", cuota?.let { Money.format(it * meses[plazo] - total) } ?: "—", nav::back,
+                        stringResource(R.string.aplazar_compra_aplazar, MovementText.display(compra.description)), "${Money.format(total)} · ${Fechas.corto(compra.day)}", plazo, { plazo = it }, tin, { tin = it },
+                        cuota?.let { stringResource(R.string.aplazar_compra_mes, Money.format(it)) } ?: "—", cuota?.let { Money.format(it * meses[plazo] - total) } ?: "—", nav::back,
                         {
                             action.run {
-                                cards.deferPurchase(compra, meses[plazo], cuenta!!, rate ?: throw AppError.InvalidInput("Revisa el interés."))
+                                cards.deferPurchase(compra, meses[plazo], cuenta!!, rate ?: throw AppError.InvalidInput(resources.getString(R.string.aplazar_compra_revisa_el_interes)))
                                 nav.back()
                             }
                         },
@@ -92,16 +96,16 @@ fun Pantalla13(nav: Nav, cardId: String?, movementId: String?) {
                     )
                 }
                 compraId == null && candidatas.isNotEmpty() -> SelectorSheet(
-                    "Elige una compra", candidatas.map { m -> "${MovementText.display(m.description)} · ${Money.format(-m.amountMinor)}" to { compraId = m.id } },
+                    stringResource(R.string.aplazar_compra_elige_una_compra), candidatas.map { m -> "${MovementText.display(m.description)} · ${Money.format(-m.amountMinor)}" to { compraId = m.id } },
                 ) { if (compraId == null) nav.back() }
-                else -> BottomSheet("No se puede aplazar", null, onDismiss = nav::back) {
+                else -> BottomSheet(stringResource(R.string.aplazar_compra_no_se_puede_aplazar), null, onDismiss = nav::back) {
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Text(
-                            "Sólo compras de 50 € o más del extracto que aún está abierto, en una tarjeta con sus condiciones puestas.",
+                            stringResource(R.string.aplazar_compra_solo_compras_de_50_o_mas),
                             style = StmType.bodyMedium, color = c.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(16.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Btn("Entendido", nav::back, kind = BtnKind.Text) }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { Btn(stringResource(R.string.comun_entendido), nav::back, kind = BtnKind.Text) }
                     }
                 }
             }
@@ -109,7 +113,7 @@ fun Pantalla13(nav: Nav, cardId: String?, movementId: String?) {
     ) {
         // Bajo la hoja, el diseño solo muestra el próximo cargo de la tarjeta.
         StmCard {
-            Text("Próximo cargo", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.comun_proximo_cargo), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(3.5.dp))
             Text(Money.format(resumen?.next?.amount ?: 0), style = StmType.displaySmall, color = c.onSurface)
             Spacer(Modifier.height(0.5.dp))
@@ -127,26 +131,26 @@ private fun BoxScope.HojaAplazar(
         Column(Modifier.padding(horizontal = 16.dp)) {
             // La cabecera del diseño mide 56 dp; la de la hoja compartida, 54.
             Spacer(Modifier.height(2.dp))
-            Segmented(listOf("3", "6", "9", "12 meses"), plazo, onPlazo)
+            Segmented(listOf("3", "6", "9", stringResource(R.string.aplazar_compra_12_meses)), plazo, onPlazo)
             Spacer(Modifier.height(16.dp))
-            SuffixOutlinedField("TIN anual", tin, onTin, "%", c.surfaceContainerLow)
+            SuffixOutlinedField(stringResource(R.string.aplazar_compra_tin_anual), tin, onTin, "%", c.surfaceContainerLow)
             Spacer(Modifier.height(16.dp))
             StmCard(color = c.surfaceContainerHighest) {
                 Row(Modifier.fillMaxWidth().height(28.dp)) {
-                    Text("Cuota", Modifier.weight(1f).alignByBaseline(), style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.aplazar_compra_cuota), Modifier.weight(1f).alignByBaseline(), style = StmType.bodyMedium, color = c.onSurfaceVariant)
                     Text(cuota, Modifier.alignByBaseline(), style = StmType.titleLarge, color = c.onSurface)
                 }
                 Spacer(Modifier.height(8.dp))
                 Row(Modifier.fillMaxWidth().height(20.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("Intereses en total", Modifier.weight(1f), style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.aplazar_compra_intereses_en_total), Modifier.weight(1f), style = StmType.bodyMedium, color = c.onSurfaceVariant)
                     Text(intereses, style = StmType.labelLarge, color = c.onSurface)
                 }
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                if (onQuitar != null) Btn("Quitar aplazado", onQuitar, kind = BtnKind.Text, color = c.error)
-                Btn("Cancelar", onCancelar, kind = BtnKind.Text)
-                Btn("Aplazar", onAplazar)
+                if (onQuitar != null) Btn(stringResource(R.string.aplazar_compra_quitar_aplazado), onQuitar, kind = BtnKind.Text, color = c.error)
+                Btn(stringResource(R.string.comun_cancelar), onCancelar, kind = BtnKind.Text)
+                Btn(stringResource(R.string.aplazar_compra_aplazar_2), onAplazar)
             }
         }
     }

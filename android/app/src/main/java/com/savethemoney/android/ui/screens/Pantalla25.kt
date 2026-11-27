@@ -16,8 +16,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.ChartRange
 import com.savethemoney.android.data.InvestmentText
 import com.savethemoney.android.data.Money
@@ -43,6 +45,7 @@ import com.savethemoney.android.ui.components.Tab
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 
 /** 25 Cartera: total, rentabilidad, evolución, reparto y activos. */
 @Composable
@@ -64,9 +67,9 @@ fun Pantalla25(nav: Nav) {
     }
     StmScreen(
         topBar = {
-            MediumTopBar("Cartera", onBack = nav::back) {
-                IconBtn(StmIcons.eventRepeat, { nav.go(Route.InversionesRecurrentes) }, contentDescription = "Inversiones recurrentes")
-                IconBtn(StmIcons.add, { if (inv.activeHoldings.isEmpty()) nuevo() else eligiendo = true }, contentDescription = "Comprar")
+            MediumTopBar(stringResource(R.string.cartera_cartera), onBack = nav::back) {
+                IconBtn(StmIcons.eventRepeat, { nav.go(Route.InversionesRecurrentes) }, contentDescription = stringResource(R.string.inversiones_recurrentes_inversiones_recurrentes))
+                IconBtn(StmIcons.add, { if (inv.activeHoldings.isEmpty()) nuevo() else eligiendo = true }, contentDescription = stringResource(R.string.cartera_comprar))
             }
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
@@ -74,12 +77,12 @@ fun Pantalla25(nav: Nav) {
         overlay = if (eligiendo) {
             {
                 SelectorSheet(
-                    "Comprar activo",
+                    stringResource(R.string.cartera_comprar_activo),
                     inv.activeHoldings.map { h ->
                         h.trimmedName to {
                             nav.go(Route.Activo(h.id))
                         }
-                    } + ("Añadir otro activo" to nuevo),
+                    } + (stringResource(R.string.cartera_anadir_otro_activo) to nuevo),
                 ) { eligiendo = false }
             }
         } else {
@@ -94,23 +97,23 @@ fun Pantalla25(nav: Nav) {
                 val texto = euros(cartera.gain, signed = true) + (cartera.gainFraction?.let { " (${InvestmentText.percent(it)})" } ?: "")
                 Pill(texto, positive = cartera.gain >= 0, icon = if (cartera.gain >= 0) StmIcons.arrowUpward else null)
                 Spacer(Modifier.width(8.dp))
-                Text("desde el inicio", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.cartera_desde_el_inicio), style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(20.dp))
         if (inv.activeHoldings.isEmpty()) {
             StmCard {
-                Text("Sin inversiones todavía", style = StmType.titleMedium, color = c.onSurface)
+                Text(stringResource(R.string.cartera_sin_inversiones_todavia), style = StmType.titleMedium, color = c.onSurface)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker.",
+                    stringResource(R.string.cartera_anade_un_fondo_un_etf_o),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(16.dp))
-                Btn("Añadir un activo", nuevo)
+                Btn(stringResource(R.string.cartera_anadir_un_activo), nuevo)
             }
         } else {
-            HugSegmented(rangos.map { it.title }, range) { range = it }
+            HugSegmented(rangos.map { stringResource(it.titulo) }, range) { range = it }
             Spacer(Modifier.height(16.dp))
             StmCard { LineChart(normalizar(inv.evolution(rangos[range]).map { it.value })) }
             if (cartera.allocation.isNotEmpty()) {
@@ -121,7 +124,7 @@ fun Pantalla25(nav: Nav) {
                         Donut(cartera.allocation.mapIndexed { i, s -> Slice(s.fraction.toFloat(), colores[i]) }, 112.dp, 16.dp)
                         Spacer(Modifier.width(16.dp))
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            cartera.allocation.forEachIndexed { i, s -> Legend(colores[i], "${s.assetClass.title} ${Math.round(s.fraction * 100)} %") }
+                            cartera.allocation.forEachIndexed { i, s -> Legend(colores[i], "${stringResource(s.assetClass.titulo)} ${Math.round(s.fraction * 100)} %") }
                         }
                     }
                 }
@@ -131,9 +134,9 @@ fun Pantalla25(nav: Nav) {
                 inv.activeHoldings.forEachIndexed { i, h ->
                     if (i > 0) Divider()
                     val p = inv.position(h)
-                    val base = if (p.quantity.signum() > 0) "${InvestmentText.quantity(p.quantity)} participaciones" else h.kind.title
+                    val base = if (p.quantity.signum() > 0) stringResource(R.string.cartera_participaciones, InvestmentText.quantity(p.quantity)) else stringResource(h.kind.titulo)
                     ListItem(
-                        h.trimmedName, if (h.ownerId != null) "$base · ${inv.ownerName(h.ownerId)}" else base,
+                        h.trimmedName, if (h.ownerId != null) "$base · ${nombreDueno(inv, h.ownerId)}" else base,
                         leading = { LeadIcon(iconoActivo(h.kind), c.tertiaryContainer, c.onTertiaryContainer) },
                         trailing = {
                             Column(horizontalAlignment = Alignment.End) {
@@ -149,6 +152,6 @@ fun Pantalla25(nav: Nav) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        Aviso("Esto no es asesoramiento de inversión. Los valores salen de los precios que apuntas a mano.")
+        Aviso(stringResource(R.string.cartera_esto_no_es_asesoramiento_de))
     }
 }

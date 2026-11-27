@@ -16,8 +16,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.InvestmentPlan
 import com.savethemoney.android.data.InvestmentText
@@ -74,30 +77,31 @@ fun Pantalla42(nav: Nav, planId: String?) {
             expectedAnnualReturn = rate, remindDaysBefore = aviso,
         )
     }
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
-        if (activo == null) throw AppError.InvalidInput("Elige un activo.")
-        val item = borrador ?: throw AppError.InvalidInput("Escribe el importe y la rentabilidad con números.")
+        if (activo == null) throw AppError.InvalidInput(resources.getString(R.string.form_plan_elige_un_activo))
+        val item = borrador ?: throw AppError.InvalidInput(resources.getString(R.string.form_plan_escribe_el_importe_y_la))
         item.issue?.let { throw AppError.InvalidInput(it) }
         inv.save(item)
         nav.back()
     }
 
-    val avisos = listOf(null to "Sin aviso", 0 to "El mismo día", 1 to "1 día antes", 3 to "3 días antes")
+    val avisos = listOf(null to stringResource(R.string.form_plan_sin_aviso), 0 to stringResource(R.string.form_plan_el_mismo_dia), 1 to stringResource(R.string.form_plan_1_dia_antes), 3 to stringResource(R.string.form_plan_3_dias_antes))
     StmScreen(
         topBar = {
-            TopBar(if (editando == null) "Nuevo plan" else "Editar plan", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn(if (editando == null) "Crear" else "Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (editando == null) stringResource(R.string.form_plan_nuevo_plan) else stringResource(R.string.form_plan_editar_plan), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(if (editando == null) stringResource(R.string.form_plan_crear) else stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = when {
             borrando -> {
                 {
-                    BottomSheet("¿Borrar este plan?", "Las compras que ya apuntaste no se borran.", onDismiss = { borrando = false }) {
+                    BottomSheet(stringResource(R.string.form_plan_borrar_este_plan), stringResource(R.string.form_plan_las_compras_que_ya_apuntaste_no), onDismiss = { borrando = false }) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                            Btn("Cancelar", { borrando = false }, kind = BtnKind.Text)
-                            Btn("Borrar plan", {
+                            Btn(stringResource(R.string.comun_cancelar), { borrando = false }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.form_plan_borrar_plan), {
                                 action.run {
                                     inv.delete(editando!!)
                                     nav.back()
@@ -111,10 +115,10 @@ fun Pantalla42(nav: Nav, planId: String?) {
                 {
                     val cerrar = { selector = null }
                     when (selector) {
-                        "activo" -> SelectorSheet("Activo", inv.activeHoldings.map { h -> h.trimmedName to { activo = h.id } }, cerrar)
-                        "cada" -> SelectorSheet("Cada", Recurrence.Common.map { r -> r.title to { recurrencia = r } }, cerrar)
-                        "aviso" -> SelectorSheet("Aviso", avisos.map { (d, t) -> t to { aviso = d } }, cerrar)
-                        else -> SelectorSheet("Sale de", listOf<Pair<String, () -> Unit>>("Ninguna cuenta" to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
+                        "activo" -> SelectorSheet(stringResource(R.string.form_plan_activo), inv.activeHoldings.map { h -> h.trimmedName to { activo = h.id } }, cerrar)
+                        "cada" -> SelectorSheet(stringResource(R.string.comun_cada), Recurrence.Common.map { r -> r.title to { recurrencia = r } }, cerrar)
+                        "aviso" -> SelectorSheet(stringResource(R.string.form_plan_aviso), avisos.map { (d, t) -> t to { aviso = d } }, cerrar)
+                        else -> SelectorSheet(stringResource(R.string.form_plan_sale_de), listOf<Pair<String, () -> Unit>>(stringResource(R.string.form_activo_ninguna_cuenta) to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
                     }
                 }
             }
@@ -125,29 +129,29 @@ fun Pantalla42(nav: Nav, planId: String?) {
             if (editando != null) {
                 StmCard {
                     val posicion = inv.holding(editando.holdingId)?.let(inv::position)
-                    DataRow(if (editando.isPaused) "Estado" else "Próxima", if (editando.isPaused) "En pausa" else editando.nextDue(hoy)?.let { Fechas.dia(it, hoy) } ?: "Terminado")
+                    DataRow(if (editando.isPaused) stringResource(R.string.form_plan_estado) else stringResource(R.string.form_plan_proxima), if (editando.isPaused) stringResource(R.string.form_plan_en_pausa) else editando.nextDue(hoy)?.let { Fechas.dia(it, hoy) } ?: stringResource(R.string.form_plan_terminado))
                     Spacer(Modifier.height(8.dp))
-                    DataRow("Invertido con el plan", Money.format(editando.invested(inv.trades, hoy)))
+                    DataRow(stringResource(R.string.form_plan_invertido_con_el_plan), Money.format(editando.invested(inv.trades, hoy)))
                     Spacer(Modifier.height(8.dp))
-                    DataRow("Rentabilidad del activo", posicion?.gainFraction?.let(InvestmentText::percent) ?: "—")
+                    DataRow(stringResource(R.string.form_plan_rentabilidad_del_activo), posicion?.gainFraction?.let(InvestmentText::percent) ?: "—")
                 }
             }
             if (editando != null) {
-                FilledField("Activo", inv.holding(activo)?.trimmedName.orEmpty())
+                FilledField(stringResource(R.string.form_plan_activo), inv.holding(activo)?.trimmedName.orEmpty())
             } else {
-                FilledField("Activo", inv.holding(activo)?.trimmedName ?: "Elige uno", trailing = StmIcons.arrowDropDown, onClick = { selector = "activo" })
+                FilledField(stringResource(R.string.form_plan_activo), inv.holding(activo)?.trimmedName ?: stringResource(R.string.form_plan_elige_uno), trailing = StmIcons.arrowDropDown, onClick = { selector = "activo" })
             }
-            FilledField("Importe", importe, { importe = it }, keyboard = KeyboardType.Decimal, suffix = "€", autoFocus = editando == null, calculator = true)
-            FilledField("Cada", recurrencia.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
-            FilledField("Sale de", finance.account(cuenta)?.name ?: "Ninguna cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
-            FilledField("Primera aportación", Fechas.largo(inicio, hoy), trailing = StmIcons.arrowDropDown, onClick = { eligeFecha = true })
-            FilledField("Aviso", avisos.first { it.first == aviso }.second, trailing = StmIcons.arrowDropDown, onClick = { selector = "aviso" })
-            FilledField("Rentabilidad anual supuesta", rentabilidad, { rentabilidad = it }, keyboard = KeyboardType.Decimal, suffix = "%")
+            FilledField(stringResource(R.string.comun_importe), importe, { importe = it }, keyboard = KeyboardType.Decimal, suffix = "€", autoFocus = editando == null, calculator = true)
+            FilledField(stringResource(R.string.comun_cada), recurrencia.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
+            FilledField(stringResource(R.string.form_plan_sale_de), finance.account(cuenta)?.name ?: stringResource(R.string.form_activo_ninguna_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+            FilledField(stringResource(R.string.form_plan_primera_aportacion), Fechas.largo(inicio, hoy), trailing = StmIcons.arrowDropDown, onClick = { eligeFecha = true })
+            FilledField(stringResource(R.string.form_plan_aviso), avisos.first { it.first == aviso }.second, trailing = StmIcons.arrowDropDown, onClick = { selector = "aviso" })
+            FilledField(stringResource(R.string.form_plan_rentabilidad_anual_supuesta), rentabilidad, { rentabilidad = it }, keyboard = KeyboardType.Decimal, suffix = "%")
             val proyeccion = borrador?.takeIf { it.issue == null }?.let {
-                "Si rinde un $rentabilidad % al año, lo aportado en 1 año valdría unos ${Money.format(it.projectedValue(12))} y en 5 años unos ${Money.format(it.projectedValue(60))}. Es una estimación, no una promesa."
-            } ?: "La rentabilidad supuesta sólo sirve para la proyección."
+                stringResource(R.string.form_plan_si_rinde_un_al_ano_lo, rentabilidad, Money.format(it.projectedValue(12)), Money.format(it.projectedValue(60)))
+            } ?: stringResource(R.string.form_plan_la_rentabilidad_supuesta_solo)
             Text(proyeccion, style = StmType.bodySmall, color = c.onSurfaceVariant)
-            if (editando != null) Btn("Borrar plan", { borrando = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
+            if (editando != null) Btn(stringResource(R.string.form_plan_borrar_plan), { borrando = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
         }
     }
     if (eligeFecha) SelectorFecha(inicio, { inicio = it }) { eligeFecha = false }

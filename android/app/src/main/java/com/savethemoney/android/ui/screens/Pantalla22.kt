@@ -17,7 +17,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Goal
 import com.savethemoney.android.data.GoalKind
 import com.savethemoney.android.data.GoalProgress
@@ -63,38 +66,38 @@ fun Pantalla22(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null)
-            LargeTitle("Metas", "Fija metas (y cúmplelas)")
+            LargeTitle(stringResource(R.string.metas_metas), stringResource(R.string.metas_fija_metas_y_cumplelas))
         },
         bottomBar = { NavBar(Tab.Metas, nav::tab) },
-        fab = { Fab("Nueva meta") { nueva() } },
+        fab = { Fab(stringResource(R.string.form_meta_nueva_meta)) { nueva() } },
         snackbar = planning.error?.let { e -> { Snackbar(e) } },
     ) {
         ChipRow {
-            listOf("Ahorro", "Deudas", "Completadas").forEachIndexed { i, label ->
+            listOf(stringResource(R.string.metas_ahorro), stringResource(R.string.metas_deudas), stringResource(R.string.metas_completadas)).forEachIndexed { i, label ->
                 Chip(label, selected = i == filter, onClick = { filter = i })
             }
-            if (archivadas.isNotEmpty() || filter == 3) Chip("Archivadas (${archivadas.size})", selected = filter == 3, onClick = { filter = 3 })
+            if (archivadas.isNotEmpty() || filter == 3) Chip(stringResource(R.string.metas_archivadas, archivadas.size), selected = filter == 3, onClick = { filter = 3 })
         }
         Spacer(Modifier.height(16.dp))
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             if (planning.progress.isEmpty() && filter != 3) {
                 StmCard {
-                    Text("Sin metas todavía", style = StmType.titleMedium, color = c.onSurface)
+                    Text(stringResource(R.string.metas_sin_metas_todavia), style = StmType.titleMedium, color = c.onSurface)
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.",
+                        stringResource(R.string.metas_crea_una_meta_para_ahorrar_un),
                         style = StmType.bodyMedium, color = c.onSurfaceVariant,
                     )
                     Spacer(Modifier.height(16.dp))
-                    Btn("Crear una meta", ::nueva)
+                    Btn(stringResource(R.string.metas_crear_una_meta), ::nueva)
                 }
             } else if (visibles.isEmpty()) {
-                Text("No hay metas en esta sección.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.metas_no_hay_metas_en_esta_seccion), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             }
             visibles.forEach { p ->
                 val deuda = p.goal.kind == GoalKind.Debt
                 GoalCard(
-                    iconoMeta(p.goal), p.goal.trimmedName, resumenMeta(p), p.fraction, importe(p.saved), "de ${importe(p.goal.targetMinor)}",
+                    iconoMeta(p.goal), p.goal.trimmedName, resumenMeta(p), p.fraction, importe(p.saved), stringResource(R.string.metas_de, importe(p.goal.targetMinor)),
                     if (deuda) c.errorContainer else c.secondaryContainer,
                     if (deuda) c.onErrorContainer else c.onSecondaryContainer,
                 ) {
@@ -115,18 +118,18 @@ private fun iconoMeta(g: Goal): ImageVector {
     }
 }
 
-private fun resumenMeta(p: GoalProgress): String {
+@Composable private fun resumenMeta(p: GoalProgress): String {
     val g = p.goal
     val llegada = p.projectedMonth
     val limite = g.targetDay
     val faltan = p.monthsLeft
     return when {
-        p.isReached -> if (g.kind == GoalKind.Savings) "¡Meta conseguida!" else "¡Deuda pagada!"
-        g.kind == GoalKind.Debt && faltan != null -> if (faltan == 1) "Deuda · 1 cuota" else "Deuda · $faltan cuotas"
+        p.isReached -> if (g.kind == GoalKind.Savings) stringResource(R.string.metas_meta_conseguida) else stringResource(R.string.metas_deuda_pagada)
+        g.kind == GoalKind.Debt && faltan != null -> pluralStringResource(R.plurals.metas_deuda_cuotas, faltan, faltan)
         llegada != null && faltan != null ->
-            "A este ritmo, en ${Fechas.mes(llegada.atDay(1))}" + if (faltan >= 12) " de ${llegada.year}" else ""
-        limite != null -> "Compartida · ${Fechas.mes(limite)} ${limite.year}"
-        else -> "Faltan ${importe(p.remaining)}"
+            if (faltan >= 12) stringResource(R.string.metas_a_este_ritmo_en_mes_de_ano, Fechas.mes(llegada.atDay(1)), llegada.year) else stringResource(R.string.metas_a_este_ritmo_en_mes, Fechas.mes(llegada.atDay(1)))
+        limite != null -> stringResource(R.string.metas_compartida, Fechas.mes(limite), limite.year)
+        else -> stringResource(R.string.metas_faltan, importe(p.remaining))
     }
 }
 

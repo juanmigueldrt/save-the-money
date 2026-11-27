@@ -10,8 +10,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.BtnKind
@@ -34,10 +36,10 @@ fun SinConexion(message: String) {
         Column(Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(message, style = StmType.bodyLarge, color = c.onSurface, textAlign = TextAlign.Center)
             Spacer(Modifier.height(16.dp))
-            Btn("Reintentar", { action.run { session.start() } }, Modifier.fillMaxWidth(), large = true, enabled = !action.busy)
+            Btn(stringResource(R.string.comun_reintentar), { action.run { session.start() } }, Modifier.fillMaxWidth(), large = true, enabled = !action.busy)
             Spacer(Modifier.height(8.dp))
             // Salida por si el fallo no se arregla reintentando.
-            Btn("Cerrar sesión", { action.run { session.signOut() } }, kind = BtnKind.Text, enabled = !action.busy)
+            Btn(stringResource(R.string.acceso_cerrar_sesion), { action.run { session.signOut() } }, kind = BtnKind.Text, enabled = !action.busy)
         }
     }
 }
@@ -49,13 +51,12 @@ fun BoxScope.UnirseDesdeEnlace() {
     val code = session.pendingInvite ?: return
     val action = rememberAction()
     StmDialog(
-        "¿Unirte a otro hogar?",
-        "Con el código ${code.value} entrarás en otro hogar. Seguirás en ${session.household?.name.orEmpty()}: " +
-            "pertenecerás a los dos hogares y podrás cambiar de uno a otro en Hogar.",
+        stringResource(R.string.acceso_unirte_a_otro_hogar),
+        stringResource(R.string.acceso_con_el_codigo_entraras_en_otro, code.value, session.household?.name.orEmpty()),
         onDismiss = { session.pendingInvite = null },
         actions = {
-            Btn("Ahora no", { session.pendingInvite = null }, kind = BtnKind.Text)
-            Btn("Unirme", { action.run { session.join(code) } }, kind = BtnKind.Text, enabled = !action.busy)
+            Btn(stringResource(R.string.acceso_ahora_no), { session.pendingInvite = null }, kind = BtnKind.Text)
+            Btn(stringResource(R.string.tu_hogar_unirme), { action.run { session.join(code) } }, kind = BtnKind.Text, enabled = !action.busy)
         },
     ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = Stm.colors.error) } }
 }

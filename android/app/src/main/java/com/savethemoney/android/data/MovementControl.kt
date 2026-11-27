@@ -140,7 +140,7 @@ data class GroupedSpending(
     val income: Long,
     val count: Int,
 ) {
-    enum class Grouping(val title: String) { Tag("Por etiqueta"), Payee("Por beneficiario") }
+    enum class Grouping { Tag, Payee }
 
     companion object {
         /** En el periodo, sin transferencias ni excluidos. Un movimiento con dos etiquetas cuenta en las dos. */

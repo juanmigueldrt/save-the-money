@@ -21,10 +21,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppTheme
 import com.savethemoney.android.data.ChangePasswordForm
-import com.savethemoney.android.data.DELETE_ACCOUNT_WARNING
 import com.savethemoney.android.data.HabitSettings
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.MovementsCsv
@@ -57,6 +58,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -93,14 +95,14 @@ fun Pantalla30(nav: Nav) {
         overlay = if (eligeTema) {
             {
                 SelectorSheet(
-                    "Tema", AppTheme.entries.map { t -> t.title to { action.run { session.setTheme(t) } } }, { eligeTema = false },
+                    stringResource(R.string.mas_tema), AppTheme.entries.map { t -> stringResource(t.titulo) to { action.run { session.setTheme(t) } } }, { eligeTema = false },
                 )
             }
         } else if (eligeHabito) {
             {
                 SelectorSheet(
-                    "Recordarme apuntar gastos",
-                    HabitSettings.LogReminder.entries.map { r -> r.title to { cambiaHabitos(habitos.copy(logReminder = r)) } },
+                    stringResource(R.string.mas_recordarme_apuntar_gastos),
+                    HabitSettings.LogReminder.entries.map { r -> stringResource(r.titulo) to { cambiaHabitos(habitos.copy(logReminder = r)) } },
                     { eligeHabito = false },
                 )
             }
@@ -113,18 +115,18 @@ fun Pantalla30(nav: Nav) {
         },
     ) {
         ListCard {
-            MenuRow(StmIcons.creditCard, "Tarjetas") { nav.go(Route.Tarjetas) }
-            MenuRow(StmIcons.eventRepeat, "Pagos fijos", count = LocalSession.current.finance?.planning?.activeSeries?.size?.toString()) { nav.go(Route.PagosFijos) }
-            MenuRow(StmIcons.monitoring, "Patrimonio, informes y score") { nav.go(Route.Patrimonio) }
-            MenuRow(StmIcons.candlestickChart, "Inversiones") { nav.go(Route.Cartera) }
-            MenuRow(StmIcons.group, "Hogar") { nav.go(Route.Hogar) }
+            MenuRow(StmIcons.creditCard, stringResource(R.string.tarjetas_tarjetas)) { nav.go(Route.Tarjetas) }
+            MenuRow(StmIcons.eventRepeat, stringResource(R.string.pagos_fijos_pagos_fijos), count = LocalSession.current.finance?.planning?.activeSeries?.size?.toString()) { nav.go(Route.PagosFijos) }
+            MenuRow(StmIcons.monitoring, stringResource(R.string.mas_patrimonio_informes_y_score)) { nav.go(Route.Patrimonio) }
+            MenuRow(StmIcons.candlestickChart, stringResource(R.string.mas_inversiones)) { nav.go(Route.Cartera) }
+            MenuRow(StmIcons.group, stringResource(R.string.hogar_hogar)) { nav.go(Route.Hogar) }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Datos")
-            MenuRow(StmIcons.uploadFile, "Importar CSV") { nav.go(Route.ImportarCsv()) }
-            MenuRow(StmIcons.pictureAsPdf, "PDF de pagos del mes") { nav.go(Route.PagosDelMes) }
-            MenuRow(StmIcons.tableView, "CSV para Excel") {
+            ListHeader(stringResource(R.string.mas_datos))
+            MenuRow(StmIcons.uploadFile, stringResource(R.string.importar_csv_importar_csv)) { nav.go(Route.ImportarCsv()) }
+            MenuRow(StmIcons.pictureAsPdf, stringResource(R.string.mas_pdf_de_pagos_del_mes)) { nav.go(Route.PagosDelMes) }
+            MenuRow(StmIcons.tableView, stringResource(R.string.mas_csv_para_excel)) {
                 action.run {
                     val modelo = finance ?: return@run
                     val datos = modelo.exportCsv()
@@ -133,13 +135,13 @@ fun Pantalla30(nav: Nav) {
                     compartir(context, fichero, "text/csv")
                 }
             }
-            MenuRow(StmIcons.category, "Categorías", count = categorias.toString()) { nav.go(Route.Categorias) }
+            MenuRow(StmIcons.category, stringResource(R.string.categorias_categorias), count = categorias.toString()) { nav.go(Route.Categorias) }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Preferencias")
+            ListHeader(stringResource(R.string.mas_preferencias))
             ListItem(
-                "Tema oscuro", if (tema == AppTheme.System) "Igual que el sistema" else tema.title,
+                stringResource(R.string.mas_tema_oscuro), if (tema == AppTheme.System) stringResource(R.string.mas_igual_que_el_sistema) else stringResource(tema.titulo),
                 leading = { StmIcon(StmIcons.darkMode, Stm.colors.onSurfaceVariant) },
                 trailing = {
                     StmSwitch(oscuro) { activo -> action.run { session.setTheme(if (activo) AppTheme.Dark else AppTheme.Light) } }
@@ -148,7 +150,7 @@ fun Pantalla30(nav: Nav) {
             )
             // Dos interruptores, como en iOS y Mac.
             ListItem(
-                "Avisos de pagos fijos", "Antes de cada cargo",
+                stringResource(R.string.mas_avisos_de_pagos_fijos), stringResource(R.string.mas_antes_de_cada_cargo),
                 leading = { StmIcon(StmIcons.notifications, Stm.colors.onSurfaceVariant) },
                 trailing = {
                     StmSwitch(alerts) {
@@ -160,7 +162,7 @@ fun Pantalla30(nav: Nav) {
                 },
             )
             ListItem(
-                "Avisos de límites del presupuesto", "Al llegar al 80 % o pasarse",
+                stringResource(R.string.mas_avisos_de_limites_del_presupuesto), stringResource(R.string.mas_al_llegar_al_80_o_pasarse),
                 leading = { StmIcon(StmIcons.donutLarge, Stm.colors.onSurfaceVariant) },
                 trailing = {
                     StmSwitch(limites) {
@@ -169,12 +171,12 @@ fun Pantalla30(nav: Nav) {
                     }
                 },
             )
-            MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false) { nav.go(Route.BorrarDatos) }
+            MenuRow(StmIcons.restartAlt, stringResource(R.string.borrar_datos_borrar_datos_y_empezar_de_cero), chevron = false) { nav.go(Route.BorrarDatos) }
         }
         // Sin permiso, Android descarta los avisos sin decir nada: que se vea aquí.
         if (!LocalNotifier(context).canShow) {
             Text(
-                "Android no deja mostrar notificaciones de Save the Money: los avisos no se verán hasta que las actives en Ajustes.",
+                stringResource(R.string.mas_android_no_deja_mostrar),
                 Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.error,
             )
         }
@@ -182,25 +184,25 @@ fun Pantalla30(nav: Nav) {
         if (finance != null) {
             Spacer(Modifier.height(16.dp))
             ListCard {
-                ListHeader("Recordatorios")
+                ListHeader(stringResource(R.string.mas_recordatorios))
                 ListItem(
-                    "Recordarme apuntar gastos", habitos.logReminder.title,
+                    stringResource(R.string.mas_recordarme_apuntar_gastos), stringResource(habitos.logReminder.titulo),
                     leading = { StmIcon(StmIcons.notifications, Stm.colors.onSurfaceVariant) },
                     trailing = { StmIcon(StmIcons.arrowDropDown, Stm.colors.onSurfaceVariant) },
                     onClick = { eligeHabito = true },
                 )
                 if (habitos.logReminder != HabitSettings.LogReminder.Off) {
                     Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Hora", Modifier.weight(1f), style = StmType.bodyLarge, color = Stm.colors.onSurface)
+                        Text(stringResource(R.string.mas_hora), Modifier.weight(1f), style = StmType.bodyLarge, color = Stm.colors.onSurface)
                         Stepper(
-                            "A las ${habitos.logHour}:00",
+                            stringResource(R.string.mas_a_las_00, habitos.logHour),
                             { cambiaHabitos(habitos.copy(logHour = (habitos.logHour - 1).coerceAtLeast(6))) },
                             { cambiaHabitos(habitos.copy(logHour = (habitos.logHour + 1).coerceAtMost(23))) },
                         )
                     }
                 }
                 ListItem(
-                    "Resumen semanal los lunes", "A las 9:00, con la semana anterior",
+                    stringResource(R.string.mas_resumen_semanal_los_lunes), stringResource(R.string.mas_a_las_9_00_con_la),
                     leading = { StmIcon(StmIcons.calendarMonth, Stm.colors.onSurfaceVariant) },
                     trailing = { StmSwitch(habitos.weeklySummary) { cambiaHabitos(habitos.copy(weeklySummary = it)) } },
                 )
@@ -209,14 +211,14 @@ fun Pantalla30(nav: Nav) {
         // No está en el diseño; va al final para no mover lo anterior. Sólo en este dispositivo.
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Vista")
-            InterruptorVista(StmIcons.visibilityOff, "Modo incógnito", "Oculta los importes; también con el ojo del Resumen", Vista.incognito, Vista::setIncognito)
-            InterruptorVista(StmIcons.savings, "Sin céntimos", "1.235 € en vez de 1.234,56 €", Vista.sinCentimos, Vista::setSinCentimos)
-            InterruptorVista(StmIcons.add, "Mostrar + en los ingresos", "+1.200,00 €", Vista.signoMas, Vista::setSignoMas)
-            InterruptorVista(StmIcons.trendingUp, "Ingresos en verde", "En las listas de movimientos", Vista.ingresosEnVerde, Vista::setIngresosEnVerde)
+            ListHeader(stringResource(R.string.mas_vista))
+            InterruptorVista(StmIcons.visibilityOff, stringResource(R.string.mas_modo_incognito), stringResource(R.string.mas_oculta_los_importes_tambien_con_el), Vista.incognito, Vista::setIncognito)
+            InterruptorVista(StmIcons.savings, stringResource(R.string.mas_sin_centimos), stringResource(R.string.mas_1_235_en_vez_de_1), Vista.sinCentimos, Vista::setSinCentimos)
+            InterruptorVista(StmIcons.add, stringResource(R.string.mas_mostrar_en_los_ingresos), "+1.200,00 €", Vista.signoMas, Vista::setSignoMas)
+            InterruptorVista(StmIcons.trendingUp, stringResource(R.string.mas_ingresos_en_verde), stringResource(R.string.mas_en_las_listas_de_movimientos), Vista.ingresosEnVerde, Vista::setIngresosEnVerde)
         }
         Text(
-            "Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.",
+            stringResource(R.string.mas_solo_en_este_dispositivo_los_pdf),
             Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
         )
         // Bloqueo con huella, cara o código (ORC-111). Sólo en este dispositivo.
@@ -225,25 +227,25 @@ fun Pantalla30(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         // Cambiar la contraseña con la sesión abierta (ORC-57).
         ListCard {
-            MenuRow(StmIcons.lock, "Cambiar la contraseña") { cambiaClave = true }
+            MenuRow(StmIcons.lock, stringResource(R.string.mas_cambiar_la_contrasena)) { cambiaClave = true }
         }
         Text(
-            if (claveCambiada) "Contraseña cambiada. Esta sesión sigue abierta; en tus otros dispositivos tendrás que volver a entrar."
-            else "Pide la contraseña actual. Al cambiarla se cierra la sesión en tus otros dispositivos.",
+            if (claveCambiada) stringResource(R.string.mas_contrasena_cambiada_esta_sesion)
+            else stringResource(R.string.mas_pide_la_contrasena_actual_al),
             Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
         )
         HogaresAnteriores()
         Spacer(Modifier.height(16.dp))
         ListCard {
-            MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }
+            MenuRow(StmIcons.logout, stringResource(R.string.acceso_cerrar_sesion), chevron = false) { action.run { session.signOut() } }
         }
         Spacer(Modifier.height(16.dp))
         // Borrar la cuenta (ORC-74): en rojo, como las demás acciones que no se pueden deshacer.
         ListCard {
-            SheetItem(StmIcons.deleteForever, "Borrar mi cuenta", Stm.colors.error, Stm.colors.error) { borraCuenta = true }
+            SheetItem(StmIcons.deleteForever, stringResource(R.string.mas_borrar_mi_cuenta), Stm.colors.error, Stm.colors.error) { borraCuenta = true }
         }
         Text(
-            "Borra tu usuario y todo lo que has apuntado. Pide la contraseña y no se puede deshacer.",
+            stringResource(R.string.mas_borra_tu_usuario_y_todo_lo),
             Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
@@ -274,11 +276,11 @@ private fun BoxScope.DialogoContrasena(onChanged: () -> Unit, onDismiss: () -> U
     val tooShort = nueva.isNotEmpty() && nueva.length < SignUpForm.MIN_PASSWORD
     val mismatch = repite.isNotEmpty() && repite != nueva
     StmDialog(
-        "Cambiar la contraseña",
+        stringResource(R.string.mas_cambiar_la_contrasena),
         onDismiss = onDismiss,
         actions = {
-            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
-            Btn("Cambiar", {
+            Btn(stringResource(R.string.comun_cancelar), onDismiss, kind = BtnKind.Text)
+            Btn(stringResource(R.string.mas_cambiar), {
                 action.run {
                     session.changePassword(form)
                     onChanged()
@@ -288,17 +290,17 @@ private fun BoxScope.DialogoContrasena(onChanged: () -> Unit, onDismiss: () -> U
         },
     ) {
         Spacer(Modifier.height(16.dp))
-        OutlinedField("Contraseña actual", actual, { actual = it }, password = true, labelBackground = c.surfaceContainerHigh, autoFocus = true)
+        OutlinedField(stringResource(R.string.mas_contrasena_actual), actual, { actual = it }, password = true, labelBackground = c.surfaceContainerHigh, autoFocus = true)
         Spacer(Modifier.height(12.dp))
         OutlinedField(
-            "Nueva contraseña", nueva, { nueva = it }, password = true, labelBackground = c.surfaceContainerHigh, error = tooShort,
-            supporting = if (tooShort) "Usa al menos ${SignUpForm.MIN_PASSWORD} caracteres" else null,
+            stringResource(R.string.mas_nueva_contrasena), nueva, { nueva = it }, password = true, labelBackground = c.surfaceContainerHigh, error = tooShort,
+            supporting = if (tooShort) stringResource(R.string.crear_cuenta_usa_al_menos_caracteres, SignUpForm.MIN_PASSWORD) else null,
         )
         Spacer(Modifier.height(12.dp))
         OutlinedField(
-            "Repite la nueva contraseña", repite, { repite = it }, password = true, labelBackground = c.surfaceContainerHigh,
+            stringResource(R.string.mas_repite_la_nueva_contrasena), repite, { repite = it }, password = true, labelBackground = c.surfaceContainerHigh,
             error = mismatch || action.error != null,
-            supporting = action.error ?: if (mismatch) "Las contraseñas no coinciden." else if (nueva.isNotEmpty() && nueva == actual) ChangePasswordForm.SAME_PASSWORD else null,
+            supporting = action.error ?: if (mismatch) stringResource(R.string.crear_cuenta_las_contrasenas_no_coinciden) else if (nueva.isNotEmpty() && nueva == actual) ChangePasswordForm.SAME_PASSWORD else null,
         )
     }
 }
@@ -310,23 +312,23 @@ internal fun BoxScope.HojaBorrarCuenta(onDismiss: () -> Unit) {
     val session = LocalSession.current
     val action = rememberAction()
     var clave by remember { mutableStateOf("") }
-    BottomSheet("Borrar mi cuenta", onDismiss = onDismiss) {
+    BottomSheet(stringResource(R.string.mas_borrar_mi_cuenta), onDismiss = onDismiss) {
         // Con letra grande o pantalla pequeña el aviso no cabe: se desplaza y los botones siguen al alcance.
         Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            Text(DELETE_ACCOUNT_WARNING, style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.mas_aviso_borrar_cuenta), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
             OutlinedField(
-                "Contraseña actual", clave, { clave = it }, password = true, labelBackground = c.surfaceContainerLow,
+                stringResource(R.string.mas_contrasena_actual), clave, { clave = it }, password = true, labelBackground = c.surfaceContainerLow,
                 error = action.error != null, supporting = action.error,
             )
             Spacer(Modifier.height(16.dp))
             // Al terminar, la sesión pasa a «sin sesión» y esta hoja desaparece con la pantalla.
             Btn(
-                "Borrar mi cuenta para siempre", { action.run { session.deleteAccount(clave) } }, Modifier.fillMaxWidth(),
+                stringResource(R.string.mas_borrar_mi_cuenta_para_siempre), { action.run { session.deleteAccount(clave) } }, Modifier.fillMaxWidth(),
                 kind = BtnKind.Error, enabled = clave.isNotEmpty() && !action.busy,
             )
             Spacer(Modifier.height(8.dp))
-            Btn("Cancelar", onDismiss, Modifier.fillMaxWidth(), kind = BtnKind.Text)
+            Btn(stringResource(R.string.comun_cancelar), onDismiss, Modifier.fillMaxWidth(), kind = BtnKind.Text)
         }
     }
 }

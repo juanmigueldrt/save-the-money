@@ -8,14 +8,14 @@ import java.util.UUID
 // Finance.swift y FinanceService de STMCore, con los mismos nombres de columna que Supabase.
 
 @Serializable
-enum class AccountKind(val title: String) {
-    @SerialName("checking") Checking("Cuenta corriente"),
-    @SerialName("savings") Savings("Ahorro"),
-    @SerialName("credit_card") CreditCard("Tarjeta de crédito"),
-    @SerialName("cash") Cash("Efectivo"),
-    @SerialName("investment") Investment("Inversión"),
-    @SerialName("loan") Loan("Préstamo"),
-    @SerialName("other") Other("Otra");
+enum class AccountKind {
+    @SerialName("checking") Checking,
+    @SerialName("savings") Savings,
+    @SerialName("credit_card") CreditCard,
+    @SerialName("cash") Cash,
+    @SerialName("investment") Investment,
+    @SerialName("loan") Loan,
+    @SerialName("other") Other;
 
     val isLiability: Boolean get() = this == CreditCard || this == Loan
 }
@@ -246,12 +246,6 @@ data class TransferDraft(
 
         /** Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella. */
         const val OTHER_LEG_LOCKED = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
-
-        /** Lo que se avisa antes de borrar una pata: se borran las dos. */
-        const val DELETE_WARNING = "Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer."
-
-        /** Lo que se avisa al editar una pata. */
-        const val EDIT_NOTE = "Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta."
     }
 }
 

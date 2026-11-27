@@ -18,6 +18,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.res.stringResource
 import androidx.core.content.edit
 import androidx.core.view.WindowCompat
 import com.savethemoney.android.data.AppTheme
@@ -155,7 +156,7 @@ class MainActivity : ComponentActivity() {
     /** Huella o cara y, si no hay o falla, el PIN, patrón o contraseña del dispositivo. */
     private fun pedirDesbloqueo() {
         if (!Bloqueo.app.empiezaAutenticar(Bloqueo.seguro(this))) return
-        val titulo = "Desbloquea Save the Money"
+        val titulo = getString(R.string.bloqueo_desbloquea_save_the_money)
         if (Build.VERSION.SDK_INT >= 29) {
             val prompt = BiometricPrompt.Builder(this).setTitle(titulo)
             if (Build.VERSION.SDK_INT >= 30) {
@@ -279,7 +280,7 @@ fun App() {
 @Composable
 private fun AvisoDemo() {
     Text(
-        "Modo demo: los datos no se guardan y se pierden al cerrar la app.",
+        stringResource(R.string.app_modo_demo),
         Modifier.fillMaxWidth().background(Stm.colors.errorContainer).statusBarsPadding().padding(horizontal = 16.dp, vertical = 6.dp),
         color = Stm.colors.onErrorContainer,
         style = StmType.bodySmall,

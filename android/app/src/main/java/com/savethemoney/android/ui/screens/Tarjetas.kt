@@ -10,7 +10,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.CardPayment
 import com.savethemoney.android.data.CardPaymentMode
@@ -35,7 +37,7 @@ import java.math.RoundingMode
 import java.time.Instant
 import java.time.LocalDate
 
-internal fun fechaLarga(d: LocalDate) = "${d.dayOfMonth} de ${Fechas.mes(d)}"
+internal fun fechaLarga(d: LocalDate, resources: android.content.res.Resources) = resources.getString(R.string.comun_dia_de_mes, d.dayOfMonth, Fechas.mes(d))
 
 /** "14" o "21,5", para los campos y los textos. */
 internal fun tasa(valor: Double) = BigDecimal(valor).setScale(2, RoundingMode.HALF_UP).stripTrailingZeros().toPlainString().replace('.', ',')
@@ -43,14 +45,14 @@ internal fun tasa(valor: Double) = BigDecimal(valor).setScale(2, RoundingMode.HA
 internal fun leerTasa(texto: String) = parseDecimal(texto, maxFractionDigits = 2)?.toDouble()
 
 /** Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces. */
-internal fun desglose(p: CardPayment, modo: CardPaymentMode): String {
+internal fun desglose(p: CardPayment, modo: CardPaymentMode, resources: android.content.res.Resources): String {
     val partes = buildList {
-        if (p.purchases > 0) add((if (modo.isRevolving) "cuota " else "compras ") + Money.format(p.purchases))
-        if (p.installments > 0) add("aplazados ${Money.format(p.installments)}")
+        if (p.purchases > 0) add(resources.getString(if (modo.isRevolving) R.string.tarjetas_desglose_cuota else R.string.tarjetas_desglose_compras, Money.format(p.purchases)))
+        if (p.installments > 0) add(resources.getString(R.string.tarjetas_aplazados, Money.format(p.installments)))
     }
-    if (partes.isEmpty()) return "Sin cargos"
+    if (partes.isEmpty()) return resources.getString(R.string.tarjetas_sin_cargos)
     val texto = partes.joinToString(" · ")
-    return if (p.interest > 0) "$texto (incluye ${Money.format(p.interest)} de intereses)" else texto
+    return if (p.interest > 0) resources.getString(R.string.tarjetas_incluye_de_intereses, texto, Money.format(p.interest)) else texto
 }
 
 internal fun Double.barra() = toFloat().coerceIn(0f, 1f)
@@ -65,16 +67,16 @@ internal fun DetalleBar(nav: Nav, cuenta: Account?, nombre: String) {
     val action = rememberAction()
     val c = Stm.colors
     TopBar(nombre, onNav = nav::back) {
-        IconBtn(StmIcons.edit, { nav.go(Route.CondicionesTarjeta(cuenta?.id)) }, contentDescription = "Editar condiciones")
+        IconBtn(StmIcons.edit, { nav.go(Route.CondicionesTarjeta(cuenta?.id)) }, contentDescription = stringResource(R.string.tarjetas_editar_condiciones))
         Box {
-            IconBtn(StmIcons.moreVert, if (cuenta == null) null else ({ menu = true }), contentDescription = "Más opciones")
+            IconBtn(StmIcons.moreVert, if (cuenta == null) null else ({ menu = true }), contentDescription = stringResource(R.string.comun_mas_opciones))
             // Bloqueada, el menú (otra ventana) no se pinta; vuelve al desbloquear.
             DropdownMenu(menu && !Bloqueo.app.bloqueada, { menu = false }, containerColor = c.surfaceContainer) {
-                DropdownMenuItem({ Text("Editar condiciones", color = c.onSurface) }, {
+                DropdownMenuItem({ Text(stringResource(R.string.tarjetas_editar_condiciones), color = c.onSurface) }, {
                     menu = false
                     nav.go(Route.CondicionesTarjeta(cuenta?.id))
                 }, leadingIcon = { StmIcon(StmIcons.edit, c.onSurfaceVariant) })
-                DropdownMenuItem({ Text("Archivar tarjeta", color = c.onSurface) }, {
+                DropdownMenuItem({ Text(stringResource(R.string.tarjetas_archivar_tarjeta), color = c.onSurface) }, {
                     menu = false
                     val a = cuenta ?: return@DropdownMenuItem
                     action.run {
@@ -82,7 +84,7 @@ internal fun DetalleBar(nav: Nav, cuenta: Account?, nombre: String) {
                         nav.back()
                     }
                 }, leadingIcon = { StmIcon(StmIcons.visibilityOff, c.onSurfaceVariant) })
-                DropdownMenuItem({ Text("Borrar tarjeta y movimientos", color = c.error) }, {
+                DropdownMenuItem({ Text(stringResource(R.string.tarjetas_borrar_tarjeta_y_movimientos), color = c.error) }, {
                     menu = false
                     borrar = true
                 }, leadingIcon = { StmIcon(StmIcons.delete, c.error) })
@@ -94,12 +96,12 @@ internal fun DetalleBar(nav: Nav, cuenta: Account?, nombre: String) {
         AlertDialog(
             onDismissRequest = { borrar = false },
             icon = { StmIcon(StmIcons.deleteForever, c.error) },
-            title = { Text("¿Borrar esta tarjeta?", style = StmType.headlineSmall, color = c.onSurface) },
-            text = { Text("Se borran también todos sus movimientos, para todo el hogar. No se puede deshacer.", style = StmType.bodyMedium, color = c.onSurfaceVariant) },
+            title = { Text(stringResource(R.string.tarjetas_borrar_esta_tarjeta), style = StmType.headlineSmall, color = c.onSurface) },
+            text = { Text(stringResource(R.string.cuenta_se_borran_tambien_todos_sus), style = StmType.bodyMedium, color = c.onSurfaceVariant) },
             containerColor = c.surfaceContainerHigh,
-            dismissButton = { Btn("Cancelar", { borrar = false }, kind = BtnKind.Text) },
+            dismissButton = { Btn(stringResource(R.string.comun_cancelar), { borrar = false }, kind = BtnKind.Text) },
             confirmButton = {
-                Btn("Borrar", {
+                Btn(stringResource(R.string.comun_borrar), {
                     action.run {
                         finance.deleteAccount(cuenta)
                         borrar = false

@@ -59,31 +59,10 @@ interface Backend {
     suspend fun removedHouseholdExport(householdId: String): RemovedHouseholdExport
 }
 
-/** Lo que la app avisa antes de borrar la cuenta (ORC-74). */
-const val DELETE_ACCOUNT_WARNING =
-    "Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; " +
-        "si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. " +
-        "Si quieres conservar tus movimientos, expórtalos antes."
-
-/** Lo que la app avisa antes de salir de un hogar (ORC-56). «CSV para Excel» es la fila de Más opciones > Datos. */
-const val LEAVE_HOUSEHOLD_WARNING =
-    "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, inversiones y pagos fijos. " +
-        "No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «CSV para Excel», en Más opciones."
-
-/** Lo que se añade a ese aviso cuando quien sale es el único miembro (ORC-59). */
-const val LAST_MEMBER_WARNING = "Eres el único miembro: el hogar también se borrará."
+// Los avisos de borrar la cuenta, salir, traspasar y quitar a un miembro son texto de pantalla: están en strings.xml (ORC-110).
 
 /** El propietario no puede salir con otros miembros dentro: el hogar se quedaría sin nadie que lo gestione. */
 const val OWNER_MUST_TRANSFER = "Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás."
-
-/** Lo que la app avisa antes de traspasar el hogar. */
-const val TRANSFER_HOUSEHOLD_WARNING =
-    "Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. Tú pasarás a ser miembro."
-
-/** Lo que la app avisa antes de quitar a un miembro. */
-const val REMOVE_MEMBER_WARNING =
-    "Dejará de tener acceso a este hogar. Sus datos se guardan ${RemovedHousehold.EXPORT_DAYS} días para que pueda exportarlos y después se borran. " +
-        "Si le vuelves a invitar antes, los recupera."
 
 const val HOUSEHOLD_NAME_ISSUE = "El nombre del hogar tiene que tener entre 1 y 80 letras."
 

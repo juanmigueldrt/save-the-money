@@ -11,8 +11,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.Money
@@ -51,10 +54,11 @@ fun Pantalla46(nav: Nav, chargeId: String) {
     var selector by remember { mutableStateOf<String?>(null) }
     var eligeFecha by remember { mutableStateOf(false) }
     val action = rememberAction()
+    val resources = LocalResources.current
     val confirmar = {
         action.run {
-            val dinero = Money.entered(importe)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("Escribe el importe, por ejemplo 12,99.")
-            val id = cuenta ?: throw AppError.InvalidInput("Elige la cuenta del cargo.")
+            val dinero = Money.entered(importe)?.takeIf { it > 0 } ?: throw AppError.InvalidInput(resources.getString(R.string.confirmar_cargo_escribe_el_importe_por_ejemplo_12))
+            val id = cuenta ?: throw AppError.InvalidInput(resources.getString(R.string.confirmar_cargo_elige_la_cuenta_del_cargo))
             finance.confirm(item, MovementDraft(id, categoria, dia, if (esIngreso) dinero else -dinero, item.series.trimmedName))
             nav.back()
         }
@@ -62,7 +66,7 @@ fun Pantalla46(nav: Nav, chargeId: String) {
     StmScreen(
         topBar = {
             TopBar(item.series.trimmedName, navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Confirmar", confirmar, kind = BtnKind.Text, enabled = !action.busy)
+                Btn(stringResource(R.string.comun_confirmar), confirmar, kind = BtnKind.Text, enabled = !action.busy)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -70,11 +74,11 @@ fun Pantalla46(nav: Nav, chargeId: String) {
             {
                 val cerrar = { selector = null }
                 if (campo == "cuenta") {
-                    SelectorSheet("Cuenta", finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
+                    SelectorSheet(stringResource(R.string.comun_cuenta), finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }, cerrar)
                 } else {
                     SelectorSheet(
-                        "Categoría",
-                        listOf<Pair<String, () -> Unit>>("Sin categoría" to { categoria = null }) +
+                        stringResource(R.string.comun_categoria),
+                        listOf<Pair<String, () -> Unit>>(stringResource(R.string.comun_sin_categoria) to { categoria = null }) +
                             finance.categories(if (esIngreso) CategoryKind.Income else CategoryKind.Expense).map { x -> x.name to { categoria = x.id } },
                         cerrar,
                     )
@@ -83,12 +87,12 @@ fun Pantalla46(nav: Nav, chargeId: String) {
         },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Importe", importe, { importe = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
-            FilledField("Día", Fechas.largo(dia, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
-            FilledField("Cuenta", finance.account(cuenta)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
-            FilledField("Categoría", finance.category(categoria)?.name ?: "Sin categoría", trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+            FilledField(stringResource(R.string.comun_importe), importe, { importe = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.confirmar_cargo_dia), Fechas.largo(dia, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+            FilledField(stringResource(R.string.comun_cuenta), finance.account(cuenta)?.name ?: stringResource(R.string.comun_elige_una_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+            FilledField(stringResource(R.string.comun_categoria), finance.category(categoria)?.name ?: stringResource(R.string.comun_sin_categoria), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
             Text(
-                "Se apunta como un movimiento normal. Si el importe ha cambiado, pon el que te han cobrado de verdad.",
+                stringResource(R.string.confirmar_cargo_se_apunta_como_un_movimiento),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
         }

@@ -5,6 +5,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.MovementBulkEdit
@@ -40,24 +42,24 @@ fun Pantalla08(nav: Nav, movementId: String) {
         } else {
             {
                 BottomSheet(MovementText.display(m.description), "${Money.format(m.amountMinor, signed = true)} · ${Fechas.dia(m.day, finance.today())}", onDismiss = nav::back) {
-                    SheetItem(StmIcons.category, "Cambiar categoría", onClick = editar)
-                    SheetItem(StmIcons.check, if (m.isReviewed) "Marcar sin revisar" else "Marcar revisado") {
+                    SheetItem(StmIcons.category, stringResource(R.string.acciones_movimiento_cambiar_categoria), onClick = editar)
+                    SheetItem(StmIcons.check, if (m.isReviewed) stringResource(R.string.acciones_movimiento_marcar_sin_revisar) else stringResource(R.string.acciones_movimiento_marcar_revisado)) {
                         action.run {
                             finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m)))
                             nav.back()
                         }
                     }
-                    SheetItem(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar en el presupuesto" else "Excluir del presupuesto") {
+                    SheetItem(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) stringResource(R.string.acciones_movimiento_volver_a_contar_en_el_presupuesto) else stringResource(R.string.acciones_movimiento_excluir_del_presupuesto)) {
                         action.run {
                             finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m)))
                             nav.back()
                         }
                     }
-                    SheetItem(StmIcons.eventRepeat, "Aplazar con la tarjeta") {
+                    SheetItem(StmIcons.eventRepeat, stringResource(R.string.acciones_movimiento_aplazar_con_la_tarjeta)) {
                         // Como antes: si no es de una tarjeta, se abre la primera tarjeta.
                         nav.go(Route.AplazarCompra(m.accountId.takeIf { finance.account(it)?.kind == AccountKind.CreditCard }, m.id))
                     }
-                    SheetItem(StmIcons.delete, "Eliminar") {
+                    SheetItem(StmIcons.delete, stringResource(R.string.comun_eliminar)) {
                         if (m.transferId != null) {
                             confirmaTransferencia = true
                         } else {

@@ -31,9 +31,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetPeriod
 import com.savethemoney.android.data.CashFlow
 import com.savethemoney.android.data.Money
@@ -74,9 +76,9 @@ fun Pantalla16(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null) {
-                IconBtn(StmIcons.calendarMonth, { eligiendo = true }, contentDescription = "Elegir periodo")
+                IconBtn(StmIcons.calendarMonth, { eligiendo = true }, contentDescription = stringResource(R.string.analisis_elegir_periodo))
             }
-            LargeTitle("Flujo de caja", titulo)
+            LargeTitle(stringResource(R.string.flujo_flujo_de_caja), titulo)
         },
         bottomBar = { NavBar(Tab.Flujo, nav::tab) },
         snackbar = budgets.error?.let { e -> { Snackbar(e) } },
@@ -86,14 +88,14 @@ fun Pantalla16(nav: Nav) {
     ) {
         SelectorPeriodo(budgets)
         Spacer(Modifier.height(16.dp))
-        SegmentedWrap(listOf("Mes", "Trimestre", "Año"), period) { period = it }
+        SegmentedWrap(listOf(stringResource(R.string.flujo_mes), stringResource(R.string.flujo_trimestre), stringResource(R.string.flujo_ano)), period) { period = it }
         Spacer(Modifier.height(16.dp))
         StmCard {
-            Text("De dónde viene y a dónde va", style = StmType.titleMedium, color = c.onSurface)
+            Text(stringResource(R.string.flujo_de_donde_viene_y_a_donde), style = StmType.titleMedium, color = c.onSurface)
             Spacer(Modifier.height(12.dp))
             if (flow.isEmpty) {
                 Text(
-                    "No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.",
+                    stringResource(R.string.flujo_no_hay_movimientos_en_este_periodo),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
             } else {
@@ -102,8 +104,8 @@ fun Pantalla16(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FlowStat("Entra", Money.format(report.income, decimals = false, signed = true), c.success, Modifier.weight(1f)) { nav.go(Route.Movimientos) }
-            FlowStat("Sale", Money.format(-report.totalSpent, decimals = false), c.onSurface, Modifier.weight(1f)) { nav.go(Route.Movimientos) }
+            FlowStat(stringResource(R.string.flujo_entra), Money.format(report.income, decimals = false, signed = true), c.success, Modifier.weight(1f)) { nav.go(Route.Movimientos) }
+            FlowStat(stringResource(R.string.flujo_sale), Money.format(-report.totalSpent, decimals = false), c.onSurface, Modifier.weight(1f)) { nav.go(Route.Movimientos) }
         }
     }
 }

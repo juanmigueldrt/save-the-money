@@ -49,15 +49,15 @@ fun BigDecimal.toMinor(): Long = multiply(HUNDRED).setScale(0, RoundingMode.HALF
 private fun Long.euros(): BigDecimal = BigDecimal(this).movePointLeft(2)
 
 @Serializable
-enum class InvestmentKind(val title: String) {
-    @SerialName("fund") Fund("Fondo"),
-    @SerialName("etf") Etf("ETF"),
-    @SerialName("stock") Stock("Acción"),
-    @SerialName("bond") Bond("Bono"),
-    @SerialName("crypto") Crypto("Cripto"),
-    @SerialName("pension") Pension("Plan de pensiones"),
-    @SerialName("cash") Cash("Liquidez"),
-    @SerialName("other") Other("Otro");
+enum class InvestmentKind {
+    @SerialName("fund") Fund,
+    @SerialName("etf") Etf,
+    @SerialName("stock") Stock,
+    @SerialName("bond") Bond,
+    @SerialName("crypto") Crypto,
+    @SerialName("pension") Pension,
+    @SerialName("cash") Cash,
+    @SerialName("other") Other;
 
     val defaultAssetClass: AssetClass get() = when (this) {
         Fund, Etf, Stock, Pension -> AssetClass.Equity
@@ -69,16 +69,16 @@ enum class InvestmentKind(val title: String) {
 }
 
 @Serializable
-enum class AssetClass(val title: String) {
-    @SerialName("equity") Equity("Renta variable"),
-    @SerialName("fixed_income") FixedIncome("Renta fija"),
-    @SerialName("crypto") Crypto("Cripto"),
-    @SerialName("cash") Cash("Liquidez"),
-    @SerialName("other") Other("Otros"),
+enum class AssetClass {
+    @SerialName("equity") Equity,
+    @SerialName("fixed_income") FixedIncome,
+    @SerialName("crypto") Crypto,
+    @SerialName("cash") Cash,
+    @SerialName("other") Other,
 }
 
 @Serializable
-enum class TradeSide(val title: String) { @SerialName("buy") Buy("Compra"), @SerialName("sell") Sell("Venta") }
+enum class TradeSide { @SerialName("buy") Buy, @SerialName("sell") Sell }
 
 /** Un fondo, ETF, acción... del hogar. El precio se apunta a mano. */
 @Serializable
@@ -308,8 +308,8 @@ class Portfolio(holdings: List<Holding>, trades: List<InvestmentTrade>) {
     }
 }
 
-enum class ChartRange(val title: String) {
-    Day("1D"), Week("1S"), Month("1M"), HalfYear("6M"), Year("1A"), FiveYears("5A"), All("Todo");
+enum class ChartRange {
+    Day, Week, Month, HalfYear, Year, FiveYears, All;
 
     fun start(today: LocalDate, earliest: LocalDate?): LocalDate = when (this) {
         Day -> today.minusDays(1)

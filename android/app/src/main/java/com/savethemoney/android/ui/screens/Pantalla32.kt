@@ -30,8 +30,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AmountColumns
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
@@ -74,6 +78,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -87,6 +92,7 @@ fun Pantalla32(nav: Nav, accountId: String?) {
     val finance = session.finance ?: return
     val c = Stm.colors
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val cardShape = RoundedCornerShape(12.dp)
     var nombre by remember { mutableStateOf<String?>(null) }
@@ -169,21 +175,21 @@ fun Pantalla32(nav: Nav, accountId: String?) {
     val problemas = filas.filter { it.issue != null }
     val anchura = t?.rows?.maxOfOrNull { it.size } ?: 0
     val cabeceras = m?.headerRow?.let { t?.rows?.get(it) } ?: emptyList()
-    fun letra(i: Int) = "Columna " + if (i < 26) ('A' + i).toString() else (i + 1).toString()
+    fun letra(i: Int) = resources.getString(R.string.importar_csv_columna, if (i < 26) ('A' + i).toString() else (i + 1).toString())
     fun columna(i: Int) = letra(i) + (cabeceras.getOrNull(i)?.takeIf { it.isNotEmpty() }?.let { " · $it" } ?: "")
 
     StmScreen(
-        topBar = { TopBar("Importar CSV", navIcon = StmIcons.close, onNav = nav::back) },
+        topBar = { TopBar(stringResource(R.string.importar_csv_importar_csv), navIcon = StmIcons.close, onNav = nav::back) },
         // En una snackbar: la vista previa puede ocupar más que la pantalla.
         snackbar = (action.error ?: resultado?.let { r ->
-            "${r.inserted} movimientos importados." + (creados?.let { if (it == 1) " 1 pago recurrente creado." else " $it pagos recurrentes creados." } ?: "") + if (r.duplicates > 0) " ${r.duplicates} ya estaban y no se han repetido." else ""
+            stringResource(R.string.importar_csv_movimientos_importados, r.inserted) + (creados?.let { pluralStringResource(R.plurals.importar_csv_pagos_recurrentes_creados, it, it) } ?: "") + if (r.duplicates > 0) stringResource(R.string.importar_csv_ya_estaban_y_no_se_han, r.duplicates) else ""
         })?.let { texto -> { Snackbar(texto) } },
         bottomBar = {
             Box(Modifier.fillMaxWidth().background(c.surface).navigationBarsPadding().padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
                 Btn(
                     when {
-                        action.busy -> "Importando…"
-                        validas.isEmpty() -> "Importar"
+                        action.busy -> stringResource(R.string.importar_csv_importando)
+                        validas.isEmpty() -> stringResource(R.string.importar_csv_importar)
                         else -> tituloImportar(validas.size)
                     },
                     {
@@ -213,22 +219,22 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                 }
                 val d = revision.apply(fila.draft!!, fila.line)
                 BottomSheet(MovementText.display(d.description), "${Fechas.numerica(d.bookedOn)} · ${Money.format(d.amountMinor, signed = true)}", onDismiss = cerrar) {
-                    FilaInterruptor("Importar esta fila", null, fila.line !in revision.skipped) { si ->
+                    FilaInterruptor(stringResource(R.string.importar_csv_importar_esta_fila), null, fila.line !in revision.skipped) { si ->
                         revision = revision.copy(skipped = if (si) revision.skipped - fila.line else revision.skipped + fila.line)
                     }
-                    FilaInterruptor("Excluir del presupuesto", null, fila.line in revision.excluded) { si ->
+                    FilaInterruptor(stringResource(R.string.acciones_movimiento_excluir_del_presupuesto), null, fila.line in revision.excluded) { si ->
                         revision = revision.copy(excluded = if (si) revision.excluded + fila.line else revision.excluded - fila.line)
                     }
-                    SheetItem(StmIcons.category, "Categoría: " + (finance.category(d.categoryId)?.name ?: "Sin categoría")) {
+                    SheetItem(StmIcons.category, stringResource(R.string.importar_csv_categoria, finance.category(d.categoryId)?.name ?: stringResource(R.string.comun_sin_categoria))) {
                         filaCategoria = fila
                         cerrar()
                     }
                     if (d.amountMinor < 0) {
                         Divider(inset = 16.dp)
-                        SheetItem(StmIcons.close, ImportMark.None.title) { marcar(ImportMark.None) }
-                        SheetItem(StmIcons.eventRepeat, ImportMark.Recurring.title) { marcar(ImportMark.Recurring) }
-                        SheetItem(StmIcons.subscriptions, ImportMark.Subscription.title) { marcar(ImportMark.Subscription) }
-                        if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, ImportMark.Card.title) { marcar(ImportMark.Card) }
+                        SheetItem(StmIcons.close, stringResource(ImportMark.None.titulo)) { marcar(ImportMark.None) }
+                        SheetItem(StmIcons.eventRepeat, stringResource(ImportMark.Recurring.titulo)) { marcar(ImportMark.Recurring) }
+                        SheetItem(StmIcons.subscriptions, stringResource(ImportMark.Subscription.titulo)) { marcar(ImportMark.Subscription) }
+                        if (tarjetas.isNotEmpty()) SheetItem(StmIcons.creditCard, stringResource(ImportMark.Card.titulo)) { marcar(ImportMark.Card) }
                     }
                 }
             }
@@ -237,8 +243,8 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                 val tipo = if (fila.draft!!.amountMinor < 0) CategoryKind.Expense else CategoryKind.Income
                 fun pon(id: String?) { revision = revision.copy(categories = revision.categories + (fila.line to id)) }
                 SelectorSheet(
-                    "Categoría",
-                    listOf<Pair<String, () -> Unit>>("Sin categoría" to { pon(null) }) +
+                    stringResource(R.string.comun_categoria),
+                    listOf<Pair<String, () -> Unit>>(stringResource(R.string.comun_sin_categoria) to { pon(null) }) +
                         (finance.categories(tipo) + finance.categories(CategoryKind.Transfer)).map { cat -> cat.name to { pon(cat.id) } },
                 ) { filaCategoria = null }
             }
@@ -247,19 +253,19 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                 val cerrar = { selector = null }
                 val columnas = { fijar: (Int) -> Unit -> (0 until anchura).map { i -> columna(i) to { fijar(i) } } }
                 when (campo) {
-                    "separador" -> SelectorSheet("Separador", SEPARADORES.map { s -> etiquetaSeparador(s) to { cambiarSeparador(s) } }, cerrar)
-                    "fecha" -> SelectorSheet("Fecha", columnas { i -> mapeo = mapeo?.copy(date = i) }, cerrar)
-                    "concepto" -> SelectorSheet("Concepto", columnas { i -> mapeo = mapeo?.copy(description = i) }, cerrar)
-                    "importe" -> SelectorSheet("Importe", columnas { i -> mapeo = mapeo?.copy(amount = AmountColumns.Signed(i)) }, cerrar)
-                    "cargos" -> SelectorSheet("Cargos (gastos)", columnas { i ->
+                    "separador" -> SelectorSheet(stringResource(R.string.importar_csv_separador), SEPARADORES.map { s -> etiquetaSeparador(s) to { cambiarSeparador(s) } }, cerrar)
+                    "fecha" -> SelectorSheet(stringResource(R.string.comun_fecha), columnas { i -> mapeo = mapeo?.copy(date = i) }, cerrar)
+                    "concepto" -> SelectorSheet(stringResource(R.string.comun_concepto), columnas { i -> mapeo = mapeo?.copy(description = i) }, cerrar)
+                    "importe" -> SelectorSheet(stringResource(R.string.comun_importe), columnas { i -> mapeo = mapeo?.copy(amount = AmountColumns.Signed(i)) }, cerrar)
+                    "cargos" -> SelectorSheet(stringResource(R.string.importar_csv_cargos_gastos), columnas { i ->
                         mapeo = mapeo?.let { it.copy(amount = AmountColumns.Split(i, (it.amount as? AmountColumns.Split)?.credit ?: i)) }
                     }, cerrar)
-                    "abonos" -> SelectorSheet("Abonos (ingresos)", columnas { i ->
+                    "abonos" -> SelectorSheet(stringResource(R.string.importar_csv_abonos_ingresos), columnas { i ->
                         mapeo = mapeo?.let { it.copy(amount = AmountColumns.Split((it.amount as? AmountColumns.Split)?.debit ?: i, i)) }
                     }, cerrar)
-                    "tarjeta" -> SelectorSheet("Tarjeta de las compras", tarjetas.map { a -> a.name to { tarjeta = a.id } }, cerrar)
-                    "formato" -> SelectorSheet("Formato de fecha", DateOrder.entries.map { o -> o.title to { mapeo = mapeo?.copy(dateOrder = o) } }, cerrar)
-                    else -> SelectorSheet("Cuenta de destino", finance.activeAccounts.map { a -> a.name to { cuenta = a.id; resultado = null } }, cerrar)
+                    "tarjeta" -> SelectorSheet(stringResource(R.string.importar_csv_tarjeta_de_las_compras), tarjetas.map { a -> a.name to { tarjeta = a.id } }, cerrar)
+                    "formato" -> SelectorSheet(stringResource(R.string.importar_csv_formato_de_fecha), DateOrder.entries.map { o -> stringResource(o.titulo) to { mapeo = mapeo?.copy(dateOrder = o) } }, cerrar)
+                    else -> SelectorSheet(stringResource(R.string.form_movimiento_cuenta_de_destino), finance.activeAccounts.map { a -> a.name to { cuenta = a.id; resultado = null } }, cerrar)
                 }
             }
         },
@@ -273,10 +279,10 @@ fun Pantalla32(nav: Nav, accountId: String?) {
             LeadIcon(StmIcons.description, c.tertiaryContainer, c.onTertiaryContainer)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(nombre ?: "Elegir archivo CSV", style = StmType.titleMedium, color = c.onSurface, maxLines = 1)
+                Text(nombre ?: stringResource(R.string.importar_csv_elegir_archivo_csv), style = StmType.titleMedium, color = c.onSurface, maxLines = 1)
                 Text(
-                    t?.let { "${it.rows.size - (m?.firstDataRow ?: 0)} filas · separador ${if (it.delimiter == '\t') "tabulador" else it.delimiter}" }
-                        ?: "El archivo no se sube: solo se guardan los movimientos",
+                    t?.let { stringResource(R.string.importar_csv_filas_separador, it.rows.size - (m?.firstDataRow ?: 0), if (it.delimiter == '\t') stringResource(R.string.importar_csv_tabulador) else it.delimiter.toString()) }
+                        ?: stringResource(R.string.importar_csv_el_archivo_no_se_sube_solo),
                     style = StmType.bodySmall, color = c.onSurfaceVariant, maxLines = 1,
                 )
             }
@@ -286,7 +292,7 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                 tabla = null
                 mapeo = null
                 resultado = null
-            }, contentDescription = "Quitar archivo")
+            }, contentDescription = stringResource(R.string.importar_csv_quitar_archivo))
         }
         aviso?.let {
             Spacer(Modifier.height(12.dp))
@@ -294,52 +300,52 @@ fun Pantalla32(nav: Nav, accountId: String?) {
         }
         if (t != null) {
             Spacer(Modifier.height(16.dp))
-            FilledField("Separador", etiquetaSeparador(t.delimiter), trailing = StmIcons.arrowDropDown, onClick = { selector = "separador" })
+            FilledField(stringResource(R.string.importar_csv_separador), etiquetaSeparador(t.delimiter), trailing = StmIcons.arrowDropDown, onClick = { selector = "separador" })
             Spacer(Modifier.height(8.dp))
-            Text("Si las columnas salen mal, prueba con otro separador.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.importar_csv_si_las_columnas_salen_mal_prueba), style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         if (t != null && m == null) {
             Spacer(Modifier.height(12.dp))
-            Text("No he reconocido las columnas de fecha, concepto e importe de este archivo.", style = StmType.bodySmall, color = c.error)
+            Text(stringResource(R.string.importar_csv_no_he_reconocido_las_columnas_de), style = StmType.bodySmall, color = c.error)
         }
         if (finance.activeAccounts.isEmpty()) {
             Spacer(Modifier.height(12.dp))
-            Btn("Crear una cuenta", { nav.go(Route.FormCuenta()) }, kind = BtnKind.Tonal, icon = StmIcons.add)
+            Btn(stringResource(R.string.importar_csv_crear_una_cuenta), { nav.go(Route.FormCuenta()) }, kind = BtnKind.Tonal, icon = StmIcons.add)
         }
         if (m != null) {
             if (formatoGuardado) {
                 Spacer(Modifier.height(12.dp))
-                Text("Columnas como la última vez con este banco.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.importar_csv_columnas_como_la_ultima_vez_con), style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
-            Text("Qué columna es cada dato", style = StmType.titleSmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.importar_csv_que_columna_es_cada_dato), style = StmType.titleSmall, color = c.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
-            FilledField("Fecha", "${letra(m.date)} · ${m.dateOrder.title.lowercase()}", trailing = StmIcons.arrowDropDown, onClick = { selector = "fecha" })
+            FilledField(stringResource(R.string.comun_fecha), "${letra(m.date)} · ${stringResource(m.dateOrder.titulo).lowercase()}", trailing = StmIcons.arrowDropDown, onClick = { selector = "fecha" })
             Spacer(Modifier.height(16.dp))
-            FilledField("Concepto", columna(m.description), trailing = StmIcons.arrowDropDown, onClick = { selector = "concepto" })
+            FilledField(stringResource(R.string.comun_concepto), columna(m.description), trailing = StmIcons.arrowDropDown, onClick = { selector = "concepto" })
             when (val a = m.amount) {
                 is AmountColumns.Signed -> {
                     Spacer(Modifier.height(16.dp))
                     val coma = t.orEmptyRows().drop(m.firstDataRow).take(20).any { ',' in it.getOrElse(a.column) { "" } }
-                    FilledField("Importe", letra(a.column) + if (coma) " · coma decimal" else "", trailing = StmIcons.arrowDropDown, onClick = { selector = "importe" })
+                    FilledField(stringResource(R.string.comun_importe), letra(a.column).let { if (coma) stringResource(R.string.importar_csv_coma_decimal, it) else it }, trailing = StmIcons.arrowDropDown, onClick = { selector = "importe" })
                 }
                 is AmountColumns.Split -> {
                     Spacer(Modifier.height(16.dp))
-                    FilledField("Cargos (gastos)", columna(a.debit), trailing = StmIcons.arrowDropDown, onClick = { selector = "cargos" })
+                    FilledField(stringResource(R.string.importar_csv_cargos_gastos), columna(a.debit), trailing = StmIcons.arrowDropDown, onClick = { selector = "cargos" })
                     Spacer(Modifier.height(16.dp))
-                    FilledField("Abonos (ingresos)", columna(a.credit), trailing = StmIcons.arrowDropDown, onClick = { selector = "abonos" })
+                    FilledField(stringResource(R.string.importar_csv_abonos_ingresos), columna(a.credit), trailing = StmIcons.arrowDropDown, onClick = { selector = "abonos" })
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Cuenta de destino", finance.account(cuenta)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+        FilledField(stringResource(R.string.form_movimiento_cuenta_de_destino), finance.account(cuenta)?.name ?: stringResource(R.string.comun_elige_una_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
         if (validas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             ListCard {
                 Row(Modifier.fillMaxWidth().padding(end = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { ListHeader("Revisa fila a fila") }
+                    Box(Modifier.weight(1f)) { ListHeader(stringResource(R.string.importar_csv_revisa_fila_a_fila)) }
                     if (revision.skipped.isNotEmpty()) {
-                        Text("${revision.skipped.size} sin importar", Modifier.padding(top = 8.dp), style = StmType.labelMedium, color = c.onSurfaceVariant)
+                        Text(stringResource(R.string.importar_csv_sin_importar, revision.skipped.size), Modifier.padding(top = 8.dp), style = StmType.labelMedium, color = c.onSurfaceVariant)
                     }
                 }
                 (if (verTodas) previas else previas.take(10)).forEachIndexed { i, fila ->
@@ -347,14 +353,14 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                     if (i > 0) Divider(inset = 16.dp)
                     val marca = marcas[fila.line]?.takeIf { it != ImportMark.None }
                     val fuera = fila.line in revision.skipped
-                    val detalle = if (fuera) "${Fechas.numerica(d.bookedOn)} · No se importará" else listOfNotNull(
+                    val detalle = if (fuera) stringResource(R.string.importar_csv_no_se_importara, Fechas.numerica(d.bookedOn)) else listOfNotNull(
                         Fechas.numerica(d.bookedOn),
                         finance.category(d.categoryId)?.name,
-                        if (d.excluded) "Excluido" else null,
+                        if (d.excluded) stringResource(R.string.importar_csv_excluido) else null,
                         when (marca) {
-                            ImportMark.Recurring -> "Recurrente, cada mes"
-                            ImportMark.Subscription -> "Suscripción, cada mes"
-                            ImportMark.Card -> "Compra con tarjeta"
+                            ImportMark.Recurring -> stringResource(R.string.importar_csv_recurrente_cada_mes)
+                            ImportMark.Subscription -> stringResource(R.string.importar_csv_suscripcion_cada_mes)
+                            ImportMark.Card -> stringResource(R.string.importar_csv_compra_con_tarjeta)
                             else -> null
                         },
                     ).joinToString(" · ")
@@ -365,29 +371,29 @@ fun Pantalla32(nav: Nav, accountId: String?) {
                         onClick = { marcando = fila },
                     )
                 }
-                if (!verTodas && previas.size > 10) ListItem("… y ${previas.size - 10} más", onClick = { verTodas = true })
+                if (!verTodas && previas.size > 10) ListItem(stringResource(R.string.importar_csv_y_mas, previas.size - 10), onClick = { verTodas = true })
             }
             if (marcas.values.any { it == ImportMark.Card } && tarjetas.size > 1) {
                 Spacer(Modifier.height(16.dp))
-                FilledField("Tarjeta de las compras", finance.account(tarjeta)?.name ?: "Elige una tarjeta", trailing = StmIcons.arrowDropDown, onClick = { selector = "tarjeta" })
+                FilledField(stringResource(R.string.importar_csv_tarjeta_de_las_compras), finance.account(tarjeta)?.name ?: stringResource(R.string.importar_csv_elige_una_tarjeta), trailing = StmIcons.arrowDropDown, onClick = { selector = "tarjeta" })
             }
             Spacer(Modifier.height(8.dp))
-            Text("Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.importar_csv_toca_una_fila_para_no_importarla), style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         if (problemas.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))
             ListCard {
-                ListHeader("Filas que no se importarán (${problemas.size})")
-                problemas.take(10).forEach { ListItem("Fila ${it.line}: ${it.issue}", supportingColor = c.error) }
+                ListHeader(stringResource(R.string.importar_csv_filas_que_no_se_importaran, problemas.size))
+                problemas.take(10).forEach { ListItem(stringResource(R.string.importar_csv_fila, it.line, it.issue.orEmpty()), supportingColor = c.error) }
             }
         }
         if (m != null) {
             Spacer(Modifier.height(16.dp))
-            FilledField("Formato de fecha", m.dateOrder.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "formato" })
+            FilledField(stringResource(R.string.importar_csv_formato_de_fecha), stringResource(m.dateOrder.titulo), trailing = StmIcons.arrowDropDown, onClick = { selector = "formato" })
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListItem(
-                    "Cargos y abonos en columnas separadas",
+                    stringResource(R.string.importar_csv_cargos_y_abonos_en_columnas),
                     trailing = {
                         StmSwitch(m.amount is AmountColumns.Split) { separadas ->
                             mapeo = when (val a = m.amount) {
@@ -431,16 +437,16 @@ private fun leerCsv(context: Context, uri: Uri): Result<Pair<String, String>> = 
         }
     }
     if (bytes > MAX_CSV_BYTES) {
-        Result.failure(AppError.InvalidInput("El archivo es demasiado grande (máximo 10 MB)."))
+        Result.failure(AppError.InvalidInput(context.getString(R.string.importar_csv_el_archivo_es_demasiado_grande)))
     } else {
         val data = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        if (data == null) Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+        if (data == null) Result.failure(AppError.InvalidInput(context.getString(R.string.importar_csv_no_he_podido_abrir_el_archivo)))
         else Result.success(CsvTable.decode(data) to archivo)
     }
 } catch (_: IOException) {
-    Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+    Result.failure(AppError.InvalidInput(context.getString(R.string.importar_csv_no_he_podido_abrir_el_archivo)))
 } catch (_: SecurityException) {
-    Result.failure(AppError.InvalidInput("No he podido abrir el archivo."))
+    Result.failure(AppError.InvalidInput(context.getString(R.string.importar_csv_no_he_podido_abrir_el_archivo)))
 }
 
 private const val MAX_CSV_BYTES = 10L * 1024 * 1024
@@ -448,10 +454,10 @@ private const val MAX_CSV_BYTES = 10L * 1024 * 1024
 /** Mismos separadores y orden que en iOS (`CSVTable.delimiters`). */
 private val SEPARADORES = listOf(';', '\t', ',')
 
-private fun etiquetaSeparador(c: Char) = when (c) {
-    ';' -> "Punto y coma (;)"
-    '\t' -> "Tabulador"
-    else -> "Coma (,)"
+@Composable private fun etiquetaSeparador(c: Char) = when (c) {
+    ';' -> stringResource(R.string.importar_csv_punto_y_coma)
+    '\t' -> stringResource(R.string.importar_csv_tabulador_2)
+    else -> stringResource(R.string.importar_csv_coma)
 }
 
 private fun CsvTable?.orEmptyRows(): List<List<String>> = this?.rows ?: emptyList()

@@ -95,7 +95,7 @@ data class CreditScore(
     @SerialName("recorded_on") val recordedOn: String,
     val note: String? = null,
 ) {
-    enum class Rating(val title: String) { Excellent("Excelente"), Good("Bueno"), Fair("Regular"), Poor("Mejorable") }
+    enum class Rating { Excellent, Good, Fair, Poor }
 
     val day: LocalDate get() = LocalDate.parse(recordedOn.take(10))
     val fraction: Double get() = if (maxScore > 0) (score.toDouble() / maxScore).coerceIn(0.0, 1.0) else 0.0
@@ -119,10 +119,10 @@ data class CreditScore(
     }
 }
 
-enum class ReportKind(val title: String) { Expense("Gastos"), Income("Ingresos") }
+enum class ReportKind { Expense, Income }
 
-enum class ReportPeriod(val title: String) {
-    ThisMonth("Este mes"), LastMonth("El mes pasado"), Last3Months("Últimos 3 meses"), Last6Months("Últimos 6 meses"), ThisYear("Este año"), Last12Months("Últimos 12 meses");
+enum class ReportPeriod {
+    ThisMonth, LastMonth, Last3Months, Last6Months, ThisYear, Last12Months;
 
     /**
      * El mismo tramo justo antes, para comparar: este mes hasta hoy frente al mes pasado hasta el mismo día,
@@ -150,16 +150,6 @@ enum class ReportPeriod(val title: String) {
         val offset = ChronoUnit.DAYS.between(key.period(monthStartDay).start, day)
         val target = key.minusMonths(months).period(monthStartDay)
         return minOf(target.endInclusive, target.start.plusDays(offset))
-    }
-
-    /** "el mes pasado", "los 3 meses anteriores"… para la frase de la comparación. */
-    val previousTitle: String get() = when (this) {
-        ThisMonth -> "el mes pasado a estas alturas"
-        LastMonth -> "el mes anterior"
-        Last3Months -> "los 3 meses anteriores"
-        Last6Months -> "los 6 meses anteriores"
-        ThisYear -> "el año pasado a estas alturas"
-        Last12Months -> "los 12 meses anteriores"
     }
 
     /** Periodos del hogar: empiezan el [monthStartDay] (como el presupuesto). "Este año" = los periodos del año del mes en curso. */

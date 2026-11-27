@@ -15,8 +15,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.NetWorth
 import com.savethemoney.android.data.NetWorthProjection
@@ -57,16 +59,16 @@ fun Pantalla17(nav: Nav) {
     val dia = tracking.today()
     val historia = remember(tracking.amounts, finance.accounts, meses, dia) { tracking.history(finance.accounts, meses) }
     val cambio = (historia.lastOrNull()?.net ?: 0) - (historia.firstOrNull()?.net ?: 0)
-    val tramo = listOf("en 1 mes", "en 6 meses", "en 1 año", "desde el principio")[range]
+    val tramo = listOf(R.string.patrimonio_cambio_en_1_mes, R.string.patrimonio_cambio_en_6_meses, R.string.patrimonio_cambio_en_1_ano, R.string.patrimonio_cambio_desde_el_principio)[range]
     val inversiones = saldos.filter { (a, b) -> a.kind == AccountKind.Investment && b > 0 }.sumOf { it.second }
     val tarjetas = saldos.filter { (a, b) -> a.kind == AccountKind.CreditCard && b < 0 }.sumOf { it.second }
     val otrasDeudas = saldos.filter { (a, b) -> a.kind != AccountKind.CreditCard && b < 0 }.sumOf { it.second }
     StmScreen(
         topBar = {
-            TopBar("Patrimonio neto", onNav = nav::back) {
+            TopBar(stringResource(R.string.patrimonio_patrimonio_neto), onNav = nav::back) {
                 IconBtn(StmIcons.add, {
                     nav.go(Route.FormCuenta())
-                }, contentDescription = "Añadir cuenta")
+                }, contentDescription = stringResource(R.string.patrimonio_anadir_cuenta))
             }
         },
         snackbar = tracking.error?.let { e -> { Snackbar(e) } },
@@ -74,9 +76,9 @@ fun Pantalla17(nav: Nav) {
         Spacer(Modifier.height(8.dp))
         Text(euros(hoy.net), style = StmType.displayMedium, color = if (hoy.net < 0) c.error else c.onSurface)
         Spacer(Modifier.height(4.dp))
-        Pill("${euros(cambio, signed = true)} $tramo", positive = cambio >= 0, icon = if (cambio >= 0) StmIcons.arrowUpward else null)
+        Pill(stringResource(tramo, euros(cambio, signed = true)), positive = cambio >= 0, icon = if (cambio >= 0) StmIcons.arrowUpward else null)
         Spacer(Modifier.height(20.dp))
-        SegmentedWrap(listOf("1M", "6M", "1A", "Todo"), range) { range = it }
+        SegmentedWrap(listOf(stringResource(R.string.patrimonio_1m), stringResource(R.string.patrimonio_6m), stringResource(R.string.patrimonio_1a), stringResource(R.string.patrimonio_todo)), range) { range = it }
         Spacer(Modifier.height(16.dp))
         StmCard {
             LineChart(normalizar(historia.map { it.net }), plotHeight = 160.dp)
@@ -88,7 +90,7 @@ fun Pantalla17(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             StmCard {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("A final de año", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                    Text(stringResource(R.string.patrimonio_a_final_de_ano), Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
                     Text(euros(prevision.endOfYear), style = StmType.labelLarge, color = if (prevision.endOfYear < 0) c.error else c.onSurface)
                 }
                 Spacer(Modifier.height(8.dp))
@@ -98,43 +100,43 @@ fun Pantalla17(nav: Nav) {
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Si sigue como los últimos meses (${euros(prevision.monthlyChange, signed = true)} al mes de media). Es una estimación, no una promesa.",
+                    stringResource(R.string.patrimonio_si_sigue_como_los_ultimos_meses, euros(prevision.monthlyChange, signed = true)),
                     style = StmType.bodySmall, color = c.onSurfaceVariant,
                 )
             }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListHeader("Activos")
+            ListHeader(stringResource(R.string.patrimonio_activos))
             ListItem(
-                "Cuentas", leading = { LeadIcon(StmIcons.accountBalance) },
+                stringResource(R.string.patrimonio_cuentas), leading = { LeadIcon(StmIcons.accountBalance) },
                 trailingText = euros(hoy.assets - inversiones), onClick = { nav.go(Route.Movimientos) },
             )
             Divider()
             ListItem(
-                "Inversiones", leading = { LeadIcon(StmIcons.candlestickChart, c.tertiaryContainer, c.onTertiaryContainer) },
+                stringResource(R.string.patrimonio_inversiones), leading = { LeadIcon(StmIcons.candlestickChart, c.tertiaryContainer, c.onTertiaryContainer) },
                 trailingText = euros(inversiones), onClick = { nav.go(Route.Cartera) },
             )
-            ListHeader("Deudas")
+            ListHeader(stringResource(R.string.patrimonio_deudas))
             ListItem(
-                "Tarjetas", leading = { LeadIcon(StmIcons.creditCard, c.errorContainer, c.onErrorContainer) },
+                stringResource(R.string.tarjetas_tarjetas), leading = { LeadIcon(StmIcons.creditCard, c.errorContainer, c.onErrorContainer) },
                 trailingText = euros(tarjetas), onClick = { nav.go(Route.Tarjetas) },
             )
             if (otrasDeudas != 0L) {
                 Divider()
-                ListItem("Otras deudas", leading = { LeadIcon(StmIcons.description, c.errorContainer, c.onErrorContainer) }, trailingText = euros(otrasDeudas))
+                ListItem(stringResource(R.string.patrimonio_otras_deudas), leading = { LeadIcon(StmIcons.description, c.errorContainer, c.onErrorContainer) }, trailingText = euros(otrasDeudas))
             }
         }
         // El diseño no dibuja cómo se llega a estas dos; en iOS están en el mismo apartado.
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListItem("Informes", leading = { LeadIcon(StmIcons.monitoring) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(Route.Informes) })
+            ListItem(stringResource(R.string.informes_informes), leading = { LeadIcon(StmIcons.monitoring) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(Route.Informes) })
             Divider()
-            ListItem("Score crediticio", leading = { LeadIcon(StmIcons.creditScore) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(Route.Score) })
+            ListItem(stringResource(R.string.score_score_crediticio), leading = { LeadIcon(StmIcons.creditScore) }, trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(Route.Score) })
         }
         Spacer(Modifier.height(16.dp))
         Text(
-            "Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan.",
+            stringResource(R.string.patrimonio_se_calcula_con_el_saldo_inicial),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
     }

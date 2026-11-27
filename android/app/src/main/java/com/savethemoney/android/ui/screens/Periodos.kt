@@ -13,10 +13,13 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetPeriod
 import com.savethemoney.android.data.ExtraBudget
 import com.savethemoney.android.data.Money
@@ -49,15 +52,15 @@ internal fun SelectorPeriodo(budgets: BudgetModel) {
     val rango = "${BudgetPeriod.dayMonth(period.start)} – ${BudgetPeriod.dayMonth(period.end)}"
     StmCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            IconBtn(StmIcons.chevronLeft, { scope.launch { budgets.showPrevious() } }, contentDescription = "Periodo anterior")
+            IconBtn(StmIcons.chevronLeft, { scope.launch { budgets.showPrevious() } }, contentDescription = stringResource(R.string.periodos_periodo_anterior))
             Column(
                 Modifier.weight(1f).tap(role = Role.Button) { scope.launch { budgets.showCurrent() } },
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(period.title, style = StmType.titleMedium, color = c.onSurface, textAlign = TextAlign.Center)
-                Text(if (budgets.isCurrentPeriod) "$rango · en curso" else rango, style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(if (budgets.isCurrentPeriod) stringResource(R.string.periodos_en_curso, rango) else rango, style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
-            IconBtn(StmIcons.chevronRight, { scope.launch { budgets.showNext() } }, contentDescription = "Periodo siguiente")
+            IconBtn(StmIcons.chevronRight, { scope.launch { budgets.showNext() } }, contentDescription = stringResource(R.string.periodos_periodo_siguiente))
         }
     }
 }
@@ -68,23 +71,22 @@ internal fun GastarHoyCard(budgets: BudgetModel, finance: FinanceModel, onClick:
     val c = Stm.colors
     val insights = budgets.insights(finance.categories)
     StmCard(onClick = onClick) {
-        Text("Puedes gastar hoy", style = StmType.labelMedium, color = c.onSurfaceVariant)
+        Text(stringResource(R.string.periodos_puedes_gastar_hoy), style = StmType.labelMedium, color = c.onSurfaceVariant)
         Spacer(Modifier.height(3.dp))
         Text(Money.format(insights.perDay), style = StmType.displaySmall, color = if (insights.left < 0) c.error else c.onSurface)
         Spacer(Modifier.height(4.dp))
         Text(detalle(insights), style = StmType.bodyMedium, color = c.onSurfaceVariant)
         Text(
-            if (budgets.hasOwnSchedule) budgets.schedule.summary else "Dinos cuándo cobras en Presupuesto › Día de cobro.",
+            if (budgets.hasOwnSchedule) budgets.schedule.summary else stringResource(R.string.periodos_dinos_cuando_cobras_en_presupuesto),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
     }
 }
 
-private fun detalle(insights: PeriodInsights): String {
-    val dias = if (insights.daysToPayday == 1) "1 día" else "${insights.daysToPayday} días"
-    return if (insights.left < 0) "Te has pasado ${Money.format(-insights.left)} · faltan $dias para cobrar"
-    else "Te quedan ${Money.format(insights.left)} · faltan $dias para cobrar"
-}
+@Composable
+private fun detalle(insights: PeriodInsights): String =
+    if (insights.left < 0) pluralStringResource(R.plurals.periodos_te_has_pasado_faltan_dias, insights.daysToPayday, insights.daysToPayday, Money.format(-insights.left))
+    else pluralStringResource(R.plurals.periodos_te_quedan_faltan_dias, insights.daysToPayday, insights.daysToPayday, Money.format(insights.left))
 
 /** Presupuestos aparte del del periodo (p. ej. «Vacaciones»), con lo gastado en cada uno. */
 @Composable
@@ -92,12 +94,12 @@ internal fun ExtrasSection(budgets: BudgetModel, finance: FinanceModel, nav: Nav
     val c = Stm.colors
     StmCard {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("Presupuestos extra", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
-            Btn("Añadir", { nav.go(Route.FormExtra()) }, kind = BtnKind.Text, icon = StmIcons.add)
+            Text(stringResource(R.string.periodos_presupuestos_extra), Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+            Btn(stringResource(R.string.comun_anadir), { nav.go(Route.FormExtra()) }, kind = BtnKind.Text, icon = StmIcons.add)
         }
         if (budgets.extraBudgets.isEmpty()) {
             Text(
-                "Para controlar un gasto concreto aparte del presupuesto: unas vacaciones, una reforma o los regalos de Navidad.",
+                stringResource(R.string.periodos_para_controlar_un_gasto_concreto),
                 style = StmType.bodyMedium, color = c.onSurfaceVariant,
             )
         }
@@ -134,13 +136,13 @@ private fun ExtraRow(extra: ExtraBudget, spent: Long, onClick: () -> Unit) {
             StmIcon(if (extra.isFavorite) StmIcons.flagFilled else StmIcons.flag, c.onSurfaceVariant)
             Spacer(Modifier.width(8.dp))
             Text(extra.name, Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
-            Text("${Money.format(spent)} de ${Money.format(extra.limit)}", style = StmType.bodySmall, color = if (over) c.error else c.onSurfaceVariant)
+            Text(stringResource(R.string.periodos_de, Money.format(spent), Money.format(extra.limit)), style = StmType.bodySmall, color = if (over) c.error else c.onSurfaceVariant)
         }
         Spacer(Modifier.height(8.dp))
         if (over) Progress(fraction, color = c.error, track = c.errorContainer) else Progress(fraction)
         Spacer(Modifier.height(4.dp))
         Text(
-            extra.endsOn?.let { "Del ${Fechas.corto(extra.startsOn)} al ${Fechas.corto(it)}" } ?: "Desde el ${Fechas.corto(extra.startsOn)}, sin fecha de fin",
+            extra.endsOn?.let { stringResource(R.string.periodos_del_al, Fechas.corto(extra.startsOn), Fechas.corto(it)) } ?: stringResource(R.string.periodos_desde_el_sin_fecha_de_fin, Fechas.corto(extra.startsOn)),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
     }

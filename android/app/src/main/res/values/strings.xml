@@ -1,3 +1,1265 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:locale="es">
     <string name="app_name">Save the Money</string>
+    <string name="app_modo_demo">Modo demo: los datos no se guardan y se pierden al cerrar la app.</string>
+
+    <!-- comun -->
+    <string name="comun_usuario">Usuario</string>
+    <string name="comun_contrasena">Contraseña</string>
+    <string name="comun_nombre">Nombre</string>
+    <string name="comun_reintentar">Reintentar</string>
+    <string name="comun_mostrar_importes">Mostrar importes</string>
+    <string name="comun_ocultar_importes">Ocultar importes</string>
+    <string name="comun_buscar">Buscar</string>
+    <string name="comun_proximo_cargo">Próximo cargo</string>
+    <string name="comun_anadir">Añadir</string>
+    <string name="comun_tipo_cuenta_compartida">%1$s · compartida</string>
+    <string name="comun_cargando">Cargando…</string>
+    <string name="comun_mas_opciones">Más opciones</string>
+    <string name="comun_sin_categoria">Sin categoría</string>
+    <string name="comun_cancelar">Cancelar</string>
+    <string name="comun_aceptar">Aceptar</string>
+    <string name="comun_deshacer">Deshacer</string>
+    <string name="comun_categoria">Categoría</string>
+    <string name="comun_borrar">Borrar</string>
+    <string name="comun_cuenta">Cuenta</string>
+    <string name="comun_editar">Editar</string>
+    <string name="comun_fecha">Fecha</string>
+    <string name="comun_elige_una_cuenta">Elige una cuenta</string>
+    <string name="comun_guardar">Guardar</string>
+    <string name="comun_desarchivar">Desarchivar</string>
+    <string name="comun_archivar">Archivar</string>
+    <string name="comun_importe">Importe</string>
+    <string name="comun_concepto">Concepto</string>
+    <string name="comun_cada">Cada</string>
+    <string name="comun_eliminar">Eliminar</string>
+    <string name="comun_entendido">Entendido</string>
+    <string name="comun_el_importe_no_es_valido">El importe no es válido.</string>
+    <string name="comun_inicial_lunes">L</string>
+    <string name="comun_inicial_martes">M</string>
+    <string name="comun_inicial_miercoles">X</string>
+    <string name="comun_inicial_jueves">J</string>
+    <string name="comun_inicial_viernes">V</string>
+    <string name="comun_inicial_sabado">S</string>
+    <string name="comun_inicial_domingo">D</string>
+    <string name="comun_nota_opcional">Nota (opcional)</string>
+    <string name="comun_atras">Atrás</string>
+    <string name="comun_confirmar">Confirmar</string>
+    <string name="comun_dia_de_mes">%1$d de %2$s</string>
+    <string name="comun_dia_de_mes_de_ano">%1$d de %2$s de %3$d</string>
+
+    <!-- iniciar_sesion -->
+    <string name="iniciar_sesion_tu_dinero_claro">Tu dinero, claro</string>
+    <string name="iniciar_sesion_entra_con_tu_usuario_y_contrasena">Entra con tu usuario y contraseña para ver las cuentas de tu hogar.</string>
+    <string name="iniciar_sesion_entrar">Entrar</string>
+
+    <!-- acceso -->
+    <string name="acceso_crear_cuenta">Crear cuenta</string>
+    <string name="acceso_con_el_codigo_entraras_en_otro">Con el código %1$s entrarás en otro hogar. Seguirás en %2$s: pertenecerás a los dos hogares y podrás cambiar de uno a otro en Hogar.</string>
+    <string name="acceso_cerrar_sesion">Cerrar sesión</string>
+    <string name="acceso_unirte_a_otro_hogar">¿Unirte a otro hogar?</string>
+    <string name="acceso_ahora_no">Ahora no</string>
+
+    <!-- crear_cuenta -->
+    <string name="crear_cuenta_solo_te_pedimos_un_usuario_y">Solo te pedimos un usuario y una contraseña. No usamos tu correo.</string>
+    <string name="crear_cuenta_asi_te_vera_tu_pareja_en">Así te verá tu pareja en el hogar</string>
+    <string name="crear_cuenta_letras_y_numeros_sin_espacios">Letras y números, sin espacios</string>
+    <string name="crear_cuenta_usa_al_menos_caracteres">Usa al menos %1$s caracteres</string>
+    <string name="crear_cuenta_repite_la_contrasena">Repite la contraseña</string>
+    <string name="crear_cuenta_las_contrasenas_no_coinciden">Las contraseñas no coinciden.</string>
+
+    <!-- tu_hogar -->
+    <string name="tu_hogar_tu_hogar">Tu hogar</string>
+    <string name="tu_hogar_un_hogar_reune_las_cuentas_que">Un hogar reúne las cuentas que compartís</string>
+    <string name="tu_hogar_crear_un_hogar_nuevo">Crear un hogar nuevo</string>
+    <string name="tu_hogar_empieza_de_cero_y_despues_invita">Empieza de cero y después invita a tu pareja con un código o un QR.</string>
+    <string name="tu_hogar_crear_hogar">Crear hogar</string>
+    <string name="tu_hogar_unirme_a_un_hogar">Unirme a un hogar</string>
+    <string name="tu_hogar_escanea_el_qr_de_tu_pareja">Escanea el QR de tu pareja o escribe su código de 6 letras.</string>
+    <string name="tu_hogar_codigo">Código</string>
+    <string name="tu_hogar_unirme">Unirme</string>
+
+    <!-- pantallas -->
+    <string name="pantallas_no_se_encuentra_puede_que_se">No se encuentra. Puede que se haya borrado o que aún se esté cargando.</string>
+
+    <!-- inicio -->
+    <plurals name="inicio_mes_y_cuentas">
+        <item quantity="one">%1$s · %2$d cuenta</item>
+        <item quantity="many">%1$s · %2$d cuentas</item>
+        <item quantity="other">%1$s · %2$d cuentas</item>
+    </plurals>
+    <string name="inicio_este_mes">%1$s este mes</string>
+    <string name="inicio_hola">Hola, %1$s</string>
+    <string name="inicio_anadir_movimiento">Añadir movimiento</string>
+    <string name="inicio_vs">vs. %1$s</string>
+    <string name="inicio_gastado">Gastado</string>
+    <string name="inicio_este_mes_2">este mes</string>
+    <string name="inicio_sin_cargos_a_la_vista">Sin cargos a la vista</string>
+    <string name="inicio_lo_que_se_cobra_cada_dia">Lo que se cobra cada día</string>
+    <string name="inicio_ultimos_movimientos">Últimos movimientos</string>
+    <string name="inicio_ver_todo">Ver todo</string>
+    <string name="inicio_todavia_no_hay_movimientos">Todavía no hay movimientos.</string>
+    <string name="inicio_cuentas">Cuentas</string>
+    <string name="inicio_anade_tu_primera_cuenta_para">Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.</string>
+    <string name="inicio_archivadas">Archivadas (%1$s)</string>
+    <string name="inicio_abrelas_para_verlas_o">Ábrelas para verlas o desarchivarlas</string>
+    <string name="inicio_archivada">%1$s · archivada</string>
+
+    <!-- movimientos -->
+    <string name="movimientos_hacia">Hacia %1$s</string>
+    <string name="movimientos_desde">Desde %1$s</string>
+    <string name="movimientos_cargar_mas_movimientos">Cargar más movimientos</string>
+    <string name="movimientos_movimientos">Movimientos</string>
+    <string name="movimientos_filtros">Filtros (%1$s)</string>
+    <string name="movimientos_filtros_2">Filtros</string>
+    <string name="movimientos_excluido_del_presupuesto">Excluido del presupuesto</string>
+    <string name="movimientos_revisado">Revisado</string>
+    <string name="movimientos_elegido">Elegido</string>
+    <string name="movimientos_borrar_la_transferencia">¿Borrar la transferencia?</string>
+    <string name="movimientos_borrar_los_dos_movimientos">Borrar los dos movimientos</string>
+    <string name="movimientos_anadir_nota">Añadir nota</string>
+    <string name="movimientos_ahora_llevan">Ahora llevan: %1$s</string>
+    <plurals name="movimientos_borrar_movimientos">
+        <item quantity="one">¿Borrar %1$d movimiento?</item>
+        <item quantity="many">¿Borrar %1$d movimientos?</item>
+        <item quantity="other">¿Borrar %1$d movimientos?</item>
+    </plurals>
+    <plurals name="movimientos_movimientos_2">
+        <item quantity="one">%1$d movimiento</item>
+        <item quantity="many">%1$d movimientos</item>
+        <item quantity="other">%1$d movimientos</item>
+    </plurals>
+    <plurals name="movimientos_seleccionados">
+        <item quantity="one">%1$d seleccionado</item>
+        <item quantity="many">%1$d seleccionados</item>
+        <item quantity="other">%1$d seleccionados</item>
+    </plurals>
+    <plurals name="movimientos_editar_movimientos">
+        <item quantity="one">Editar %1$d movimiento</item>
+        <item quantity="many">Editar %1$d movimientos</item>
+        <item quantity="other">Editar %1$d movimientos</item>
+    </plurals>
+    <string name="movimientos_concepto_beneficiario_etiqueta_o">Concepto, beneficiario, #etiqueta o importe</string>
+    <string name="movimientos_movimiento_eliminado">Movimiento eliminado</string>
+    <string name="movimientos_todas_las_categorias">Todas las categorías</string>
+    <string name="movimientos_las_transferencias_se_borran_con">Las transferencias se borran con sus dos movimientos, el de cada cuenta. No se puede deshacer.</string>
+    <string name="movimientos_no_se_puede_deshacer">No se puede deshacer.</string>
+    <string name="movimientos_terminar_seleccion">Terminar selección</string>
+    <string name="movimientos_seleccionar">Seleccionar</string>
+    <string name="movimientos_quitar_filtros_y_busqueda">Quitar filtros y búsqueda</string>
+    <string name="movimientos_no_hay_movimientos_apunta_uno_con">No hay movimientos. Apunta uno con Añadir o importa un CSV desde Más opciones.</string>
+    <string name="movimientos_nada_coincide_con_la_busqueda_o">Nada coincide con la búsqueda o los filtros.</string>
+    <string name="movimientos_todas">Todas</string>
+    <string name="movimientos_tipo">Tipo</string>
+    <string name="movimientos_estado">Estado</string>
+    <string name="movimientos_etiqueta">Etiqueta</string>
+    <string name="movimientos_todas_las_etiquetas">Todas las etiquetas</string>
+    <string name="movimientos_fechas">Fechas</string>
+    <string name="movimientos_desde_2">Desde</string>
+    <string name="movimientos_hasta">Hasta</string>
+    <string name="movimientos_quitar_filtros">Quitar filtros</string>
+    <string name="movimientos_ver_movimientos">Ver movimientos</string>
+    <string name="movimientos_gastos_ingresos">Gastos %1$s · Ingresos %2$s</string>
+    <string name="movimientos_ninguno">Ninguno</string>
+    <string name="movimientos_todos">Todos</string>
+    <string name="movimientos_cambiar_la_fecha">Cambiar la fecha</string>
+    <string name="movimientos_cambiar_la_categoria">Cambiar la categoría</string>
+    <string name="movimientos_cambiar_la_cuenta">Cambiar la cuenta</string>
+    <string name="movimientos_cambiar_el_beneficiario">Cambiar el beneficiario</string>
+    <string name="movimientos_beneficiario_vacio_lo_quita">Beneficiario (vacío lo quita)</string>
+    <string name="movimientos_anadir_etiquetas_p_ej_viaje">Añadir etiquetas, p. ej. viaje</string>
+    <string name="movimientos_quitar_etiquetas">Quitar etiquetas</string>
+    <string name="movimientos_no_cambiar">No cambiar</string>
+    <string name="movimientos_marcar_revisados">Marcar revisados</string>
+    <string name="movimientos_presupuesto_e_informes">Presupuesto e informes</string>
+    <string name="movimientos_excluir">Excluir</string>
+    <string name="movimientos_volver_a_contar">Volver a contar</string>
+    <string name="movimientos_aviso_borrar_transferencia">Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer.</string>
+    <string name="movimientos_no_se_han_podido_cargar">No se han podido cargar los movimientos. %1$s</string>
+
+    <!-- cuenta -->
+    <string name="cuenta_no_se_han_podido_cargar_los">No se han podido cargar los movimientos del gráfico. %1$s</string>
+    <string name="cuenta_borrar_esta_cuenta">¿Borrar esta cuenta?</string>
+    <string name="cuenta_se_borran_tambien_todos_sus">Se borran también todos sus movimientos, para todo el hogar. No se puede deshacer.</string>
+    <string name="cuenta_actualizar_saldo">Actualizar saldo</string>
+    <string name="cuenta_borrar_cuenta_y_movimientos">Borrar cuenta y movimientos</string>
+    <string name="cuenta_saldo">Saldo</string>
+    <string name="cuenta_transferir">Transferir</string>
+    <string name="cuenta_saldo_en_6_meses">Saldo en 6 meses</string>
+    <string name="cuenta_todavia_no_hay_movimientos_en_esta">Todavía no hay movimientos en esta cuenta.</string>
+    <string name="cuenta_saldo_en_la_app">Saldo en la app: %1$s</string>
+    <string name="cuenta_saldo_real">Saldo real</string>
+    <string name="cuenta_ajuste">Ajuste: %1$s</string>
+    <string name="cuenta_se_apunta_un_movimiento_ajuste_de">Se apunta un movimiento «Ajuste de saldo» por la diferencia, hoy. No cuenta como gasto ni como ingreso.</string>
+    <string name="cuenta_escribe_el_saldo_por_ejemplo_1">Escribe el saldo, por ejemplo 1.250,00.</string>
+
+    <!-- form_movimiento -->
+    <string name="form_movimiento_cambiar_tambien_su_categoria">¿Quieres cambiar también su categoría a «%1$s»?</string>
+    <string name="form_movimiento_al_mes_total_intereses_tin">%1$s al mes · total %2$s · intereses %3$s (TIN %4$s %%)</string>
+    <plurals name="form_movimiento_hay_movimientos_con_el_mismo">
+        <item quantity="one">Hay %1$d movimiento con el mismo concepto</item>
+        <item quantity="many">Hay %1$d movimientos con el mismo concepto</item>
+        <item quantity="other">Hay %1$d movimientos con el mismo concepto</item>
+    </plurals>
+    <string name="form_movimiento_escribe_un_importe_por_ejemplo_12">Escribe un importe, por ejemplo 12,50.</string>
+    <string name="form_movimiento_elige_una_cuenta">Elige una cuenta.</string>
+    <string name="form_movimiento_elige_la_cuenta_de_destino">Elige la cuenta de destino.</string>
+    <string name="form_movimiento_elige_dos_cuentas_distintas">Elige dos cuentas distintas.</string>
+    <string name="form_movimiento_editar_movimiento">Editar movimiento</string>
+    <string name="form_movimiento_nuevo_movimiento">Nuevo movimiento</string>
+    <string name="form_movimiento_solo_este">Sólo este</string>
+    <string name="form_movimiento_ponerles_la_misma_categoria">Ponerles la misma categoría</string>
+    <string name="form_movimiento_frecuencia">Frecuencia</string>
+    <string name="form_movimiento_cuenta_de_destino">Cuenta de destino</string>
+    <string name="form_movimiento_gasto">Gasto</string>
+    <string name="form_movimiento_ingreso">Ingreso</string>
+    <string name="form_movimiento_transferencia">Transferencia</string>
+    <string name="form_movimiento_tipo_de_compra">Tipo de compra</string>
+    <string name="form_movimiento_normal">Normal</string>
+    <string name="form_movimiento_a_plazos">A plazos</string>
+    <string name="form_movimiento_recurrente">Recurrente</string>
+    <string name="form_movimiento_plazos">Plazos</string>
+    <string name="form_movimiento_meses">%1$s meses</string>
+    <string name="form_movimiento_muchos_contratos_solo_aplazan">Muchos contratos sólo aplazan compras de 50 € o más</string>
+    <string name="form_movimiento_se_crea_un_pago_fijo_con">Se crea un pago fijo con este concepto, importe y categoría. Los próximos cargos saldrán como pendientes de confirmar.</string>
+    <string name="form_movimiento_beneficiario_opcional">Beneficiario (opcional)</string>
+    <string name="form_movimiento_etiquetas_p_ej_viaje_regalos">Etiquetas, p. ej. viaje, regalos</string>
+    <string name="form_movimiento_las_etiquetas_sirven_para_juntar">Las etiquetas sirven para juntar gastos de distintas categorías, como un viaje. Sepáralas con comas.</string>
+    <string name="form_movimiento_notas">Notas</string>
+    <string name="form_movimiento_revisado">Revisado</string>
+    <string name="form_movimiento_excluir_del_presupuesto_e_informes">Excluir del presupuesto e informes</string>
+    <string name="form_movimiento_un_movimiento_excluido_sigue">Un movimiento excluido sigue contando en el saldo de la cuenta, pero no en el presupuesto, los informes ni el flujo de caja.</string>
+    <string name="form_movimiento_nota_transferencia">Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta.</string>
+
+    <!-- acciones_movimiento -->
+    <string name="acciones_movimiento_cambiar_categoria">Cambiar categoría</string>
+    <string name="acciones_movimiento_marcar_sin_revisar">Marcar sin revisar</string>
+    <string name="acciones_movimiento_marcar_revisado">Marcar revisado</string>
+    <string name="acciones_movimiento_volver_a_contar_en_el_presupuesto">Volver a contar en el presupuesto</string>
+    <string name="acciones_movimiento_excluir_del_presupuesto">Excluir del presupuesto</string>
+    <string name="acciones_movimiento_aplazar_con_la_tarjeta">Aplazar con la tarjeta</string>
+
+    <!-- form_cuenta -->
+    <string name="form_cuenta_el_saldo_inicial_no_es_un">El saldo inicial no es un importe válido.</string>
+    <string name="form_cuenta_editar_cuenta">Editar cuenta</string>
+    <string name="form_cuenta_nueva_cuenta">Nueva cuenta</string>
+    <string name="form_cuenta_tipo">Tipo</string>
+    <string name="form_cuenta_corriente">Corriente</string>
+    <string name="form_cuenta_una_tarjeta_de_credito_no_puede">Una tarjeta de crédito no puede cambiar de tipo.</string>
+    <string name="form_cuenta_saldo_inicial">Saldo inicial</string>
+    <string name="form_cuenta_compartir_con_el_hogar">Compartir con el hogar</string>
+    <string name="form_cuenta_tu_pareja_vera_el_saldo_y">Tu pareja verá el saldo y los movimientos</string>
+    <string name="form_cuenta_cuenta_predeterminada">Cuenta predeterminada</string>
+    <string name="form_cuenta_contar_en_el_patrimonio">Contar en el patrimonio</string>
+    <string name="form_cuenta_la_predeterminada_sale_elegida_al">La predeterminada sale elegida al apuntar un movimiento. Sin «Contar en el patrimonio», la cuenta sigue con su saldo pero no suma en el patrimonio neto.</string>
+
+    <!-- tarjetas -->
+    <string name="tarjetas_proximo_cargo_fecha">Próximo cargo · %1$s</string>
+    <string name="tarjetas_sale_de">" Sale de %1$s."</string>
+    <string name="tarjetas_de_momento_puede_subir_con_nuevas">" De momento; puede subir con nuevas compras."</string>
+    <string name="tarjetas_de">%1$s de %2$s</string>
+    <string name="tarjetas_falta_poner_el_limite_y_como">Falta poner el límite y cómo la pagas</string>
+    <string name="tarjetas_usado_de">Usado %1$s de %2$s · %3$s</string>
+    <string name="tarjetas_anadir_tarjeta">Añadir tarjeta</string>
+    <string name="tarjetas_tarjetas">Tarjetas</string>
+    <string name="tarjetas_aun_no_hay_tarjetas">Aún no hay tarjetas</string>
+    <string name="tarjetas_anade_tu_tarjeta_de_credito_y">Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes.</string>
+    <string name="tarjetas_proximos_cargos_de_todas_las">Próximos cargos de todas las tarjetas</string>
+    <string name="tarjetas_usado">Usado</string>
+    <string name="tarjetas_limite">Límite</string>
+    <string name="tarjetas_disponible">Disponible</string>
+    <string name="tarjetas_ver_calendario">Ver calendario</string>
+    <string name="tarjetas_desglose_cuota">cuota %1$s</string>
+    <string name="tarjetas_desglose_compras">compras %1$s</string>
+    <string name="tarjetas_aplazados">aplazados %1$s</string>
+    <string name="tarjetas_sin_cargos">Sin cargos</string>
+    <string name="tarjetas_incluye_de_intereses">%1$s (incluye %2$s de intereses)</string>
+    <string name="tarjetas_editar_condiciones">Editar condiciones</string>
+    <string name="tarjetas_archivar_tarjeta">Archivar tarjeta</string>
+    <string name="tarjetas_borrar_tarjeta_y_movimientos">Borrar tarjeta y movimientos</string>
+    <string name="tarjetas_borrar_esta_tarjeta">¿Borrar esta tarjeta?</string>
+
+    <!-- tarjeta -->
+    <string name="tarjeta_del_al">del %1$s al %2$s</string>
+    <string name="tarjeta_pagada">Pagada</string>
+    <plurals name="tarjeta_quedan_cuotas">
+        <item quantity="one">Queda %1$d cuota</item>
+        <item quantity="many">Quedan %1$d cuotas</item>
+        <item quantity="other">Quedan %1$d cuotas</item>
+    </plurals>
+    <string name="tarjeta_extracto_se_cobra_ese_mes">Lo que gastas entra en el extracto del día %1$s, que se cobra el día %2$s de ese mes.</string>
+    <string name="tarjeta_extracto_se_cobra_mes_siguiente">Lo que gastas entra en el extracto del día %1$s, que se cobra el día %2$s del mes siguiente.</string>
+    <string name="tarjeta_extracto_se_cobra_meses_despues">Lo que gastas entra en el extracto del día %1$s, que se cobra el día %2$s, %3$s meses después.</string>
+    <string name="tarjeta_cargo_estimado">%1$s · estimado</string>
+    <plurals name="tarjeta_terminarias_de_pagar">
+        <item quantity="one">Sin compras nuevas, terminarías de pagar en %1$d mes y pagarías %2$s de intereses. Pagando todo a fin de mes no pagarías ninguno.</item>
+        <item quantity="many">Sin compras nuevas, terminarías de pagar en %1$d meses y pagarías %2$s de intereses. Pagando todo a fin de mes no pagarías ninguno.</item>
+        <item quantity="other">Sin compras nuevas, terminarías de pagar en %1$d meses y pagarías %2$s de intereses. Pagando todo a fin de mes no pagarías ninguno.</item>
+    </plurals>
+    <string name="tarjeta_los_extractos_sin_cobrar_tienen">Los extractos sin cobrar tienen %1$s movimientos o más y puede que no se hayan cargado todos: los cargos y lo gastado pueden salir más bajos de lo que son.</string>
+    <plurals name="tarjeta_hay_abonos_sin_categoria_sin">
+        <item quantity="one">Hay %1$d abono sin categoría. Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia.</item>
+        <item quantity="many">Hay %1$d abonos sin categoría. Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia.</item>
+        <item quantity="other">Hay %1$d abonos sin categoría. Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia.</item>
+    </plurals>
+    <plurals name="tarjeta_no_se_han_podido_cargar_las">
+        <item quantity="one">No se ha podido cargar la compra de %1$d aplazado. Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato.</item>
+        <item quantity="many">No se han podido cargar las compras de %1$d aplazados. Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato.</item>
+        <item quantity="other">No se han podido cargar las compras de %1$d aplazados. Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato.</item>
+    </plurals>
+    <string name="tarjeta_extracto_abierto">Extracto abierto</string>
+    <string name="tarjeta_gastado_este_ciclo">Gastado este ciclo</string>
+    <string name="tarjeta_calendario_de_cargos">Calendario de cargos</string>
+    <string name="tarjeta_compras_aplazadas">Compras aplazadas</string>
+    <string name="tarjeta_aplazar">Aplazar</string>
+    <string name="tarjeta_pon_el_limite_el_dia_del">Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos.</string>
+    <string name="tarjeta_configurar_tarjeta">Configurar tarjeta</string>
+    <string name="tarjeta_meses_tin">%1$s meses · TIN %2$s %%</string>
+    <string name="tarjeta_mes">%1$s/mes</string>
+    <string name="tarjeta_has_pasado_del_del_limite_te">Has pasado del %1$s %% del límite. Te quedan %2$s.</string>
+    <string name="tarjeta_lo_que_cuesta_aplazar">Lo que cuesta aplazar</string>
+    <string name="tarjeta_deuda_con_intereses_tin">Deuda con intereses · TIN %1$s %%</string>
+    <string name="tarjeta_intereses_en_cargos">Intereses en %1$s cargos</string>
+    <string name="tarjeta_la_cuota_no_llega_a_cubrir">La cuota no llega a cubrir los intereses: la deuda no baja. Sube la cuota o paga todo a fin de mes.</string>
+    <string name="tarjeta_las_compras_de_50_o_mas">Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al %1$s %% TIN. La cuota se suma a cada cargo.</string>
+    <string name="tarjeta_para_aplazar_otra_compra_tiene_que">Para aplazar otra compra tiene que ser de 50 € o más y del extracto abierto.</string>
+    <string name="tarjeta_se_paga_desde">Se paga desde %1$s</string>
+    <string name="tarjeta_no_llega_para_el_proximo_cargo">No llega para el próximo cargo de %1$s.</string>
+    <string name="tarjeta_elige_en_condiciones_la_cuenta">Elige en Condiciones la cuenta desde la que se paga la tarjeta para saber si hay saldo.</string>
+    <string name="tarjeta_apuntar_el_pago_de_la_tarjeta">Apuntar el pago de la tarjeta</string>
+    <string name="tarjeta_el_pago_se_apunta_como">El pago se apunta como transferencia de la cuenta a la tarjeta, así el gasto no cuenta dos veces.</string>
+
+    <!-- condiciones_tarjeta -->
+    <string name="condiciones_tarjeta_el_pago_minimo_es_el_de">%1$s El pago mínimo es el %% de la deuda más los intereses, y nunca menos del importe mínimo.</string>
+    <string name="condiciones_tarjeta_el_limite_no_es_un_importe">El límite no es un importe válido.</string>
+    <string name="condiciones_tarjeta_revisa_los_intereses_y_el_pago">Revisa los intereses y el pago mínimo.</string>
+    <string name="condiciones_tarjeta_el_pago_minimo_no_es_un">El pago mínimo no es un importe válido.</string>
+    <string name="condiciones_tarjeta_la_cuota_no_es_un_importe">La cuota no es un importe válido.</string>
+    <string name="condiciones_tarjeta_condiciones">Condiciones</string>
+    <string name="condiciones_tarjeta_se_paga_desde">Se paga desde</string>
+    <string name="condiciones_tarjeta_sin_elegir">Sin elegir</string>
+    <string name="condiciones_tarjeta_limite_de_credito">Límite de crédito</string>
+    <string name="condiciones_tarjeta_dia_del_extracto">Día del extracto</string>
+    <string name="condiciones_tarjeta_dia_del_cargo">Día del cargo</string>
+    <string name="condiciones_tarjeta_forma_de_pago">Forma de pago</string>
+    <string name="condiciones_tarjeta_todo">Todo</string>
+    <string name="condiciones_tarjeta_cuota_fija">Cuota fija</string>
+    <string name="condiciones_tarjeta_minimo">Mínimo</string>
+    <string name="condiciones_tarjeta_cuota_al_mes">Cuota al mes</string>
+    <string name="condiciones_tarjeta_minimo_deuda" formatted="false">Mínimo: % deuda</string>
+    <string name="condiciones_tarjeta_minimo_al_menos">Mínimo: al menos</string>
+    <string name="condiciones_tarjeta_tin_aplazado">TIN aplazado</string>
+    <string name="condiciones_tarjeta_tin_a_plazos">TIN a plazos</string>
+    <string name="condiciones_tarjeta_paga_desde">Paga desde</string>
+    <string name="condiciones_tarjeta_recordar_el_cargo">Recordar el cargo</string>
+    <string name="condiciones_tarjeta_avisar_al_del_limite">Avisar al %1$s %% del límite</string>
+    <string name="condiciones_tarjeta_cuando_recordar">Cuándo recordar</string>
+    <string name="condiciones_tarjeta_avisar_al_pasar_del">Avisar al pasar del</string>
+    <string name="condiciones_tarjeta_se_cobra">Se cobra</string>
+    <string name="condiciones_tarjeta_mismo_mes">Mismo mes</string>
+    <string name="condiciones_tarjeta_mes_siguiente">Mes siguiente</string>
+    <string name="condiciones_tarjeta_2_meses">2 meses</string>
+    <string name="condiciones_tarjeta_miralo_en_tu_contrato_por_ejemplo">Míralo en tu contrato. Por ejemplo: extracto el día 1 y cargo el día 1 del mes siguiente quiere decir que lo gastado en enero se cobra el 1 de marzo.</string>
+
+    <!-- aplazar_compra -->
+    <string name="aplazar_compra_tarjeta">Tarjeta</string>
+    <string name="aplazar_compra_aplazar">Aplazar %1$s</string>
+    <string name="aplazar_compra_mes">%1$s/mes</string>
+    <string name="aplazar_compra_revisa_el_interes">Revisa el interés.</string>
+    <string name="aplazar_compra_elige_una_compra">Elige una compra</string>
+    <string name="aplazar_compra_no_se_puede_aplazar">No se puede aplazar</string>
+    <string name="aplazar_compra_solo_compras_de_50_o_mas">Sólo compras de 50 € o más del extracto que aún está abierto, en una tarjeta con sus condiciones puestas.</string>
+    <string name="aplazar_compra_12_meses">12 meses</string>
+    <string name="aplazar_compra_tin_anual">TIN anual</string>
+    <string name="aplazar_compra_cuota">Cuota</string>
+    <string name="aplazar_compra_intereses_en_total">Intereses en total</string>
+    <string name="aplazar_compra_quitar_aplazado">Quitar aplazado</string>
+    <string name="aplazar_compra_aplazar_2">Aplazar</string>
+
+    <!-- planes -->
+    <string name="planes_el_mismo_dia">el mismo día</string>
+    <plurals name="planes_dias_antes">
+        <item quantity="one">%1$d día antes</item>
+        <item quantity="many">%1$d días antes</item>
+        <item quantity="other">%1$d días antes</item>
+    </plurals>
+    <plurals name="planes_semanas">
+        <item quantity="one">%1$d semana</item>
+        <item quantity="many">%1$d semanas</item>
+        <item quantity="other">%1$d semanas</item>
+    </plurals>
+    <plurals name="planes_meses">
+        <item quantity="one">%1$d mes</item>
+        <item quantity="many">%1$d meses</item>
+        <item quantity="other">%1$d meses</item>
+    </plurals>
+    <plurals name="planes_anos">
+        <item quantity="one">%1$d año</item>
+        <item quantity="many">%1$d años</item>
+        <item quantity="other">%1$d años</item>
+    </plurals>
+    <string name="planes_menos">Menos</string>
+    <string name="planes_mas">Más</string>
+
+    <!-- analisis -->
+    <string name="analisis_elegir_periodo">Elegir periodo</string>
+
+    <!-- periodos -->
+    <plurals name="periodos_te_has_pasado_faltan_dias">
+        <item quantity="one">Te has pasado %2$s · faltan %1$d día para cobrar</item>
+        <item quantity="many">Te has pasado %2$s · faltan %1$d días para cobrar</item>
+        <item quantity="other">Te has pasado %2$s · faltan %1$d días para cobrar</item>
+    </plurals>
+    <plurals name="periodos_te_quedan_faltan_dias">
+        <item quantity="one">Te quedan %2$s · faltan %1$d día para cobrar</item>
+        <item quantity="many">Te quedan %2$s · faltan %1$d días para cobrar</item>
+        <item quantity="other">Te quedan %2$s · faltan %1$d días para cobrar</item>
+    </plurals>
+    <string name="periodos_periodo_anterior">Periodo anterior</string>
+    <string name="periodos_en_curso">%1$s · en curso</string>
+    <string name="periodos_periodo_siguiente">Periodo siguiente</string>
+    <string name="periodos_puedes_gastar_hoy">Puedes gastar hoy</string>
+    <string name="periodos_dinos_cuando_cobras_en_presupuesto">Dinos cuándo cobras en Presupuesto › Día de cobro.</string>
+    <string name="periodos_presupuestos_extra">Presupuestos extra</string>
+    <string name="periodos_para_controlar_un_gasto_concreto">Para controlar un gasto concreto aparte del presupuesto: unas vacaciones, una reforma o los regalos de Navidad.</string>
+    <string name="periodos_de">%1$s de %2$s</string>
+    <string name="periodos_del_al">Del %1$s al %2$s</string>
+    <string name="periodos_desde_el_sin_fecha_de_fin">Desde el %1$s, sin fecha de fin</string>
+
+    <!-- presupuesto -->
+    <string name="presupuesto_de">de %1$s</string>
+    <string name="presupuesto_de_quedan_dias">de %1$s · quedan %2$s días</string>
+    <string name="presupuesto_editar_presupuesto">Editar presupuesto</string>
+    <string name="presupuesto_presupuesto">Presupuesto</string>
+    <string name="presupuesto_plantilla">%1$s · plantilla %2$s/%3$s/%4$s</string>
+    <string name="presupuesto_aun_no_hay_presupuesto_para_este">Aún no hay presupuesto para este periodo. Puedes partir del de %1$s.</string>
+    <string name="presupuesto_aun_no_hay_presupuesto_para_este_2">Aún no hay presupuesto para este periodo. Mientras tanto, se reparten los ingresos reales con 50/30/20.</string>
+    <string name="presupuesto_crear_presupuesto">Crear presupuesto</string>
+    <string name="presupuesto_limites_por_encima_de_lo_previsto">Límites por encima de lo previsto</string>
+    <string name="presupuesto_queda_por_presupuestar">Queda por presupuestar</string>
+    <string name="presupuesto_al_ritmo_de_hoy_gastaras">Al ritmo de hoy gastarás</string>
+    <string name="presupuesto_gastos_sin_categoria">Gastos sin categoría</string>
+    <string name="presupuesto_ponles_categoria_en_movimientos">Ponles categoría en Movimientos para que cuenten en su grupo.</string>
+    <string name="presupuesto_por_encima">%1$s por encima</string>
+    <string name="presupuesto_de_2">%1$s de %2$s</string>
+    <string name="presupuesto_incluye_de_menos_del_periodo">Incluye %1$s de menos del periodo anterior</string>
+    <string name="presupuesto_incluye_que_sobro_del_periodo">Incluye %1$s que sobró del periodo anterior</string>
+
+    <!-- editar_presupuesto -->
+    <string name="editar_presupuesto_el_limite_no_es_valido">El límite de %1$s no es un importe válido.</string>
+    <string name="editar_presupuesto_una_categoria">una categoría</string>
+    <string name="editar_presupuesto_limite_de">Límite de %1$s</string>
+    <string name="editar_presupuesto_los_ingresos_previstos_no_son_un">Los ingresos previstos no son un importe válido.</string>
+    <string name="editar_presupuesto_presupuesto">Presupuesto · %1$s</string>
+    <string name="editar_presupuesto_por_categorias">Por categorías</string>
+    <string name="editar_presupuesto_flexible">Flexible</string>
+    <string name="editar_presupuesto_ingresos_previstos">Ingresos previstos</string>
+    <string name="editar_presupuesto_reparto">Reparto %1$s/%2$s/%3$s</string>
+    <string name="editar_presupuesto_aplicar">Aplicar</string>
+    <string name="editar_presupuesto_arrastre_y_avisos">Arrastre y avisos</string>
+    <string name="editar_presupuesto_pasar_lo_que_sobre_al_siguiente">Pasar lo que sobre al siguiente periodo</string>
+    <string name="editar_presupuesto_avisarme_al">Avisarme al</string>
+    <string name="editar_presupuesto_del_limite">%1$s %% del límite</string>
+    <string name="editar_presupuesto_con_el_arrastre_lo_que_sobre">Con el arrastre, lo que sobre en una categoría se suma a su límite del siguiente periodo, y lo que te pases se resta.</string>
+    <string name="editar_presupuesto_proponer_limites_media_de_3">Proponer límites (media de 3 periodos)</string>
+    <string name="editar_presupuesto_aun_no_hay_gastos_en_los">Aún no hay gastos en los periodos anteriores para proponer límites.</string>
+    <string name="editar_presupuesto_vaciar_limites">Vaciar límites</string>
+    <string name="editar_presupuesto_la_propuesta_usa_lo_que_gastaste">La propuesta usa lo que gastaste de media en cada categoría en los 3 periodos anteriores. Puedes cambiarla antes de guardar.</string>
+    <string name="editar_presupuesto_entra">Entra</string>
+    <string name="editar_presupuesto_ahorro">Ahorro</string>
+    <string name="editar_presupuesto_para_todo_lo_demas">Para todo lo demás</string>
+    <string name="editar_presupuesto_gastado">Gastado</string>
+    <string name="editar_presupuesto_gastado_de_mas">Gastado de más</string>
+    <string name="editar_presupuesto_queda">Queda</string>
+    <string name="editar_presupuesto_al_dia">%1$s al día</string>
+    <string name="editar_presupuesto_sin_limite">Sin límite</string>
+
+    <!-- flujo -->
+    <string name="flujo_flujo_de_caja">Flujo de caja</string>
+    <string name="flujo_mes">Mes</string>
+    <string name="flujo_trimestre">Trimestre</string>
+    <string name="flujo_ano">Año</string>
+    <string name="flujo_de_donde_viene_y_a_donde">De dónde viene y a dónde va</string>
+    <string name="flujo_no_hay_movimientos_en_este_periodo">No hay movimientos en este periodo. Cuando apuntes o importes ingresos y gastos, aquí verás a dónde va tu dinero.</string>
+    <string name="flujo_entra">Entra</string>
+    <string name="flujo_sale">Sale</string>
+
+    <!-- patrimonio -->
+    <string name="patrimonio_cambio_en_1_mes">%1$s en 1 mes</string>
+    <string name="patrimonio_cambio_en_6_meses">%1$s en 6 meses</string>
+    <string name="patrimonio_cambio_en_1_ano">%1$s en 1 año</string>
+    <string name="patrimonio_cambio_desde_el_principio">%1$s desde el principio</string>
+    <string name="patrimonio_patrimonio_neto">Patrimonio neto</string>
+    <string name="patrimonio_anadir_cuenta">Añadir cuenta</string>
+    <string name="patrimonio_1m">1M</string>
+    <string name="patrimonio_6m">6M</string>
+    <string name="patrimonio_1a">1A</string>
+    <string name="patrimonio_todo">Todo</string>
+    <string name="patrimonio_a_final_de_ano">A final de año</string>
+    <string name="patrimonio_si_sigue_como_los_ultimos_meses">Si sigue como los últimos meses (%1$s al mes de media). Es una estimación, no una promesa.</string>
+    <string name="patrimonio_activos">Activos</string>
+    <string name="patrimonio_cuentas">Cuentas</string>
+    <string name="patrimonio_inversiones">Inversiones</string>
+    <string name="patrimonio_deudas">Deudas</string>
+    <string name="patrimonio_otras_deudas">Otras deudas</string>
+    <string name="patrimonio_se_calcula_con_el_saldo_inicial">Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan.</string>
+
+    <!-- informes -->
+    <string name="informes_media_al_mes_y_al_dia">Media de %1$s al mes · %2$s al día</string>
+    <string name="informes_al_dia">%1$s al día</string>
+    <string name="informes_sube_con_porcentaje">%1$s, +%2$d %% vs. %3$s</string>
+    <string name="informes_sube">%1$s vs. %2$s</string>
+    <string name="informes_frente_a">%1$s frente a %2$s</string>
+    <string name="informes_informe_de_save_the_money">Informe de Save the Money</string>
+    <string name="informes_compartir_informe">Compartir informe</string>
+    <string name="informes_informes">Informes</string>
+    <string name="informes_compartir">Compartir</string>
+    <string name="informes_periodo">Periodo</string>
+    <string name="informes_todas">Todas</string>
+    <string name="informes_ingresos_y_gastos">Ingresos y gastos</string>
+    <string name="informes_por_categoria">Por categoría</string>
+    <string name="informes_por_etiqueta">Por etiqueta</string>
+    <string name="informes_por_beneficiario">Por beneficiario</string>
+    <string name="informes_no_hay_movimientos_con_etiquetas">No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento.</string>
+    <string name="informes_no_hay_movimientos_con">No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento.</string>
+    <string name="informes_movimientos_ingresos">%1$s movimientos · ingresos %2$s</string>
+    <string name="informes_movimientos">%1$s movimientos</string>
+    <string name="informes_un_movimiento_con_varias_etiquetas">Un movimiento con varias etiquetas cuenta en cada una. No se incluyen transferencias ni excluidos.</string>
+    <string name="informes_no_hay_movimientos_en_este_periodo">No hay movimientos en este periodo.</string>
+    <string name="informes_movimientos_2">%1$s %% · %2$s movimientos</string>
+    <string name="informes_ultimos_6_meses">últimos 6 meses</string>
+    <string name="informes_ingresos">Ingresos</string>
+    <string name="informes_gastos">Gastos</string>
+    <string name="informes_ahorro_medio">Ahorro medio</string>
+    <string name="informes_lo_que_te_queda_cada_mes">Lo que te queda cada mes</string>
+    <string name="informes_categoria_que_mas_sube">Categoría que más sube</string>
+    <string name="informes_igual_que">Igual que %1$s</string>
+    <string name="informes_del_al">Del %1$s al %2$s</string>
+    <string name="informes_total">Total: %1$s</string>
+    <string name="informes_media_por_dia">Media por día: %1$s</string>
+    <string name="informes_frente_a_2">Frente a %1$s: %2$s</string>
+    <string name="informes_movimientos_3">%1$s: %2$s (%3$d %%, %4$s movimientos)</string>
+    <string name="informes_ingresos_y_gastos_ultimos_6_meses">Ingresos y gastos · últimos 6 meses</string>
+    <string name="informes_ingresos_gastos">%1$s %2$d: ingresos %3$s, gastos %4$s</string>
+    <string name="informes_ahorro_medio_al_mes">Ahorro medio al mes: %1$s</string>
+
+    <!-- score -->
+    <string name="score_score_crediticio">Score crediticio</string>
+    <string name="score_anadir_puntuacion">Añadir puntuación</string>
+    <string name="score_borrar_este_score">¿Borrar este score?</string>
+    <string name="score_de">%1$s de %2$s</string>
+    <string name="score_apunta_el_score_que_te_da">Apunta el score que te da tu banco o tu proveedor para ver cómo evoluciona.</string>
+    <string name="score_apuntar_mi_score">Apuntar mi score</string>
+    <string name="score_lo_apuntas_tu_a_mano_en">Lo apuntas tú a mano: en España no hay una fuente abierta para consultarlo.</string>
+    <string name="score_historial">Historial</string>
+    <string name="score_de_2">%1$s de %2$s · %3$s</string>
+    <string name="score_solo_lo_ves_tu_no_se">Sólo lo ves tú: no se comparte con el resto del hogar. Los tramos son orientativos. Toca uno para borrarlo.</string>
+
+    <!-- pagos_fijos -->
+    <string name="pagos_fijos_oferta">oferta %1$s</string>
+    <plurals name="pagos_fijos_pagos">
+        <item quantity="one">%1$d pago</item>
+        <item quantity="many">%1$d pagos</item>
+        <item quantity="other">%1$d pagos</item>
+    </plurals>
+    <string name="pagos_fijos_cerrar_busqueda">Cerrar búsqueda</string>
+    <string name="pagos_fijos_pagos_fijos">Pagos fijos</string>
+    <string name="pagos_fijos_nombre_del_pago">Nombre del pago</string>
+    <string name="pagos_fijos_nuevo_pago">Nuevo pago</string>
+    <string name="pagos_fijos_este_mes">Este mes</string>
+    <string name="pagos_fijos_en_los_proximos_12_meses">%1$s en los próximos 12 meses</string>
+    <string name="pagos_fijos_ningun_pago_fijo_se_llama_asi">Ningún pago fijo se llama así.</string>
+    <string name="pagos_fijos_apunta_suscripciones_alquiler_luz">Apunta suscripciones, alquiler, luz o tu nómina para ver cuánto suman y recibir un aviso antes de cada cobro.</string>
+    <string name="pagos_fijos_proximos">Próximos</string>
+    <string name="pagos_fijos_ingresos">Ingresos</string>
+    <string name="pagos_fijos_archivados">Archivados</string>
+    <string name="pagos_fijos_archivado">Archivado</string>
+    <string name="pagos_fijos_terminado">Terminado</string>
+    <string name="pagos_fijos_luego">luego %1$s</string>
+
+    <!-- form_pago_fijo -->
+    <string name="form_pago_fijo_mismo_dia">Mismo día</string>
+    <plurals name="form_pago_fijo_dias">
+        <item quantity="one">%1$d día</item>
+        <item quantity="many">%1$d días</item>
+        <item quantity="other">%1$d días</item>
+    </plurals>
+    <string name="form_pago_fijo_si_dejas_de_pagarlo_se_guarda">Si dejas de pagarlo, se guarda con fecha de fin y no habrá más cargos ni avisos. Si lo borras, desaparece con sus cargos pendientes. Los movimientos ya apuntados no se tocan en ningún caso.</string>
+    <string name="form_pago_fijo_el_dia_del_cargo_aparece_en">El día del cargo aparece en Resumen para confirmarlo con el importe real. Hasta entonces no cuenta en saldos ni presupuesto, y si llega antes por CSV se empareja solo.</string>
+    <plurals name="form_pago_fijo_cargos">
+        <item quantity="one">%1$d cargo</item>
+        <item quantity="many">%1$d cargos</item>
+        <item quantity="other">%1$d cargos</item>
+    </plurals>
+    <string name="form_pago_fijo_el_precio_de_oferta_no_es">El precio de oferta no es válido.</string>
+    <string name="form_pago_fijo_editar_pago_fijo">Editar pago fijo</string>
+    <string name="form_pago_fijo_nuevo_pago_fijo">Nuevo pago fijo</string>
+    <string name="form_pago_fijo_que_quieres_hacer_con_este_pago">¿Qué quieres hacer con este pago fijo?</string>
+    <string name="form_pago_fijo_dejar_de_pagarlo_desde_hoy">Dejar de pagarlo desde hoy</string>
+    <string name="form_pago_fijo_borrarlo_con_sus_pendientes">Borrarlo con sus pendientes</string>
+    <string name="form_pago_fijo_sin_cuenta">Sin cuenta</string>
+    <string name="form_pago_fijo_desde">Desde</string>
+    <string name="form_pago_fijo_precio_de_oferta_al_principio">Precio de oferta al principio</string>
+    <string name="form_pago_fijo_por_ejemplo_3_meses_a_5">Por ejemplo, 3 meses a 5,99 €</string>
+    <string name="form_pago_fijo_precio_de_oferta">Precio de oferta</string>
+    <string name="form_pago_fijo_se_comparte_con_todo_el_hogar">Se comparte con todo el hogar</string>
+    <string name="form_pago_fijo_avisarme">Avisarme %1$s</string>
+    <string name="form_pago_fijo_cuando_avisar">Cuándo avisar</string>
+    <string name="form_pago_fijo_apuntarlo_como_pendiente_al_llegar">Apuntarlo como pendiente al llegar el día</string>
+    <string name="form_pago_fijo_tiene_fecha_de_fin">Tiene fecha de fin</string>
+    <string name="form_pago_fijo_ultimo_cargo">Último cargo</string>
+    <string name="form_pago_fijo_reactivar">Reactivar</string>
+    <string name="form_pago_fijo_archivar_ya_no_se_paga">Archivar (ya no se paga)</string>
+
+    <!-- inversiones -->
+    <string name="inversiones_no_apuntar_en_ninguna_cuenta">No apuntar en ninguna cuenta</string>
+    <string name="inversiones_compartido">Compartido</string>
+    <string name="inversiones_otro_miembro">Otro miembro</string>
+
+    <!-- metas -->
+    <string name="metas_a_este_ritmo_en_mes">A este ritmo, en %1$s</string>
+    <string name="metas_a_este_ritmo_en_mes_de_ano">A este ritmo, en %1$s de %2$d</string>
+    <plurals name="metas_deuda_cuotas">
+        <item quantity="one">Deuda · %1$d cuota</item>
+        <item quantity="many">Deuda · %1$d cuotas</item>
+        <item quantity="other">Deuda · %1$d cuotas</item>
+    </plurals>
+    <string name="metas_metas">Metas</string>
+    <string name="metas_fija_metas_y_cumplelas">Fija metas (y cúmplelas)</string>
+    <string name="metas_ahorro">Ahorro</string>
+    <string name="metas_deudas">Deudas</string>
+    <string name="metas_completadas">Completadas</string>
+    <string name="metas_archivadas">Archivadas (%1$s)</string>
+    <string name="metas_sin_metas_todavia">Sin metas todavía</string>
+    <string name="metas_crea_una_meta_para_ahorrar_un">Crea una meta para ahorrar (un viaje, un fondo de emergencia) o para terminar de pagar una deuda. Verás cuánto falta y cuándo llegarás.</string>
+    <string name="metas_crear_una_meta">Crear una meta</string>
+    <string name="metas_no_hay_metas_en_esta_seccion">No hay metas en esta sección.</string>
+    <string name="metas_de">de %1$s</string>
+    <string name="metas_meta_conseguida">¡Meta conseguida!</string>
+    <string name="metas_deuda_pagada">¡Deuda pagada!</string>
+    <string name="metas_compartida">Compartida · %1$s %2$s</string>
+    <string name="metas_faltan">Faltan %1$s</string>
+    <string name="metas_para_el_vas_bien">Para el %1$d de %2$s de %3$d, vas bien</string>
+    <string name="metas_para_el_necesitas">Para el %1$d de %2$s de %3$d, necesitas %4$s al mes</string>
+    <string name="metas_aportar">Aportar</string>
+    <string name="metas_apuntar_pago">Apuntar pago</string>
+    <string name="metas_borrar_esta_aportacion">Borrar esta aportación</string>
+    <string name="metas_borrar_esta_meta">¿Borrar esta meta?</string>
+    <string name="metas_se_borran_tambien_sus_aportaciones">Se borran también sus aportaciones, para todo el hogar. No se puede deshacer.</string>
+    <string name="metas_borrar_meta_y_aportaciones">Borrar meta y aportaciones</string>
+    <string name="metas_ahorrado">Ahorrado</string>
+    <string name="metas_pagado">Pagado</string>
+    <string name="metas_de_2">de %1$s · %2$s %%</string>
+    <string name="metas_proyeccion">Proyección</string>
+    <string name="metas_aportaciones">Aportaciones</string>
+    <string name="metas_todavia_no_hay_aportaciones">Todavía no hay aportaciones.</string>
+    <string name="metas_con_mes_llegas_en_de">Con %1$s/mes llegas en %2$s de %3$s</string>
+    <string name="metas_con_mes_en">Con %1$s/mes, en %2$s</string>
+    <string name="metas_faltan_anade_una_aportacion_o_un">Faltan %1$s. Añade una aportación o un plan mensual para ver cuándo llegarás</string>
+
+    <!-- form_meta -->
+    <plurals name="form_meta_durante_meses">
+        <item quantity="one">durante %1$d mes</item>
+        <item quantity="many">durante %1$d meses</item>
+        <item quantity="other">durante %1$d meses</item>
+    </plurals>
+    <string name="form_meta_indica_cuanto_se_debia">Indica cuánto se debía.</string>
+    <string name="form_meta_indica_cuanto_quieres_juntar">Indica cuánto quieres juntar.</string>
+    <string name="form_meta_algun_importe_no_es_valido">Algún importe no es válido.</string>
+    <string name="form_meta_editar_meta">Editar meta</string>
+    <string name="form_meta_nueva_meta">Nueva meta</string>
+    <string name="form_meta_cuenta_asociada">Cuenta asociada</string>
+    <string name="form_meta_ninguna">Ninguna</string>
+    <string name="form_meta_ahorro">Ahorro</string>
+    <string name="form_meta_pagar_deuda">Pagar deuda</string>
+    <string name="form_meta_nombre_de_la_meta">Nombre de la meta</string>
+    <string name="form_meta_lo_veras_en_tu_lista_de">Lo verás en tu lista de metas</string>
+    <string name="form_meta_cuanto_se_debia_al_empezar">Cuánto se debía al empezar</string>
+    <string name="form_meta_importe_objetivo">Importe objetivo</string>
+    <string name="form_meta_escribe_un_importe_por_ejemplo_150">Escribe un importe, por ejemplo 150</string>
+    <string name="form_meta_fecha_limite">Fecha límite</string>
+    <string name="form_meta_sin_fecha">Sin fecha</string>
+    <string name="form_meta_aporte_mensual_necesario">Aporte mensual necesario</string>
+    <string name="form_meta_mes">%1$s/mes</string>
+    <string name="form_meta_se_comparte_con_el_hogar">Se comparte con el hogar</string>
+    <string name="form_meta_todos_podran_ver_y_aportar">Todos podrán ver y aportar</string>
+    <string name="form_meta_quitar_la_fecha">Quitar la fecha</string>
+    <string name="form_meta_lo_que_ya_has_pagado_opcional">Lo que ya has pagado (opcional)</string>
+    <string name="form_meta_lo_que_ya_tienes_opcional">Lo que ya tienes (opcional)</string>
+    <string name="form_meta_aportacion_mensual_prevista">Aportación mensual prevista (opcional)</string>
+
+    <!-- cartera -->
+    <string name="cartera_cartera">Cartera</string>
+    <string name="cartera_comprar">Comprar</string>
+    <string name="cartera_comprar_activo">Comprar activo</string>
+    <string name="cartera_anadir_otro_activo">Añadir otro activo</string>
+    <string name="cartera_desde_el_inicio">desde el inicio</string>
+    <string name="cartera_sin_inversiones_todavia">Sin inversiones todavía</string>
+    <string name="cartera_anade_un_fondo_un_etf_o">Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker.</string>
+    <string name="cartera_anadir_un_activo">Añadir un activo</string>
+    <string name="cartera_participaciones">%1$s participaciones</string>
+    <string name="cartera_esto_no_es_asesoramiento_de">Esto no es asesoramiento de inversión. Los valores salen de los precios que apuntas a mano.</string>
+
+    <!-- activo -->
+    <string name="activo_fecha_y_comision">%1$s · comisión %2$s</string>
+    <string name="activo_activo">Activo</string>
+    <string name="activo_este_activo_ya_no_existe">Este activo ya no existe.</string>
+    <string name="activo_compra_apuntada_participaciones">Compra apuntada: %1$s participaciones.</string>
+    <string name="activo_la_compra_esta_apuntada_pero_no">La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas.</string>
+    <string name="activo_desde">Desde</string>
+    <string name="activo_borrar_esta_operacion">¿Borrar esta operación?</string>
+    <string name="activo_no_borra_el_movimiento_de_la">No borra el movimiento de la cuenta, si lo había.</string>
+    <string name="activo_precio_apuntado_hoy">Precio · apuntado hoy</string>
+    <string name="activo_precio_apuntado_el">Precio · apuntado el %1$s</string>
+    <string name="activo_aun_no_has_apuntado_ningun_precio">Aún no has apuntado ningún precio</string>
+    <string name="activo_desde_el_precio_anterior">%1$s desde el precio anterior</string>
+    <string name="activo_tu_posicion">Tu posición</string>
+    <string name="activo_participaciones">Participaciones</string>
+    <string name="activo_precio_medio">Precio medio</string>
+    <string name="activo_valor">Valor</string>
+    <string name="activo_rentabilidad">Rentabilidad</string>
+    <string name="activo_todavia_no_tienes_participaciones">Todavía no tienes participaciones. Apunta tu primera compra.</string>
+    <string name="activo_ganancia_ya_hecha_con_ventas">Ganancia ya hecha con ventas: %1$s</string>
+    <string name="activo_min_1_ano">Mín. 1 año</string>
+    <string name="activo_max_1_ano">Máx. 1 año</string>
+    <string name="activo_comprar">Comprar</string>
+    <string name="activo_apunta_primero_el_precio_de_hoy">Apunta primero el precio de hoy para calcular la compra.</string>
+    <string name="activo_por_importe">Por importe</string>
+    <string name="activo_por_participaciones">Por participaciones</string>
+    <string name="activo_uds">uds.</string>
+    <string name="activo_comision">Comisión</string>
+    <string name="activo_participaciones_2">≈ %1$s participaciones</string>
+    <string name="activo_escribe_las_participaciones_con">Escribe las participaciones con coma para los decimales, p. ej. 0,125.</string>
+    <string name="activo_repetir_cada_mes">Repetir cada mes</string>
+    <string name="activo_comprar_2">Comprar %1$s</string>
+    <string name="activo_operaciones">Operaciones</string>
+    <string name="activo_a">%1$s · %2$s a %3$s</string>
+    <string name="activo_esto_no_es_asesoramiento_de">Esto no es asesoramiento de inversión. La compra se apunta en la app; tu bróker no recibe ninguna orden.</string>
+
+    <!-- inversiones_recurrentes -->
+    <plurals name="inversiones_recurrentes_al_mes_en_planes">
+        <item quantity="one">%1$s al mes en %2$d plan activo</item>
+        <item quantity="many">%1$s al mes en %2$d planes activos</item>
+        <item quantity="other">%1$s al mes en %2$d planes activos</item>
+    </plurals>
+    <plurals name="inversiones_recurrentes_al_mes_en_planes_y_pausa">
+        <item quantity="one">%1$s al mes en %2$d plan activo y %3$d en pausa</item>
+        <item quantity="many">%1$s al mes en %2$d planes activos y %3$d en pausa</item>
+        <item quantity="other">%1$s al mes en %2$d planes activos y %3$d en pausa</item>
+    </plurals>
+    <string name="inversiones_recurrentes_en_pausa">%1$s · en pausa</string>
+    <string name="inversiones_recurrentes_inversiones_recurrentes">Inversiones recurrentes</string>
+    <string name="inversiones_recurrentes_el_dia_de_cada_mes">el día %1$s de cada mes</string>
+    <string name="inversiones_recurrentes_activo">Activo</string>
+    <string name="inversiones_recurrentes_anade_antes_un_activo_en_la">Añade antes un activo en la cartera.</string>
+    <string name="inversiones_recurrentes_este_mes">Este mes</string>
+    <string name="inversiones_recurrentes_un_plan_no_compra_nada_solo">Un plan no compra nada solo: te avisa el día que toca y tú confirmas la compra en la app.</string>
+
+    <!-- form_activo -->
+    <string name="form_activo_escribe_el_precio_con_coma_para">Escribe el precio con coma para los decimales, p. ej. 12,50.</string>
+    <string name="form_activo_escribe_la_comision_con_numeros_p">Escribe la comisión con números, p. ej. 0,2.</string>
+    <string name="form_activo_nuevo_activo">Nuevo activo</string>
+    <string name="form_activo_editar_activo">Editar activo</string>
+    <string name="form_activo_borrar_este_activo">¿Borrar este activo?</string>
+    <string name="form_activo_se_borran_tambien_sus_precios">Se borran también sus precios, operaciones y aportaciones automáticas, para todo el hogar. No se puede deshacer.</string>
+    <string name="form_activo_borrar_activo">Borrar activo</string>
+    <string name="form_activo_tipo">Tipo</string>
+    <string name="form_activo_clase">Clase</string>
+    <string name="form_activo_de_quien_es">De quién es</string>
+    <string name="form_activo_donde_esta">Dónde está</string>
+    <string name="form_activo_ninguna_cuenta">Ninguna cuenta</string>
+    <string name="form_activo_ticker_o_isin_opcional">Ticker o ISIN (opcional)</string>
+    <string name="form_activo_precio_actual_por_participacion">Precio actual por participación</string>
+    <string name="form_activo_comision_de_compra_en" formatted="false">Comisión de compra en %</string>
+    <string name="form_activo_el_precio_lo_apuntas_tu_buscalo">El precio lo apuntas tú: búscalo en tu bróker o banco cuando quieras actualizarlo.</string>
+    <string name="form_activo_todo_el_hogar_ve_las_inversiones">Todo el hogar ve las inversiones, como las cuentas.</string>
+    <string name="form_activo_borrar_activo_y_sus_operaciones">Borrar activo y sus operaciones</string>
+
+    <!-- apuntar_precio -->
+    <string name="apuntar_precio_apuntar_precio">Apuntar precio</string>
+    <string name="apuntar_precio_precio_por_participacion">Precio por participación</string>
+    <string name="apuntar_precio_si_ya_habias_apuntado_un_precio">Si ya habías apuntado un precio ese día, se sustituye.</string>
+
+    <!-- vender -->
+    <string name="vender_escribe_las_participaciones_y_el">Escribe las participaciones y el precio con coma para los decimales, p. ej. 0,125.</string>
+    <string name="vender_escribe_la_comision_con_numeros">Escribe la comisión con números.</string>
+    <string name="vender_vender">Vender</string>
+    <string name="vender_ingresar_en">Ingresar en</string>
+    <string name="vender_participaciones_tienes">Participaciones (tienes %1$s)</string>
+    <string name="vender_comision_en_opcional">Comisión en € (opcional)</string>
+    <string name="vender_si_eliges_una_cuenta_se_apunta">Si eliges una cuenta, se apunta allí lo que recibes.</string>
+
+    <!-- form_plan -->
+    <string name="form_plan_elige_un_activo">Elige un activo.</string>
+    <string name="form_plan_escribe_el_importe_y_la">Escribe el importe y la rentabilidad con números.</string>
+    <string name="form_plan_sin_aviso">Sin aviso</string>
+    <string name="form_plan_el_mismo_dia">El mismo día</string>
+    <string name="form_plan_1_dia_antes">1 día antes</string>
+    <string name="form_plan_3_dias_antes">3 días antes</string>
+    <string name="form_plan_nuevo_plan">Nuevo plan</string>
+    <string name="form_plan_editar_plan">Editar plan</string>
+    <string name="form_plan_crear">Crear</string>
+    <string name="form_plan_borrar_este_plan">¿Borrar este plan?</string>
+    <string name="form_plan_las_compras_que_ya_apuntaste_no">Las compras que ya apuntaste no se borran.</string>
+    <string name="form_plan_borrar_plan">Borrar plan</string>
+    <string name="form_plan_activo">Activo</string>
+    <string name="form_plan_aviso">Aviso</string>
+    <string name="form_plan_sale_de">Sale de</string>
+    <string name="form_plan_estado">Estado</string>
+    <string name="form_plan_proxima">Próxima</string>
+    <string name="form_plan_en_pausa">En pausa</string>
+    <string name="form_plan_terminado">Terminado</string>
+    <string name="form_plan_invertido_con_el_plan">Invertido con el plan</string>
+    <string name="form_plan_rentabilidad_del_activo">Rentabilidad del activo</string>
+    <string name="form_plan_elige_uno">Elige uno</string>
+    <string name="form_plan_primera_aportacion">Primera aportación</string>
+    <string name="form_plan_rentabilidad_anual_supuesta">Rentabilidad anual supuesta</string>
+    <string name="form_plan_si_rinde_un_al_ano_lo">Si rinde un %1$s %% al año, lo aportado en 1 año valdría unos %2$s y en 5 años unos %3$s. Es una estimación, no una promesa.</string>
+    <string name="form_plan_la_rentabilidad_supuesta_solo">La rentabilidad supuesta sólo sirve para la proyección.</string>
+
+    <!-- hogar -->
+    <string name="hogar_tu_propietario">Tú · propietario</string>
+    <string name="hogar_tu_miembro">Tú · miembro</string>
+    <string name="hogar_propietario">Propietario</string>
+    <string name="hogar_miembro">Miembro</string>
+    <string name="hogar_no_se_han_podido_cargar_los">No se han podido cargar los miembros del hogar.</string>
+    <string name="hogar_cambiar_el_nombre_del_hogar">Cambiar el nombre del hogar</string>
+    <string name="hogar_hogar">Hogar</string>
+    <string name="hogar_quitar_a_del_hogar">¿Quitar a %1$s del hogar?</string>
+    <string name="hogar_quitar">Quitar</string>
+    <string name="hogar_hacer_propietario_a">¿Hacer propietario a %1$s?</string>
+    <string name="hogar_hacer_propietario">Hacer propietario</string>
+    <string name="hogar_nombre_del_hogar">Nombre del hogar</string>
+    <string name="hogar_lo_veran_todos_los_miembros">Lo verán todos los miembros.</string>
+    <string name="hogar_salir_del_hogar">¿Salir del hogar?</string>
+    <string name="hogar_salir">Salir</string>
+    <string name="hogar_dia_de_inicio_del_mes">Día de inicio del mes</string>
+    <string name="hogar_dia">Día %1$s</string>
+    <string name="hogar_tu_nombre_visible">Tu nombre visible</string>
+    <string name="hogar_es_como_te_ven_los_demas">Es como te ven los demás miembros. Vacío, se usa tu usuario; como mucho 60 caracteres.</string>
+    <string name="hogar_nombre_visible">Nombre visible</string>
+    <string name="hogar_tus_hogares">Tus hogares</string>
+    <string name="hogar_abierto">Abierto</string>
+    <string name="hogar_abrir_este_hogar">Abrir este hogar</string>
+    <string name="hogar_cada_hogar_tiene_sus_propias">Cada hogar tiene sus propias cuentas y presupuestos. Este dispositivo recuerda cuál abriste.</string>
+    <string name="hogar_ajustes">Ajustes</string>
+    <string name="hogar_inicio_del_mes">Inicio del mes</string>
+    <string name="hogar_dia_solo_quien_creo_el_hogar">Día %1$s · solo quien creó el hogar puede cambiarlo</string>
+    <string name="hogar_presupuestos_informes_y_este_mes">Presupuestos, informes y «este mes» cuentan desde el día de inicio. No se cambia ni se borra ningún movimiento.</string>
+    <string name="hogar_miembros">Miembros</string>
+    <string name="hogar_quitar_del_hogar">Quitar del hogar</string>
+    <string name="hogar_que_compartis">Qué compartís</string>
+    <string name="hogar_metas_pagos_fijos_y_gastos">Metas, pagos fijos y gastos esenciales. Las cuentas, los presupuestos y el score son de cada uno salvo que los compartas.</string>
+    <string name="hogar_invitar_a_alguien">Invitar a alguien</string>
+    <string name="hogar_salir_del_hogar_2">Salir del hogar</string>
+    <string name="hogar_aviso_salir">Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «CSV para Excel», en Más opciones.</string>
+    <string name="hogar_aviso_quitar_miembro">Dejará de tener acceso a este hogar. Sus datos se guardan %1$s días para que pueda exportarlos y después se borran. Si le vuelves a invitar antes, los recupera.</string>
+    <string name="hogar_aviso_ultimo_miembro">Eres el único miembro: el hogar también se borrará.</string>
+    <string name="hogar_aviso_traspasar">Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. Tú pasarás a ser miembro.</string>
+
+    <!-- invitar -->
+    <plurals name="invitar_caduca_en_horas">
+        <item quantity="one">Caduca en %1$d hora</item>
+        <item quantity="many">Caduca en %1$d horas</item>
+        <item quantity="other">Caduca en %1$d horas</item>
+    </plurals>
+    <string name="invitar_invitar">Invitar</string>
+    <string name="invitar_escanea_este_codigo_desde_su_movil">Escanea este código desde su móvil</string>
+    <string name="invitar_o_escribe_el_codigo">O escribe el código</string>
+    <string name="invitar_copiar_codigo">Copiar código</string>
+    <string name="invitar_compartir_enlace">Compartir enlace</string>
+    <string name="invitar_unete_a_nuestro_hogar_en_save">Únete a nuestro hogar en Save the Money: %1$s (código %2$s)</string>
+
+    <!-- mas -->
+    <string name="mas_tema">Tema</string>
+    <string name="mas_recordarme_apuntar_gastos">Recordarme apuntar gastos</string>
+    <string name="mas_patrimonio_informes_y_score">Patrimonio, informes y score</string>
+    <string name="mas_inversiones">Inversiones</string>
+    <string name="mas_datos">Datos</string>
+    <string name="mas_pdf_de_pagos_del_mes">PDF de pagos del mes</string>
+    <string name="mas_csv_para_excel">CSV para Excel</string>
+    <string name="mas_preferencias">Preferencias</string>
+    <string name="mas_tema_oscuro">Tema oscuro</string>
+    <string name="mas_igual_que_el_sistema">Igual que el sistema</string>
+    <string name="mas_avisos_de_pagos_fijos">Avisos de pagos fijos</string>
+    <string name="mas_antes_de_cada_cargo">Antes de cada cargo</string>
+    <string name="mas_avisos_de_limites_del_presupuesto">Avisos de límites del presupuesto</string>
+    <string name="mas_al_llegar_al_80_o_pasarse" formatted="false">Al llegar al 80 % o pasarse</string>
+    <string name="mas_android_no_deja_mostrar">Android no deja mostrar notificaciones de Save the Money: los avisos no se verán hasta que las actives en Ajustes.</string>
+    <string name="mas_recordatorios">Recordatorios</string>
+    <string name="mas_hora">Hora</string>
+    <string name="mas_a_las_00">A las %1$s:00</string>
+    <string name="mas_resumen_semanal_los_lunes">Resumen semanal los lunes</string>
+    <string name="mas_a_las_9_00_con_la">A las 9:00, con la semana anterior</string>
+    <string name="mas_vista">Vista</string>
+    <string name="mas_modo_incognito">Modo incógnito</string>
+    <string name="mas_oculta_los_importes_tambien_con_el">Oculta los importes; también con el ojo del Resumen</string>
+    <string name="mas_sin_centimos">Sin céntimos</string>
+    <string name="mas_1_235_en_vez_de_1">1.235 € en vez de 1.234,56 €</string>
+    <string name="mas_mostrar_en_los_ingresos">Mostrar + en los ingresos</string>
+    <string name="mas_ingresos_en_verde">Ingresos en verde</string>
+    <string name="mas_en_las_listas_de_movimientos">En las listas de movimientos</string>
+    <string name="mas_solo_en_este_dispositivo_los_pdf">Sólo en este dispositivo. Los PDF y CSV llevan siempre los importes completos.</string>
+    <string name="mas_cambiar_la_contrasena">Cambiar la contraseña</string>
+    <string name="mas_contrasena_cambiada_esta_sesion">Contraseña cambiada. Esta sesión sigue abierta; en tus otros dispositivos tendrás que volver a entrar.</string>
+    <string name="mas_pide_la_contrasena_actual_al">Pide la contraseña actual. Al cambiarla se cierra la sesión en tus otros dispositivos.</string>
+    <string name="mas_borrar_mi_cuenta">Borrar mi cuenta</string>
+    <string name="mas_borra_tu_usuario_y_todo_lo">Borra tu usuario y todo lo que has apuntado. Pide la contraseña y no se puede deshacer.</string>
+    <string name="mas_cambiar">Cambiar</string>
+    <string name="mas_contrasena_actual">Contraseña actual</string>
+    <string name="mas_nueva_contrasena">Nueva contraseña</string>
+    <string name="mas_repite_la_nueva_contrasena">Repite la nueva contraseña</string>
+    <string name="mas_borrar_mi_cuenta_para_siempre">Borrar mi cuenta para siempre</string>
+    <plurals name="mas_importar_movimientos">
+        <item quantity="one">Importar %1$d movimiento</item>
+        <item quantity="many">Importar %1$d movimientos</item>
+        <item quantity="other">Importar %1$d movimientos</item>
+    </plurals>
+    <string name="mas_aviso_borrar_cuenta">Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes.</string>
+
+    <!-- hogares_anteriores -->
+    <string name="hogares_anteriores_ya_no_estas_en">Ya no estás en %1$s</string>
+    <string name="hogares_anteriores_lo_que_apuntaste_alli_se_guarda">Lo que apuntaste allí se guarda hasta el %1$s y después se borra. Hasta entonces puedes exportar tus movimientos.</string>
+    <string name="hogares_anteriores_exportar_mis_movimientos_csv">Exportar mis movimientos (CSV)</string>
+
+    <!-- categorias -->
+    <string name="categorias_categorias">Categorías</string>
+    <string name="categorias_anadir_categoria">Añadir categoría</string>
+    <string name="categorias_gastos">Gastos</string>
+    <string name="categorias_ingresos">Ingresos</string>
+    <string name="categorias_sin_grupo">Sin grupo</string>
+    <string name="categorias_borrar">¿Borrar «%1$s»?</string>
+    <string name="categorias_movimientos_recientes_se_quedaran">%1$s movimientos recientes se quedarán sin categoría.</string>
+    <string name="categorias_no_hay_movimientos_recientes_con">No hay movimientos recientes con esta categoría.</string>
+    <string name="categorias_editar_categoria">Editar categoría</string>
+    <string name="categorias_nueva_categoria">Nueva categoría</string>
+    <string name="categorias_reordenar">Reordenar</string>
+
+    <!-- importar_csv -->
+    <string name="importar_csv_columna">Columna %1$s</string>
+    <string name="importar_csv_categoria">Categoría: %1$s</string>
+    <string name="importar_csv_filas_separador">%1$s filas · separador %2$s</string>
+    <string name="importar_csv_tabulador">tabulador</string>
+    <string name="importar_csv_coma_decimal">%1$s · coma decimal</string>
+    <plurals name="importar_csv_pagos_recurrentes_creados">
+        <item quantity="one">" %1$d pago recurrente creado."</item>
+        <item quantity="many">" %1$d pagos recurrentes creados."</item>
+        <item quantity="other">" %1$d pagos recurrentes creados."</item>
+    </plurals>
+    <string name="importar_csv_importar_csv">Importar CSV</string>
+    <string name="importar_csv_movimientos_importados">%1$s movimientos importados.</string>
+    <string name="importar_csv_ya_estaban_y_no_se_han">" %1$s ya estaban y no se han repetido."</string>
+    <string name="importar_csv_importando">Importando…</string>
+    <string name="importar_csv_importar">Importar</string>
+    <string name="importar_csv_importar_esta_fila">Importar esta fila</string>
+    <string name="importar_csv_separador">Separador</string>
+    <string name="importar_csv_cargos_gastos">Cargos (gastos)</string>
+    <string name="importar_csv_abonos_ingresos">Abonos (ingresos)</string>
+    <string name="importar_csv_tarjeta_de_las_compras">Tarjeta de las compras</string>
+    <string name="importar_csv_formato_de_fecha">Formato de fecha</string>
+    <string name="importar_csv_elegir_archivo_csv">Elegir archivo CSV</string>
+    <string name="importar_csv_el_archivo_no_se_sube_solo">El archivo no se sube: solo se guardan los movimientos</string>
+    <string name="importar_csv_quitar_archivo">Quitar archivo</string>
+    <string name="importar_csv_si_las_columnas_salen_mal_prueba">Si las columnas salen mal, prueba con otro separador.</string>
+    <string name="importar_csv_no_he_reconocido_las_columnas_de">No he reconocido las columnas de fecha, concepto e importe de este archivo.</string>
+    <string name="importar_csv_crear_una_cuenta">Crear una cuenta</string>
+    <string name="importar_csv_columnas_como_la_ultima_vez_con">Columnas como la última vez con este banco.</string>
+    <string name="importar_csv_que_columna_es_cada_dato">Qué columna es cada dato</string>
+    <string name="importar_csv_revisa_fila_a_fila">Revisa fila a fila</string>
+    <string name="importar_csv_sin_importar">%1$s sin importar</string>
+    <string name="importar_csv_no_se_importara">%1$s · No se importará</string>
+    <string name="importar_csv_excluido">Excluido</string>
+    <string name="importar_csv_recurrente_cada_mes">Recurrente, cada mes</string>
+    <string name="importar_csv_suscripcion_cada_mes">Suscripción, cada mes</string>
+    <string name="importar_csv_compra_con_tarjeta">Compra con tarjeta</string>
+    <string name="importar_csv_y_mas">… y %1$s más</string>
+    <string name="importar_csv_elige_una_tarjeta">Elige una tarjeta</string>
+    <string name="importar_csv_toca_una_fila_para_no_importarla">Toca una fila para no importarla, cambiar su categoría o excluirla del presupuesto. En un gasto también puedes marcarlo como recurrente o suscripción (se crea un pago mensual desde esa fecha, que puedes ajustar en Pagos fijos) o como compra con tarjeta de crédito (se apunta en la tarjeta).</string>
+    <string name="importar_csv_filas_que_no_se_importaran">Filas que no se importarán (%1$s)</string>
+    <string name="importar_csv_fila">Fila %1$s: %2$s</string>
+    <string name="importar_csv_cargos_y_abonos_en_columnas">Cargos y abonos en columnas separadas</string>
+    <string name="importar_csv_el_archivo_es_demasiado_grande">El archivo es demasiado grande (máximo 10 MB).</string>
+    <string name="importar_csv_no_he_podido_abrir_el_archivo">No he podido abrir el archivo.</string>
+    <string name="importar_csv_punto_y_coma">Punto y coma (;)</string>
+    <string name="importar_csv_tabulador_2">Tabulador</string>
+    <string name="importar_csv_coma">Coma (,)</string>
+
+    <!-- borrar_datos -->
+    <string name="borrar_datos_escribe_para_confirmar">Escribe «%1$s» para confirmar</string>
+    <string name="borrar_datos_borrar_lo_que_creaste">¿Borrar lo que creaste?</string>
+    <string name="borrar_datos_borra_lo_que_creaste_tu_cuentas">Borra lo que creaste tú: cuentas, tarjetas, movimientos, presupuestos, pagos fijos, metas e inversiones. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo. Esta acción no se puede deshacer.</string>
+    <string name="borrar_datos_palabra">borrar</string>
+    <string name="borrar_datos_borrar_datos_y_empezar_de_cero">Borrar datos y empezar de cero</string>
+
+    <!-- detalle_movimiento -->
+    <string name="detalle_movimiento_duplicar">Duplicar</string>
+    <string name="detalle_movimiento_sin_revisar">Sin revisar</string>
+    <string name="detalle_movimiento_aplazar">Aplazar</string>
+    <string name="detalle_movimiento_revisado">Revisado</string>
+
+    <!-- aportar -->
+    <string name="aportar_aportacion">Aportación</string>
+    <string name="aportar_pago_de_la_deuda">Pago de la deuda</string>
+    <string name="aportar_sacar_dinero_de_la_meta">Sacar dinero de la meta</string>
+
+    <!-- pagos_del_mes -->
+    <string name="pagos_del_mes_pagos_del_mes">Pagos del mes</string>
+    <string name="pagos_del_mes_este_mes">Este mes</string>
+    <string name="pagos_del_mes_el_mes_que_viene">El mes que viene</string>
+    <string name="pagos_del_mes_pagos_de">Pagos de %1$s</string>
+    <string name="pagos_del_mes_quedan_por_pagar">Quedan %1$s por pagar</string>
+    <string name="pagos_del_mes_no_hay_pagos_fijos_este_mes">No hay pagos fijos este mes. Añádelos en Pagos fijos.</string>
+    <string name="pagos_del_mes_crear_pdf">Crear PDF</string>
+    <string name="pagos_del_mes_salen_los_cargos_de_suscripciones">Salen los cargos de suscripciones y gastos esenciales de Pagos fijos. El PDF se crea en este dispositivo.</string>
+
+    <!-- escaner_qr -->
+    <string name="escaner_qr_sin_permiso_de_camara_no_se">Sin permiso de cámara no se puede escanear. Puedes escribir el código a mano.</string>
+    <string name="escaner_qr_escanear_qr">Escanear QR</string>
+    <string name="escaner_qr_apunta_al_qr_de_tu_pareja">Apunta al QR de tu pareja.</string>
+    <string name="escaner_qr_este_dispositivo_no_tiene_camara">Este dispositivo no tiene cámara trasera. Puedes escribir el código a mano.</string>
+
+    <!-- apuntar_score -->
+    <string name="apuntar_score_escribe_el_score_con_numeros">Escribe el score con números.</string>
+    <string name="apuntar_score_apuntar_score">Apuntar score</string>
+    <string name="apuntar_score_escala">Escala</string>
+    <string name="apuntar_score_sobre">Sobre %1$s</string>
+    <string name="apuntar_score_score">Score</string>
+    <string name="apuntar_score_proveedor_opcional">Proveedor (opcional)</string>
+    <string name="apuntar_score_solo_lo_ves_tu_no_se">Sólo lo ves tú. No se comparte con el hogar.</string>
+
+    <!-- calendario -->
+    <string name="calendario_inversion">Inversión</string>
+    <string name="calendario_calendario_de_pagos">Calendario de pagos</string>
+    <string name="calendario_pagos_de">Pagos de %1$s</string>
+    <string name="calendario_ingresos_previstos">Ingresos previstos: %1$s</string>
+    <string name="calendario_mes_anterior">Mes anterior</string>
+    <string name="calendario_mes_siguiente">Mes siguiente</string>
+    <string name="calendario_sin_pagos_este_dia">Sin pagos este día</string>
+    <string name="calendario_proximos">Próximos</string>
+    <string name="calendario_no_hay_pagos_previstos">No hay pagos previstos</string>
+
+    <!-- dia_de_cobro -->
+    <string name="dia_de_cobro_dia_de_cobro">Día de cobro</string>
+    <string name="dia_de_cobro_cobro">Cobro</string>
+    <string name="dia_de_cobro_el_dia">El día %1$s</string>
+    <string name="dia_de_cobro_primer_dia">Primer día: %1$s</string>
+    <string name="dia_de_cobro_segundo_dia">Segundo día: %1$s</string>
+    <string name="dia_de_cobro_un_dia_que_cobraste">Un día que cobraste</string>
+    <string name="dia_de_cobro_el_presupuesto_va_de_un_cobro">El presupuesto va de un cobro al día antes del siguiente. Si cobras un día 31 y el mes es más corto, cuenta el último día. Sólo lo ves tú.</string>
+    <string name="dia_de_cobro_periodo_de_hoy">Periodo de hoy</string>
+    <string name="dia_de_cobro_del">Del</string>
+    <string name="dia_de_cobro_al">Al</string>
+
+    <!-- form_extra -->
+    <string name="form_extra_escribe_un_limite_por_ejemplo_800">Escribe un límite, por ejemplo 800,00.</string>
+    <string name="form_extra_nuevo_presupuesto_extra">Nuevo presupuesto extra</string>
+    <string name="form_extra_borrar">¿Borrar «%1$s»?</string>
+    <string name="form_extra_los_movimientos_no_se_borran">Los movimientos no se borran.</string>
+    <string name="form_extra_nombre_p_ej_vacaciones">Nombre, p. ej. Vacaciones</string>
+    <string name="form_extra_limite_p_ej_800_00">Límite, p. ej. 800,00</string>
+    <string name="form_extra_favorito_sale_en_resumen">Favorito (sale en Resumen)</string>
+    <string name="form_extra_con_fecha_de_fin">Con fecha de fin</string>
+    <string name="form_extra_desde">Desde</string>
+    <string name="form_extra_hasta">Hasta</string>
+    <string name="form_extra_si_no_eliges_ninguna_cuenta_todo">Si no eliges ninguna, cuenta todo el gasto.</string>
+    <string name="form_extra_elegidas">%1$s elegidas.</string>
+    <string name="form_extra_cuentas">Cuentas</string>
+    <string name="form_extra_si_no_eliges_ninguna_cuentan_todas">Si no eliges ninguna, cuentan todas.</string>
+    <string name="form_extra_borrar_presupuesto_extra">Borrar presupuesto extra</string>
+
+    <!-- confirmar_cargo -->
+    <string name="confirmar_cargo_escribe_el_importe_por_ejemplo_12">Escribe el importe, por ejemplo 12,99.</string>
+    <string name="confirmar_cargo_elige_la_cuenta_del_cargo">Elige la cuenta del cargo.</string>
+    <string name="confirmar_cargo_dia">Día</string>
+    <string name="confirmar_cargo_se_apunta_como_un_movimiento">Se apunta como un movimiento normal. Si el importe ha cambiado, pon el que te han cobrado de verdad.</string>
+
+    <!-- resumen_semanal -->
+    <string name="resumen_semanal_resumen_semanal">Resumen semanal</string>
+    <string name="resumen_semanal_la_pasada">La pasada</string>
+    <string name="resumen_semanal_esta_semana">Esta semana</string>
+    <string name="resumen_semanal_ingresos">Ingresos</string>
+    <string name="resumen_semanal_semana_anterior">Semana anterior</string>
+    <string name="resumen_semanal_gastos_mas_grandes">Gastos más grandes</string>
+    <string name="resumen_semanal_no_hay_gastos_esta_semana">No hay gastos esta semana.</string>
+    <string name="resumen_semanal_en_que_se_fue">En qué se fue</string>
+    <string name="resumen_semanal_dia_a_dia">Día a día</string>
+    <string name="resumen_semanal_cuanto_mas_oscuro_mas_gastaste_ese">Cuanto más oscuro, más gastaste ese día. Las últimas 6 semanas.</string>
+    <string name="resumen_semanal_lunes">Lunes</string>
+    <string name="resumen_semanal_martes">Martes</string>
+    <string name="resumen_semanal_miercoles">Miércoles</string>
+    <string name="resumen_semanal_jueves">Jueves</string>
+    <string name="resumen_semanal_viernes">Viernes</string>
+    <string name="resumen_semanal_sabado">Sábado</string>
+    <string name="resumen_semanal_domingo">Domingo</string>
+
+    <!-- pendientes -->
+    <string name="pendientes_pendientes_de_confirmar">Pendientes de confirmar</string>
+    <string name="pendientes_aun_no_cuentan_en_tus_saldos">Aún no cuentan en tus saldos ni en el presupuesto.</string>
+    <string name="pendientes_no_se_ha_cobrado">No se ha cobrado</string>
+    <string name="pendientes_y_mas">Y %1$s más.</string>
+    <string name="pendientes_la_semana_pasada">La semana pasada · %1$s</string>
+
+    <!-- calculadora -->
+    <string name="calculadora_la_cuenta_no_esta_completa">La cuenta no está completa</string>
+    <string name="calculadora_mas">Más</string>
+    <string name="calculadora_menos">Menos</string>
+    <string name="calculadora_por">Por</string>
+    <string name="calculadora_entre">Entre</string>
+    <string name="calculadora_abrir_parentesis">Abrir paréntesis</string>
+    <string name="calculadora_cerrar_parentesis">Cerrar paréntesis</string>
+    <string name="calculadora_calcular">Calcular</string>
+
+    <!-- nav -->
+    <string name="nav_inicio">Inicio</string>
+    <string name="nav_presupuesto">Presupuesto</string>
+    <string name="nav_flujo">Flujo</string>
+    <string name="nav_metas">Metas</string>
+    <string name="nav_mas">Más</string>
+
+    <!-- bloqueo -->
+    <string name="bloqueo_desbloquea_save_the_money">Desbloquea Save the Money</string>
+    <string name="bloqueo_solo_en_este_dispositivo_tapa_la">Sólo en este dispositivo. Tapa la app en las apps recientes y no deja hacer capturas de pantalla. Protege la pantalla, no los datos: tu hogar los sigue viendo en los suyos.</string>
+    <string name="bloqueo_save_the_money_esta_bloqueada">Save the Money está bloqueada</string>
+    <string name="bloqueo_desbloquear">Desbloquear</string>
+    <string name="bloqueo_seguridad">Seguridad</string>
+    <string name="bloqueo_pedir_huella_cara_o_codigo">Pedir huella, cara o código</string>
+    <string name="bloqueo_al_abrir_y_al_volver_tras">Al abrir y al volver tras más de un minuto</string>
+    <string name="bloqueo_configura_un_bloqueo_de_pantalla">Configura un bloqueo de pantalla en el dispositivo para usarlo</string>
+
+    <!-- avisos -->
+    <string name="avisos_canal">Avisos</string>
+
+    <!-- pdf_pagos -->
+    <string name="pdf_pagos_pagos_de_de">Pagos de %1$s de %2$d</string>
+    <string name="pdf_pagos_total">Total: %1$s</string>
+    <string name="pdf_pagos_dia">Día</string>
+    <string name="pdf_pagos_pagado">Pagado</string>
+    <string name="pdf_pagos_suscripciones">Suscripciones</string>
+    <string name="pdf_pagos_esenciales">Esenciales</string>
+    <string name="pdf_pagos_creado_con_save_the_money_el">Creado con Save the Money el %1$d de %2$s de %3$d.</string>
+
+    <!-- formato_fecha -->
+    <string name="formato_fecha_dia_mes_ano">Día/mes/año</string>
+    <string name="formato_fecha_ano_mes_dia">Año-mes-día</string>
+    <string name="formato_fecha_mes_dia_ano">Mes/día/año</string>
+
+    <!-- marca_importar -->
+    <string name="marca_importar_sin_marcar">Sin marcar</string>
+    <string name="marca_importar_recurrente">Recurrente</string>
+    <string name="marca_importar_suscripcion">Suscripción</string>
+    <string name="marca_importar_compra_con_tarjeta">Compra con tarjeta</string>
+
+    <!-- filtro_tipo -->
+    <string name="filtro_tipo_todos">Todos</string>
+    <string name="filtro_tipo_gastos">Gastos</string>
+    <string name="filtro_tipo_ingresos">Ingresos</string>
+    <string name="filtro_tipo_transferencias">Transferencias</string>
+
+    <!-- filtro_estado -->
+    <string name="filtro_estado_todos">Todos</string>
+    <string name="filtro_estado_sin_revisar">Sin revisar</string>
+    <string name="filtro_estado_revisados">Revisados</string>
+    <string name="filtro_estado_excluidos">Excluidos</string>
+
+    <!-- filtro_fechas -->
+    <string name="filtro_fechas_cualquier_fecha">Cualquier fecha</string>
+    <string name="filtro_fechas_este_mes">Este mes</string>
+    <string name="filtro_fechas_el_mes_pasado">El mes pasado</string>
+    <string name="filtro_fechas_ultimos_30_dias">Últimos 30 días</string>
+    <string name="filtro_fechas_ultimos_90_dias">Últimos 90 días</string>
+    <string name="filtro_fechas_este_ano">Este año</string>
+    <string name="filtro_fechas_fechas_a_medida">Fechas a medida</string>
+
+    <!-- score_tramo -->
+    <string name="score_tramo_excelente">Excelente</string>
+    <string name="score_tramo_bueno">Bueno</string>
+    <string name="score_tramo_regular">Regular</string>
+    <string name="score_tramo_mejorable">Mejorable</string>
+
+    <!-- informe_tipo -->
+    <string name="informe_tipo_gastos">Gastos</string>
+    <string name="informe_tipo_ingresos">Ingresos</string>
+
+    <!-- informe_periodo -->
+    <string name="informe_periodo_este_mes">Este mes</string>
+    <string name="informe_periodo_el_mes_pasado">El mes pasado</string>
+    <string name="informe_periodo_ultimos_3_meses">Últimos 3 meses</string>
+    <string name="informe_periodo_ultimos_6_meses">Últimos 6 meses</string>
+    <string name="informe_periodo_este_ano">Este año</string>
+    <string name="informe_periodo_ultimos_12_meses">Últimos 12 meses</string>
+
+    <!-- informe_periodo_anterior -->
+    <string name="informe_periodo_anterior_el_mes_pasado_a_estas_alturas">el mes pasado a estas alturas</string>
+    <string name="informe_periodo_anterior_el_mes_anterior">el mes anterior</string>
+    <string name="informe_periodo_anterior_los_3_meses_anteriores">los 3 meses anteriores</string>
+    <string name="informe_periodo_anterior_los_6_meses_anteriores">los 6 meses anteriores</string>
+    <string name="informe_periodo_anterior_el_ano_pasado_a_estas_alturas">el año pasado a estas alturas</string>
+    <string name="informe_periodo_anterior_los_12_meses_anteriores">los 12 meses anteriores</string>
+
+    <!-- recordatorio_apuntar -->
+    <string name="recordatorio_apuntar_no">No</string>
+    <string name="recordatorio_apuntar_cada_dia">Cada día</string>
+    <string name="recordatorio_apuntar_los_domingos">Los domingos</string>
+
+    <!-- tipo_cuenta -->
+    <string name="tipo_cuenta_cuenta_corriente">Cuenta corriente</string>
+    <string name="tipo_cuenta_ahorro">Ahorro</string>
+    <string name="tipo_cuenta_tarjeta_de_credito">Tarjeta de crédito</string>
+    <string name="tipo_cuenta_efectivo">Efectivo</string>
+    <string name="tipo_cuenta_inversion">Inversión</string>
+    <string name="tipo_cuenta_prestamo">Préstamo</string>
+    <string name="tipo_cuenta_otra">Otra</string>
+
+    <!-- tipo_activo -->
+    <string name="tipo_activo_fondo">Fondo</string>
+    <string name="tipo_activo_etf">ETF</string>
+    <string name="tipo_activo_accion">Acción</string>
+    <string name="tipo_activo_bono">Bono</string>
+    <string name="tipo_activo_cripto">Cripto</string>
+    <string name="tipo_activo_plan_de_pensiones">Plan de pensiones</string>
+    <string name="tipo_activo_liquidez">Liquidez</string>
+    <string name="tipo_activo_otro">Otro</string>
+
+    <!-- clase_activo -->
+    <string name="clase_activo_renta_variable">Renta variable</string>
+    <string name="clase_activo_renta_fija">Renta fija</string>
+    <string name="clase_activo_cripto">Cripto</string>
+    <string name="clase_activo_liquidez">Liquidez</string>
+    <string name="clase_activo_otros">Otros</string>
+
+    <!-- operacion -->
+    <string name="operacion_compra">Compra</string>
+    <string name="operacion_venta">Venta</string>
+
+    <!-- rango_grafico -->
+    <string name="rango_grafico_1d">1D</string>
+    <string name="rango_grafico_1s">1S</string>
+    <string name="rango_grafico_1m">1M</string>
+    <string name="rango_grafico_6m">6M</string>
+    <string name="rango_grafico_1a">1A</string>
+    <string name="rango_grafico_5a">5A</string>
+    <string name="rango_grafico_todo">Todo</string>
+
+    <!-- forma_pago -->
+    <string name="forma_pago_todo">Todo a fin de mes</string>
+    <string name="forma_pago_todo_detalle">Pagas el extracto entero cada mes, sin intereses.</string>
+    <string name="forma_pago_cuota_fija">Cuota fija</string>
+    <string name="forma_pago_cuota_fija_detalle">Pagas la misma cantidad cada mes; lo que queda genera intereses.</string>
+    <string name="forma_pago_minimo">Pago mínimo</string>
+    <string name="forma_pago_minimo_detalle">Pagas lo mínimo que pide el banco; lo que queda genera intereses.</string>
+
+    <!-- cobro -->
+    <string name="cobro_cada_semana">Cada semana</string>
+    <string name="cobro_cada_dos_semanas">Cada dos semanas</string>
+    <string name="cobro_dos_dias_al_mes">Dos días al mes</string>
+    <string name="cobro_cada_mes">Cada mes</string>
+    <string name="cobro_cada_ano">Cada año</string>
+
+    <!-- tema -->
+    <string name="tema_automatico">Automático</string>
+    <string name="tema_claro">Claro</string>
+    <string name="tema_oscuro">Oscuro</string>
+
+    <!-- agrupar -->
+    <string name="agrupar_por_etiqueta">Por etiqueta</string>
+    <string name="agrupar_por_beneficiario">Por beneficiario</string>
 </resources>

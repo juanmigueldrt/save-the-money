@@ -235,7 +235,7 @@ class FinanceModel(
             throw e
         } catch (e: Exception) {
             val message = (e as? AppError)?.message ?: AppError.Unknown("app").message
-            turns.store(::listError, "No se han podido cargar los movimientos. $message", turn)
+            turns.store(::listError, message, turn)
         } finally {
             listLoads--
         }

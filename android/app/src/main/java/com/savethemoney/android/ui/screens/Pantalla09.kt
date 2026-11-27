@@ -14,8 +14,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AccountDraft
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
@@ -39,6 +42,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 
 /** 09 Nueva o editar cuenta: nombre, tipo, saldo inicial y si se comparte con el hogar. */
 @Composable
@@ -64,9 +68,10 @@ fun Pantalla09(nav: Nav, accountId: String?, kind: AccountKind?) {
     val tipos = listOf(AccountKind.Checking, AccountKind.Savings, AccountKind.CreditCard, AccountKind.Cash, AccountKind.Investment)
         .let { if (tipo in it) it else it + tipo }
         .filter { !tarjetaFija || it == AccountKind.CreditCard }
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
-        val apertura = if (saldo.isBlank()) 0L else Money.entered(saldo) ?: throw AppError.InvalidInput("El saldo inicial no es un importe válido.")
+        val apertura = if (saldo.isBlank()) 0L else Money.entered(saldo) ?: throw AppError.InvalidInput(resources.getString(R.string.form_cuenta_el_saldo_inicial_no_es_un))
         val dueno = if (compartir) null else editando?.ownerId ?: session.profile?.id
         val draft = AccountDraft(nombre, tipo, apertura, dueno, idCuenta)
         draft.issue?.let { throw AppError.InvalidInput(it) }
@@ -86,32 +91,32 @@ fun Pantalla09(nav: Nav, accountId: String?, kind: AccountKind?) {
 
     StmScreen(
         topBar = {
-            TopBar(if (editando != null) "Editar cuenta" else "Nueva cuenta", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (editando != null) stringResource(R.string.form_cuenta_editar_cuenta) else stringResource(R.string.form_cuenta_nueva_cuenta), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
     ) {
         Spacer(Modifier.height(8.dp))
-        FilledField("Nombre", nombre, { nombre = it }, autoFocus = true)
+        FilledField(stringResource(R.string.comun_nombre), nombre, { nombre = it }, autoFocus = true)
         Spacer(Modifier.height(16.dp))
-        Text("Tipo", style = StmType.labelLarge, color = c.onSurfaceVariant)
+        Text(stringResource(R.string.form_cuenta_tipo), style = StmType.labelLarge, color = c.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
         ChipRow(Modifier.fillMaxWidth()) {
             tipos.forEach { t ->
-                Chip(if (t == AccountKind.Checking) "Corriente" else t.title, selected = t == tipo, onClick = { tipo = t })
+                Chip(if (t == AccountKind.Checking) stringResource(R.string.form_cuenta_corriente) else stringResource(t.titulo), selected = t == tipo, onClick = { tipo = t })
             }
         }
         if (tarjetaFija) {
             Spacer(Modifier.height(8.dp))
-            Text("Una tarjeta de crédito no puede cambiar de tipo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.form_cuenta_una_tarjeta_de_credito_no_puede), style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Saldo inicial", saldo, { saldo = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+        FilledField(stringResource(R.string.form_cuenta_saldo_inicial), saldo, { saldo = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListItem(
-                "Compartir con el hogar", "Tu pareja verá el saldo y los movimientos",
+                stringResource(R.string.form_cuenta_compartir_con_el_hogar), stringResource(R.string.form_cuenta_tu_pareja_vera_el_saldo_y),
                 trailing = {
                     // El diseño reserva 40 dp al final y deja que el interruptor de 52 sobresalga.
                     Box(Modifier.width(40.dp).wrapContentWidth(Alignment.Start, unbounded = true)) {
@@ -122,13 +127,13 @@ fun Pantalla09(nav: Nav, accountId: String?, kind: AccountKind?) {
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
-            FilaInterruptor("Cuenta predeterminada", null, predeterminada) { predeterminada = it }
+            FilaInterruptor(stringResource(R.string.form_cuenta_cuenta_predeterminada), null, predeterminada) { predeterminada = it }
             Divider(inset = 16.dp)
-            FilaInterruptor("Contar en el patrimonio", null, patrimonio) { patrimonio = it }
+            FilaInterruptor(stringResource(R.string.form_cuenta_contar_en_el_patrimonio), null, patrimonio) { patrimonio = it }
         }
         Spacer(Modifier.height(8.dp))
         Text(
-            "La predeterminada sale elegida al apuntar un movimiento. Sin «Contar en el patrimonio», la cuenta sigue con su saldo pero no suma en el patrimonio neto.",
+            stringResource(R.string.form_cuenta_la_predeterminada_sale_elegida_al),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
     }

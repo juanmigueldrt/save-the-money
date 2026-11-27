@@ -15,7 +15,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.CardInstallment
 import com.savethemoney.android.data.CreditCardCalculator
@@ -44,19 +48,16 @@ import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
 
 /** Aviso de abonos sin categoría: no se sabe si son un pago de la tarjeta o una devolución. */
-private fun avisoAbonos(n: Int) =
-    (if (n == 1) "Hay 1 abono sin categoría" else "Hay $n abonos sin categoría") +
-        ". Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
+@Composable private fun avisoAbonos(n: Int) =
+    pluralStringResource(R.plurals.tarjeta_hay_abonos_sin_categoria_sin, n, n)
 
 /** Aviso de aplazados cuya compra no se ha podido cargar: sin ella no se sabe la cuota ni el capital. */
-private fun avisoAplazados(n: Int) =
-    (if (n == 1) "No se ha podido cargar la compra de 1 aplazado" else "No se han podido cargar las compras de $n aplazados") +
-        ". Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato."
+@Composable private fun avisoAplazados(n: Int) =
+    pluralStringResource(R.plurals.tarjeta_no_se_han_podido_cargar_las, n, n)
 
 /** Aviso de que los extractos sin cobrar tienen más movimientos de los que se cargan de una vez. */
-private val avisoRecortados =
-    "Los extractos sin cobrar tienen ${CreditCardModel.CYCLE_LIMIT} movimientos o más y puede que no se hayan cargado todos: " +
-        "los cargos y lo gastado pueden salir más bajos de lo que son."
+@Composable private fun avisoRecortados() =
+    stringResource(R.string.tarjeta_los_extractos_sin_cobrar_tienen, CreditCardModel.CYCLE_LIMIT)
 
 private class Cargo11(val fecha: String, val detalle: String, val importe: String)
 
@@ -73,12 +74,12 @@ private fun Detalle11(
     StmScreen(topBar = { DetalleBar(nav, cuenta, nombre) }, snackbar = snackbar?.let { e -> { Snackbar(e) } }) {
         StmCard {
             Row(Modifier.fillMaxWidth().height(24.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Extracto abierto", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                Text(stringResource(R.string.tarjeta_extracto_abierto), Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
                 Text(rango, style = StmType.bodyMedium, color = c.onSurfaceVariant)
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth().height(28.dp)) {
-                Text("Gastado este ciclo", Modifier.weight(1f).alignByBaseline(), style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.tarjeta_gastado_este_ciclo), Modifier.weight(1f).alignByBaseline(), style = StmType.bodyMedium, color = c.onSurfaceVariant)
                 Text(gastado, Modifier.alignByBaseline(), style = StmType.titleLarge, color = c.onSurface)
             }
             Spacer(Modifier.height(12.dp))
@@ -86,7 +87,7 @@ private fun Detalle11(
         }
         trasExtracto()
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Calendario de cargos")
+        SectionHeader(stringResource(R.string.tarjeta_calendario_de_cargos))
         ListCard {
             cargos.forEachIndexed { i, cargo ->
                 if (i > 0) Divider()
@@ -95,7 +96,7 @@ private fun Detalle11(
         }
         trasCalendario()
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Compras aplazadas", "Aplazar", onAplazar)
+        SectionHeader(stringResource(R.string.tarjeta_compras_aplazadas), stringResource(R.string.tarjeta_aplazar), onAplazar)
         if (plazos.isNotEmpty()) {
             ListCard {
                 plazos.forEachIndexed { i, plazo ->
@@ -134,16 +135,17 @@ fun Pantalla11(nav: Nav, cardId: String?) {
     if (s == null) {
         StmScreen(topBar = { DetalleBar(nav, cuenta, cuenta.name) }) {
             StmCard {
-                Text("Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.tarjeta_pon_el_limite_el_dia_del), style = StmType.bodyMedium, color = c.onSurfaceVariant)
                 Spacer(Modifier.height(16.dp))
-                Btn("Configurar tarjeta", { nav.go(Route.CondicionesTarjeta(cuenta.id)) })
+                Btn(stringResource(R.string.tarjeta_configurar_tarjeta), { nav.go(Route.CondicionesTarjeta(cuenta.id)) })
             }
         }
         return
     }
     val inicio = s.terms.cycleStart(s.openStatement)
     val fin = s.openStatement.minusDays(1)
-    val rango = "del " + (if (inicio.month == fin.month) "${inicio.dayOfMonth}" else Fechas.corto(inicio)) + " al ${Fechas.corto(fin)}"
+    val resources = LocalResources.current
+    val rango = stringResource(R.string.tarjeta_del_al, (if (inicio.month == fin.month) "${inicio.dayOfMonth}" else Fechas.corto(inicio)), Fechas.corto(fin))
     val compras = cards.movements(cuenta)
     val aplazables = cards.deferrable(cuenta)
     val planes = cards.plans(cuenta)
@@ -151,9 +153,9 @@ fun Pantalla11(nav: Nav, cardId: String?) {
         val m = compras.firstOrNull { it.id == plan.movementId } ?: return@mapNotNull null
         val quedan = CreditCardCalculator.remainingInstallments(plan, m, s)
         Plazo11(
-            iconoCategoria(finance.category(m.categoryId)), MovementText.display(m.description), "${plan.months} meses · TIN ${tasa(plan.rate)} %",
-            when (quedan) { 0 -> "Pagada"; 1 -> "Queda 1 cuota"; else -> "Quedan $quedan cuotas" },
-            Money.format(-m.amountMinor), "${Money.format(CardInstallment.payment(-m.amountMinor, plan.months, plan.rate))}/mes",
+            iconoCategoria(finance.category(m.categoryId)), MovementText.display(m.description), stringResource(R.string.tarjeta_meses_tin, plan.months, tasa(plan.rate)),
+            if (quedan == 0) stringResource(R.string.tarjeta_pagada) else pluralStringResource(R.plurals.tarjeta_quedan_cuotas, quedan, quedan),
+            Money.format(-m.amountMinor), stringResource(R.string.tarjeta_mes, Money.format(CardInstallment.payment(-m.amountMinor, plan.months, plan.rate))),
         ) {
             nav.go(Route.AplazarCompra(cuenta.id, m.id))
         }
@@ -163,65 +165,65 @@ fun Pantalla11(nav: Nav, cardId: String?) {
         Text(texto, style = StmType.bodySmall, color = color)
     }
     val retraso = when (s.terms.paymentDelayMonths) {
-        0 -> "el día ${s.terms.paymentDay} de ese mes"
-        1 -> "el día ${s.terms.paymentDay} del mes siguiente"
-        else -> "el día ${s.terms.paymentDay}, ${s.terms.paymentDelayMonths} meses después"
+        0 -> stringResource(R.string.tarjeta_extracto_se_cobra_ese_mes, s.terms.statementDay, s.terms.paymentDay)
+        1 -> stringResource(R.string.tarjeta_extracto_se_cobra_mes_siguiente, s.terms.statementDay, s.terms.paymentDay)
+        else -> stringResource(R.string.tarjeta_extracto_se_cobra_meses_despues, s.terms.statementDay, s.terms.paymentDay, s.terms.paymentDelayMonths)
     }
     Detalle11(
         nav, cuenta, cuenta.name, rango, Money.format(s.spentThisCycle), s.usedFraction.barra(), s.isOverAlert,
         s.payments.map { p ->
-            Cargo11(fechaLarga(p.due), desglose(p, s.terms.paymentMode).replaceFirstChar(Char::uppercase) + if (p.isEstimate) " · estimado" else "", Money.format(p.amount))
+            Cargo11(fechaLarga(p.due, resources), desglose(p, s.terms.paymentMode, resources).replaceFirstChar(Char::uppercase).let { if (p.isEstimate) stringResource(R.string.tarjeta_cargo_estimado, it) else it }, Money.format(p.amount))
         },
         plazos,
         onAplazar = if (aplazables.isEmpty()) null else ({ nav.go(Route.AplazarCompra(cuenta.id)) }),
         snackbar = cards.error,
         trasExtracto = {
             val alerta = s.terms.alertPercent
-            if (s.isOverAlert && alerta != null) nota("Has pasado del $alerta % del límite. Te quedan ${Money.format(s.available)}.", c.error)
+            if (s.isOverAlert && alerta != null) nota(stringResource(R.string.tarjeta_has_pasado_del_del_limite_te, alerta, Money.format(s.available)), c.error)
             if (s.uncategorizedCredits.isNotEmpty()) nota(avisoAbonos(s.uncategorizedCredits.size), c.error)
             if (s.unresolvedInstallments.isNotEmpty()) nota(avisoAplazados(s.unresolvedInstallments.size), c.error)
-            if (s.movementsTruncated) nota(avisoRecortados, c.error)
+            if (s.movementsTruncated) nota(avisoRecortados(), c.error)
         },
         trasCalendario = {
-            nota("Lo que gastas entra en el extracto del día ${s.terms.statementDay}, que se cobra $retraso.", c.onSurfaceVariant)
+            nota(retraso, c.onSurfaceVariant)
             if (s.terms.paymentMode.isRevolving) {
                 Spacer(Modifier.height(16.dp))
-                SectionHeader("Lo que cuesta aplazar")
+                SectionHeader(stringResource(R.string.tarjeta_lo_que_cuesta_aplazar))
                 StmCard {
-                    Fila("Deuda con intereses · TIN ${tasa(s.terms.revolvingRate)} %", Money.format(s.revolvingBalance))
+                    Fila(stringResource(R.string.tarjeta_deuda_con_intereses_tin, tasa(s.terms.revolvingRate)), Money.format(s.revolvingBalance))
                     Spacer(Modifier.height(8.dp))
-                    Fila("Intereses en ${s.payments.size} cargos", Money.format(s.interestInPayments))
+                    Fila(stringResource(R.string.tarjeta_intereses_en_cargos, s.payments.size), Money.format(s.interestInPayments))
                     val fin = s.payoff
                     if (fin != null) {
                         nota(
-                            "Sin compras nuevas, terminarías de pagar en ${fin.months} ${if (fin.months == 1) "mes" else "meses"} y pagarías ${Money.format(fin.interest)} de intereses. Pagando todo a fin de mes no pagarías ninguno.",
+                            pluralStringResource(R.plurals.tarjeta_terminarias_de_pagar, fin.months, fin.months, Money.format(fin.interest)),
                             c.onSurface,
                         )
                     } else if (s.revolvingBalance > 0) {
-                        nota("La cuota no llega a cubrir los intereses: la deuda no baja. Sube la cuota o paga todo a fin de mes.", c.error)
+                        nota(stringResource(R.string.tarjeta_la_cuota_no_llega_a_cubrir), c.error)
                     }
                 }
             }
         },
         trasAplazados = {
             if (planes.isEmpty()) {
-                nota("Las compras de 50 € o más del extracto abierto se pueden pagar en 3, 6, 9 o 12 meses al ${tasa(s.terms.installmentRate)} % TIN. La cuota se suma a cada cargo.", c.onSurfaceVariant)
+                nota(stringResource(R.string.tarjeta_las_compras_de_50_o_mas, tasa(s.terms.installmentRate)), c.onSurfaceVariant)
             } else if (aplazables.isEmpty()) {
-                nota("Para aplazar otra compra tiene que ser de 50 € o más y del extracto abierto.", c.onSurfaceVariant)
+                nota(stringResource(R.string.tarjeta_para_aplazar_otra_compra_tiene_que), c.onSurfaceVariant)
             }
             Spacer(Modifier.height(16.dp))
             StmCard {
                 val origen = finance.account(s.terms.payFromAccountId)
                 if (origen != null) {
                     val saldo = finance.balance(origen)
-                    Fila("Se paga desde ${origen.name}", Money.format(saldo))
+                    Fila(stringResource(R.string.tarjeta_se_paga_desde, origen.name), Money.format(saldo))
                     val prox = s.next
-                    if (prox != null && saldo < prox.amount) nota("No llega para el próximo cargo de ${Money.format(prox.amount)}.", c.error)
+                    if (prox != null && saldo < prox.amount) nota(stringResource(R.string.tarjeta_no_llega_para_el_proximo_cargo, Money.format(prox.amount)), c.error)
                 } else {
-                    Text("Elige en Condiciones la cuenta desde la que se paga la tarjeta para saber si hay saldo.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.tarjeta_elige_en_condiciones_la_cuenta), style = StmType.bodyMedium, color = c.onSurfaceVariant)
                 }
                 Spacer(Modifier.height(16.dp))
-                Btn("Apuntar el pago de la tarjeta", {
+                Btn(stringResource(R.string.tarjeta_apuntar_el_pago_de_la_tarjeta), {
                     // El importe y el concepto los pone el formulario con los datos de la tarjeta al abrirse.
                     nav.go(
                         Route.FormMovimiento(
@@ -230,7 +232,7 @@ fun Pantalla11(nav: Nav, cardId: String?) {
                         ),
                     )
                 }, kind = BtnKind.Outlined)
-                nota("El pago se apunta como transferencia de la cuenta a la tarjeta, así el gasto no cuenta dos veces.", c.onSurfaceVariant)
+                nota(stringResource(R.string.tarjeta_el_pago_se_apunta_como), c.onSurfaceVariant)
             }
         },
     )

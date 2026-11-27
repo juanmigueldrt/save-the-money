@@ -9,6 +9,7 @@ import android.graphics.pdf.PdfDocument
 import android.text.TextPaint
 import android.text.TextUtils
 import androidx.core.content.FileProvider
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.MonthlyBills
 import com.savethemoney.android.data.RecurringKind
@@ -35,7 +36,7 @@ fun compartir(context: Context, fichero: File, tipo: String) {
 }
 
 /** Hoja A4 de los pagos del mes, siempre en claro, para imprimir; sigue en otra página si no cabe. */
-fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino: File) {
+fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino: File, resources: android.content.res.Resources) {
     val ancho = 595
     val alto = 842
     val margen = 40f
@@ -58,19 +59,19 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
         var y = margen + 12f
         pagina.canvas.drawText(hogar, margen, y, nota)
         y += 30f
-        pagina.canvas.drawText("Pagos de ${Fechas.mes(bills.month.atDay(1))} de ${bills.month.year}", margen, y, titulo)
+        pagina.canvas.drawText(resources.getString(R.string.pdf_pagos_pagos_de_de, Fechas.mes(bills.month.atDay(1)), bills.month.year), margen, y, titulo)
         y += 24f
-        pagina.canvas.drawText("Total: ${Money.format(bills.total, options = Money.Display.Standard)}", margen, y, texto)
+        pagina.canvas.drawText(resources.getString(R.string.pdf_pagos_total, Money.format(bills.total, options = Money.Display.Standard)), margen, y, texto)
         y += 32f
 
         fun cabecera() {
             pagina.canvas.run {
-                drawText("Día", columnas[0], y, nota)
-                drawText("Concepto", columnas[1], y, nota)
-                drawText("Cuenta", columnas[2], y, nota)
+                drawText(resources.getString(R.string.pdf_pagos_dia), columnas[0], y, nota)
+                drawText(resources.getString(R.string.comun_concepto), columnas[1], y, nota)
+                drawText(resources.getString(R.string.comun_cuenta), columnas[2], y, nota)
                 val p = TextPaint(nota).apply { textAlign = Paint.Align.RIGHT }
-                drawText("Importe", derecha, y, p)
-                drawText("Pagado", pagado, y, p)
+                drawText(resources.getString(R.string.comun_importe), derecha, y, p)
+                drawText(resources.getString(R.string.pdf_pagos_pagado), pagado, y, p)
             }
             y += 8f
         }
@@ -87,7 +88,7 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
             pagina.canvas.drawLine(margen, y, pagado, y, linea)
             y += 18f
             pagina.canvas.run {
-                drawText("${l.due.dayOfMonth} de ${Fechas.mes(l.due)}", columnas[0], y, texto)
+                drawText(resources.getString(R.string.comun_dia_de_mes, l.due.dayOfMonth, Fechas.mes(l.due)), columnas[0], y, texto)
                 drawText(corta(l.name, columnas[2] - columnas[1] - 8), columnas[1], y, texto)
                 drawText(corta(l.accountName ?: "", derecha - columnas[2] - 76), columnas[2], y, texto)
                 drawText(Money.format(l.amount, options = Money.Display.Standard), derecha, y, derechaTexto)
@@ -96,12 +97,12 @@ fun escribirPdfPagos(bills: MonthlyBills, hogar: String, hoy: LocalDate, destino
             y += 10f
         }
         y += 24f
-        pagina.canvas.drawText("Suscripciones", margen, y, nota)
-        pagina.canvas.drawText("Esenciales", 300f, y, nota)
+        pagina.canvas.drawText(resources.getString(R.string.pdf_pagos_suscripciones), margen, y, nota)
+        pagina.canvas.drawText(resources.getString(R.string.pdf_pagos_esenciales), 300f, y, nota)
         y += 16f
         pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Subscription), options = Money.Display.Standard), margen, y, texto)
         pagina.canvas.drawText(Money.format(bills.total(RecurringKind.Essential), options = Money.Display.Standard), 300f, y, texto)
-        pagina.canvas.drawText("Creado con Save the Money el ${hoy.dayOfMonth} de ${Fechas.mes(hoy)} de ${hoy.year}.", margen, alto - margen, nota)
+        pagina.canvas.drawText(resources.getString(R.string.pdf_pagos_creado_con_save_the_money_el, hoy.dayOfMonth, Fechas.mes(hoy), hoy.year), margen, alto - margen, nota)
         doc.finishPage(pagina)
         destino.outputStream().use(doc::writeTo)
     } finally {

@@ -73,8 +73,8 @@ class InvestmentModel(
 
     fun yearRange(holding: Holding) = PriceHistory.range(holding, prices, trades, today().minusMonths(12), today())
 
-    /** "Ana" o "Compartido". */
-    fun ownerName(id: String?): String = if (id == null) "Compartido" else members.firstOrNull { it.profile.id == id }?.profile?.name ?: "Otro miembro"
+    /** El nombre de ese miembro, o nulo si ya no está en el hogar. El texto de «compartido» lo pone la pantalla. */
+    fun memberName(id: String): String? = members.firstOrNull { it.profile.id == id }?.profile?.name
 
     /** Nunca lanza: si falla, se quedan los datos que había y [error] dice por qué. */
     suspend fun load() {

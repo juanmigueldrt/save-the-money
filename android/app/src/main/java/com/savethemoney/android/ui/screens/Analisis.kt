@@ -24,9 +24,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.BudgetModel
@@ -69,7 +71,7 @@ internal fun colorGrupo(group: BudgetGroup): Color = when (group) {
 @Composable
 internal fun BoxScope.SelectorPeriodos(budgets: BudgetModel, cerrar: () -> Unit) {
     val scope = rememberCoroutineScope()
-    SelectorSheet("Elegir periodo", budgets.periods().map { p -> p.title to { scope.launch { budgets.show(p) }; Unit } }, onDismiss = cerrar)
+    SelectorSheet(stringResource(R.string.analisis_elegir_periodo), budgets.periods().map { p -> p.title to { scope.launch { budgets.show(p) }; Unit } }, onDismiss = cerrar)
 }
 
 /** Importe final de una fila, en gris. */
