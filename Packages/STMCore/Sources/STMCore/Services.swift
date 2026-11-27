@@ -90,9 +90,13 @@ public protocol HouseholdService: Sendable {
     func revokeInvite(_ inviteId: UUID) async throws
     func acceptInvite(_ code: InviteCode) async throws -> Household
     /// Sale del hogar y borra todo lo que esa persona apuntó en él (ORC-56). No se puede deshacer.
+    /// El propietario no puede salir mientras haya otros miembros (`LeavingHousehold.ownerMustTransfer`);
+    /// cuando sale el último miembro, el hogar se borra.
     func leave(householdId: UUID) async throws
     /// Solo el dueño del hogar: saca a otro miembro. Sus datos se guardan `RemovedHousehold.exportDays` días.
     func removeMember(_ userId: UUID, from householdId: UUID) async throws
+    /// Solo el propietario: pasa el hogar a otro miembro y se queda como miembro (ORC-59).
+    func transferHousehold(_ householdId: UUID, to userId: UUID) async throws
     /// Los hogares de los que han quitado a quien tiene la sesión y de los que aún puede exportar.
     func removedHouseholds() async throws -> [RemovedHousehold]
     /// Sus datos de uno de esos hogares. Fuera de plazo, o si no le quitaron de ese hogar, falla.

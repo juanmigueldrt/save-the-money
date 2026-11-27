@@ -42,7 +42,15 @@ versiones antiguas de las apps. Pruebas: `supabase/tests/database/25_orc56_datos
   A los 30 días ya no se pueden exportar y una tarea diaria los borra.
 - **Se borra tu usuario:** se borran todas tus filas de todos los hogares.
 
-Lo que no cubre todavía: borrar la cuenta desde la app (ORC-74), y que el dueño no pueda dejar el hogar sin dueño (ORC-59).
+Quién manda en el hogar y cuándo se borra (ORC-59, pruebas en `26_orc59_hogar_sin_dueno.test.sql`):
+
+- El propietario no puede salir mientras haya otros miembros: antes traspasa el hogar a uno de ellos o los quita.
+  Si se borra el usuario del propietario, el hogar pasa al miembro más antiguo.
+- Un hogar sin miembros se borra solo, cuando ya no queda nadie con plazo para exportar.
+- El hogar sólo se puede borrar a mano cuando su propietario es el único miembro y nadie tiene plazo para exportar:
+  borrarlo nunca se lleva los datos de otra persona.
+
+Lo que no cubre todavía: borrar la cuenta desde la app (ORC-74).
 
 ## En la app
 

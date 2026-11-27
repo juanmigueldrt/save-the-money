@@ -232,6 +232,14 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         }
     }
 
+    public func transferHousehold(_ householdId: UUID, to userId: UUID) async throws {
+        try await mapped {
+            try await client.rpc("transfer_household",
+                                 params: ["target_household": householdId.uuidString, "new_owner": userId.uuidString])
+                .execute()
+        }
+    }
+
     public func removedHouseholds() async throws -> [RemovedHousehold] {
         try await mapped {
             try await client.rpc("removed_households").execute().value
@@ -341,6 +349,8 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "STM06": .invalidInput(Household.currencyLocked)
         // Transferencias: la otra pata no se pudo cambiar o borrar a la vez.
         case "STM07": .invalidInput(TransferDraft.otherLegLocked)
+        // El trigger de household_members: el propietario no sale con otros miembros dentro.
+        case "STM08": .invalidInput(LeavingHousehold.ownerMustTransfer)
         default: .unknown(postgresCode ?? "postgrest")
         }
     }

@@ -256,9 +256,13 @@ public actor InMemoryBackend: AuthService, HouseholdService {
 
     public func leave(householdId: UUID) async throws {
         let user = try requireUser()
-        guard isMember(user, of: householdId) else { return }
+        guard let mine = memberships.first(where: { $0.userId == user && $0.householdId == householdId }) else { return }
+        if mine.role == .owner, memberships.contains(where: { $0.householdId == householdId && $0.userId != user }) {
+            throw AppError.invalidInput(LeavingHousehold.ownerMustTransfer)
+        }
         memberships.removeAll { $0.userId == user && $0.householdId == householdId }
         purgeData(of: user, in: householdId)
+        deleteHouseholdIfEmpty(householdId)
         if users[user]?.profile.defaultHouseholdId == householdId {
             users[user]?.profile.defaultHouseholdId = nil
         }
@@ -290,6 +294,28 @@ public actor InMemoryBackend: AuthService, HouseholdService {
             movements: financeMovements.filter { $0.householdId == householdId && mine($0.id) })
     }
 
+    public func transferHousehold(_ householdId: UUID, to userId: UUID) async throws {
+        let user = try requireUser()
+        guard let mine = memberships.firstIndex(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
+            throw AppError.invalidInput("Solo el propietario puede traspasar el hogar.")
+        }
+        guard userId != user else { return }
+        guard let theirs = memberships.firstIndex(where: { $0.userId == userId && $0.householdId == householdId }) else {
+            throw AppError.invalidInput("Esa persona no es miembro del hogar.")
+        }
+        memberships[theirs].role = .owner
+        memberships[mine].role = .member
+    }
+
+    /// Sin miembros y sin nadie con plazo para exportar, el hogar ya no es de nadie.
+    private func deleteHouseholdIfEmpty(_ householdId: UUID) {
+        guard !memberships.contains(where: { $0.householdId == householdId }) else { return }
+        // Aunque el hogar siga por el plazo de alguien, nadie debe entrar ya: no tendría propietario.
+        invites.removeAll { $0.householdId == householdId }
+        guard !removals.keys.contains(where: { $0.householdId == householdId }) else { return }
+        householdsById[householdId] = nil
+    }
+
     private static func exportUntil(_ removedAt: Date) -> Date {
         removedAt.addingTimeInterval(TimeInterval(RemovedHousehold.exportDays) * 86_400)
     }
@@ -299,6 +325,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         for (removal, date) in removals where Self.exportUntil(date) <= now() {
             removals[removal] = nil
             purgeData(of: removal.userId, in: removal.householdId)
+            deleteHouseholdIfEmpty(removal.householdId)
         }
     }
 

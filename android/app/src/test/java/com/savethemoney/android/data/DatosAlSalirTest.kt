@@ -164,4 +164,72 @@ class DatosAlSalirTest {
             MovementsCsv.text(export.movements, export.accounts, export.categories),
         )
     }
+
+    /** ORC-59, lo mismo que `testElPropietarioNoDejaElHogarSinPropietario` de HouseholdFlowTests.swift. */
+    @Test
+    fun elPropietarioNoDejaElHogarSinPropietario() = runBlocking {
+        val backend = InMemoryBackend()
+        suspend fun role(name: String, home: String) = backend.members(home).firstOrNull { it.profile.username == name }?.role
+
+        backend.signUp(user("ana"), password, null)
+        val home = backend.createHousehold("Casa de prueba").id
+        val invite = InviteCode.parse(backend.createInvite(home).code)!!
+        val spare = InviteCode.parse(backend.createInvite(home).code)!!
+        backend.signOut()
+        val bruno = backend.signUp(user("bruno"), password, null)
+        backend.acceptInvite(invite)
+        assertTrue("un miembro no puede hacerse propietario", runCatching { backend.transferHousehold(home, bruno) }.isFailure)
+        backend.signOut()
+
+        backend.signIn(user("ana"), password)
+        assertEquals(
+            "la propietaria no puede salir con otros miembros dentro",
+            OWNER_MUST_TRANSFER,
+            runCatching { backend.leave(home) }.exceptionOrNull()?.message,
+        )
+        assertTrue("no se traspasa a quien no es miembro", runCatching { backend.transferHousehold(home, "nadie") }.isFailure)
+        backend.transferHousehold(home, bruno)
+        assertEquals(MemberRole.Member, role("ana", home))
+        assertEquals(MemberRole.Owner, role("bruno", home))
+        backend.leave(home)
+        backend.signOut()
+
+        // Bruno, propietario y único miembro, sale: el hogar se borra y sus invitaciones dejan de valer.
+        backend.signIn(user("bruno"), password)
+        backend.leave(home)
+        assertEquals(emptyList<Household>(), backend.households())
+        assertEquals("la invitación de un hogar borrado no vale", AppError.InvalidOrExpiredInvite, runCatching { backend.acceptInvite(spare) }.exceptionOrNull())
+    }
+
+    /** ORC-59: un hogar sin miembros sigue mientras alguien a quien quitaron pueda exportar; vencido el plazo, se borra. */
+    @Test
+    fun elHogarVacioSeBorraCuandoVenceElPlazoDeQuienFueQuitado() = runBlocking {
+        val start = Instant.parse("2027-01-15T08:00:00Z")
+        var now = start
+        val backend = InMemoryBackend { now }
+        val bruno = backend.signUp(user("bruno"), password, null)
+        backend.signUp(user("ana"), password, null)
+        val home = backend.createHousehold("Casa de prueba").id
+        val invite = InviteCode.parse(backend.createInvite(home).code)!!
+        val spare = InviteCode.parse(backend.createInvite(home).code)!!
+        backend.signIn(user("bruno"), password)
+        backend.acceptInvite(invite)
+
+        // Ana quita a Bruno y, ya sola, sale: el hogar se queda sin miembros.
+        backend.signIn(user("ana"), password)
+        backend.removeMember(home, bruno)
+        backend.leave(home)
+        assertEquals(emptyList<Household>(), backend.households())
+
+        backend.signIn(user("bruno"), password)
+        assertEquals("a Bruno le queda su plazo: el hogar sigue", listOf("Casa de prueba"), backend.removedHouseholds().map { it.name })
+        backend.removedHouseholdExport(home)
+
+        now = start.plus(Duration.ofDays(30))
+        assertEquals(emptyList<RemovedHousehold>(), backend.removedHouseholds())
+        assertTrue("fuera de plazo no se exporta", runCatching { backend.removedHouseholdExport(home) }.isFailure)
+        // El reloj vuelve atrás para que la invitación no esté caducada por fecha: lo que la rechaza es que el hogar ya no existe.
+        now = start
+        assertEquals("con el plazo vencido el hogar se borró", AppError.InvalidOrExpiredInvite, runCatching { backend.acceptInvite(spare) }.exceptionOrNull())
+    }
 }

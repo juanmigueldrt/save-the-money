@@ -127,6 +127,7 @@ struct HouseholdView: View {
     @State private var shownInvite: HouseholdInvite?
     @State private var confirmingLeave = false
     @State private var removing: HouseholdMember?
+    @State private var promoting: HouseholdMember?
     @State private var renaming = false
     @State private var newName = ""
     @State private var startDay = 1
@@ -134,6 +135,14 @@ struct HouseholdView: View {
     @State private var isSaving = false
 
     private var myRole: MemberRole? { model.role(of: profile.id) }
+    /// El propietario no puede salir con otros miembros dentro (ORC-59): el servidor también lo impide.
+    private var ownerWithOthers: Bool { myRole == .owner && model.members.count > 1 }
+    private var leaveMessage: String {
+        if ownerWithOthers { return LeavingHousehold.ownerMustTransfer }
+        return model.members.count == 1
+            ? LeavingHousehold.leaveWarning + " " + LeavingHousehold.lastMemberWarning
+            : LeavingHousehold.leaveWarning
+    }
 
     var body: some View {
         ScrollView {
@@ -179,6 +188,10 @@ struct HouseholdView: View {
                                 .font(Typography.footnote)
                                 .foregroundStyle(Palette.labelSecondary)
                             if myRole == .owner && member.profile.id != profile.id {
+                                Button("Hacer propietario") { promoting = member }
+                                    .font(Typography.subheadlineEmphasis)
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Hacer propietario a \(member.profile.name)")
                                 Button("Quitar") { removing = member }
                                     .font(Typography.subheadlineEmphasis)
                                     .foregroundStyle(Palette.negativeText)
@@ -220,7 +233,7 @@ struct HouseholdView: View {
                 ErrorText(message: model.error)
 
                 VStack(spacing: Spacing.s16) {
-                    if myRole == .member {
+                    if myRole != nil {
                         Button("Salir del hogar") { confirmingLeave = true }
                             .buttonStyle(SecondaryButtonStyle())
                     }
@@ -254,11 +267,22 @@ struct HouseholdView: View {
             Text("Lo verán todos los miembros.")
         }
         .confirmationDialog("¿Salir de \(household.name)?", isPresented: $confirmingLeave, titleVisibility: .visible) {
-            Button("Salir del hogar", role: .destructive) {
-                Task { await model.leave(then: session.refresh) }
+            if !ownerWithOthers {
+                Button("Salir del hogar", role: .destructive) {
+                    Task { await model.leave(then: session.refresh) }
+                }
             }
         } message: {
-            Text(LeavingHousehold.leaveWarning)
+            Text(leaveMessage)
+        }
+        .confirmationDialog("¿Hacer propietario a \(promoting?.profile.name ?? "")?",
+                            isPresented: Binding(get: { promoting != nil }, set: { if !$0 { promoting = nil } }),
+                            titleVisibility: .visible, presenting: promoting) { member in
+            Button("Hacer propietario") {
+                Task { await model.makeOwner(member) }
+            }
+        } message: { _ in
+            Text(LeavingHousehold.transferWarning)
         }
         .confirmationDialog("¿Quitar a \(removing?.profile.name ?? "") del hogar?",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),

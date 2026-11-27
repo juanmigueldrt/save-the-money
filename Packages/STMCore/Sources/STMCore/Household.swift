@@ -203,6 +203,15 @@ public enum LeavingHousehold {
     public static let leaveWarning =
         "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, "
         + "inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «Exportar CSV para Excel», en Más opciones."
+    /// Lo que se añade a ese aviso cuando quien sale es el único miembro (ORC-59).
+    public static let lastMemberWarning = "Eres el único miembro: el hogar también se borrará."
+    /// El propietario no puede salir con otros miembros dentro: el hogar se quedaría sin nadie que lo gestione.
+    public static let ownerMustTransfer =
+        "Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás."
+    /// Lo que la app avisa antes de traspasar el hogar.
+    public static let transferWarning =
+        "Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. "
+        + "Tú pasarás a ser miembro."
     /// Lo que la app avisa antes de quitar a un miembro.
     public static let removeWarning =
         "Dejará de tener acceso a este hogar. Sus datos se guardan \(RemovedHousehold.exportDays) días para que pueda "
