@@ -30,6 +30,20 @@ Supabase en el momento: borrarlo del historial no basta.
   leer las migraciones. Cómo comprobar la copia y cómo volver atrás:
   [docs/operaciones/copias-y-vuelta-atras.md](docs/operaciones/copias-y-vuelta-atras.md).
 
+## Qué pasa con tus datos al dejar un hogar
+
+Regla decidida el 2026-11-27 (ORC-56). La aplica el servidor con un trigger, así que vale también para las
+versiones antiguas de las apps. Pruebas: `supabase/tests/database/25_orc56_datos_al_salir.test.sql`.
+
+- **Sales por tu cuenta:** se borra en el momento todo lo que apuntaste en ese hogar (cuentas, movimientos,
+  categorías, presupuestos, metas, tarjetas, inversiones y pagos fijos). La app lo avisa antes y no se puede deshacer.
+- **Te quita el dueño:** dejas de ser miembro en el momento, pero tus datos se guardan 30 días. En ese plazo sólo tú
+  puedes exportar tus movimientos; nadie más los ve, tampoco el dueño. Si vuelves a entrar antes, los recuperas.
+  A los 30 días ya no se pueden exportar y una tarea diaria los borra.
+- **Se borra tu usuario:** se borran todas tus filas de todos los hogares.
+
+Lo que no cubre todavía: borrar la cuenta desde la app (ORC-74), y que el dueño no pueda dejar el hogar sin dueño (ORC-59).
+
 ## En la app
 
 - La sesión (tokens de acceso y de refresco) no se guarda nunca en claro:

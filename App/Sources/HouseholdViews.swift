@@ -60,6 +60,11 @@ struct HouseholdOnboardingView: View {
                     }
                     .card()
 
+                    if !session.removedHouseholds.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.s16) { RemovedHouseholdRows() }
+                            .card()
+                    }
+
                     ErrorText(message: error)
 
                     Button("Cerrar sesión") { Task { await session.signOut() } }
@@ -253,7 +258,7 @@ struct HouseholdView: View {
                 Task { await model.leave(then: session.refresh) }
             }
         } message: {
-            Text("Dejarás de ver lo que te hayan compartido en este hogar.")
+            Text(LeavingHousehold.leaveWarning)
         }
         .confirmationDialog("¿Quitar a \(removing?.profile.name ?? "") del hogar?",
                             isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } }),
@@ -262,7 +267,7 @@ struct HouseholdView: View {
                 Task { await model.remove(member) }
             }
         } message: { _ in
-            Text("Dejará de tener acceso a este hogar. Puedes volver a invitarle cuando quieras.")
+            Text(LeavingHousehold.removeWarning)
         }
     }
 }

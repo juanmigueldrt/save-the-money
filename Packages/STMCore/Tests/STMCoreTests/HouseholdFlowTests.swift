@@ -82,6 +82,104 @@ final class HouseholdFlowTests: XCTestCase {
         XCTAssertEqual(left.map(\.profile.username), ["ana"])
     }
 
+    /// ORC-56, lo mismo que `supabase/tests/database/25_orc56_datos_al_salir.test.sql`: quien sale pierde lo suyo
+    /// en el momento; a quien quitan le quedan 30 días para exportar. Datos inventados.
+    func testDatosDeQuienSaleODeQuienQuitan() async throws {
+        final class Clock: @unchecked Sendable { var date = Date(timeIntervalSince1970: 1_800_000_000) }
+        let clock = Clock()
+        let backend = InMemoryBackend(now: { clock.date })
+        let password = "contrasena-de-prueba"
+        let day = CalendarDay(year: 2026, month: 11, day: 2)!
+        func note(_ name: String, in home: UUID) async throws {
+            let account = try await backend.createAccount(AccountDraft(name: "Cuenta de \(name)"), in: home)
+            _ = try await backend.addMovement(MovementDraft(accountId: account.id, bookedOn: day, amount: Money(minor: -4500),
+                                                            description: "Compra de \(name)"), in: home)
+        }
+        func enter(_ username: String, home: UUID, as owner: String = "ana") async throws {
+            try await backend.signOut()
+            _ = try await backend.signIn(username: Username(owner), password: password)
+            let invite = try await backend.createInvite(for: home)
+            try await backend.signOut()
+            _ = try await backend.signIn(username: Username(username), password: password)
+            _ = try await backend.acceptInvite(XCTUnwrap(invite.inviteCode))
+        }
+        func rejected(_ message: String, _ call: () async throws -> Void) async {
+            do {
+                try await call()
+                XCTFail(message)
+            } catch {}
+        }
+
+        for name in ["bruno", "carla", "ana"] {
+            _ = try await backend.signUp(username: Username(name), password: password, displayName: nil)
+            try await backend.signOut()
+        }
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        let home = try await backend.createHousehold(name: "Casa de prueba").id
+        try await note("Ana", in: home)
+
+        // Bruno entra, apunta y sale por su cuenta: se borra todo lo suyo.
+        try await enter("bruno", home: home)
+        try await note("Bruno", in: home)
+        let seeded = try await backend.categories(in: home).count
+        try await backend.leave(householdId: home)
+        let brunoRemoved = try await backend.removedHouseholds()
+        XCTAssertEqual(brunoRemoved, [], "quien sale por su cuenta no queda como quitado")
+        try await enter("bruno", home: home)
+        let brunoAccounts = try await backend.accounts(in: home)
+        let brunoMovements = try await backend.allMovements(in: home)
+        let brunoCategories = try await backend.categories(in: home).count
+        XCTAssertEqual(brunoAccounts, [], "al salir se borraron sus cuentas")
+        XCTAssertEqual(brunoMovements, [], "y sus movimientos")
+        XCTAssertEqual(brunoCategories, seeded, "al volver empieza con las categorías de partida")
+
+        // Carla entra y apunta; Ana la quita: sus datos siguen 30 días y sólo ella puede exportarlos.
+        try await enter("carla", home: home)
+        try await note("Carla", in: home)
+        let carla = try await backend.myProfile().id
+        try await backend.signOut()
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        try await backend.removeMember(carla, from: home)
+        await rejected("la dueña no exporta los datos de quien ha quitado") { _ = try await backend.removedHouseholdExport(home) }
+        let anaAccounts = try await backend.accounts(in: home)
+        XCTAssertEqual(anaAccounts.map(\.name), ["Cuenta de Ana"], "lo de Ana no se toca")
+        try await backend.signOut()
+
+        _ = try await backend.signIn(username: Username("carla"), password: password)
+        let households = try await backend.households()
+        XCTAssertEqual(households, [], "Carla ya no está en el hogar")
+        let removed = try await backend.removedHouseholds()
+        XCTAssertEqual(removed, [RemovedHousehold(householdId: home, name: "Casa de prueba",
+                                                  exportUntil: clock.date.addingTimeInterval(30 * 86_400))])
+        let export = try await backend.removedHouseholdExport(home)
+        XCTAssertEqual(export.accounts.map(\.name), ["Cuenta de Carla"])
+        XCTAssertEqual(export.movements.map(\.description), ["Compra de Carla"])
+        XCTAssertEqual(export.categories.count, seeded)
+
+        // Vuelve a entrar dentro del plazo: recupera lo suyo y no queda nada que purgar.
+        try await enter("carla", home: home)
+        let back = try await backend.accounts(in: home)
+        let backRemoved = try await backend.removedHouseholds()
+        let backCategories = try await backend.categories(in: home).count
+        XCTAssertEqual(back.map(\.name), ["Cuenta de Carla"])
+        XCTAssertEqual(backRemoved, [])
+        XCTAssertEqual(backCategories, seeded, "sin categorías repetidas")
+
+        // Ana la quita otra vez y pasan los 30 días: ya no se puede exportar y los datos se borran.
+        try await backend.signOut()
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        try await backend.removeMember(carla, from: home)
+        clock.date.addTimeInterval(30 * 86_400)
+        try await backend.signOut()
+        _ = try await backend.signIn(username: Username("carla"), password: password)
+        let late = try await backend.removedHouseholds()
+        XCTAssertEqual(late, [])
+        await rejected("fuera de plazo no se exporta") { _ = try await backend.removedHouseholdExport(home) }
+        try await enter("carla", home: home)
+        let afterPurge = try await backend.accounts(in: home)
+        XCTAssertEqual(afterPurge, [], "pasado el plazo se borró todo lo suyo")
+    }
+
     /// Lo mismo que `supabase/tests/database/11_privacidad.test.sql`: cada miembro ve y toca solo lo suyo.
     /// Datos inventados.
     func testBrunoNoVeLasCuentasDeAna() async throws {

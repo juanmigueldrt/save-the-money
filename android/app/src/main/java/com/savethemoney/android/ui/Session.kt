@@ -14,6 +14,7 @@ import com.savethemoney.android.data.InviteCode
 import com.savethemoney.android.data.NoNotifier
 import com.savethemoney.android.data.Notifier
 import com.savethemoney.android.data.Profile
+import com.savethemoney.android.data.RemovedHousehold
 import com.savethemoney.android.data.SignUpForm
 import com.savethemoney.android.data.Username
 import java.time.LocalDate
@@ -54,6 +55,10 @@ class Session(
 
     /** Los hogares de quien ha entrado, para elegir cuál abrir cuando hay más de uno. */
     var households by mutableStateOf<List<Household>>(emptyList())
+        private set
+
+    /** Hogares de los que le han quitado y de los que aún puede exportar sus datos (ORC-56). */
+    var removedHouseholds by mutableStateOf<List<RemovedHousehold>>(emptyList())
         private set
 
     val profile: Profile? get() = when (val s = state) {
@@ -100,6 +105,7 @@ class Session(
             borrarLocal()
             finance = null
             households = emptyList()
+            removedHouseholds = emptyList()
             state = State.SignedOut
             signOutNotice = AppError.NotSignedIn.message
         }
@@ -119,6 +125,14 @@ class Session(
                 val profile = backend.myProfile()
                 val homes = backend.households()
                 households = homes
+                // Si falla (sin red, o un servidor que aún no tiene la función) no se bloquea la entrada: no se enseña la lista.
+                removedHouseholds = try {
+                    backend.removedHouseholds()
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Exception) {
+                    emptyList()
+                }
                 val elegido = hogarElegido(profile.id)
                 val home = homes.firstOrNull { it.id == elegido } ?: homes.firstOrNull { it.id == profile.defaultHouseholdId } ?: homes.firstOrNull()
                 if (home != null) State.Ready(profile, home) else State.NeedsHousehold(profile)
@@ -203,6 +217,7 @@ class Session(
         borrarLocal()
         finance = null
         households = emptyList()
+        removedHouseholds = emptyList()
         state = State.SignedOut
     }
 

@@ -464,6 +464,11 @@ interface FinanceService {
  * shortcut: sin `backend` (pruebas de una sola persona) no comprueba quién eres ni que seas del hogar.
  */
 class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
+    init {
+        // Salir de un hogar, o que se acabe el plazo de quien fue quitado, borra datos de aquí (ORC-56).
+        (backend as? InMemoryBackend)?.finance = this
+    }
+
     private val accounts = mutableListOf<Account>()
     private val categories = mutableListOf<BudgetCategory>()
 
@@ -541,14 +546,17 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
     }
 
     /** Como el servidor: borra solo lo tuyo de ese hogar y te repone tus categorías de partida. */
-    override suspend fun resetHousehold(householdId: String) {
-        val mine = mine(householdId)
+    override suspend fun resetHousehold(householdId: String) = purgeData(creator(householdId), householdId)
+
+    /** Borra todo lo que [user] creó en ese hogar, como `private.purge_member_data` en el servidor. */
+    internal fun purgeData(user: String?, householdId: String) {
+        val mine = { id: String -> creators[id] == user }
         fun <T> MutableList<T>.dropMine(household: (T) -> String, id: (T) -> String) = removeAll { household(it) == householdId && mine(id(it)) }
         accounts.dropMine({ it.householdId }, { it.id })
         categories.dropMine({ it.householdId }, { it.id })
-        seeded -= householdId to me()
+        seeded -= householdId to user
         movements.dropMine({ it.householdId }, { it.id })
-        myBudgets().removeAll { it.householdId == householdId }
+        budgets[user]?.removeAll { it.householdId == householdId }
         extras.dropMine({ it.householdId }, { it.id })
         series.dropMine({ it.householdId }, { it.id })
         charges.dropMine({ it.householdId }, { it.id })
@@ -561,6 +569,16 @@ class InMemoryFinance(private val backend: Backend? = null) : FinanceService {
         prices.dropMine({ it.householdId }, { it.id })
         trades.dropMine({ it.householdId }, { it.id })
         plans.dropMine({ it.householdId }, { it.id })
+    }
+
+    /** Las cuentas, categorías y movimientos que [user] creó en ese hogar: lo que exporta quien ha sido quitado. */
+    internal fun exportOf(user: String, householdId: String): RemovedHouseholdExport {
+        val mine = { id: String -> creators[id] == user }
+        return RemovedHouseholdExport(
+            accounts.filter { it.householdId == householdId && mine(it.id) },
+            categories.filter { it.householdId == householdId && mine(it.id) },
+            movements.filter { it.householdId == householdId && mine(it.id) },
+        )
     }
 
     override suspend fun accounts(householdId: String): List<Account> {

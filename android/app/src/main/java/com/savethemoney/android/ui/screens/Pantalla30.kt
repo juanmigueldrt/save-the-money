@@ -222,6 +222,7 @@ fun Pantalla30(nav: Nav) {
             else "Pide la contraseña actual. Al cambiarla se cierra la sesión en tus otros dispositivos.",
             Modifier.padding(start = 16.dp, top = 8.dp), style = StmType.bodySmall, color = Stm.colors.onSurfaceVariant,
         )
+        HogaresAnteriores()
         Spacer(Modifier.height(16.dp))
         ListCard {
             MenuRow(StmIcons.logout, "Cerrar sesión", chevron = false) { action.run { session.signOut() } }

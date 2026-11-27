@@ -144,3 +144,67 @@ public struct HouseholdInvite: Identifiable, Hashable, Codable, Sendable {
         case expiresAt = "expires_at"
     }
 }
+
+/// Un hogar del que te han quitado (ORC-56). Tus datos de ese hogar se guardan hasta `exportUntil`
+/// para que puedas exportarlos; después se borran.
+public struct RemovedHousehold: Identifiable, Hashable, Codable, Sendable {
+    public var householdId: UUID
+    public var name: String
+    public var exportUntil: Date
+
+    public var id: UUID { householdId }
+
+    /// Días de plazo, los mismos que en el servidor (`private.removed_until`).
+    public static let exportDays = 30
+
+    public init(householdId: UUID, name: String, exportUntil: Date) {
+        self.householdId = householdId
+        self.name = name
+        self.exportUntil = exportUntil
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case householdId = "household_id"
+        case exportUntil = "export_until"
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        name = try c.decode(String.self, forKey: .name)
+        exportUntil = try c.decode(ServerDate.self, forKey: .exportUntil).date
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(householdId, forKey: .householdId)
+        try c.encode(name, forKey: .name)
+        try c.encode(ServerDate(exportUntil), forKey: .exportUntil)
+    }
+}
+
+/// Lo que puede llevarse quien ha sido quitado de un hogar: sus movimientos, con sus cuentas y categorías
+/// para poner los nombres en el CSV.
+public struct RemovedHouseholdExport: Hashable, Decodable, Sendable {
+    public var accounts: [Account]
+    public var categories: [BudgetCategory]
+    public var movements: [Movement]
+
+    public init(accounts: [Account], categories: [BudgetCategory], movements: [Movement]) {
+        self.accounts = accounts
+        self.categories = categories
+        self.movements = movements
+    }
+}
+
+public enum LeavingHousehold {
+    /// Lo que la app avisa antes de salir de un hogar.
+    public static let leaveWarning =
+        "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, "
+        + "inversiones y pagos fijos. No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «Exportar CSV para Excel», en Más opciones."
+    /// Lo que la app avisa antes de quitar a un miembro.
+    public static let removeWarning =
+        "Dejará de tener acceso a este hogar. Sus datos se guardan \(RemovedHousehold.exportDays) días para que pueda "
+        + "exportarlos y después se borran. Si le vuelves a invitar antes, los recupera."
+}

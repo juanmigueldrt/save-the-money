@@ -99,6 +99,10 @@ struct MoreView: View {
 
             ChangePasswordSection()
 
+            if !session.removedHouseholds.isEmpty {
+                Section("Hogares anteriores") { RemovedHouseholdRows() }
+            }
+
             Section {
                 Toggle("Avisos de pagos fijos", isOn: $remindersEnabled)
                     .onChange(of: remindersEnabled) { _, _ in

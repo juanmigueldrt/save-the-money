@@ -366,4 +366,38 @@ class SessionTest {
         otra.refresh()
         assertEquals(deAna.id, otra.household?.id)
     }
+
+    /** ORC-56: si no se puede pedir la lista de hogares de los que te han quitado, se entra igual; al cerrar sesión se borra. */
+    @Test
+    fun losHogaresAnterioresNoBloqueanLaEntradaYSeBorranAlCerrarSesion() = runBlocking {
+        val clave = "secreto123"
+        val memory = InMemoryBackend()
+        memory.signUp(Username.parse("bea").getOrThrow(), clave, null)
+        val bea = memory.myProfile().id
+        memory.signUp(Username.parse("ana").getOrThrow(), clave, null)
+        val casa = memory.createHousehold("Casa de Ana")
+        val codigo = InviteCode.parse(memory.createInvite(casa.id).code)!!
+        memory.signIn(Username.parse("bea").getOrThrow(), clave)
+        memory.acceptInvite(codigo)
+        memory.signIn(Username.parse("ana").getOrThrow(), clave)
+        memory.removeMember(casa.id, bea)
+        memory.signIn(Username.parse("bea").getOrThrow(), clave)
+
+        // Un servidor que aún no tiene la función, o sin red justo en esa llamada.
+        var falla = true
+        val backend = object : Backend by memory {
+            override suspend fun removedHouseholds() = if (falla) throw AppError.Unknown("PGRST202") else memory.removedHouseholds()
+        }
+        val session = Session(backend, InMemoryFinance(memory), isDemo = true)
+        session.refresh()
+        assertTrue(session.state is Session.State.NeedsHousehold)
+        assertTrue(session.removedHouseholds.isEmpty())
+
+        falla = false
+        session.refresh()
+        assertEquals(listOf("Casa de Ana"), session.removedHouseholds.map { it.name })
+
+        session.signOut()
+        assertTrue(session.removedHouseholds.isEmpty())
+    }
 }

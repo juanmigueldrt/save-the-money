@@ -196,6 +196,14 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         Unit
     }
 
+    override suspend fun removedHouseholds(): List<RemovedHousehold> = mapped {
+        client.postgrest.rpc("removed_households").decodeList()
+    }
+
+    override suspend fun removedHouseholdExport(householdId: String): RemovedHouseholdExport = mapped {
+        client.postgrest.rpc("removed_household_export", buildJsonObject { put("target_household", householdId) }).decodeAs()
+    }
+
     override suspend fun renameHousehold(householdId: String, name: String): Household {
         val valid = validHouseholdName(name) ?: throw AppError.InvalidInput(HOUSEHOLD_NAME_ISSUE)
         // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila.

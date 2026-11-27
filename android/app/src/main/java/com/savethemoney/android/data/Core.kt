@@ -2,6 +2,9 @@ package com.savethemoney.android.data
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import java.time.LocalDate
+import java.time.OffsetDateTime
+import java.time.ZoneId
 
 // Modelos y reglas de Packages/STMCore (iOS), con los mismos nombres de columna que Supabase.
 
@@ -190,4 +193,36 @@ data class HouseholdInvite(
     val status: InviteStatus = InviteStatus.Pending,
     /** ISO 8601, como lo devuelve Postgres. */
     @SerialName("expires_at") val expiresAt: String,
+)
+
+/**
+ * Un hogar del que te han quitado (ORC-56). Tus datos de ese hogar se guardan hasta [exportUntil]
+ * para que puedas exportarlos; después se borran.
+ */
+@Serializable
+data class RemovedHousehold(
+    @SerialName("household_id") val householdId: String,
+    val name: String,
+    /** ISO 8601, como lo devuelve Postgres. */
+    @SerialName("export_until") val exportUntil: String,
+) {
+    /** El día en que acaba el plazo, en la zona del dispositivo; nulo si la fecha no se entiende. */
+    fun exportDay(zone: ZoneId = ZoneId.systemDefault()): LocalDate? =
+        runCatching { OffsetDateTime.parse(exportUntil).atZoneSameInstant(zone).toLocalDate() }.getOrNull()
+
+    companion object {
+        /** Días de plazo, los mismos que en el servidor (`private.removed_until`). */
+        const val EXPORT_DAYS = 30
+    }
+}
+
+/**
+ * Lo que puede llevarse quien ha sido quitado de un hogar: sus movimientos, con sus cuentas y categorías
+ * para poner los nombres en el CSV.
+ */
+@Serializable
+data class RemovedHouseholdExport(
+    val accounts: List<Account>,
+    val categories: List<BudgetCategory>,
+    val movements: List<Movement>,
 )
