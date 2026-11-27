@@ -25,23 +25,23 @@ public enum AppError: Error, Equatable, LocalizedError, Sendable {
 
     public var errorDescription: String? {
         switch self {
-        case .invalidCredentials: "Usuario o contraseña incorrectos."
-        case .wrongCurrentPassword: "La contraseña actual no es correcta."
-        case .tooManyAttempts: "Demasiados intentos seguidos. Inténtalo de nuevo más tarde."
-        case .usernameTaken: "Ese nombre de usuario ya existe. Prueba con otro."
-        case .weakPassword: "La contraseña es demasiado débil. Usa al menos \(SignUpForm.minimumPasswordLength) caracteres."
-        case .notSignedIn: "Tu sesión ha caducado. Vuelve a iniciar sesión."
-        case .invalidOrExpiredInvite: "Ese código no es válido o ha caducado. Pide uno nuevo."
+        case .invalidCredentials: localized("Usuario o contraseña incorrectos.")
+        case .wrongCurrentPassword: localized("La contraseña actual no es correcta.")
+        case .tooManyAttempts: localized("Demasiados intentos seguidos. Inténtalo de nuevo más tarde.")
+        case .usernameTaken: localized("Ese nombre de usuario ya existe. Prueba con otro.")
+        case .weakPassword: localized("La contraseña es demasiado débil. Usa al menos \(SignUpForm.minimumPasswordLength) caracteres.")
+        case .notSignedIn: localized("Tu sesión ha caducado. Vuelve a iniciar sesión.")
+        case .invalidOrExpiredInvite: localized("Ese código no es válido o ha caducado. Pide uno nuevo.")
         case .tooManyInviteAttempts(let minutes):
-            "Has probado demasiados códigos. Vuelve a intentarlo dentro de \(minutes == 1 ? "1 minuto" : "\(minutes) minutos")."
-        case .alreadyMember: "Ya formas parte de ese hogar."
-        case .network: "No hay conexión. Inténtalo de nuevo en un momento."
+            localized("Has probado demasiados códigos. Vuelve a intentarlo dentro de \(minutes == 1 ? localized("1 minuto") : localized("\(minutes) minutos")).")
+        case .alreadyMember: localized("Ya formas parte de ese hogar.")
+        case .network: localized("No hay conexión. Inténtalo de nuevo en un momento.")
         case .invalidInput(let message): message
         // Sin texto en el dominio: la app lo resuelve antes de enseñarlo. Este es solo el de reserva.
-        case .validation: "Algún dato no es válido. Revisa el formulario."
+        case .validation: localized("Algún dato no es válido. Revisa el formulario.")
         case .movementChanged:
-            "Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta."
-        case .unknown: "Algo ha fallado. Inténtalo de nuevo."
+            localized("Esto ha cambiado en otro dispositivo y se ha vuelto a cargar. Ciérralo, revísalo y repite el cambio si hace falta.")
+        case .unknown: localized("Algo ha fallado. Inténtalo de nuevo.")
         }
     }
 }
@@ -199,13 +199,13 @@ public struct TransferDraft: Hashable, Sendable {
 
     /// Lo que ve quien repite un alta ya guardada (una transferencia, una cuenta, una meta…) después de cambiar
     /// sus datos en el formulario.
-    public static let storedWithOtherData = "Esto ya se guardó con otros datos. Cierra el formulario y revisa lo guardado antes de repetirlo."
+    public static let storedWithOtherData = localized("Esto ya se guardó con otros datos. Cierra el formulario y revisa lo guardado antes de repetirlo.")
     /// Lo que ve quien cambia o borra una pata cuando la otra no se puede cambiar con ella.
-    public static let otherLegLocked = "No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo."
+    public static let otherLegLocked = localized("No se puede cambiar la otra parte de la transferencia. Recarga e inténtalo de nuevo.")
     /// Lo que se avisa antes de borrar una pata: se borran las dos.
-    public static let deleteWarning = "Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer."
+    public static let deleteWarning = localized("Se borran los dos movimientos, la salida de una cuenta y la entrada en la otra. No se puede deshacer.")
     /// Lo que se avisa al editar una pata.
-    public static let editNote = "Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta."
+    public static let editNote = localized("Es una transferencia: el importe y la fecha cambian también en el movimiento de la otra cuenta.")
 
     /// Las dos patas: la salida de una cuenta y la entrada en la otra.
     public var legs: [MovementDraft] {

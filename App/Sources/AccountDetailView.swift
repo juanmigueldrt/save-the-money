@@ -73,7 +73,7 @@ struct AccountDetailView: View {
             } catch is CancellationError {
                 return
             } catch {
-                chartError = "No se han podido cargar los movimientos del gráfico. " + ((error as? AppError)?.text ?? "")
+                chartError = String(localized: "No se han podido cargar los movimientos del gráfico. ") + ((error as? AppError)?.text ?? "")
             }
         }
     }
@@ -83,8 +83,8 @@ extension CalendarDay {
     /// "Hoy", "Ayer" o "lunes, 3 de noviembre" para las cabeceras de la lista por días.
     var dayHeader: String {
         let today = CalendarDay()
-        if self == today { return "Hoy" }
-        if self == today.adding(days: -1) { return "Ayer" }
+        if self == today { return String(localized: "Hoy") }
+        if self == today.adding(days: -1) { return String(localized: "Ayer") }
         let style = Date.FormatStyle.dateTime.weekday(.wide).day().month(.wide).locale(AppRegion.locale)
         let text = date().formatted(year == today.year ? style : style.year())
         return text.prefix(1).uppercased() + text.dropFirst()
@@ -151,7 +151,7 @@ struct BalanceAdjustmentView: View {
             Form {
                 Section {
                     LabeledContent("Saldo en la app", value: current.formatted())
-                    AmountField("Saldo real, p. ej. 1.250,00", text: $actual)
+                    AmountField(String(localized: "Saldo real, p. ej. 1.250,00"), text: $actual)
                     if let difference, difference.minor != 0 {
                         LabeledContent("Ajuste", value: difference.signedText())
                     }
@@ -172,7 +172,7 @@ struct BalanceAdjustmentView: View {
 
     private func save() async {
         guard let money = Money(entered: actual) else {
-            error = "Escribe el saldo, por ejemplo 1.250,00."
+            error = String(localized: "Escribe el saldo, por ejemplo 1.250,00.")
             return
         }
         isWorking = true

@@ -8,9 +8,9 @@ public enum BudgetGroup: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .needs: "Necesidades"
-        case .wants: "Deseos"
-        case .savings: "Ahorro"
+        case .needs: localized("Necesidades")
+        case .wants: localized("Deseos")
+        case .savings: localized("Ahorro")
         }
     }
 }

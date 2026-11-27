@@ -26,10 +26,10 @@ struct AmountField: View {
                 .decimalInput()
                 .focused($focused)
             if AmountExpression.hasOperation(text) {
-                Text(result.map { "= " + $0.formatted(options: .standard) } ?? "La cuenta no está completa")
+                Text(result.map { "= " + $0.formatted(options: .standard) } ?? String(localized: "La cuenta no está completa"))
                     .font(Typography.footnote)
                     .foregroundStyle(result == nil ? Palette.negativeText : Palette.labelSecondary)
-                    .accessibilityLabel(result.map { "Resultado: " + $0.formatted(options: .standard) } ?? "La cuenta no está completa")
+                    .accessibilityLabel(result.map { String(localized: "Resultado: ") + $0.formatted(options: .standard) } ?? String(localized: "La cuenta no está completa"))
             }
         }
         #if os(iOS)
@@ -55,10 +55,10 @@ struct AmountField: View {
 
     private static func spoken(_ symbol: String) -> String {
         switch symbol {
-        case "+": "Más"
-        case "−": "Menos"
-        case "×": "Por"
-        default: "Entre"
+        case "+": String(localized: "Más")
+        case "−": String(localized: "Menos")
+        case "×": String(localized: "Por")
+        default: String(localized: "Entre")
         }
     }
 }

@@ -11,7 +11,7 @@ struct FlexBudgetCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s16) {
-            Eyebrow(flex.isOver ? "Gastado de más en lo flexible" : "Te queda para lo flexible")
+            Eyebrow(flex.isOver ? String(localized: "Gastado de más en lo flexible") : String(localized: "Te queda para lo flexible"))
             Text(Money(minor: abs(flex.remaining.minor)).formatted())
                 .titleFont(.largeTitle)
                 .foregroundStyle(flex.isOver ? Palette.negativeText : Palette.label)
@@ -23,12 +23,12 @@ struct FlexBudgetCard: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             Divider()
-            SummaryLine(title: "Ingresos previstos", amount: flex.income)
-            SummaryLine(title: "Pagos fijos (de Pagos fijos)", amount: flex.fixed)
-            SummaryLine(title: "Ahorro previsto", amount: flex.savings)
-            SummaryLine(title: "Para lo flexible", amount: flex.flexible, highlight: true)
-            SummaryLine(title: "Gastado en lo flexible", amount: flex.flexibleSpent)
-            SummaryLine(title: "Gastado en pagos fijos", amount: flex.fixedSpent)
+            SummaryLine(title: String(localized: "Ingresos previstos"), amount: flex.income)
+            SummaryLine(title: String(localized: "Pagos fijos (de Pagos fijos)"), amount: flex.fixed)
+            SummaryLine(title: String(localized: "Ahorro previsto"), amount: flex.savings)
+            SummaryLine(title: String(localized: "Para lo flexible"), amount: flex.flexible, highlight: true)
+            SummaryLine(title: String(localized: "Gastado en lo flexible"), amount: flex.flexibleSpent)
+            SummaryLine(title: String(localized: "Gastado en pagos fijos"), amount: flex.fixedSpent)
             Text("Lo flexible es todo lo que no son pagos fijos ni ahorro: compra, ocio, restaurantes… Los gastos cuyas categorías usan tus pagos fijos cuentan como fijos.")
                 .font(Typography.footnote)
                 .foregroundStyle(Palette.labelSecondary)

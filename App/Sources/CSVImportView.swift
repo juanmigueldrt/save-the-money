@@ -97,7 +97,7 @@ struct CSVImportView: View {
                 MappingSection(table: table, mapping: Binding(get: { mapping ?? Self.emptyMapping }, set: { mapping = $0 }))
             } else if table != nil {
                 Section {
-                    ErrorText(message: "No he reconocido las columnas de fecha, concepto e importe de este archivo.")
+                    ErrorText(message: String(localized: "No he reconocido las columnas de fecha, concepto e importe de este archivo."))
                 }
             }
 
@@ -149,7 +149,7 @@ struct CSVImportView: View {
     }
 
     private var importTitle: String {
-        if isImporting { return "Importando…" }
+        if isImporting { return String(localized: "Importando…") }
         return Self.buttonTitle(validCount: validDrafts.count)
     }
 
@@ -170,16 +170,15 @@ struct CSVImportView: View {
     /// "Importar", "Importar 1 movimiento", "Importar 2 movimientos".
     static func buttonTitle(validCount: Int) -> String {
         switch validCount {
-        case 0: "Importar"
-        case 1: "Importar 1 movimiento"
-        default: "Importar \(validCount) movimientos"
+        case 0: String(localized: "Importar")
+        default: String(localized: "Importar \(validCount) movimientos")
         }
     }
 
     private func resultText(_ result: ImportResult) -> String {
-        var text = "\(result.inserted) movimientos importados."
-        if result.duplicates > 0 { text += " \(result.duplicates) ya estaban y no se han repetido." }
-        if createdSeries > 0 { text += createdSeries == 1 ? " 1 pago recurrente creado." : " \(createdSeries) pagos recurrentes creados." }
+        var text = String(localized: "\(result.inserted) movimientos importados.")
+        if result.duplicates > 0 { text += String(localized: " \(result.duplicates) ya estaban y no se han repetido.") }
+        if createdSeries > 0 { text += String(localized: " \(createdSeries) pagos recurrentes creados.") }
         return text
     }
 

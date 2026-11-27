@@ -59,9 +59,9 @@ struct CardPaymentFormView: View {
     }
 
     private func save() async {
-        guard let money = Money(entered: amount), money.minor > 0 else { error = "El importe no es válido."; return }
+        guard let money = Money(entered: amount), money.minor > 0 else { error = String(localized: "El importe no es válido."); return }
         guard let source = finance.accounts.first(where: { $0.id == from }) else {
-            error = "Elige la cuenta desde la que pagas."
+            error = String(localized: "Elige la cuenta desde la que pagas.")
             return
         }
         isWorking = true

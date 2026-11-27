@@ -16,7 +16,7 @@ struct PaymentCalendarSource {
             }
         }
         let plans = investments.plans.map { plan in
-            PaymentCalendar.PlanEntry(name: investments.holding(plan.holdingId)?.name ?? "Inversión", plan: plan)
+            PaymentCalendar.PlanEntry(name: investments.holding(plan.holdingId)?.name ?? String(localized: "Inversión"), plan: plan)
         }
         return PaymentCalendar(series: planning.series, cardPayments: cardPayments, plans: plans)
     }
@@ -80,7 +80,7 @@ struct PaymentCalendarView: View {
 
     private func totals(_ data: PaymentMonth) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
-            Eyebrow("Pagos de \(data.key.title.lowercased())")
+            Eyebrow(String(localized: "Pagos de \(data.key.title.lowercased())"))
             Text(data.totalOut.formatted())
                 .titleFont(.largeTitle)
                 .foregroundStyle(Palette.label)
@@ -104,7 +104,7 @@ struct PaymentCalendarView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if payments.isEmpty {
-                EmptyHint(text: "No hay pagos este día.")
+                EmptyHint(text: String(localized: "No hay pagos este día."))
             }
             ForEach(payments) { PaymentRow(payment: $0, showsDay: false) }
             if payments.count > 1 {
@@ -128,7 +128,7 @@ struct PaymentCalendarView: View {
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
             if payments.isEmpty {
-                EmptyHint(text: planning.isLoading ? "Cargando…" : "No hay más pagos previstos. Añade tus pagos fijos y suscripciones para verlos aquí.")
+                EmptyHint(text: planning.isLoading ? String(localized: "Cargando…") : String(localized: "No hay más pagos previstos. Añade tus pagos fijos y suscripciones para verlos aquí."))
             }
             ForEach(payments) { payment in
                 Button { jump(to: payment.day) } label: { PaymentRow(payment: payment, showsDay: true) }
@@ -207,7 +207,7 @@ private struct DayCell: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(day.longTitle + (hasPayments ? ", con pagos" : ""))
+        .accessibilityLabel(day.longTitle + (hasPayments ? String(localized: ", con pagos") : ""))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -244,7 +244,7 @@ struct PaymentRow: View {
     private var detail: String {
         var parts = [payment.source.title]
         if showsDay { parts.insert(payment.day.shortText, at: 0) }
-        if payment.isEstimate { parts.append("estimado") }
+        if payment.isEstimate { parts.append(String(localized: "estimado")) }
         return parts.joined(separator: " · ")
     }
 }
@@ -272,7 +272,7 @@ struct NextPaymentsCard: View {
                         .foregroundStyle(Palette.labelSecondary)
                 }
                 if next.isEmpty {
-                    EmptyHint(text: planning.isLoading ? "Cargando…" : "Cuando añadas pagos fijos o suscripciones verás aquí los próximos.")
+                    EmptyHint(text: planning.isLoading ? String(localized: "Cargando…") : String(localized: "Cuando añadas pagos fijos o suscripciones verás aquí los próximos."))
                 }
                 ForEach(next) { PaymentRow(payment: $0, showsDay: true) }
             }

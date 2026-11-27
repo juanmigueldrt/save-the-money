@@ -5,6 +5,7 @@ import PackageDescription
 // La sesión la guarda supabase-swift en el Llavero del sistema.
 let package = Package(
     name: "STMData",
+    defaultLocalization: "es",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "STMData", targets: ["STMData"]),
@@ -17,7 +18,7 @@ let package = Package(
         .target(name: "STMData", dependencies: [
             "STMCore",
             .product(name: "Supabase", package: "supabase-swift"),
-        ]),
+        ], resources: [.process("Localizable.xcstrings")]),
         .testTarget(name: "STMDataTests", dependencies: ["STMData"])
     ]
 )

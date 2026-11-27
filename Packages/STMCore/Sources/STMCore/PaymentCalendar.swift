@@ -16,11 +16,11 @@ public enum PaymentSource: String, Hashable, Sendable, CaseIterable {
 
     public var title: String {
         switch self {
-        case .subscription: "Suscripción"
-        case .essential: "Pago fijo"
-        case .income: "Ingreso fijo"
-        case .creditCard: "Tarjeta de crédito"
-        case .investment: "Inversión"
+        case .subscription: localized("Suscripción")
+        case .essential: localized("Pago fijo")
+        case .income: localized("Ingreso fijo")
+        case .creditCard: localized("Tarjeta de crédito")
+        case .investment: localized("Inversión")
         }
     }
 
@@ -196,10 +196,10 @@ public enum CSVRowMark: Hashable, Sendable {
 
     public var title: String {
         switch self {
-        case .none: "Sin marcar"
-        case .recurring: "Recurrente"
-        case .subscription: "Suscripción"
-        case .creditCard: "Compra con tarjeta"
+        case .none: localized("Sin marcar")
+        case .recurring: localized("Recurrente")
+        case .subscription: localized("Suscripción")
+        case .creditCard: localized("Compra con tarjeta")
         }
     }
 

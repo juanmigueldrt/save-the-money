@@ -19,7 +19,7 @@ struct CreditCardsView: View {
                         Text("Aún no hay tarjetas")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: cards.isLoading ? "Cargando…" : "Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes.")
+                        EmptyHint(text: cards.isLoading ? String(localized: "Cargando…") : String(localized: "Añade tu tarjeta de crédito y sus condiciones (límite, día del extracto y forma de pago) para saber cuánto te cobrarán cada mes."))
                         Button("Añadir tarjeta") { adding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -27,7 +27,7 @@ struct CreditCardsView: View {
                 } else {
                     if accounts.count > 1, cards.nextPaymentsTotal.minor > 0 {
                         VStack(alignment: .leading, spacing: Spacing.s8) {
-                            Eyebrow("Próximos cargos de todas las tarjetas")
+                            Eyebrow(String(localized: "Próximos cargos de todas las tarjetas"))
                             Text(cards.nextPaymentsTotal.formatted())
                                 .titleFont(.largeTitle)
                                 .foregroundStyle(Palette.label)
@@ -47,7 +47,7 @@ struct CreditCardsView: View {
                                 Label(account.name, systemImage: "creditcard")
                                     .font(Typography.headline)
                                     .foregroundStyle(Palette.label)
-                                EmptyHint(text: "Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos.")
+                                EmptyHint(text: String(localized: "Pon el límite, el día del extracto y cómo la pagas para calcular tus cargos."))
                                 Button("Configurar tarjeta") { configuring = account }
                                     .buttonStyle(PrimaryButtonStyle())
                             }
@@ -94,7 +94,7 @@ struct CardOverview: View {
                     .foregroundStyle(Palette.labelSecondary)
             }
             VStack(alignment: .leading, spacing: Spacing.s4) {
-                Eyebrow("Próximo cargo")
+                Eyebrow(String(localized: "Próximo cargo"))
                 Text((summary.next?.amount ?? .zero).formatted())
                     .titleFont(.largeTitle)
                     .foregroundStyle(Palette.label)
@@ -107,10 +107,10 @@ struct CardOverview: View {
             }
             LimitBar(summary: summary)
             HStack(alignment: .top) {
-                CardFigure(title: "Gastado en este extracto", value: summary.spentThisCycle,
-                           detail: "se cobra el \(summary.terms.paymentDate(forStatement: summary.openStatement).longTitle)")
-                CardFigure(title: "Disponible", value: summary.available,
-                           detail: "de \(summary.terms.creditLimit.formatted())")
+                CardFigure(title: String(localized: "Gastado en este extracto"), value: summary.spentThisCycle,
+                           detail: String(localized: "se cobra el \(summary.terms.paymentDate(forStatement: summary.openStatement).longTitle)"))
+                CardFigure(title: String(localized: "Disponible"), value: summary.available,
+                           detail: String(localized: "de \(summary.terms.creditLimit.formatted())"))
             }
         }
         .accessibilityElement(children: .combine)
@@ -166,36 +166,36 @@ struct CardFigure: View {
 
 enum CardText {
     static func due(_ payment: CardPayment) -> String {
-        let estimate = payment.isEstimate ? " · de momento, puede subir con nuevas compras" : ""
-        return "El \(payment.due.longTitle)\(estimate)"
+        let estimate = payment.isEstimate ? String(localized: " · de momento, puede subir con nuevas compras") : ""
+        return String(localized: "El \(payment.due.longTitle)\(estimate)")
     }
 
     static func breakdown(_ payment: CardPayment, mode: CardPaymentMode) -> String {
         var parts: [String] = []
         if payment.purchases.minor > 0 {
-            parts.append(mode.isRevolving ? "cuota \(payment.purchases.formatted())" : "compras \(payment.purchases.formatted())")
+            parts.append(mode.isRevolving ? String(localized: "cuota \(payment.purchases.formatted())") : String(localized: "compras \(payment.purchases.formatted())"))
         }
-        if payment.installments.minor > 0 { parts.append("aplazados \(payment.installments.formatted())") }
-        guard !parts.isEmpty else { return "Sin cargos" }
+        if payment.installments.minor > 0 { parts.append(String(localized: "aplazados \(payment.installments.formatted())")) }
+        guard !parts.isEmpty else { return String(localized: "Sin cargos") }
         let text = parts.joined(separator: " · ")
         // Los intereses ya van dentro de las cuotas: se dicen aparte para que no se sumen dos veces.
-        return payment.interest.minor > 0 ? "\(text) (incluye \(payment.interest.formatted()) de intereses)" : text
+        return payment.interest.minor > 0 ? String(localized: "\(text) (incluye \(payment.interest.formatted()) de intereses)") : text
     }
 
     /// Aviso de abonos sin categoría: no se sabe si son un pago de la tarjeta o una devolución.
     static func uncategorizedCredits(_ count: Int) -> String {
-        let credits = count == 1 ? "Hay 1 abono sin categoría" : "Hay \(count) abonos sin categoría"
-        return "\(credits). Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia."
+        let credits = String(localized: "Hay \(count) abonos sin categoría")
+        return String(localized: "\(credits). Sin categoría no bajan los cargos: si es una devolución, ponle la suya; si es un pago de la tarjeta, una de transferencia.")
     }
 
     /// Aviso de aplazados cuya compra no se ha podido cargar: sin ella no se sabe la cuota ni el capital.
     static func unresolvedInstallments(_ count: Int) -> String {
-        let plans = count == 1 ? "No se ha podido cargar la compra de 1 aplazado" : "No se han podido cargar las compras de \(count) aplazados"
-        return "\(plans). Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato."
+        let plans = String(localized: "No se han podido cargar las compras de \(count) aplazados")
+        return String(localized: "\(plans). Hasta que se carguen, los cargos y la deuda de la tarjeta no son de fiar: vuelve a abrirla en un rato.")
     }
 
     /// Aviso de que los extractos sin cobrar tienen más movimientos de los que se cargan de una vez.
     static func movementsTruncated(_ limit: Int) -> String {
-        "Los extractos sin cobrar tienen \(limit) movimientos o más y puede que no se hayan cargado todos: los cargos y lo gastado pueden salir más bajos de lo que son."
+        String(localized: "Los extractos sin cobrar tienen \(String(limit)) movimientos o más y puede que no se hayan cargado todos: los cargos y lo gastado pueden salir más bajos de lo que son.")
     }
 }

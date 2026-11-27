@@ -23,12 +23,12 @@ public struct SignUpForm: Equatable, Sendable {
 
         public var message: String {
             switch self {
-            case .username(.tooShort): "El usuario necesita al menos 3 caracteres."
-            case .username(.tooLong): "El usuario puede tener como mucho 30 caracteres."
-            case .username(.invalidCharacters): "Usa solo letras sin tilde, números, punto, guion o guion bajo."
-            case .username(.invalidEdges): "El usuario empieza y termina con una letra o un número."
-            case .passwordTooShort: "La contraseña necesita al menos \(SignUpForm.minimumPasswordLength) caracteres."
-            case .passwordsDoNotMatch: "Las contraseñas no coinciden."
+            case .username(.tooShort): localized("El usuario necesita al menos 3 caracteres.")
+            case .username(.tooLong): localized("El usuario puede tener como mucho 30 caracteres.")
+            case .username(.invalidCharacters): localized("Usa solo letras sin tilde, números, punto, guion o guion bajo.")
+            case .username(.invalidEdges): localized("El usuario empieza y termina con una letra o un número.")
+            case .passwordTooShort: localized("La contraseña necesita al menos \(SignUpForm.minimumPasswordLength) caracteres.")
+            case .passwordsDoNotMatch: localized("Las contraseñas no coinciden.")
             }
         }
     }
@@ -72,10 +72,10 @@ public struct ChangePasswordForm: Equatable, Sendable {
 
         public var message: String {
             switch self {
-            case .currentPasswordMissing: "Escribe tu contraseña actual."
+            case .currentPasswordMissing: localized("Escribe tu contraseña actual.")
             case .passwordTooShort: SignUpForm.Issue.passwordTooShort.message
             case .passwordsDoNotMatch: SignUpForm.Issue.passwordsDoNotMatch.message
-            case .samePassword: "La nueva contraseña tiene que ser distinta de la actual."
+            case .samePassword: localized("La nueva contraseña tiene que ser distinta de la actual.")
             }
         }
     }

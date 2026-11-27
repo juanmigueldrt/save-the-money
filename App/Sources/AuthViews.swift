@@ -50,12 +50,12 @@ struct LoginView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s24) {
-            LabeledField(label: "Usuario") {
+            LabeledField(label: String(localized: "Usuario")) {
                 TextField("tu-usuario", text: $username)
                     .textContentType(.username)
                     .plainIdentifierInput()
             }
-            LabeledField(label: "Contraseña") {
+            LabeledField(label: String(localized: "Contraseña")) {
                 SecureField("Contraseña", text: $password)
                     .textContentType(.password)
                     .onSubmit(submit)
@@ -103,20 +103,20 @@ struct SignUpView: View {
 
     var body: some View {
         VStack(spacing: Spacing.s24) {
-            LabeledField(label: "Usuario") {
+            LabeledField(label: String(localized: "Usuario")) {
                 TextField("tu-usuario", text: $form.username)
                     .textContentType(.username)
                     .plainIdentifierInput()
             }
-            LabeledField(label: "Tu nombre (opcional)") {
+            LabeledField(label: String(localized: "Tu nombre (opcional)")) {
                 TextField("Cómo te verá tu pareja", text: $form.displayName)
                     .nameContentType()
             }
-            LabeledField(label: "Contraseña") {
+            LabeledField(label: String(localized: "Contraseña")) {
                 SecureField("Al menos \(SignUpForm.minimumPasswordLength) caracteres", text: $form.password)
                     .newPasswordContentType()
             }
-            LabeledField(label: "Repite la contraseña") {
+            LabeledField(label: String(localized: "Repite la contraseña")) {
                 SecureField("Contraseña", text: $form.passwordConfirmation)
                     .newPasswordContentType()
                     .onSubmit(submit)

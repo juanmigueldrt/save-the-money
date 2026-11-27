@@ -23,9 +23,9 @@ enum CSVOpenFailure: Error, Sendable {
 
     var message: String {
         switch self {
-        case .tooLarge: "El archivo es demasiado grande (máximo 10 MB)."
-        case .unreadableText: "No he podido leer el texto del archivo."
-        case .cannotOpen: "No he podido abrir el archivo."
+        case .tooLarge: String(localized: "El archivo es demasiado grande (máximo 10 MB).")
+        case .unreadableText: String(localized: "No he podido leer el texto del archivo.")
+        case .cannotOpen: String(localized: "No he podido abrir el archivo.")
         }
     }
 }

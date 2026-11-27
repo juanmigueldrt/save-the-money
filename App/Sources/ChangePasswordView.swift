@@ -40,15 +40,15 @@ struct ChangePasswordView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: Spacing.s24) {
-                    LabeledField(label: "Contraseña actual") {
+                    LabeledField(label: String(localized: "Contraseña actual")) {
                         SecureField("Contraseña actual", text: $form.currentPassword)
                             .textContentType(.password)
                     }
-                    LabeledField(label: "Nueva contraseña") {
+                    LabeledField(label: String(localized: "Nueva contraseña")) {
                         SecureField("Al menos \(SignUpForm.minimumPasswordLength) caracteres", text: $form.newPassword)
                             .newPasswordContentType()
                     }
-                    LabeledField(label: "Repite la nueva contraseña") {
+                    LabeledField(label: String(localized: "Repite la nueva contraseña")) {
                         SecureField("Nueva contraseña", text: $form.newPasswordConfirmation)
                             .newPasswordContentType()
                             .onSubmit(submit)
@@ -124,7 +124,7 @@ struct DeleteAccountView: View {
                     Text(DeletingAccount.warning)
                         .font(Typography.body)
                         .foregroundStyle(Palette.label)
-                    LabeledField(label: "Contraseña actual") {
+                    LabeledField(label: String(localized: "Contraseña actual")) {
                         SecureField("Contraseña actual", text: $password)
                             .textContentType(.password)
                     }

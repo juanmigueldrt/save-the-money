@@ -1,0 +1,21 @@
+{
+  "sourceLanguage" : "es",
+  "strings" : {
+    "Algún dato no es válido. Revisa el formulario." : {
+
+    },
+    "El nombre del hogar tiene que tener entre 1 y 80 letras." : {
+
+    },
+    "El precio no puede ser negativo." : {
+
+    },
+    "Ya hay un registro igual guardado. Revisa el formulario." : {
+
+    },
+    "Ya hay una categoría con ese nombre." : {
+
+    }
+  },
+  "version" : "1.0"
+}

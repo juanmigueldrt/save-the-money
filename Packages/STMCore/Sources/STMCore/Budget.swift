@@ -246,7 +246,7 @@ public struct BudgetReport: Hashable, Sendable {
             case nil:
                 if movement.amount.minor > 0 {
                     income += movement.amount.minor
-                    incomeByTitle["Sin categoría", default: 0] += movement.amount.minor
+                    incomeByTitle[localized("Sin categoría"), default: 0] += movement.amount.minor
                 } else {
                     uncategorized -= movement.amount.minor
                 }

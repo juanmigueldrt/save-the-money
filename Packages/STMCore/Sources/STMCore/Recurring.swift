@@ -75,14 +75,14 @@ public struct Recurrence: Hashable, Codable, Sendable {
 
     public var title: String {
         switch (unit, every) {
-        case (.week, 1): "Cada semana"
-        case (.week, let n): "Cada \(n) semanas"
-        case (.month, 1): "Cada mes"
-        case (.month, 3): "Cada trimestre"
-        case (.month, 6): "Cada semestre"
-        case (.month, let n): "Cada \(n) meses"
-        case (.year, 1): "Cada año"
-        case (.year, let n): "Cada \(n) años"
+        case (.week, 1): localized("Cada semana")
+        case (.week, let n): localized("Cada \(n) semanas")
+        case (.month, 1): localized("Cada mes")
+        case (.month, 3): localized("Cada trimestre")
+        case (.month, 6): localized("Cada semestre")
+        case (.month, let n): localized("Cada \(n) meses")
+        case (.year, 1): localized("Cada año")
+        case (.year, let n): localized("Cada \(n) años")
         }
     }
 

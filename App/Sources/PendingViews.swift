@@ -93,7 +93,7 @@ struct ConfirmChargeView: View {
         NavigationStack {
             Form {
                 Section {
-                    AmountField("Importe, p. ej. 12,99", text: $amount)
+                    AmountField(String(localized: "Importe, p. ej. 12,99"), text: $amount)
                     DatePicker("Día", selection: $day, displayedComponents: .date)
                         .environment(\.locale, AppRegion.locale)
                     Picker("Cuenta", selection: $accountId) {
@@ -136,11 +136,11 @@ struct ConfirmChargeView: View {
 
     private func confirm() async {
         guard let money = Money(entered: amount), money.minor > 0 else {
-            error = "Escribe el importe, por ejemplo 12,99."
+            error = String(localized: "Escribe el importe, por ejemplo 12,99.")
             return
         }
         guard let accountId else {
-            error = "Elige la cuenta del cargo."
+            error = String(localized: "Elige la cuenta del cargo.")
             return
         }
         let signed = item.series.kind == .income ? money : Money(minor: -money.minor)
@@ -171,7 +171,7 @@ struct WeeklySummaryCard: View {
         } label: {
             VStack(alignment: .leading, spacing: Spacing.s8) {
                 HStack {
-                    Eyebrow("La semana pasada · \(summary.title)")
+                    Eyebrow(String(localized: "La semana pasada · \(summary.title)"))
                     Spacer()
                     Image(systemName: "chevron.right")
                         .font(Typography.footnote)
@@ -204,7 +204,7 @@ struct WeeklySummaryView: View {
                                     includeCurrent: current)
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
-                CapsuleSegmented("Semana", selection: $current, options: [false, true]) { $0 ? "Esta semana" : "La pasada" }
+                CapsuleSegmented(String(localized: "Semana"), selection: $current, options: [false, true]) { $0 ? String(localized: "Esta semana") : String(localized: "La pasada") }
 
                 VStack(alignment: .leading, spacing: Spacing.s8) {
                     Eyebrow(summary.title)
@@ -215,8 +215,8 @@ struct WeeklySummaryView: View {
                         .font(Typography.subheadline)
                         .foregroundStyle(Palette.labelSecondary)
                     Divider()
-                    SummaryLine(title: "Ingresos", amount: summary.week.income)
-                    SummaryLine(title: "Semana anterior", amount: summary.previous.spent)
+                    SummaryLine(title: String(localized: "Ingresos"), amount: summary.week.income)
+                    SummaryLine(title: String(localized: "Semana anterior"), amount: summary.previous.spent)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .card()
@@ -226,7 +226,7 @@ struct WeeklySummaryView: View {
                         .titleFont(.title2)
                         .foregroundStyle(Palette.label)
                     if summary.biggest.isEmpty {
-                        EmptyHint(text: "No hay gastos esta semana.")
+                        EmptyHint(text: String(localized: "No hay gastos esta semana."))
                     }
                     ForEach(summary.biggest) { movement in
                         HStack {
@@ -295,10 +295,10 @@ struct WeeklySummaryView: View {
 
     static func changeText(_ summary: WeeklySummary) -> String {
         guard let percent = summary.change.percent else {
-            return summary.previous.spent.minor == 0 ? "La semana anterior no hubo gastos." : ""
+            return summary.previous.spent.minor == 0 ? String(localized: "La semana anterior no hubo gastos.") : ""
         }
-        if percent == 0 { return "Lo mismo que la semana anterior." }
-        return percent > 0 ? "\(percent) % más que la semana anterior" : "\(-percent) % menos que la semana anterior"
+        if percent == 0 { return String(localized: "Lo mismo que la semana anterior.") }
+        return percent > 0 ? String(localized: "\(percent) % más que la semana anterior") : String(localized: "\(-percent) % menos que la semana anterior")
     }
 }
 

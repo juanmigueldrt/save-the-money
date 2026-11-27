@@ -312,7 +312,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         let user = try requireUser()
         purgeExpiredRemovals()
         guard removals[Removal(householdId: householdId, userId: user)] != nil else {
-            throw AppError.invalidInput("Ya no hay datos que exportar de ese hogar.")
+            throw AppError.invalidInput(localized("Ya no hay datos que exportar de ese hogar."))
         }
         let mine = { (id: UUID) in self.creators[id] == user }
         return RemovedHouseholdExport(
@@ -324,11 +324,11 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func transferHousehold(_ householdId: UUID, to userId: UUID) async throws {
         let user = try requireUser()
         guard let mine = memberships.firstIndex(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
-            throw AppError.invalidInput("Solo el propietario puede traspasar el hogar.")
+            throw AppError.invalidInput(localized("Solo el propietario puede traspasar el hogar."))
         }
         guard userId != user else { return }
         guard let theirs = memberships.firstIndex(where: { $0.userId == userId && $0.householdId == householdId }) else {
-            throw AppError.invalidInput("Esa persona no es miembro del hogar.")
+            throw AppError.invalidInput(localized("Esa persona no es miembro del hogar."))
         }
         memberships[theirs].role = .owner
         memberships[mine].role = .member
@@ -362,7 +362,7 @@ public actor InMemoryBackend: AuthService, HouseholdService {
             throw AppError.invalidInput(Household.renameOwnerOnly)
         }
         guard let valid = HouseholdName.validated(name) else {
-            throw AppError.invalidInput("El nombre del hogar tiene que tener entre 1 y 80 letras.")
+            throw AppError.invalidInput(localized("El nombre del hogar tiene que tener entre 1 y 80 letras."))
         }
         guard var household = householdsById[householdId] else { throw AppError.unknown("hogar") }
         household.name = valid
@@ -385,9 +385,9 @@ public actor InMemoryBackend: AuthService, HouseholdService {
     public func removeMember(_ userId: UUID, from householdId: UUID) async throws {
         let user = try requireUser()
         guard memberships.contains(where: { $0.userId == user && $0.householdId == householdId && $0.role == .owner }) else {
-            throw AppError.invalidInput("Solo quien creó el hogar puede quitar a un miembro.")
+            throw AppError.invalidInput(localized("Solo quien creó el hogar puede quitar a un miembro."))
         }
-        guard userId != user else { throw AppError.invalidInput("No puedes quitarte a ti mismo.") }
+        guard userId != user else { throw AppError.invalidInput(localized("No puedes quitarte a ti mismo.")) }
         guard isMember(userId, of: householdId) else { return }
         memberships.removeAll { $0.userId == userId && $0.householdId == householdId }
         removals[Removal(householdId: householdId, userId: userId)] = now()

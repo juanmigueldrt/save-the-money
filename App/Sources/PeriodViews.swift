@@ -13,7 +13,7 @@ struct SpendTodayCard: View {
     var body: some View {
         let insights = budgets.insights(categories: finance.categories)
         VStack(alignment: .leading, spacing: Spacing.s8) {
-            Eyebrow("Puedes gastar hoy")
+            Eyebrow(String(localized: "Puedes gastar hoy"))
             Text(insights.perDay.formatted())
                 .titleFont(.title1)
                 .foregroundStyle(insights.left.isNegative ? Palette.negativeText : Palette.label)
@@ -21,7 +21,7 @@ struct SpendTodayCard: View {
             Text(detail(insights))
                 .font(Typography.subheadline)
                 .foregroundStyle(Palette.labelSecondary)
-            Text(budgets.hasOwnSchedule ? budgets.schedule.summary : "Dinos cuándo cobras en Presupuesto › Día de cobro.")
+            Text(budgets.hasOwnSchedule ? budgets.schedule.summary : String(localized: "Dinos cuándo cobras en Presupuesto › Día de cobro."))
                 .font(Typography.footnote)
                 .foregroundStyle(Palette.labelSecondary)
         }
@@ -31,11 +31,11 @@ struct SpendTodayCard: View {
     }
 
     private func detail(_ insights: PeriodInsights) -> String {
-        let days = insights.daysToPayday == 1 ? "1 día" : "\(insights.daysToPayday) días"
+        let days = String(localized: "\(insights.daysToPayday) días")
         if insights.left.isNegative {
-            return "Te has pasado \(Money(minor: -insights.left.minor).formatted()) · faltan \(days) para cobrar"
+            return String(localized: "Te has pasado \(Money(minor: -insights.left.minor).formatted()) · faltan \(days) para cobrar")
         }
-        return "Te quedan \(insights.left.formatted()) · faltan \(days) para cobrar"
+        return String(localized: "Te quedan \(insights.left.formatted()) · faltan \(days) para cobrar")
     }
 }
 
@@ -74,7 +74,7 @@ struct PeriodSwitcher: View {
 
     private var subtitle: String {
         let range = "\(budgets.period.start.shortText) – \(budgets.period.end.shortText)"
-        return budgets.isCurrentPeriod ? range + " · en curso" : range
+        return budgets.isCurrentPeriod ? range + String(localized: " · en curso") : range
     }
 }
 
@@ -175,7 +175,7 @@ struct ExtraBudgetsSection: View {
                 .font(Typography.subheadlineEmphasis)
             }
             if budgets.extraBudgets.isEmpty {
-                EmptyHint(text: "Para controlar un gasto concreto aparte del presupuesto: unas vacaciones, una reforma o los regalos de Navidad.")
+                EmptyHint(text: String(localized: "Para controlar un gasto concreto aparte del presupuesto: unas vacaciones, una reforma o los regalos de Navidad."))
             }
             ForEach(budgets.extraBudgets) { extra in
                 Button { editing = extra } label: {
@@ -230,8 +230,8 @@ struct ExtraBudgetRow: View {
     }
 
     private var dates: String {
-        if let end = extra.endsOn { return "Del \(extra.startsOn.shortText) al \(end.shortText)" }
-        return "Desde el \(extra.startsOn.shortText), sin fecha de fin"
+        if let end = extra.endsOn { return String(localized: "Del \(extra.startsOn.shortText) al \(end.shortText)") }
+        return String(localized: "Desde el \(extra.startsOn.shortText), sin fecha de fin")
     }
 }
 
@@ -261,7 +261,7 @@ struct ExtraBudgetFormView: View {
             Form {
                 Section {
                     TextField("Nombre, p. ej. Vacaciones", text: $name)
-                    AmountField("Límite, p. ej. 800,00", text: $limit)
+                    AmountField(String(localized: "Límite, p. ej. 800,00"), text: $limit)
                     Toggle("Favorito (sale en Resumen)", isOn: $isFavorite)
                 }
                 Section {
@@ -301,7 +301,7 @@ struct ExtraBudgetFormView: View {
             }
             .formStyle(.grouped)
             .brandBackground()
-            .navigationTitle(isNew ? "Nuevo presupuesto extra" : extra.name)
+            .navigationTitle(isNew ? String(localized: "Nuevo presupuesto extra") : extra.name)
             .formToolbar(isWorking: isWorking, cancel: { dismiss() }, save: { await save() })
             .confirmationDialog("¿Borrar «\(extra.name)»?", isPresented: $confirmingDelete, titleVisibility: .visible) {
                 Button("Borrar", role: .destructive) {
@@ -334,7 +334,7 @@ struct ExtraBudgetFormView: View {
 
     private func save() async {
         guard let amount = Money(entered: limit), amount.minor > 0 else {
-            error = "Escribe un límite, por ejemplo 800,00."
+            error = String(localized: "Escribe un límite, por ejemplo 800,00.")
             return
         }
         var updated = extra

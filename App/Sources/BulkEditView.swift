@@ -74,7 +74,7 @@ struct BulkEditView: View {
                     Text("Etiquetas")
                 } footer: {
                     if !usedTags.isEmpty {
-                        Text("Ahora llevan: " + usedTags.map { "#" + $0 }.joined(separator: " "))
+                        Text(String(localized: "Ahora llevan: ") + usedTags.map { "#" + $0 }.joined(separator: " "))
                     }
                 }
                 Section {
@@ -95,7 +95,7 @@ struct BulkEditView: View {
             }
             .formStyle(.grouped)
             .brandBackground()
-            .navigationTitle(movements.count == 1 ? "Editar 1 movimiento" : "Editar \(movements.count) movimientos")
+            .navigationTitle("Editar \(movements.count) movimientos")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

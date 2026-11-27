@@ -54,13 +54,13 @@ public struct CashFlow: Hashable, Sendable {
             }
         }
         if report.uncategorized.minor > 0 {
-            middle.append(Node(id: "sin-categoria", title: "Sin categoría", column: 1,
+            middle.append(Node(id: "sin-categoria", title: localized("Sin categoría"), column: 1,
                                value: Double(report.uncategorized.minor), role: .uncategorized))
         }
         let spent = middle.reduce(0) { $0 + $1.value }
         let income = report.incomeSources.reduce(0) { $0 + Double($1.amount.minor) }
         if income > spent {
-            middle.append(Node(id: "sin-gastar", title: "Sin gastar", column: 1, value: income - spent, role: .unspent))
+            middle.append(Node(id: "sin-gastar", title: localized("Sin gastar"), column: 1, value: income - spent, role: .unspent))
         }
 
         // Columna 0: ingresos y, si se gastó más de lo que entró, lo que salió del saldo.
@@ -68,7 +68,7 @@ public struct CashFlow: Hashable, Sendable {
             Node(id: "ingreso:\(index)", title: source.title, column: 0, value: Double(source.amount.minor), role: .income)
         }
         if spent > income {
-            sources.append(Node(id: "del-saldo", title: "Del saldo", column: 0, value: spent - income, role: .fromBalance))
+            sources.append(Node(id: "del-saldo", title: localized("Del saldo"), column: 0, value: spent - income, role: .fromBalance))
         }
 
         // Cada fuente reparte su importe entre los grupos en proporción a lo que se llevan.

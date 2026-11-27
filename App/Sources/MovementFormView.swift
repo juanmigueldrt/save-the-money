@@ -69,7 +69,7 @@ struct MovementFormView: View {
                     .pickerStyle(.segmented)
                     // En una transferencia la salida es siempre un gasto y la entrada un ingreso.
                     .disabled(movement?.transferId != nil)
-                    AmountField("Importe, p. ej. 12,50 o 25+7,40", text: $amount)
+                    AmountField(String(localized: "Importe, p. ej. 12,50 o 25+7,40"), text: $amount)
                     TextField("Concepto", text: $concept)
                         .conceptInput()
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
@@ -149,8 +149,7 @@ struct MovementFormView: View {
             } message: {
                 Text(TransferDraft.deleteWarning)
             }
-            .confirmationDialog(similar.count == 1 ? "Hay 1 movimiento con el mismo concepto"
-                                                   : "Hay \(similar.count) movimientos con el mismo concepto",
+            .confirmationDialog("Hay \(similar.count) movimientos con el mismo concepto",
                                 isPresented: Binding(get: { !similar.isEmpty }, set: { if !$0 { similar = []; dismiss() } }),
                                 titleVisibility: .visible) {
                 Button("Ponerles la misma categoría") {
@@ -168,7 +167,7 @@ struct MovementFormView: View {
                 }
                 Button("Sólo este", role: .cancel) { similar = []; dismiss() }
             } message: {
-                Text("¿Quieres cambiar también su categoría a «\(finance.category(selectedCategory)?.name ?? "Sin categoría")»?")
+                Text("¿Quieres cambiar también su categoría a «\(finance.category(selectedCategory)?.name ?? String(localized: "Sin categoría"))»?")
             }
             .onChange(of: isExpense) { _, _ in
                 if let current = finance.category(selectedCategory), current.kind != .transfer, current.kind != kind {
@@ -257,10 +256,10 @@ struct MovementFormView: View {
 
     private func save() async {
         guard let parsed = Money(entered: amount), parsed.minor != 0 else {
-            error = "Escribe un importe, por ejemplo 12,50."
+            error = String(localized: "Escribe un importe, por ejemplo 12,50.")
             return
         }
-        guard let accountId = selectedAccount else { error = "Elige una cuenta."; return }
+        guard let accountId = selectedAccount else { error = String(localized: "Elige una cuenta."); return }
         let signed = Money(minor: isExpense ? -abs(parsed.minor) : abs(parsed.minor))
         let trimmedNotes = notes.trimmingCharacters(in: .whitespacesAndNewlines)
         let draft = MovementDraft(id: newMovementId, accountId: accountId, categoryId: selectedCategory, bookedOn: CalendarDay(date),
@@ -297,10 +296,10 @@ struct MovementFormView: View {
             switch purchaseKind {
             case .installments:
                 ok = await cards.deferPurchase(created, months: months, in: card)
-                if !ok { error = "El gasto se ha guardado, pero no se ha podido aplazar: \(cards.error ?? "inténtalo desde la tarjeta.")"; return }
+                if !ok { error = String(localized: "El gasto se ha guardado, pero no se ha podido aplazar: \(cards.error ?? String(localized: "inténtalo desde la tarjeta."))"); return }
             case .recurring:
                 ok = await planning.save(RecurringSeries.fromPurchase(created, recurrence: recurrence))
-                if !ok { error = "El gasto se ha guardado, pero no se ha podido crear el pago fijo: \(planning.error ?? "créalo en Pagos fijos.")"; return }
+                if !ok { error = String(localized: "El gasto se ha guardado, pero no se ha podido crear el pago fijo: \(planning.error ?? String(localized: "créalo en Pagos fijos."))"); return }
             case .normal:
                 ok = true
             }

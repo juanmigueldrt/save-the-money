@@ -5,13 +5,13 @@ import STMCore
 extension AccountKind {
     var title: String {
         switch self {
-        case .checking: "Cuenta corriente"
-        case .savings: "Ahorro"
-        case .creditCard: "Tarjeta de crédito"
-        case .cash: "Efectivo"
-        case .investment: "Inversión"
-        case .loan: "Préstamo"
-        case .other: "Otra"
+        case .checking: String(localized: "Cuenta corriente")
+        case .savings: String(localized: "Ahorro")
+        case .creditCard: String(localized: "Tarjeta de crédito")
+        case .cash: String(localized: "Efectivo")
+        case .investment: String(localized: "Inversión")
+        case .loan: String(localized: "Préstamo")
+        case .other: String(localized: "Otra")
         }
     }
 
@@ -31,9 +31,9 @@ extension AccountKind {
 extension CategoryKind {
     var title: String {
         switch self {
-        case .income: "Ingreso"
-        case .expense: "Gasto"
-        case .transfer: "Transferencia"
+        case .income: String(localized: "Ingreso")
+        case .expense: String(localized: "Gasto")
+        case .transfer: String(localized: "Transferencia")
         }
     }
 }
@@ -41,8 +41,8 @@ extension CategoryKind {
 extension GoalKind {
     var title: String {
         switch self {
-        case .savings: "Ahorro"
-        case .debt: "Pagar una deuda"
+        case .savings: String(localized: "Ahorro")
+        case .debt: String(localized: "Pagar una deuda")
         }
     }
 
@@ -57,17 +57,17 @@ extension GoalKind {
 extension RecurringKind {
     var title: String {
         switch self {
-        case .subscription: "Suscripción"
-        case .essential: "Gasto esencial"
-        case .income: "Ingreso fijo"
+        case .subscription: String(localized: "Suscripción")
+        case .essential: String(localized: "Gasto esencial")
+        case .income: String(localized: "Ingreso fijo")
         }
     }
 
     var pluralTitle: String {
         switch self {
-        case .subscription: "Suscripciones"
-        case .essential: "Gastos esenciales"
-        case .income: "Ingresos fijos"
+        case .subscription: String(localized: "Suscripciones")
+        case .essential: String(localized: "Gastos esenciales")
+        case .income: String(localized: "Ingresos fijos")
         }
     }
 

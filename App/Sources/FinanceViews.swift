@@ -17,7 +17,7 @@ struct SummaryView: View {
                 } label: {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
                         HStack {
-                            Eyebrow("Patrimonio neto")
+                            Eyebrow(String(localized: "Patrimonio neto"))
                             Spacer()
                             Image(systemName: "chevron.right")
                                 .font(Typography.footnote)
@@ -45,7 +45,7 @@ struct SummaryView: View {
                 SpendTodayCard()
 
                 VStack(alignment: .leading, spacing: Spacing.s8) {
-                    Eyebrow("Gastado este mes")
+                    Eyebrow(String(localized: "Gastado este mes"))
                     Text(MonthSummary.spent(movements: finance.recent, categories: finance.categories,
                                             monthStartDay: finance.household.monthStartDay).formatted())
                         .titleFont(.title1)
@@ -77,7 +77,7 @@ struct SummaryView: View {
                                 .font(Typography.subheadlineEmphasis)
                         }
                         if finance.activeAccounts.isEmpty {
-                            EmptyHint(text: finance.isLoading ? "Cargando…" : "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
+                            EmptyHint(text: finance.isLoading ? String(localized: "Cargando…") : String(localized: "Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco."))
                         }
                         ForEach(finance.activeAccounts) { account in
                             NavigationLink(value: account) {
@@ -111,7 +111,7 @@ struct SummaryView: View {
                                 .font(Typography.subheadlineEmphasis)
                         }
                         if finance.recent.isEmpty {
-                            EmptyHint(text: finance.isLoading ? "Cargando…" : "Todavía no hay movimientos.")
+                            EmptyHint(text: finance.isLoading ? String(localized: "Cargando…") : String(localized: "Todavía no hay movimientos."))
                         }
                         ForEach(finance.recent.prefix(8)) { movement in
                             MovementRow(movement: movement, showsAccount: true)
@@ -143,8 +143,8 @@ struct SummaryView: View {
     private var netWorthChangeText: String {
         let change = MonthSummary.netWorthChange(accounts: finance.accounts, movements: finance.recent,
                                                  monthStartDay: finance.household.monthStartDay)
-        if change.minor == 0 { return "Igual que a final del mes pasado" }
-        return (change.isNegative ? "−" : "+") + Money(minor: abs(change.minor)).formatted() + " este mes"
+        if change.minor == 0 { return String(localized: "Igual que a final del mes pasado") }
+        return (change.isNegative ? "−" : "+") + Money(minor: abs(change.minor)).formatted() + String(localized: " este mes")
     }
 }
 
@@ -162,7 +162,7 @@ struct AccountRow: View {
                 Text(account.name)
                     .font(Typography.headline)
                     .foregroundStyle(Palette.label)
-                Text(account.isShared ? "\(account.kind.title) · compartida" : account.kind.title)
+                Text(account.isShared ? String(localized: "\(account.kind.title) · compartida") : account.kind.title)
                     .font(Typography.footnote)
                     .foregroundStyle(Palette.labelSecondary)
                     .lineLimit(1)
@@ -205,7 +205,7 @@ struct MovementRow: View {
               let other = finance.recent.first(where: { $0.transferId == transferId && $0.id != movement.id })
                 ?? finance.list.rows.first(where: { $0.transferId == transferId && $0.id != movement.id }),
               let account = finance.account(other.accountId) else { return nil }
-        return (movement.isExpense ? "Hacia " : "Desde ") + account.name
+        return (movement.isExpense ? String(localized: "Hacia ") : String(localized: "Desde ")) + account.name
     }
 
     @AppStorage(DisplayPreferences.plusSignKey) private var showsPlusSign = false

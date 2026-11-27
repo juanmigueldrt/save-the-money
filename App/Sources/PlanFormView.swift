@@ -115,8 +115,8 @@ struct PlanFormView: View {
     }
 
     private func save() async {
-        guard holdingId != nil else { error = "Elige un activo."; return }
-        guard let item = draft else { error = "Escribe el importe y la rentabilidad con números."; return }
+        guard holdingId != nil else { error = String(localized: "Elige un activo."); return }
+        guard let item = draft else { error = String(localized: "Escribe el importe y la rentabilidad con números."); return }
         if let issue = item.issue { error = issue.text; return }
         isWorking = true
         defer { isWorking = false }

@@ -8,10 +8,10 @@ public enum MovementKindFilter: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .all: "Todos"
-        case .expense: "Gastos"
-        case .income: "Ingresos"
-        case .transfer: "Transferencias"
+        case .all: localized("Todos")
+        case .expense: localized("Gastos")
+        case .income: localized("Ingresos")
+        case .transfer: localized("Transferencias")
         }
     }
 }
@@ -24,10 +24,10 @@ public enum MovementStatusFilter: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .all: "Todos"
-        case .unreviewed: "Sin revisar"
-        case .reviewed: "Revisados"
-        case .excluded: "Excluidos"
+        case .all: localized("Todos")
+        case .unreviewed: localized("Sin revisar")
+        case .reviewed: localized("Revisados")
+        case .excluded: localized("Excluidos")
         }
     }
 }
@@ -40,13 +40,13 @@ public enum MovementDateFilter: String, CaseIterable, Sendable, Identifiable {
 
     public var title: String {
         switch self {
-        case .all: "Cualquier fecha"
-        case .thisMonth: "Este mes"
-        case .lastMonth: "El mes pasado"
-        case .last30Days: "Últimos 30 días"
-        case .last90Days: "Últimos 90 días"
-        case .thisYear: "Este año"
-        case .custom: "Fechas a medida"
+        case .all: localized("Cualquier fecha")
+        case .thisMonth: localized("Este mes")
+        case .lastMonth: localized("El mes pasado")
+        case .last30Days: localized("Últimos 30 días")
+        case .last90Days: localized("Últimos 90 días")
+        case .thisYear: localized("Este año")
+        case .custom: localized("Fechas a medida")
         }
     }
 

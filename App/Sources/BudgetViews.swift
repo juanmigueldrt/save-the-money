@@ -10,7 +10,7 @@ struct BudgetView: View {
         var title: String {
             switch self {
             case .template: "50/30/20"
-            case .flexible: "Flexible"
+            case .flexible: String(localized: "Flexible")
             }
         }
     }
@@ -30,7 +30,7 @@ struct BudgetView: View {
 
                 if budgets.isCurrentPeriod { SpendTodayCard() }
 
-                CapsuleSegmented("Tipo de presupuesto", selection: $mode, options: Mode.allCases) { $0.title }
+                CapsuleSegmented(String(localized: "Tipo de presupuesto"), selection: $mode, options: Mode.allCases) { $0.title }
 
                 if mode == .flexible {
                     FlexBudgetCard(flex: budgets.flex(categories: finance.categories, series: planning.series))
@@ -55,19 +55,19 @@ struct BudgetView: View {
                             ForEach(report.groups, id: \.group) { SemicircleGauge(progress: $0) }
                         }
                         Divider()
-                        SummaryLine(title: "Ingresos del periodo", amount: report.income)
-                        SummaryLine(title: budgets.budget == nil ? "Base del reparto (ingresos reales)" : "Ingresos previstos",
+                        SummaryLine(title: String(localized: "Ingresos del periodo"), amount: report.income)
+                        SummaryLine(title: budgets.budget == nil ? String(localized: "Base del reparto (ingresos reales)") : String(localized: "Ingresos previstos"),
                                     amount: report.base)
-                        SummaryLine(title: "Gastado", amount: report.totalSpent)
-                        SummaryLine(title: report.remaining.isNegative ? "Gastado de más" : "Te queda",
+                        SummaryLine(title: String(localized: "Gastado"), amount: report.totalSpent)
+                        SummaryLine(title: report.remaining.isNegative ? String(localized: "Gastado de más") : String(localized: "Te queda"),
                                     amount: report.remaining, highlight: true)
                         if budgets.budget != nil {
                             let insights = budgets.insights(categories: finance.categories)
                             Divider()
-                            SummaryLine(title: insights.unbudgeted.isNegative ? "Límites por encima de lo previsto" : "Queda por presupuestar",
+                            SummaryLine(title: insights.unbudgeted.isNegative ? String(localized: "Límites por encima de lo previsto") : String(localized: "Queda por presupuestar"),
                                         amount: insights.unbudgeted)
                             if budgets.isCurrentPeriod {
-                                SummaryLine(title: "Al ritmo de hoy gastarás", amount: insights.projectedSpent)
+                                SummaryLine(title: String(localized: "Al ritmo de hoy gastarás"), amount: insights.projectedSpent)
                             }
                         }
                     }
@@ -89,7 +89,7 @@ struct BudgetView: View {
 
                 if report.uncategorized.minor > 0 {
                     VStack(alignment: .leading, spacing: Spacing.s8) {
-                        SummaryLine(title: "Gastos sin categoría", amount: report.uncategorized)
+                        SummaryLine(title: String(localized: "Gastos sin categoría"), amount: report.uncategorized)
                         Text("Ponles categoría en Movimientos para que cuenten en su grupo.")
                             .font(Typography.footnote)
                             .foregroundStyle(Palette.labelSecondary)
@@ -283,7 +283,7 @@ struct BudgetFormView: View {
     private func suggest() {
         let suggested = budgets.suggestedLimits(categories: finance.categories)
         guard !suggested.isEmpty else {
-            error = "Aún no hay gastos en los periodos anteriores para proponer límites."
+            error = String(localized: "Aún no hay gastos en los periodos anteriores para proponer límites.")
             return
         }
         error = nil
@@ -293,7 +293,7 @@ struct BudgetFormView: View {
     private func save() async {
         let trimmed = income.trimmingCharacters(in: .whitespaces)
         guard let expected = trimmed.isEmpty ? .zero : Money(entered: trimmed), !expected.isNegative else {
-            error = "Los ingresos previstos no son un importe válido."
+            error = String(localized: "Los ingresos previstos no son un importe válido.")
             return
         }
         var parsed: [UUID: Money] = [:]
@@ -301,13 +301,13 @@ struct BudgetFormView: View {
             let value = text.trimmingCharacters(in: .whitespaces)
             guard !value.isEmpty else { continue }
             guard let money = Money(entered: value), !money.isNegative else {
-                let name = finance.category(id)?.name ?? "una categoría"
-                error = "El límite de \(name) no es un importe válido."
+                let name = finance.category(id)?.name ?? String(localized: "una categoría")
+                error = String(localized: "El límite de \(name) no es un importe válido.")
                 return
             }
             if money.minor > 0 { parsed[id] = money }
         }
-        guard total == 100 else { error = "El reparto tiene que sumar 100 %."; return }
+        guard total == 100 else { error = String(localized: "El reparto tiene que sumar 100 %."); return }
 
         var budget = initial
         budget.expectedIncome = expected

@@ -62,7 +62,7 @@ struct CardTermsFormView: View {
                             .decimalInput()
                     }
                 } footer: {
-                    Text(mode.detail + (mode.isRevolving ? " El pago mínimo es el % de la deuda más los intereses, y nunca menos del importe mínimo." : ""))
+                    Text(mode.detail + (mode.isRevolving ? String(localized: " El pago mínimo es el % de la deuda más los intereses, y nunca menos del importe mínimo.") : ""))
                 }
                 Section {
                     TextField("Interés de las compras a plazos (TIN %)", text: $installmentRate)
@@ -79,7 +79,7 @@ struct CardTermsFormView: View {
                     }
                     Toggle("Avisarme antes del cargo", isOn: $reminds)
                     if reminds {
-                        Stepper(remindDays == 0 ? "El mismo día" : remindDays == 1 ? "1 día antes" : "\(remindDays) días antes",
+                        Stepper(remindDays == 0 ? "El mismo día" : "\(remindDays) días antes",
                                 value: $remindDays, in: 0...14)
                     }
                     Toggle("Avisarme al acercarme al límite", isOn: $alerts)
@@ -123,13 +123,13 @@ struct CardTermsFormView: View {
     }
 
     private func save() async {
-        guard let limitMoney = Money(entered: limit), limitMoney.minor > 0 else { error = "El límite no es un importe válido."; return }
+        guard let limitMoney = Money(entered: limit), limitMoney.minor > 0 else { error = String(localized: "El límite no es un importe válido."); return }
         guard let revolving = Decimal(parsing: revolvingRate, maxFractionDigits: 2), let installment = Decimal(parsing: installmentRate, maxFractionDigits: 2),
-              let percent = Decimal(parsing: minPercent, maxFractionDigits: 2) else { error = "Revisa los intereses y el pago mínimo."; return }
-        guard let minimum = Money(entered: minAmount.isEmpty ? "0" : minAmount) else { error = "El pago mínimo no es un importe válido."; return }
+              let percent = Decimal(parsing: minPercent, maxFractionDigits: 2) else { error = String(localized: "Revisa los intereses y el pago mínimo."); return }
+        guard let minimum = Money(entered: minAmount.isEmpty ? "0" : minAmount) else { error = String(localized: "El pago mínimo no es un importe válido."); return }
         var fixedMoney: Money?
         if mode == .fixed {
-            guard let value = Money(entered: fixed), value.minor > 0 else { error = "La cuota no es un importe válido."; return }
+            guard let value = Money(entered: fixed), value.minor > 0 else { error = String(localized: "La cuota no es un importe válido."); return }
             fixedMoney = value
         }
         let terms = CreditCardTerms(

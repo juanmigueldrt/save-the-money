@@ -1,0 +1,22 @@
+{
+  "sourceLanguage" : "es",
+  "strings" : {
+    "%@: %@ gastados de %@" : {
+      "localizations" : {
+        "es" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "%1$@: %2$@ gastados de %3$@"
+          }
+        }
+      }
+    },
+    "%lld %%" : {
+
+    },
+    "de %@" : {
+
+    }
+  },
+  "version" : "1.0"
+}

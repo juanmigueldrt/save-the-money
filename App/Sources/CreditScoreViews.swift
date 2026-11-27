@@ -15,7 +15,7 @@ struct CreditScoreView: View {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 if let latest = tracking.latestScore {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
-                        Eyebrow("Tu score crediticio")
+                        Eyebrow(String(localized: "Tu score crediticio"))
                         HStack(alignment: .firstTextBaseline, spacing: Spacing.s8) {
                             Text("\(latest.score)")
                                 .titleFont(.largeTitle)
@@ -41,7 +41,7 @@ struct CreditScoreView: View {
                     .accessibilityElement(children: .combine)
                 } else {
                     VStack(alignment: .leading, spacing: Spacing.s16) {
-                        Eyebrow("Tu score crediticio")
+                        Eyebrow(String(localized: "Tu score crediticio"))
                         Text("Apunta el score que te da tu banco o tu proveedor para ver cómo evoluciona.")
                             .font(Typography.subheadline)
                             .foregroundStyle(Palette.labelSecondary)
@@ -169,7 +169,7 @@ struct CreditScoreFormView: View {
 
     private func save() async {
         guard let value = Int(score.trimmingCharacters(in: .whitespaces)) else {
-            error = "Escribe el score con números."
+            error = String(localized: "Escribe el score con números.")
             return
         }
         let item = CreditScore(score: value, maxScore: maxScore, provider: provider, recordedOn: CalendarDay(recordedOn),

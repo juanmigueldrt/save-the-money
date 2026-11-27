@@ -73,7 +73,7 @@ extension SupabaseBackend: InvestmentService {
 
     /// `record_holding_price` apunta el precio del día y el precio actual del activo en una sola transacción.
     public func recordPrice(_ price: Decimal, on day: CalendarDay, for holdingId: UUID) async throws -> Holding {
-        if price < 0 { throw AppError.invalidInput("El precio no puede ser negativo.") }
+        if price < 0 { throw AppError.invalidInput(String(localized: "El precio no puede ser negativo.", bundle: .module)) }
         let rows: [Holding] = try await mapped {
             try await client.rpc("record_holding_price", params: PriceParams(holding: holdingId, priced: day, newPrice: price))
                 .select(Self.holdingColumns)

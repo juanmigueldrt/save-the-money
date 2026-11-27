@@ -200,7 +200,7 @@ public struct SupabaseBackend: AuthService, HouseholdService {
 
     public func renameHousehold(_ householdId: UUID, to name: String) async throws -> Household {
         guard let valid = HouseholdName.validated(name) else {
-            throw AppError.invalidInput("El nombre del hogar tiene que tener entre 1 y 80 letras.")
+            throw AppError.invalidInput(String(localized: "El nombre del hogar tiene que tener entre 1 y 80 letras.", bundle: .module))
         }
         // RLS: sólo el dueño puede actualizar; si no lo es, no vuelve ninguna fila.
         let rows: [Household] = try await mapped {
@@ -342,12 +342,12 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         case "23505":
             // profiles.username es único: Postgres nombra la restricción en el mensaje.
             if message.contains("already a member") { .alreadyMember } else if message.contains("categories_household_name_idx") {
-                .invalidInput("Ya hay una categoría con ese nombre.")
+                .invalidInput(String(localized: "Ya hay una categoría con ese nombre.", bundle: .module))
             } else if message.contains("profiles_username_key") { .usernameTaken } else {
-                .invalidInput("Ya hay un registro igual guardado. Revisa el formulario.")
+                .invalidInput(String(localized: "Ya hay un registro igual guardado. Revisa el formulario.", bundle: .module))
             }
         case "28000", "PGRST301": .notSignedIn
-        case "23503", "23514", "22P02": .invalidInput("Algún dato no es válido. Revisa el formulario.")
+        case "23503", "23514", "22P02": .invalidInput(String(localized: "Algún dato no es válido. Revisa el formulario.", bundle: .module))
         // create_transfer: la transferencia ya estaba guardada con otra cuenta, otro importe u otro día.
         case "STM01": .invalidInput(TransferDraft.storedWithOtherData)
         // El trigger de investment_trades: la posición quedaría en negativo en alguna fecha.

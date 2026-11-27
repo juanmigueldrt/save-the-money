@@ -43,7 +43,7 @@ struct ScanInviteButton: View {
                     if let text = QRImageReader.read(url), let code = InviteCode(text) {
                         onCode(code)
                     } else {
-                        error = "No se encontró un QR de invitación en esa imagen."
+                        error = String(localized: "No se encontró un QR de invitación en esa imagen.")
                     }
                 }
             #endif

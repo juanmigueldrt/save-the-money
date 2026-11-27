@@ -99,11 +99,11 @@ public struct WeeklySummary: Hashable, Sendable {
 
     /// Texto corto para el aviso del lunes.
     public var notificationBody: String {
-        var text = "Gastaste \(week.spent.formatted())"
+        var text = localized("Gastaste \(week.spent.formatted())")
         if let percent = change.percent, percent != 0 {
-            text += percent > 0 ? ", un \(percent) % más que la semana anterior" : ", un \(-percent) % menos que la semana anterior"
+            text += percent > 0 ? localized(", un \(percent) % más que la semana anterior") : localized(", un \(-percent) % menos que la semana anterior")
         }
-        if let top = topCategories.first { text += ". Lo que más: \(top.title)" }
+        if let top = topCategories.first { text += localized(". Lo que más: \(top.title)") }
         return text + "."
     }
 }
@@ -120,9 +120,9 @@ public enum HabitReminderPlanner {
             let day = today.adding(days: offset)
             if weekly && day.weekdayIndex != 6 { return nil }
             return PlannedReminder(id: "\(prefix)log.\(day.iso)", fireOn: day, hour: hour,
-                                   title: "¿Has apuntado tus gastos?",
-                                   body: weekly ? "Tómate un minuto para repasar los gastos de la semana."
-                                                : "Apunta lo que has gastado hoy; es un momento.")
+                                   title: localized("¿Has apuntado tus gastos?"),
+                                   body: weekly ? localized("Tómate un minuto para repasar los gastos de la semana.")
+                                                : localized("Apunta lo que has gastado hoy; es un momento."))
         }
     }
 
@@ -132,8 +132,8 @@ public enum HabitReminderPlanner {
         return (0..<weeks).map { w in
             let day = nextMonday.adding(days: 7 * w)
             return PlannedReminder(id: "\(prefix)weekly.\(day.iso)", fireOn: day, hour: hour,
-                                   title: "Tu resumen de la semana",
-                                   body: "Mira en qué se fue el dinero la semana pasada.")
+                                   title: localized("Tu resumen de la semana"),
+                                   body: localized("Mira en qué se fue el dinero la semana pasada."))
         }
     }
 }

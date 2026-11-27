@@ -19,14 +19,14 @@ struct NetWorthView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.s24) {
                 VStack(alignment: .leading, spacing: Spacing.s16) {
-                    Eyebrow("Patrimonio neto")
+                    Eyebrow(String(localized: "Patrimonio neto"))
                     Text(now.net.formatted())
                         .titleFont(.largeTitle)
                         .foregroundStyle(now.net.isNegative ? Palette.negativeText : Palette.label)
                         .contentTransition(.numericText())
                     HStack(spacing: Spacing.s16) {
-                        figure("Lo que tienes", now.assets)
-                        figure("Lo que debes", now.liabilities)
+                        figure(String(localized: "Lo que tienes"), now.assets)
+                        figure(String(localized: "Lo que debes"), now.liabilities)
                     }
                     if history.count >= 2 {
                         Text((rangeChange.isNegative ? "−" : "+") + Money(minor: abs(rangeChange.minor)).formatted() + " " + range.caption)
@@ -40,9 +40,9 @@ struct NetWorthView: View {
                     Text("Evolución")
                         .titleFont(.title2)
                         .foregroundStyle(Palette.label)
-                    CapsuleSegmented("Tramo", selection: $range, options: NetWorthRange.allCases) { $0.title }
+                    CapsuleSegmented(String(localized: "Tramo"), selection: $range, options: NetWorthRange.allCases) { $0.title }
                     if finance.accounts.isEmpty {
-                        EmptyHint(text: "Añade tus cuentas para ver cómo evoluciona tu patrimonio.")
+                        EmptyHint(text: String(localized: "Añade tus cuentas para ver cómo evoluciona tu patrimonio."))
                     } else {
                         Chart(history) { point in
                             AreaMark(x: .value("Mes", point.month.firstDay.date(), unit: .month),
@@ -68,8 +68,8 @@ struct NetWorthView: View {
                     projectionCard(projection)
                 }
 
-                accountsCard(title: "Lo que tienes", accounts: finance.activeAccounts.filter { !finance.balance(of: $0).isNegative })
-                accountsCard(title: "Lo que debes", accounts: finance.activeAccounts.filter { finance.balance(of: $0).isNegative })
+                accountsCard(title: String(localized: "Lo que tienes"), accounts: finance.activeAccounts.filter { !finance.balance(of: $0).isNegative })
+                accountsCard(title: String(localized: "Lo que debes"), accounts: finance.activeAccounts.filter { finance.balance(of: $0).isNegative })
 
                 Text("Se calcula con el saldo inicial de cada cuenta y sus movimientos. Las cuentas archivadas no cuentan.")
                     .font(Typography.footnote)

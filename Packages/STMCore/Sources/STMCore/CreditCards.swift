@@ -19,17 +19,17 @@ public enum CardPaymentMode: String, Codable, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .full: "Todo a fin de mes"
-        case .fixed: "Cuota fija"
-        case .minimum: "Pago mínimo"
+        case .full: localized("Todo a fin de mes")
+        case .fixed: localized("Cuota fija")
+        case .minimum: localized("Pago mínimo")
         }
     }
 
     public var detail: String {
         switch self {
-        case .full: "Pagas el extracto entero cada mes, sin intereses."
-        case .fixed: "Pagas la misma cantidad cada mes; lo que queda genera intereses."
-        case .minimum: "Pagas lo mínimo que pide el banco; lo que queda genera intereses."
+        case .full: localized("Pagas el extracto entero cada mes, sin intereses.")
+        case .fixed: localized("Pagas la misma cantidad cada mes; lo que queda genera intereses.")
+        case .minimum: localized("Pagas lo mínimo que pide el banco; lo que queda genera intereses.")
         }
     }
 
@@ -557,14 +557,14 @@ extension ReminderPlanner {
             for payment in card.summary.payments.prefix(3) where payment.amount.minor > 0 {
                 let fire = payment.due.adding(days: -before)
                 guard fire >= today else { continue }
-                let when = before == 0 ? "Hoy" : before == 1 ? "Mañana" : "En \(before) días"
-                var body = "Se cobran \(payment.amount.formatted()) el \(payment.due.longTitle)"
-                body += payment.isEstimate ? " (de momento; puede subir con nuevas compras)." : "."
+                let when = before == 0 ? localized("Hoy") : before == 1 ? localized("Mañana") : localized("En \(before) días")
+                var body = localized("Se cobran \(payment.amount.formatted()) el \(payment.due.longTitle)")
+                body += payment.isEstimate ? localized(" (de momento; puede subir con nuevas compras).") : "."
                 if let balance = card.payFromBalance, balance < payment.amount {
-                    body += " En la cuenta de pago sólo hay \(balance.formatted())."
+                    body += localized(" En la cuenta de pago sólo hay \(balance.formatted()).")
                 }
                 result.append(PlannedReminder(id: "\(cardPrefix)\(card.summary.terms.accountId.uuidString).\(payment.due.iso)",
-                                              fireOn: fire, hour: hour, title: "\(when): cargo de \(card.name)", body: body))
+                                              fireOn: fire, hour: hour, title: localized("\(when): cargo de \(card.name)"), body: body))
             }
         }
         return Array(result.sorted { $0.fireOn != $1.fireOn ? $0.fireOn < $1.fireOn : $0.id < $1.id }.prefix(limit))
@@ -576,8 +576,8 @@ extension BudgetAlertPlanner {
     public static func cardAlert(for summary: CreditCardSummary, name: String) -> BudgetAlert? {
         guard summary.isOverAlert, let percent = summary.terms.alertPercent else { return nil }
         return BudgetAlert(id: "\(prefix)card.\(summary.openStatement.iso).\(summary.terms.accountId.uuidString)",
-                           title: "\(name): has usado el \(Int((summary.usedFraction * 100).rounded())) % del límite",
-                           body: "Te quedan \(summary.available.formatted()) de \(summary.terms.creditLimit.formatted()). El aviso salta al \(percent) %.")
+                           title: localized("\(name): has usado el \(Int((summary.usedFraction * 100).rounded())) % del límite"),
+                           body: localized("Te quedan \(summary.available.formatted()) de \(summary.terms.creditLimit.formatted()). El aviso salta al \(percent) %."))
     }
 }
 
@@ -589,9 +589,9 @@ public enum CardPurchaseKind: String, CaseIterable, Sendable {
 
     public var title: String {
         switch self {
-        case .normal: "Normal"
-        case .installments: "A plazos"
-        case .recurring: "Recurrente"
+        case .normal: localized("Normal")
+        case .installments: localized("A plazos")
+        case .recurring: localized("Recurrente")
         }
     }
 }

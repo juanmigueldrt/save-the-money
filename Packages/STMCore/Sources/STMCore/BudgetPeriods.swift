@@ -12,11 +12,11 @@ public enum PayFrequency: String, CaseIterable, Codable, Sendable, Identifiable 
 
     public var title: String {
         switch self {
-        case .weekly: "Cada semana"
-        case .biweekly: "Cada dos semanas"
-        case .twiceMonthly: "Dos días al mes"
-        case .monthly: "Cada mes"
-        case .yearly: "Cada año"
+        case .weekly: localized("Cada semana")
+        case .biweekly: localized("Cada dos semanas")
+        case .twiceMonthly: localized("Dos días al mes")
+        case .monthly: localized("Cada mes")
+        case .yearly: localized("Cada año")
         }
     }
 
@@ -66,11 +66,11 @@ public struct PaySchedule: Hashable, Sendable, Codable {
     /// Texto corto: "Cada mes, el día 25", "Días 1 y 15", "Cada semana (lunes)".
     public var summary: String {
         switch frequency {
-        case .monthly: return day1 == 1 ? "Cada mes, desde el día 1" : "Cada mes, el día \(day1)"
-        case .twiceMonthly: return "Los días \(day1) y \(day2 ?? 15)"
-        case .weekly: return "Cada semana" + (anchor.map { " (\($0.weekdayName))" } ?? "")
-        case .biweekly: return "Cada dos semanas" + (anchor.map { " (\($0.weekdayName))" } ?? "")
-        case .yearly: return "Cada año" + (anchor.map { ", el \($0.day)/\($0.month)" } ?? "")
+        case .monthly: return day1 == 1 ? localized("Cada mes, desde el día 1") : localized("Cada mes, el día \(day1)")
+        case .twiceMonthly: return localized("Los días \(day1) y \(day2 ?? 15)")
+        case .weekly: return localized("Cada semana") + (anchor.map { " (\($0.weekdayName))" } ?? "")
+        case .biweekly: return localized("Cada dos semanas") + (anchor.map { " (\($0.weekdayName))" } ?? "")
+        case .yearly: return localized("Cada año") + (anchor.map { localized(", el \($0.day)/\($0.month)") } ?? "")
         }
     }
 

@@ -95,7 +95,7 @@ struct InvestmentsView: View {
                         Text("Sin inversiones todavía")
                             .titleFont(.title2)
                             .foregroundStyle(Palette.label)
-                        EmptyHint(text: investments.isLoading ? "Cargando…" : "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker.")
+                        EmptyHint(text: investments.isLoading ? String(localized: "Cargando…") : String(localized: "Añade un fondo, un ETF o una acción y apunta tus compras. Los precios los apuntas tú cuando quieras; la app no se conecta a ningún bróker."))
                         Button("Añadir un activo") { addingHolding = true }
                             .buttonStyle(PrimaryButtonStyle())
                     }
@@ -136,7 +136,7 @@ struct InvestmentsView: View {
 
     private func header(_ portfolio: Portfolio) -> some View {
         VStack(alignment: .leading, spacing: Spacing.s8) {
-            Eyebrow("Tu cartera")
+            Eyebrow(String(localized: "Tu cartera"))
             Text(portfolio.value.formatted())
                 .titleFont(.largeTitle)
                 .foregroundStyle(Palette.label)
@@ -165,7 +165,7 @@ struct InvestmentsView: View {
             Text("Evolución")
                 .titleFont(.title2)
                 .foregroundStyle(Palette.label)
-            CapsuleSegmented("Periodo", selection: $investments.range, options: ChartRange.portfolio) { $0.title }
+            CapsuleSegmented(String(localized: "Periodo"), selection: $investments.range, options: ChartRange.portfolio) { $0.title }
             Chart(points) { point in
                 AreaMark(x: .value("Día", point.day.date()), y: .value("Valor", point.value.decimal))
                     .foregroundStyle(Palette.accent.opacity(0.12))
@@ -294,7 +294,7 @@ struct HoldingRow: View {
 
     private var subtitle: String {
         position.quantity > 0
-            ? "\(InvestmentText.quantity(position.quantity)) participaciones · \(owner)"
+            ? String(localized: "\(InvestmentText.quantity(position.quantity)) participaciones · \(owner)")
             : "\(position.holding.kind.title) · \(owner)"
     }
 }

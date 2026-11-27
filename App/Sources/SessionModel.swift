@@ -150,7 +150,7 @@ final class SessionModel {
         do {
             try await services.auth.signOut()
         } catch {
-            signOutError = "No se ha podido cerrar la sesión en el servidor. " + ((error as? AppError)?.text ?? "")
+            signOutError = String(localized: "No se ha podido cerrar la sesión en el servidor. ") + ((error as? AppError)?.text ?? "")
         }
         // Se borra aunque el servidor no haya contestado: el dispositivo ya no es de esa cuenta.
         await clearLocalData()
