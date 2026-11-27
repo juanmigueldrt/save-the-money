@@ -33,7 +33,6 @@ import kotlinx.coroutines.coroutineScope
 import java.text.Collator
 import com.savethemoney.android.data.MovementsCsv
 import java.time.LocalDate
-import java.util.Locale
 
 /** Lo que trae escrito la pantalla 07 (sale de su ruta): un movimiento a editar, una cuenta preelegida o una transferencia. */
 data class MovementForm(
@@ -122,7 +121,7 @@ class FinanceModel(
     fun category(id: String?): BudgetCategory? = categories.firstOrNull { it.id == id }
 
     fun categories(kind: CategoryKind): List<BudgetCategory> {
-        val collator = Collator.getInstance(Locale("es", "ES"))
+        val collator = Collator.getInstance(com.savethemoney.android.data.Region.locale)
         return categories.filter { it.kind == kind }.sortedWith(compareBy(collator) { it.name })
     }
 

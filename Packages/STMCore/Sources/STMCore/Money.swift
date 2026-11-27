@@ -5,7 +5,7 @@ public struct Money: Hashable, Codable, Sendable {
     public var minor: Int
     public var currency: String
 
-    public init(minor: Int, currency: String = "EUR") {
+    public init(minor: Int, currency: String = AppRegion.currency) {
         self.minor = minor
         self.currency = currency
     }
@@ -17,7 +17,7 @@ public struct Money: Hashable, Codable, Sendable {
 
     /// Convierte texto escrito por el usuario o leído de un CSV ("1.234,56", "-12,5", "12.50 €").
     /// Devuelve nil si no es un importe válido. La regla completa está en `NumberParser`.
-    public init?(parsing text: String, currency: String = "EUR") {
+    public init?(parsing text: String, currency: String = AppRegion.currency) {
         guard let number = NumberParser.parse(text, maxFractionDigits: 2),
               let whole = Int(number.integer.isEmpty ? "0" : number.integer),
               let cents = Int(number.fraction.padding(toLength: 2, withPad: "0", startingAt: 0)) else { return nil }
@@ -27,12 +27,12 @@ public struct Money: Hashable, Codable, Sendable {
     }
 
     /// Texto en formato español: "1.234,56 €". Respeta `Money.display` (modo incógnito y redondeo).
-    public func formatted(locale: Locale = Locale(identifier: "es_ES")) -> String {
+    public func formatted(locale: Locale = AppRegion.locale) -> String {
         formatted(locale: locale, options: Money.display)
     }
 
     /// Igual, con unas opciones concretas (p. ej. `.standard` para un PDF o un archivo).
-    public func formatted(locale: Locale = Locale(identifier: "es_ES"), options: MoneyDisplayOptions) -> String {
+    public func formatted(locale: Locale = AppRegion.locale, options: MoneyDisplayOptions) -> String {
         if isMixed { return Money.mixedText }
         return Money.withFormatter(locale: locale, currency: currency, roundsToUnits: options.roundsToUnits) { formatter in
             if options.hidesAmounts { return "•••• " + (formatter.currencySymbol ?? currency) }

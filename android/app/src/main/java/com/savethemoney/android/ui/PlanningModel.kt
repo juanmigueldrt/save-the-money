@@ -29,7 +29,6 @@ import kotlinx.coroutines.coroutineScope
 import java.text.Collator
 import java.time.Instant
 import java.time.LocalDate
-import java.util.Locale
 
 /** Pagos recurrentes y metas del hogar abierto; al cambiar los pagos se reprograman los avisos (PlanningModel de iOS). */
 class PlanningModel(
@@ -223,7 +222,7 @@ class PlanningModel(
             }
             throw e
         }
-        val collator = Collator.getInstance(Locale("es", "ES"))
+        val collator = Collator.getInstance(com.savethemoney.android.data.Region.locale)
         turns.changed(::series, (series.filter { it.id != saved.id } + saved).sortedWith(compareBy(collator) { it.trimmedName }))
         reschedule()
     }

@@ -43,7 +43,7 @@ public struct Merchant: Hashable, Sendable {
 /// Lo guardado no cambia (la detección de duplicados del CSV usa el texto original).
 public enum MovementText {
     public static func display(_ description: String) -> String {
-        description.uppercased(with: Locale(identifier: "es_ES"))
+        description.uppercased(with: AppRegion.locale)
     }
 }
 
@@ -135,7 +135,7 @@ public enum MerchantDirectory {
     /// Mayúsculas, sin tildes y con cualquier signo convertido en espacio:
     /// "Apple.com/bill" -> "APPLE COM BILL".
     static func normalize(_ text: String) -> String {
-        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es_ES"))
+        let folded = text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: AppRegion.locale)
             .uppercased()
         let mapped = folded.unicodeScalars.map { CharacterSet.alphanumerics.contains($0) ? Character($0) : " " }
         return String(mapped).split(separator: " ").joined(separator: " ")

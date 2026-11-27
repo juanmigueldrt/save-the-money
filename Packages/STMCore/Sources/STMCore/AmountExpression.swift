@@ -6,7 +6,7 @@ import Foundation
 /// El resultado se redondea al céntimo (la mitad hacia arriba).
 public enum AmountExpression {
     /// Calcula el importe, o nil si el texto no es una cuenta válida (o divide entre cero).
-    public static func evaluate(_ text: String, currency: String = "EUR") -> Money? {
+    public static func evaluate(_ text: String, currency: String = AppRegion.currency) -> Money? {
         var parser = Parser(tokens: tokenize(text) ?? [])
         guard !parser.tokens.isEmpty, let value = parser.expression(), parser.isAtEnd else { return nil }
         // Fracción de céntimo: se redondea al céntimo más cercano.
@@ -131,7 +131,7 @@ public enum AmountExpression {
 
 extension Money {
     /// Lo que el usuario escribe en un campo de importe: un número o una cuenta ("12,50+3×2").
-    public init?(entered text: String, currency: String = "EUR") {
+    public init?(entered text: String, currency: String = AppRegion.currency) {
         if let plain = Money(parsing: text, currency: currency) {
             self = plain
         } else if let result = AmountExpression.evaluate(text, currency: currency) {

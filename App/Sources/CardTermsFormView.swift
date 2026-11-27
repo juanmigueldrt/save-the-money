@@ -148,6 +148,6 @@ struct CardTermsFormView: View {
 extension CardText {
     /// "14" o "21,5" para los campos de texto.
     static func plain(_ value: Decimal) -> String {
-        value.formatted(.number.precision(.fractionLength(0...2)).grouping(.never).locale(Locale(identifier: "es_ES")))
+        value.formatted(.number.precision(.fractionLength(0...2)).grouping(.never).locale(AppRegion.locale))
     }
 }

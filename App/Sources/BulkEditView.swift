@@ -45,7 +45,7 @@ struct BulkEditView: View {
                     Toggle("Cambiar la fecha", isOn: $changesDate)
                     if changesDate {
                         DatePicker("Fecha", selection: $date, displayedComponents: .date)
-                            .environment(\.locale, Locale(identifier: "es_ES"))
+                            .environment(\.locale, AppRegion.locale)
                     }
                     Toggle("Cambiar la categoría", isOn: $changesCategory)
                     if changesCategory {

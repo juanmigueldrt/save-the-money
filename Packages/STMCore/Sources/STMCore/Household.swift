@@ -7,7 +7,7 @@ public struct Household: Identifiable, Hashable, Codable, Sendable {
     public var baseCurrency: String
     public var monthStartDay: Int
 
-    public init(id: UUID = UUID(), name: String, baseCurrency: String = "EUR", monthStartDay: Int = 1) {
+    public init(id: UUID = UUID(), name: String, baseCurrency: String = AppRegion.currency, monthStartDay: Int = 1) {
         self.id = id
         self.name = name
         self.baseCurrency = baseCurrency

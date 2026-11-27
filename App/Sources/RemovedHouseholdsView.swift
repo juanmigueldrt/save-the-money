@@ -23,7 +23,7 @@ private struct RemovedHouseholdRow: View {
     @State private var error: String?
 
     private var untilText: String {
-        removed.exportUntil.formatted(.dateTime.day().month(.wide).year().locale(Locale(identifier: "es_ES")))
+        removed.exportUntil.formatted(.dateTime.day().month(.wide).year().locale(AppRegion.locale))
     }
 
     var body: some View {
