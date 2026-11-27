@@ -38,9 +38,10 @@ public enum ControlSize {
 /// Títulos en Source Serif 4 a peso 400 (las HIG desaconsejan pesos ligeros);
 /// el resto en la fuente del sistema (SF Pro), que el manual pone primero.
 public enum Typography {
-    public static let largeTitle = serif(34, relativeTo: .largeTitle)
-    public static let title1 = serif(28, relativeTo: .title)
-    public static let title2 = serif(22, relativeTo: .title2)
+    // Calculados cada vez y no guardados: el tamaño sigue al tamaño de letra del sistema sin relanzar la app (ORC-110).
+    public static var largeTitle: Font { serif(34, relativeTo: .largeTitle) }
+    public static var title1: Font { serif(28, relativeTo: .title) }
+    public static var title2: Font { serif(22, relativeTo: .title2) }
     public static let title3 = Font.title3
     public static let headline = Font.headline
     public static let body = Font.body
@@ -110,13 +111,24 @@ public struct CardModifier: ViewModifier {
     }
 }
 
+/// Leer `dynamicTypeSize` hace que el título se vuelva a pintar, con su tamaño recalculado, cuando el usuario
+/// cambia el tamaño de letra con la app abierta.
+private struct TitleFontModifier: ViewModifier {
+    let size: TitleSize
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    func body(content: Content) -> some View {
+        // El valor no se usa: basta con depender de él.
+        _ = dynamicTypeSize
+        return content.font(size.font).tracking(size.tracking)
+    }
+}
+
 public extension View {
     func card() -> some View { modifier(CardModifier()) }
 
     /// Título serif del manual con su espaciado.
-    func titleFont(_ size: TitleSize) -> some View {
-        font(size.font).tracking(size.tracking)
-    }
+    func titleFont(_ size: TitleSize) -> some View { modifier(TitleFontModifier(size: size)) }
 
     /// Formularios y listas sobre el lienzo bg-grouped, no sobre el gris de iOS.
     func brandBackground() -> some View {

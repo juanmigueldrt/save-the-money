@@ -58,7 +58,7 @@ struct MovementsView: View {
                     DatePicker("Desde", selection: $customFrom, displayedComponents: .date)
                     DatePicker("Hasta", selection: $customThrough, displayedComponents: .date)
                 }
-                .environment(\.locale, Locale(identifier: "es_ES"))
+                .environment(\.locale, AppRegion.locale)
             }
             if source.isEmpty {
                 if finance.listError == nil {

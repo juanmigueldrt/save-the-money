@@ -204,7 +204,7 @@ struct CreditCardDetailView: View {
 
 extension CardText {
     static func percent(_ value: Decimal) -> String {
-        "\(value.formatted(.number.precision(.fractionLength(0...2)).locale(Locale(identifier: "es_ES")))) %"
+        "\(value.formatted(.number.precision(.fractionLength(0...2)).locale(AppRegion.locale))) %"
     }
 
     static func delay(_ terms: CreditCardTerms) -> String {

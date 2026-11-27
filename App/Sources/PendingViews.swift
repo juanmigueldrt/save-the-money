@@ -95,7 +95,7 @@ struct ConfirmChargeView: View {
                 Section {
                     AmountField("Importe, p. ej. 12,99", text: $amount)
                     DatePicker("Día", selection: $day, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "es_ES"))
+                        .environment(\.locale, AppRegion.locale)
                     Picker("Cuenta", selection: $accountId) {
                         Text("Elige una cuenta").tag(UUID?.none)
                         ForEach(finance.activeAccounts) { Text($0.name).tag(Optional($0.id)) }

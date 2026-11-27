@@ -73,7 +73,7 @@ struct MovementFormView: View {
                     TextField("Concepto", text: $concept)
                         .conceptInput()
                     DatePicker("Fecha", selection: $date, displayedComponents: .date)
-                        .environment(\.locale, Locale(identifier: "es_ES"))
+                        .environment(\.locale, AppRegion.locale)
                 } footer: {
                     if movement?.transferId != nil { Text(TransferDraft.editNote) }
                 }

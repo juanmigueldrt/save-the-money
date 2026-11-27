@@ -153,7 +153,7 @@ enum class AppTheme(val title: String) {
 data class Household(
     val id: String,
     val name: String,
-    @SerialName("base_currency") val baseCurrency: String = "EUR",
+    @SerialName("base_currency") val baseCurrency: String = Region.CURRENCY,
     @SerialName("month_start_day") val monthStartDay: Int = 1,
 )
 

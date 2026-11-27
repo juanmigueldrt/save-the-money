@@ -52,7 +52,7 @@ extension Decimal {
 
 extension Money {
     /// Unos euros con decimales, redondeados al céntimo.
-    public init(decimal: Decimal, currency: String = "EUR") {
+    public init(decimal: Decimal, currency: String = AppRegion.currency) {
         let cents = (decimal * 100).rounded(scale: 0)
         self.init(minor: NSDecimalNumber(decimal: cents).intValue, currency: currency)
     }
@@ -160,7 +160,7 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
     public var updatedAt: String?
 
     public init(id: UUID = UUID(), householdId: UUID, name: String, symbol: String? = nil, kind: InvestmentKind = .fund,
-                assetClass: AssetClass? = nil, currency: String = "EUR", accountId: UUID? = nil, ownerId: UUID? = nil,
+                assetClass: AssetClass? = nil, currency: String = AppRegion.currency, accountId: UUID? = nil, ownerId: UUID? = nil,
                 price: Decimal = 0, priceOn: CalendarDay? = nil, feeRate: Decimal = 0, note: String? = nil,
                 archivedAt: Date? = nil, updatedAt: String? = nil) {
         self.updatedAt = updatedAt
@@ -234,7 +234,7 @@ public struct Holding: Identifiable, Hashable, Codable, Sendable, Named, Archiva
         symbol = try c.decodeIfPresent(String.self, forKey: .symbol)
         kind = try c.decode(InvestmentKind.self, forKey: .kind)
         assetClass = try c.decode(AssetClass.self, forKey: .assetClass)
-        currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? "EUR"
+        currency = try c.decodeIfPresent(String.self, forKey: .currency) ?? AppRegion.currency
         accountId = try c.decodeIfPresent(UUID.self, forKey: .accountId)
         ownerId = try c.decodeIfPresent(UUID.self, forKey: .ownerId)
         price = try decodeNumeric(c, .price)
