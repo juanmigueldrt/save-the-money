@@ -50,7 +50,9 @@ Quién manda en el hogar y cuándo se borra (ORC-59, pruebas en `26_orc59_hogar_
 - El hogar sólo se puede borrar a mano cuando su propietario es el único miembro y nadie tiene plazo para exportar:
   borrarlo nunca se lleva los datos de otra persona.
 
-Lo que no cubre todavía: borrar la cuenta desde la app (ORC-74).
+Borrar la cuenta (ORC-74, pruebas en `27_orc74_borrar_cuenta.test.sql`): desde la app, en Más opciones o en la
+pantalla de crear o unirse a un hogar. Pide la contraseña actual y borra el usuario con todo lo anterior: sus datos de
+todos los hogares, su perfil, su historial de crédito y sus membresías. No se puede deshacer.
 
 ## En la app
 

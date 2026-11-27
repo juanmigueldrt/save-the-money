@@ -132,6 +132,16 @@ final class SessionModel {
         try await services.auth.changePassword(currentPassword: form.currentPassword, newPassword: form.newPassword)
     }
 
+    /// Borra la cuenta en el servidor y, si ha ido bien, lo que queda de ella en este dispositivo.
+    /// Si falla no se borra nada y la sesión sigue como estaba.
+    func deleteAccount(currentPassword: String) async throws {
+        try await services.auth.deleteAccount(currentPassword: currentPassword)
+        await clearLocalData()
+        households = []
+        removedHouseholds = []
+        state = .signedOut
+    }
+
     /// Si el cierre no llegó al servidor. Este dispositivo ya está desconectado; el aviso se ve en la pantalla de entrar.
     private(set) var signOutError: String?
 

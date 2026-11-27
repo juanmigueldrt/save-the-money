@@ -20,6 +20,12 @@ interface Backend {
      * Comprueba antes la actual: si no es, lanza [AppError.WrongCurrentPassword] y no cambia nada.
      */
     suspend fun changePassword(currentPassword: String, newPassword: String)
+
+    /**
+     * Borra la cuenta de quien tiene la sesión abierta y todo lo que apuntó, en todos sus hogares (ORC-74).
+     * No se puede deshacer. Comprueba antes la contraseña: si no es, lanza [AppError.WrongCurrentPassword] y no borra nada.
+     */
+    suspend fun deleteAccount(currentPassword: String)
     suspend fun signOut()
 
     suspend fun myProfile(): Profile
@@ -52,6 +58,12 @@ interface Backend {
     /** Sus datos de uno de esos hogares. Fuera de plazo, o si no le quitaron de ese hogar, falla. */
     suspend fun removedHouseholdExport(householdId: String): RemovedHouseholdExport
 }
+
+/** Lo que la app avisa antes de borrar la cuenta (ORC-74). */
+const val DELETE_ACCOUNT_WARNING =
+    "Se borrarán tu usuario y todo lo que has apuntado, en todos tus hogares. Un hogar en el que estés solo se borra; " +
+        "si eres el propietario de uno con más miembros, pasa al miembro más antiguo. No se puede deshacer. " +
+        "Si quieres conservar tus movimientos, expórtalos antes."
 
 /** Lo que la app avisa antes de salir de un hogar (ORC-56). «CSV para Excel» es la fila de Más opciones > Datos. */
 const val LEAVE_HOUSEHOLD_WARNING =
@@ -136,6 +148,29 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         if (newPassword.length < SignUpForm.MIN_PASSWORD) throw AppError.WeakPassword
         if (newPassword == currentPassword) throw AppError.InvalidInput(ChangePasswordForm.SAME_PASSWORD)
         record.password = newPassword
+    }
+
+    /** Como `delete_my_account` en el servidor, con lo que hacen sus claves foráneas y los triggers de ORC-56 y ORC-59. */
+    override suspend fun deleteAccount(currentPassword: String) {
+        val user = requireUser()
+        if (users[user]?.password != currentPassword) throw AppError.WrongCurrentPassword
+        for (mine in memberships.filter { it.userId == user }) {
+            memberships -= mine
+            finance?.purgeData(user, mine.householdId)
+            // El hogar no se queda sin propietario: pasa al miembro más antiguo.
+            val next = memberships.indexOfFirst { it.householdId == mine.householdId }
+            if (mine.role == MemberRole.Owner && next >= 0) memberships[next] = memberships[next].copy(role = MemberRole.Owner)
+            deleteHouseholdIfEmpty(mine.householdId)
+        }
+        // Lo que guardara de hogares de los que le quitaron.
+        for (removal in removals.keys.filter { it.userId == user }) {
+            removals -= removal
+            finance?.purgeData(user, removal.householdId)
+            deleteHouseholdIfEmpty(removal.householdId)
+        }
+        finance?.purgeUser(user)
+        users -= user
+        currentUser = null
     }
 
     override suspend fun signOut() { currentUser = null }
