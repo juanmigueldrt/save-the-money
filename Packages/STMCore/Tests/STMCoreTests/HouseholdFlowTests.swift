@@ -82,6 +82,55 @@ final class HouseholdFlowTests: XCTestCase {
         XCTAssertEqual(left.map(\.profile.username), ["ana"])
     }
 
+    /// ORC-59, lo mismo que `supabase/tests/database/26_orc59_hogar_sin_dueno.test.sql`: el propietario no deja el
+    /// hogar sin propietario y un hogar sin miembros se borra. Datos inventados.
+    func testElPropietarioNoDejaElHogarSinPropietario() async throws {
+        let backend = InMemoryBackend()
+        let password = "contrasena-de-prueba"
+        func rejected(_ message: String, _ call: () async throws -> Void) async {
+            do {
+                try await call()
+                XCTFail(message)
+            } catch {}
+        }
+        func role(_ username: String, in home: UUID) async throws -> MemberRole? {
+            try await backend.members(of: home).first { $0.profile.username == username }?.role
+        }
+
+        _ = try await backend.signUp(username: Username("ana"), password: password, displayName: nil)
+        let home = try await backend.createHousehold(name: "Casa de prueba").id
+        let invite = try await backend.createInvite(for: home)
+        let spare = try await backend.createInvite(for: home)
+        try await backend.signOut()
+        let bruno = try await backend.signUp(username: Username("bruno"), password: password, displayName: nil)
+        _ = try await backend.acceptInvite(XCTUnwrap(invite.inviteCode))
+        await rejected("un miembro no puede hacerse propietario") { try await backend.transferHousehold(home, to: bruno) }
+        try await backend.signOut()
+
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        do {
+            try await backend.leave(householdId: home)
+            XCTFail("la propietaria no puede salir con otros miembros dentro")
+        } catch {
+            XCTAssertEqual(error as? AppError, .invalidInput(LeavingHousehold.ownerMustTransfer))
+        }
+        await rejected("no se traspasa a quien no es miembro") { try await backend.transferHousehold(home, to: UUID()) }
+        try await backend.transferHousehold(home, to: bruno)
+        let anaRole = try await role("ana", in: home)
+        let brunoRole = try await role("bruno", in: home)
+        XCTAssertEqual(anaRole, .member)
+        XCTAssertEqual(brunoRole, .owner)
+        try await backend.leave(householdId: home)
+        try await backend.signOut()
+
+        // Bruno, propietario y único miembro, sale: el hogar se borra y sus invitaciones dejan de valer.
+        _ = try await backend.signIn(username: Username("bruno"), password: password)
+        try await backend.leave(householdId: home)
+        let left = try await backend.households()
+        XCTAssertEqual(left, [])
+        await rejected("la invitación de un hogar borrado no vale") { _ = try await backend.acceptInvite(XCTUnwrap(spare.inviteCode)) }
+    }
+
     /// ORC-56, lo mismo que `supabase/tests/database/25_orc56_datos_al_salir.test.sql`: quien sale pierde lo suyo
     /// en el momento; a quien quitan le quedan 30 días para exportar. Datos inventados.
     func testDatosDeQuienSaleODeQuienQuitan() async throws {

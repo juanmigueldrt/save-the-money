@@ -240,6 +240,15 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
         if (removed.isEmpty()) throw AppError.InvalidInput("Solo quien creó el hogar puede quitar a alguien.")
     }
 
+    override suspend fun transferHousehold(householdId: String, userId: String) = mapped {
+        val params = buildJsonObject {
+            put("target_household", householdId)
+            put("new_owner", userId)
+        }
+        client.postgrest.rpc("transfer_household", params)
+        Unit
+    }
+
     /**
      * Convierte cualquier error en un AppError con mensaje en español. El fallo se registra antes de traducirlo
      * (ORC-72), con [registrarError]: sin datos del usuario.
@@ -294,6 +303,8 @@ class SupabaseBackend(url: String, anonKey: String) : Backend {
             "STM06" -> AppError.InvalidInput(Money.BASE_CURRENCY_LOCKED)
             // Transferencias: la otra pata no se pudo cambiar o borrar a la vez.
             "STM07" -> AppError.InvalidInput(TransferDraft.OTHER_LEG_LOCKED)
+            // El trigger de household_members: el dueño no sale con otros miembros dentro.
+            "STM08" -> AppError.InvalidInput(OWNER_MUST_TRANSFER)
             else -> AppError.Unknown(code ?: "postgrest")
         }
 

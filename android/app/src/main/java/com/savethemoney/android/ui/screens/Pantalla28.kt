@@ -22,10 +22,13 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.HouseholdMember
+import com.savethemoney.android.data.LAST_MEMBER_WARNING
 import com.savethemoney.android.data.LEAVE_HOUSEHOLD_WARNING
 import com.savethemoney.android.data.MONTH_START_DAYS
 import com.savethemoney.android.data.MemberRole
+import com.savethemoney.android.data.OWNER_MUST_TRANSFER
 import com.savethemoney.android.data.REMOVE_MEMBER_WARNING
+import com.savethemoney.android.data.TRANSFER_HOUSEHOLD_WARNING
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Route
@@ -64,7 +67,10 @@ fun Pantalla28(nav: Nav) {
     val members = miembros?.getOrNull().orEmpty().sortedBy { it.profile.id != me }
     val fallo = miembros?.exceptionOrNull()?.let { (it as? AppError)?.message ?: "No se han podido cargar los miembros del hogar." }
     val soyDueno = members.any { it.profile.id == me && it.role == MemberRole.Owner }
+    // El dueño no puede salir con otros miembros dentro (ORC-59): el servidor también lo impide.
+    val duenoConOtros = soyDueno && members.size > 1
     var quitando by remember { mutableStateOf<HouseholdMember?>(null) }
+    var traspasando by remember { mutableStateOf<HouseholdMember?>(null) }
     var saliendo by remember { mutableStateOf(false) }
     var nombre by remember { mutableStateOf<String?>(null) }
     var eligeDia by remember { mutableStateOf(false) }
@@ -105,6 +111,25 @@ fun Pantalla28(nav: Nav) {
                     },
                 ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
             }
+        } ?: traspasando?.let { m ->
+            {
+                StmDialog(
+                    "¿Hacer propietario a ${m.profile.name}?",
+                    TRANSFER_HOUSEHOLD_WARNING,
+                    onDismiss = { traspasando = null },
+                    actions = {
+                        Btn("Cancelar", { traspasando = null }, kind = BtnKind.Text)
+                        Btn("Hacer propietario", {
+                            val h = session.household ?: return@Btn
+                            action.run {
+                                session.backend.transferHousehold(h.id, m.profile.id)
+                                traspasando = null
+                                recarga++
+                            }
+                        }, kind = BtnKind.Text, enabled = !action.busy)
+                    },
+                ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
+            }
         } ?: nombre?.let { texto ->
             {
                 StmDialog(
@@ -130,15 +155,21 @@ fun Pantalla28(nav: Nav) {
             {
                 StmDialog(
                     "¿Salir del hogar?",
-                    LEAVE_HOUSEHOLD_WARNING,
+                    when {
+                        duenoConOtros -> OWNER_MUST_TRANSFER
+                        members.size == 1 -> "$LEAVE_HOUSEHOLD_WARNING $LAST_MEMBER_WARNING"
+                        else -> LEAVE_HOUSEHOLD_WARNING
+                    },
                     icon = StmIcons.logout,
                     onDismiss = { saliendo = false },
                     actions = {
-                        Btn("Cancelar", { saliendo = false }, kind = BtnKind.Text)
-                        Btn("Salir", {
-                            val h = session.household ?: return@Btn
-                            action.run { session.leaveHousehold(h) }
-                        }, kind = BtnKind.Error, enabled = !action.busy)
+                        Btn(if (duenoConOtros) "Entendido" else "Cancelar", { saliendo = false }, kind = BtnKind.Text)
+                        if (!duenoConOtros) {
+                            Btn("Salir", {
+                                val h = session.household ?: return@Btn
+                                action.run { session.leaveHousehold(h) }
+                            }, kind = BtnKind.Error, enabled = !action.busy)
+                        }
                     },
                 ) { action.error?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) } }
             }
@@ -207,7 +238,7 @@ fun Pantalla28(nav: Nav) {
             Modifier.padding(16.dp), style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
         // Lo que no se pudo guardar desde una hoja (día de inicio, cambiar de hogar): el aviso del servidor.
-        if (!eligeDia && nombreVisible == null && nombre == null && quitando == null && !saliendo) {
+        if (!eligeDia && nombreVisible == null && nombre == null && quitando == null && traspasando == null && !saliendo) {
             action.error?.let { Text(it, Modifier.padding(horizontal = 16.dp), style = StmType.bodySmall, color = c.error) }
         }
         Spacer(Modifier.height(16.dp))
@@ -215,7 +246,7 @@ fun Pantalla28(nav: Nav) {
             ListHeader("Miembros")
             members.forEachIndexed { i, m ->
                 if (i > 0) Divider()
-                val role = if (m.role == MemberRole.Owner) "creó el hogar" else "miembro"
+                val role = if (m.role == MemberRole.Owner) "propietario" else "miembro"
                 ListItem(
                     m.profile.name, if (m.profile.id == me) "Tú · $role" else role.replaceFirstChar { it.uppercase() },
                     leading = { Avatar(m.profile.name.take(1).uppercase()) },
@@ -224,6 +255,10 @@ fun Pantalla28(nav: Nav) {
                         IconBtn(StmIcons.personRemove, { quitando = m }, contentDescription = "Quitar del hogar")
                     }),
                 )
+                // Debajo de la fila y no junto al icono: con letra grande, un botón de texto ahí dejaría sin sitio al nombre.
+                if (m.profile.id != me && soyDueno) {
+                    Btn("Hacer propietario", { traspasando = m }, Modifier.padding(start = 60.dp, bottom = 4.dp), kind = BtnKind.Text)
+                }
             }
         }
         // Sin red la lista sale vacía: el aviso y «Reintentar» dicen que no es que el hogar no tenga miembros.
@@ -244,7 +279,7 @@ fun Pantalla28(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         Btn("Invitar a alguien", { nav.go(Route.Invitar) }, Modifier.fillMaxWidth(), icon = StmIcons.personAdd, large = true)
-        if (members.any { it.profile.id == me } && !soyDueno) {
+        if (members.any { it.profile.id == me }) {
             Spacer(Modifier.height(8.dp))
             Btn("Salir del hogar", { saliendo = true }, Modifier.fillMaxWidth(), kind = BtnKind.Text, color = c.error)
         }

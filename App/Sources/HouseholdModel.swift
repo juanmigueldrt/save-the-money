@@ -65,6 +65,13 @@ final class HouseholdModel: ServerModel {
         await reloadAfterSave { try await fetch(turn: nextTurn()) }
     }
 
+    /// Solo el propietario: pasa el hogar a `member` y vuelve a cargar la lista, que es de donde sale quién manda.
+    func makeOwner(_ member: HouseholdMember) async {
+        let done = await perform { try await service.transferHousehold(householdId, to: member.profile.id) }
+        guard done else { return }
+        await reloadAfterSave { try await fetch(turn: nextTurn()) }
+    }
+
     /// Sale del hogar y, si ha ido bien, `refresh` lleva a la sesión a su siguiente hogar o a crear uno.
     @discardableResult
     func leave(then refresh: () async throws -> Void) async -> Bool {

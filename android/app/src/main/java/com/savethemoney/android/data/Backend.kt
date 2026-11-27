@@ -31,7 +31,10 @@ interface Backend {
     suspend fun createInvite(householdId: String): HouseholdInvite
     suspend fun revokeInvite(inviteId: String)
     suspend fun acceptInvite(code: InviteCode): Household
-    /** Sale del hogar y borra todo lo que esa persona apuntó en él (ORC-56). No se puede deshacer. */
+    /**
+     * Sale del hogar y borra todo lo que esa persona apuntó en él (ORC-56). No se puede deshacer.
+     * El dueño no puede salir mientras haya otros miembros; cuando sale el último, el hogar se borra (ORC-59).
+     */
     suspend fun leave(householdId: String)
     /** Cambia el nombre del hogar. Sólo puede quien lo creó. */
     suspend fun renameHousehold(householdId: String, name: String): Household
@@ -42,6 +45,8 @@ interface Backend {
     suspend fun setMonthStartDay(householdId: String, day: Int): Household
     /** Solo el dueño del hogar puede quitar a otro miembro. Sus datos se guardan [RemovedHousehold.EXPORT_DAYS] días. */
     suspend fun removeMember(householdId: String, userId: String)
+    /** Traspasa el hogar a otro miembro, que pasa a ser el dueño; quien lo era queda como miembro. Sólo puede el dueño (ORC-59). */
+    suspend fun transferHousehold(householdId: String, userId: String)
     /** Los hogares de los que han quitado a quien tiene la sesión y de los que aún puede exportar. */
     suspend fun removedHouseholds(): List<RemovedHousehold>
     /** Sus datos de uno de esos hogares. Fuera de plazo, o si no le quitaron de ese hogar, falla. */
@@ -52,6 +57,16 @@ interface Backend {
 const val LEAVE_HOUSEHOLD_WARNING =
     "Se borrará todo lo que has apuntado en este hogar: cuentas, movimientos, presupuestos, metas, tarjetas, inversiones y pagos fijos. " +
         "No se puede deshacer. Si quieres conservar tus movimientos, expórtalos antes con «CSV para Excel», en Más opciones."
+
+/** Lo que se añade a ese aviso cuando quien sale es el único miembro (ORC-59). */
+const val LAST_MEMBER_WARNING = "Eres el único miembro: el hogar también se borrará."
+
+/** El propietario no puede salir con otros miembros dentro: el hogar se quedaría sin nadie que lo gestione. */
+const val OWNER_MUST_TRANSFER = "Eres el propietario. Antes de salir, haz propietario a otro miembro o quita a los demás."
+
+/** Lo que la app avisa antes de traspasar el hogar. */
+const val TRANSFER_HOUSEHOLD_WARNING =
+    "Podrá cambiar el nombre del hogar, el día en que empieza el mes y quitar a otros miembros, tú incluido. Tú pasarás a ser miembro."
 
 /** Lo que la app avisa antes de quitar a un miembro. */
 const val REMOVE_MEMBER_WARNING =
@@ -219,8 +234,13 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
 
     override suspend fun leave(householdId: String) {
         val user = requireUser()
-        if (!memberships.removeAll { it.userId == user && it.householdId == householdId }) return
+        val mine = memberships.firstOrNull { it.userId == user && it.householdId == householdId } ?: return
+        if (mine.role == MemberRole.Owner && memberships.any { it.householdId == householdId && it.userId != user }) {
+            throw AppError.InvalidInput(OWNER_MUST_TRANSFER)
+        }
+        memberships -= mine
         finance?.purgeData(user, householdId)
+        deleteHouseholdIfEmpty(householdId)
         users[user]?.let { if (it.profile.defaultHouseholdId == householdId) it.profile = it.profile.copy(defaultHouseholdId = null) }
     }
 
@@ -246,6 +266,27 @@ class InMemoryBackend(private val now: () -> Instant = Instant::now) : Backend {
         val expired = removals.filterValues { exportUntil(it) <= now() }.keys
         expired.forEach { finance?.purgeData(it.userId, it.householdId) }
         removals -= expired
+        expired.forEach { deleteHouseholdIfEmpty(it.householdId) }
+    }
+
+    /** Sin miembros y sin nadie con plazo para exportar, el hogar ya no es de nadie. */
+    private fun deleteHouseholdIfEmpty(householdId: String) {
+        if (memberships.any { it.householdId == householdId }) return
+        // Aunque el hogar siga por el plazo de alguien, nadie debe entrar ya: no tendría propietario.
+        invites.removeAll { it.householdId == householdId }
+        if (removals.keys.any { it.householdId == householdId }) return
+        householdsById -= householdId
+    }
+
+    override suspend fun transferHousehold(householdId: String, userId: String) {
+        val user = requireUser()
+        val mine = memberships.indexOfFirst { it.userId == user && it.householdId == householdId && it.role == MemberRole.Owner }
+        if (mine < 0) throw AppError.InvalidInput("Solo el propietario puede traspasar el hogar.")
+        if (userId == user) return
+        val theirs = memberships.indexOfFirst { it.userId == userId && it.householdId == householdId }
+        if (theirs < 0) throw AppError.InvalidInput("Esa persona no es miembro del hogar.")
+        memberships[theirs] = memberships[theirs].copy(role = MemberRole.Owner)
+        memberships[mine] = memberships[mine].copy(role = MemberRole.Member)
     }
 
     override suspend fun removeMember(householdId: String, userId: String) {
