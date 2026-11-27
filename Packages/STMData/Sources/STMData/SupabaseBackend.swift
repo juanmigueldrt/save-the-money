@@ -48,6 +48,18 @@ public struct SupabaseBackend: AuthService, HouseholdService {
         try await mapped { _ = try await client.auth.update(user: UserAttributes(password: newPassword)) }
     }
 
+    public func deleteAccount(currentPassword: String) async throws {
+        guard let email = client.auth.currentSession?.user.email else { throw AppError.notSignedIn }
+        do {
+            _ = try await mapped { try await client.auth.signIn(email: email, password: currentPassword) }
+        } catch AppError.invalidCredentials {
+            throw AppError.wrongCurrentPassword
+        }
+        try await mapped { try await client.rpc("delete_my_account").execute() }
+        // El usuario ya no existe en el servidor: sólo queda quitar la sesión guardada en este dispositivo.
+        try? await client.auth.signOut(scope: .local)
+    }
+
     public func signOut() async throws {
         try await mapped { try await client.auth.signOut() }
     }

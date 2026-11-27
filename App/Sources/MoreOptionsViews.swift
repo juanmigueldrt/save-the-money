@@ -180,6 +180,8 @@ struct MoreView: View {
             } footer: {
                 Text("Sesión iniciada como \(profile.name).")
             }
+
+            DeleteAccountSection()
         }
         .brandBackground()
         .navigationTitle("Más opciones")

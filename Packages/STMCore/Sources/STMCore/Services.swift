@@ -75,6 +75,9 @@ public protocol AuthService: Sendable {
     /// Cambia la contraseña de quien tiene la sesión abierta, que sigue abierta en este dispositivo.
     /// Comprueba antes la actual: si no es, lanza `wrongCurrentPassword` y no cambia nada.
     func changePassword(currentPassword: String, newPassword: String) async throws
+    /// Borra la cuenta de quien tiene la sesión abierta y todo lo que apuntó, en todos sus hogares (ORC-74).
+    /// No se puede deshacer. Comprueba antes la contraseña: si no es, lanza `wrongCurrentPassword` y no borra nada.
+    func deleteAccount(currentPassword: String) async throws
     func signOut() async throws
 }
 

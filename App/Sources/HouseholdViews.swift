@@ -11,6 +11,7 @@ struct HouseholdOnboardingView: View {
     @State private var code = ""
     @State private var error: String?
     @State private var isWorking = false
+    @State private var deletingAccount = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -72,6 +73,14 @@ struct HouseholdOnboardingView: View {
                         .foregroundStyle(Palette.labelSecondary)
                         .buttonStyle(.plain)
                         .frame(maxWidth: .infinity)
+
+                    // Quien aún no tiene hogar también tiene que poder borrar su cuenta.
+                    Button("Borrar mi cuenta") { deletingAccount = true }
+                        .font(Typography.subheadlineEmphasis)
+                        .foregroundStyle(Palette.negativeText)
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
+                        .sheet(isPresented: $deletingAccount) { DeleteAccountView() }
                 }
                 .padding(Spacing.s24)
                 .formWidth()

@@ -43,10 +43,16 @@ fun Pantalla03(nav: Nav) {
     val join = rememberAction()
     var code by rememberSaveable { mutableStateOf(session.pendingInvite?.value ?: "") }
     val parsed = InviteCode.parse(code)
+    var borraCuenta by rememberSaveable { mutableStateOf(false) }
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null)
             LargeTitle("Tu hogar", "Un hogar reúne las cuentas que compartís")
+        },
+        overlay = if (borraCuenta) {
+            { HojaBorrarCuenta { borraCuenta = false } }
+        } else {
+            null
         },
     ) {
         OptionCard(StmIcons.homeWork, c.secondaryContainer, c.onSecondaryContainer, "Crear un hogar nuevo",
@@ -68,6 +74,9 @@ fun Pantalla03(nav: Nav) {
             Btn("Unirme", { parsed?.let { join.run { session.join(it) } } }, kind = BtnKind.Tonal, enabled = parsed != null && !join.busy)
         }
         HogaresAnteriores()
+        Spacer(Modifier.height(16.dp))
+        // Quien aún no tiene hogar también tiene que poder borrar su cuenta (ORC-74).
+        Btn("Borrar mi cuenta", { borraCuenta = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
     }
 }
 

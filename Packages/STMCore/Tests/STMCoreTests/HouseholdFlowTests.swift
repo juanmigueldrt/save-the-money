@@ -82,6 +82,61 @@ final class HouseholdFlowTests: XCTestCase {
         XCTAssertEqual(left.map(\.profile.username), ["ana"])
     }
 
+    /// ORC-74, lo mismo que `supabase/tests/database/27_orc74_borrar_cuenta.test.sql`. Datos inventados.
+    func testBorrarLaCuentaSeLlevaLoMioYNoLoDeLosDemas() async throws {
+        let backend = InMemoryBackend()
+        let password = "contrasena-de-prueba"
+        let day = CalendarDay(year: 2026, month: 11, day: 2)!
+        func note(_ name: String, in home: UUID) async throws {
+            let account = try await backend.createAccount(AccountDraft(name: "Cuenta de \(name)"), in: home)
+            _ = try await backend.addMovement(MovementDraft(accountId: account.id, bookedOn: day, amount: Money(minor: -4500),
+                                                            description: "Compra de \(name)"), in: home)
+        }
+
+        // Ana es propietaria de un hogar con Bruno dentro y de otro en el que está sola.
+        _ = try await backend.signUp(username: Username("ana"), password: password, displayName: nil)
+        let shared = try await backend.createHousehold(name: "Casa compartida").id
+        let alone = try await backend.createHousehold(name: "Casa de Ana").id
+        try await note("Ana", in: shared)
+        try await note("Ana", in: alone)
+        let invite = try await backend.createInvite(for: shared)
+        let aloneInvite = try await backend.createInvite(for: alone)
+        try await backend.signOut()
+        _ = try await backend.signUp(username: Username("bruno"), password: password, displayName: nil)
+        _ = try await backend.acceptInvite(XCTUnwrap(invite.inviteCode))
+        try await note("Bruno", in: shared)
+        try await backend.signOut()
+
+        _ = try await backend.signIn(username: Username("ana"), password: password)
+        do {
+            try await backend.deleteAccount(currentPassword: "otra-contrasena")
+            XCTFail("con la contraseña equivocada no se borra nada")
+        } catch {
+            XCTAssertEqual(error as? AppError, .wrongCurrentPassword)
+        }
+        let stillThere = try await backend.accounts(in: shared)
+        XCTAssertEqual(stillThere.map(\.name), ["Cuenta de Ana"])
+        try await backend.deleteAccount(currentPassword: password)
+        let signedIn = await backend.currentUserId()
+        XCTAssertNil(signedIn, "tras borrar la cuenta no queda sesión")
+        do {
+            _ = try await backend.signIn(username: Username("ana"), password: password)
+            XCTFail("la cuenta borrada ya no existe")
+        } catch {}
+
+        // Bruno se queda con el hogar compartido y con lo suyo; el otro hogar ya no existe.
+        _ = try await backend.signIn(username: Username("bruno"), password: password)
+        let members = try await backend.members(of: shared)
+        XCTAssertEqual(members.map(\.profile.username), ["bruno"])
+        XCTAssertEqual(members.map(\.role), [.owner])
+        let brunoAccounts = try await backend.accounts(in: shared)
+        XCTAssertEqual(brunoAccounts.map(\.name), ["Cuenta de Bruno"])
+        do {
+            _ = try await backend.acceptInvite(XCTUnwrap(aloneInvite.inviteCode))
+            XCTFail("el hogar en el que Ana estaba sola se borró")
+        } catch {}
+    }
+
     /// ORC-59, lo mismo que `supabase/tests/database/26_orc59_hogar_sin_dueno.test.sql`: el propietario no deja el
     /// hogar sin propietario y un hogar sin miembros se borra. Datos inventados.
     func testElPropietarioNoDejaElHogarSinPropietario() async throws {

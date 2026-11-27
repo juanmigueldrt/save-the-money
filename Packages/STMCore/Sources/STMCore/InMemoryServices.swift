@@ -83,6 +83,33 @@ public actor InMemoryBackend: AuthService, HouseholdService {
         users[user]?.password = newPassword
     }
 
+    /// Como `delete_my_account` en el servidor, con lo que hacen sus claves foráneas y los triggers de ORC-56 y ORC-59.
+    public func deleteAccount(currentPassword: String) async throws {
+        try throwIfInjected(#function)
+        guard let user = currentUser, let record = users[user] else { throw AppError.notSignedIn }
+        guard record.password == currentPassword else { throw AppError.wrongCurrentPassword }
+        for mine in memberships.filter({ $0.userId == user }) {
+            memberships.removeAll { $0.id == mine.id }
+            purgeData(of: user, in: mine.householdId)
+            // El hogar no se queda sin propietario: pasa al miembro más antiguo.
+            if mine.role == .owner, let next = memberships.firstIndex(where: { $0.householdId == mine.householdId }) {
+                memberships[next].role = .owner
+            }
+            deleteHouseholdIfEmpty(mine.householdId)
+        }
+        // Lo que guardara de hogares de los que le quitaron.
+        for removal in removals.keys where removal.userId == user {
+            removals[removal] = nil
+            purgeData(of: user, in: removal.householdId)
+            deleteHouseholdIfEmpty(removal.householdId)
+        }
+        scoresByUser[user] = nil
+        paySchedules[user] = nil
+        budgets[user] = nil
+        users[user] = nil
+        currentUser = nil
+    }
+
     public func signOut() async throws {
         try throwIfInjected(#function)
         currentUser = nil
