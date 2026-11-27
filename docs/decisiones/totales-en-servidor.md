@@ -1,6 +1,6 @@
 # Totales calculados en el servidor (ORC-70)
 
-Estado: medido, diagnosticado y arreglado en el servidor y en las descargas (ORC-70, paso 2). Falta volver a medir. Los totales no se han llevado al servidor: con lo encontrado, lo más probable es que no haga falta (ver «¿Sigue compensando…?»).
+Estado: medido, diagnosticado y arreglado en el servidor y en las descargas (ORC-70, paso 2), y vuelto a medir. Patrimonio e Informes piden menos desde ORC-149. Los totales no se han llevado al servidor: con lo encontrado, lo más probable es que no haga falta (ver «¿Sigue compensando…?»).
 
 ## El problema
 
@@ -152,7 +152,39 @@ Con los números de arriba:
 
 - La razón de tiempo que motivó el ticket desaparece: sumar en el servidor no habría arreglado nada, porque la suma que ya hacía el servidor (`account_balances`) era igual de lenta por la misma política.
 - Lo que queda son los bytes: Patrimonio e Informes siguen bajando una fila por movimiento (4,4 MB por cada 10.000, sin comprimir) cada vez que cambia la lista. Para eso la opción B (pedir sólo tres columnas, y en Informes sólo los últimos meses) es más barata que cualquier agregado en el servidor y no obliga a repetir en SQL las reglas de `STMCore`.
-- Recomendación: no hacer C, D ni E. Si el tamaño de la respuesta molesta en el móvil, hacer B en otro ticket.
+- Recomendación: no hacer C, D ni E. La opción B se hizo en ORC-149 (más abajo).
+
+## Opción B hecha (ORC-149)
+
+Sin tocar el servidor:
+
+- **Patrimonio.** Las dos apps piden todos los movimientos con cuatro columnas (`id`, `account_id`, `booked_on`, `amount_minor`) en vez de quince: `movementAmounts` en `STMData/SupabaseFinance.swift` y en `data/SupabaseFinance.kt`, por cursor y en el mismo orden (día e id ascendentes). `id` sólo hace falta para el cursor. `NetWorth.history` da el mismo resultado con estas filas: lo comprueban los vectores de `testdata/vectors/net_worth.json` en las dos plataformas.
+- **Informes en iOS.** «Ingresos y gastos» y la categoría que más sube piden sólo los últimos seis meses (`TrackingModel.loadSixMonths`). El informe por periodo ya pedía su tramo. De paso, la petición por fechas de iOS (`periodColumns`) lleva ahora `transfer_id`, como la de Android: sin él, el presupuesto y los informes sólo reconocían una transferencia sin categoría por su pareja del mismo día.
+- **Informes en Android.** La pantalla pide los movimientos desde `reportWindowStart`: el primer día del periodo más largo que puede elegir y de su periodo anterior (unos 25 meses), en vez de todos. Una prueba compara todos los informes de la pantalla con la lista entera y con la ventana.
+
+Lo que no cambia: Patrimonio sigue bajando una fila por movimiento, y las dos apps siguen pidiéndolo todo cada vez que cambia la lista de movimientos recientes.
+
+### Medición
+
+Workflow «Medición de carga» sobre la rama de ORC-149, mediana de tres ejecuciones. «Antes» es la descarga completa con quince columnas, que es lo que pedían las dos pantallas. Bytes del cuerpo sin comprimir.
+
+| Movimientos | Petición | Filas | Bytes antes | Bytes después | Tiempo antes | Tiempo después |
+|---:|---|---:|---:|---:|---:|---:|
+| 10.000 | Patrimonio | 10.000 | 4,4 MB | 1,5 MB | 0,08 s | 0,04 s |
+| 10.000 | Informes, iOS (6 meses) | 825 | 4,4 MB | 0,36 MB | 0,08 s | 0,007 s |
+| 10.000 | Informes, Android (ventana) | 3.447 | 4,4 MB | 1,5 MB | 0,07 s | 0,03 s |
+| 50.000 | Patrimonio | 50.000 | 21,8 MB | 7,4 MB | 0,40 s | 0,21 s |
+| 50.000 | Informes, iOS (6 meses) | 4.255 | 21,8 MB | 1,9 MB | 0,40 s | 0,04 s |
+| 50.000 | Informes, Android (ventana) | 17.314 | 21,8 MB | 7,6 MB | 0,37 s | 0,13 s |
+
+Ejecución: [45957693327](https://github.com/juanmigueldrt/save-the-money/actions/runs/45957693327), 27-11-2026.
+
+Patrimonio pesa un tercio. Lo que bajan los Informes depende de cómo se reparten los movimientos en el tiempo: los de prueba están repartidos por igual en seis años, así que seis meses son un 8 % de las filas y la ventana de Android un 35 %. En un hogar con más de seis años de datos la proporción será menor.
+
+### El resto de políticas y los dos índices: no se tocan
+
+- **Políticas con `private.is_mine`** (`accounts_select` y las demás): se evalúan fila a fila, a 0,08 ms por fila. Son tablas de decenas de filas por hogar: unos milisegundos por petición. La vista de saldos, que era la única lectura grande que pasaba por ellas, ya tarda 28 ms con 50.000 movimientos. Reescribirlas obligaría a demostrar otra vez, política a política, que la frontera de privacidad no cambia, para un ahorro que no se puede medir.
+- **`holding_prices_household_id_idx` e `investment_trades_household_id_idx`**: son prefijo de los índices de ORC-70 y Postgres ya no los necesita. Sobran, pero sólo cuestan una entrada de índice más por alta en dos tablas pequeñas. Quitarlos es una migración en producción para un ahorro que tampoco se nota. Si algún día otra migración toca esas tablas, se quitan en ella.
 
 ## Opciones para llevar los totales al servidor
 

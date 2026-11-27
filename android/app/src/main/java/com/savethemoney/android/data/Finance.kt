@@ -119,15 +119,38 @@ data class BudgetCategory(
     }
 }
 
+/** Lo que el patrimonio necesita de un movimiento: en qué cuenta, qué día y cuánto. */
+interface AccountAmount {
+    val accountId: String
+    val day: LocalDate
+    val amountMinor: Long
+}
+
+/**
+ * Un movimiento con sólo lo que usa el patrimonio (ORC-149): la descarga completa pesa un tercio que con todas las
+ * columnas. [id] sólo sirve para pedir la página siguiente.
+ */
+@Serializable
+data class MovementAmount(
+    val id: String,
+    @SerialName("account_id") override val accountId: String,
+    @SerialName("booked_on") val bookedOn: String,
+    @SerialName("amount_minor") override val amountMinor: Long,
+) : AccountAmount {
+    @kotlinx.serialization.Transient override val day: LocalDate = LocalDate.parse(bookedOn.take(10))
+
+    constructor(movement: Movement) : this(movement.id, movement.accountId, movement.bookedOn, movement.amountMinor)
+}
+
 /** Movimiento de una cuenta. Importe negativo = gasto, positivo = ingreso. */
 @Serializable
 data class Movement(
     val id: String,
     @SerialName("household_id") val householdId: String,
-    @SerialName("account_id") val accountId: String,
+    @SerialName("account_id") override val accountId: String,
     @SerialName("category_id") val categoryId: String? = null,
     @SerialName("booked_on") val bookedOn: String,
-    @SerialName("amount_minor") val amountMinor: Long,
+    @SerialName("amount_minor") override val amountMinor: Long,
     val description: String,
     val notes: String? = null,
     @SerialName("import_hash") val importHash: String? = null,
@@ -146,9 +169,9 @@ data class Movement(
      * transferencias apuntadas antes de que existiera. Lo pone el servidor al crearla; no se cambia.
      */
     @SerialName("transfer_id") val transferId: String? = null,
-) {
+) : AccountAmount {
     /** Se analiza una vez al crear el movimiento: los informes la leen miles de veces. */
-    @kotlinx.serialization.Transient val day: LocalDate = LocalDate.parse(bookedOn.take(10))
+    @kotlinx.serialization.Transient override val day: LocalDate = LocalDate.parse(bookedOn.take(10))
     val isExpense: Boolean get() = amountMinor < 0
     val isReviewed: Boolean get() = reviewedAt != null
 
@@ -354,6 +377,10 @@ interface FinanceService {
     suspend fun saveExtraBudget(budget: ExtraBudget): ExtraBudget
     suspend fun deleteExtraBudget(id: String)
     suspend fun movements(householdId: String, from: LocalDate, through: LocalDate): List<Movement>
+
+    /** Todos los movimientos del hogar con sólo cuenta, día e importe, para rehacer el patrimonio (ORC-149). */
+    suspend fun movementAmounts(householdId: String): List<MovementAmount> =
+        movements(householdId, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31)).map(::MovementAmount)
 
     suspend fun recurringSeries(householdId: String): List<RecurringSeries>
     suspend fun createRecurring(series: RecurringSeries): RecurringSeries

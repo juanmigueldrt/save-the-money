@@ -137,6 +137,8 @@ public protocol FinanceService: Sendable {
     func movements(in householdId: UUID, accountId: UUID, since: CalendarDay, limit: Int) async throws -> [Movement]
     /// Todos los movimientos del hogar, para exportarlos. El servidor los da por páginas.
     func allMovements(in householdId: UUID) async throws -> [Movement]
+    /// Todos los movimientos del hogar con sólo cuenta, día e importe, para rehacer el patrimonio (ORC-149).
+    func movementAmounts(in householdId: UUID) async throws -> [MovementAmount]
     /// Repetir la llamada con el mismo `draft.id` devuelve el movimiento ya guardado y no apunta nada nuevo; si se
     /// repite con otra cuenta, otro importe u otro día falla con `TransferDraft.storedWithOtherData`.
     func addMovement(_ draft: MovementDraft, in householdId: UUID) async throws -> Movement
@@ -338,4 +340,11 @@ public protocol InvestmentService: Sendable {
     func createPlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan
     func updatePlan(_ plan: InvestmentPlan) async throws -> InvestmentPlan
     func deletePlan(_ planId: UUID) async throws
+}
+
+extension FinanceService {
+    /// Quien no tenga una lectura más barata reduce la descarga completa.
+    public func movementAmounts(in householdId: UUID) async throws -> [MovementAmount] {
+        try await allMovements(in: householdId).map(MovementAmount.init)
+    }
 }

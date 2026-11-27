@@ -7,7 +7,8 @@ import Supabase
 extension SupabaseBackend: BudgetService {
     private static let budgetColumns = "id,household_id,month,ends_on,expected_income_minor,needs_pct,wants_pct,savings_pct,carry_over,warn_pct,budget_lines(category_id,limit_minor)"
     private static let extraColumns = "id,household_id,name,limit_minor,starts_on,ends_on,category_ids,account_ids,is_favorite,updated_at"
-    private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags"
+    /// Con `transfer_id`: presupuesto e informes lo usan para no contar las transferencias sin categoría.
+    private static let periodColumns = "id,household_id,account_id,category_id,booked_on,amount_minor,description,notes,import_hash,excluded,reviewed_at,payee,tags,transfer_id"
 
     public func budget(startingOn day: CalendarDay, in householdId: UUID) async throws -> Budget? {
         let rows: [BudgetRow] = try await mapped {

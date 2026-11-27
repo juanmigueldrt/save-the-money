@@ -86,6 +86,8 @@ class SharedVectorsTest {
             assertEquals(name, expected("assets"), history.map { it.assets })
             assertEquals(name, expected("liabilities"), history.map { it.liabilities })
             assertEquals(name, expected("net"), history.map { it.net })
+            // ORC-149: con los movimientos reducidos sale el mismo patrimonio.
+            assertEquals(name, history, NetWorth.history(accounts, movements.map(::MovementAmount), v.int("months"), YearMonth.parse(v.str("through"))))
         }
     }
 

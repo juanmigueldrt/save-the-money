@@ -10,15 +10,21 @@ import com.savethemoney.android.data.CreditScore
 import com.savethemoney.android.data.FinanceService
 import com.savethemoney.android.data.Household
 import com.savethemoney.android.data.Movement
+import com.savethemoney.android.data.MovementAmount
 import com.savethemoney.android.data.NetWorth
 import com.savethemoney.android.data.NetWorthPoint
+import com.savethemoney.android.data.reportWindowStart
 import java.time.LocalDate
 import java.time.YearMonth
 
 /** Patrimonio con su historia, score e informes (TrackingModel de iOS). */
 class TrackingModel(private val household: Household, private val service: FinanceService, val today: () -> LocalDate) {
-    /** Todos los movimientos: rehacen el patrimonio mes a mes y alimentan los informes. */
-    var allMovements by mutableStateOf(emptyList<Movement>())
+    /** Todos los movimientos, sólo con cuenta, día e importe: rehacen el patrimonio mes a mes. */
+    var amounts by mutableStateOf(emptyList<MovementAmount>())
+        private set
+
+    /** Movimientos desde [reportWindowStart]: lo que pintan los informes (ORC-149). */
+    var reportMovements by mutableStateOf(emptyList<Movement>())
         private set
     var scores by mutableStateOf(emptyList<CreditScore>())
         private set
@@ -31,7 +37,7 @@ class TrackingModel(private val household: Household, private val service: Finan
     val latestScore: CreditScore? get() = scores.firstOrNull()
 
     fun history(accounts: List<Account>, months: Int): List<NetWorthPoint> =
-        NetWorth.history(accounts, allMovements, months, YearMonth.from(today()))
+        NetWorth.history(accounts, amounts, months, YearMonth.from(today()))
 
     /** Meses desde el primer movimiento hasta hoy, ambos incluidos. */
     val monthsWithData: Int get() {
@@ -40,7 +46,7 @@ class TrackingModel(private val household: Household, private val service: Finan
     }
 
     /** Se recalcula sólo cuando cambian los movimientos, no en cada recomposición. */
-    private val firstMonth by derivedStateOf { allMovements.minOfOrNull { YearMonth.from(it.day) } }
+    private val firstMonth by derivedStateOf { amounts.minOfOrNull { YearMonth.from(it.day) } }
 
     private suspend fun guarded(block: suspend (turn: Long) -> Unit) {
         val turn = turns.next()
@@ -53,7 +59,12 @@ class TrackingModel(private val household: Household, private val service: Finan
     }
 
     suspend fun loadMovements() = guarded { turn ->
-        turns.store(::allMovements, service.movements(household.id, LocalDate.of(1900, 1, 1), LocalDate.of(2999, 12, 31)), turn)
+        turns.store(::amounts, service.movementAmounts(household.id), turn)
+    }
+
+    suspend fun loadReports() = guarded { turn ->
+        val from = reportWindowStart(today(), household.monthStartDay)
+        turns.store(::reportMovements, service.movements(household.id, from, LocalDate.of(2999, 12, 31)), turn)
     }
 
     suspend fun loadScores() = guarded { turn -> turns.store(::scores, service.creditScores(), turn) }

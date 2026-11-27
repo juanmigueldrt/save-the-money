@@ -12,8 +12,10 @@ final class TrackingModel: ServerModel {
     private let scores: any CreditScoreService
     private let today: () -> CalendarDay
 
-    /// Todos los movimientos, para rehacer el patrimonio mes a mes.
-    private(set) var allMovements: [Movement] = []
+    /// Todos los movimientos, sólo con cuenta, día e importe, para rehacer el patrimonio mes a mes.
+    private(set) var amounts: [MovementAmount] = []
+    /// Movimientos de los últimos seis meses: «Ingresos y gastos» y la categoría que más sube.
+    private(set) var sixMonthMovements: [Movement] = []
     /// Día del movimiento más antiguo, calculado al cargar (lo usa el tramo «Todo»).
     private var firstMovement: CalendarDay?
     /// Patrimonio ya calculado, para no rehacerlo en cada pintado. Se vacía al cargar otros movimientos.
@@ -48,7 +50,7 @@ final class TrackingModel: ServerModel {
     func history(accounts: [Account], months: Int = 12) -> [NetWorthPoint] {
         let key = HistoryKey(accounts: accounts, months: months, through: MonthKey(today()))
         if let cached = historyCache[key] { return cached }
-        let points = NetWorth.history(accounts: accounts, movements: allMovements, months: months, through: key.through)
+        let points = NetWorth.history(accounts: accounts, amounts: amounts, months: months, through: key.through)
         // Cambiar cuentas sin cambiar movimientos deja claves viejas: con esto no crece sin límite.
         if historyCache.count >= 16 { historyCache.removeAll() }
         historyCache[key] = points
@@ -65,12 +67,22 @@ final class TrackingModel: ServerModel {
     func loadHistory() async {
         let finance = finance, id = household.id, turn = nextTurn()
         await perform(turn: turn) {
-            let list = try await finance.allMovements(in: id)
+            let list = try await finance.movementAmounts(in: id)
             // Una respuesta antigua no pisa una más nueva; y si llega lo mismo no se recalcula nada.
-            guard mayStore(\.allMovements, turn: turn), list != self.allMovements else { return }
-            self.allMovements = list
+            guard mayStore(\.amounts, turn: turn), list != self.amounts else { return }
+            self.amounts = list
             self.firstMovement = list.map(\.bookedOn).min()
             self.historyCache = [:]
+        }
+    }
+
+    /// Sólo el tramo que pintan los informes de seis meses, no todos los movimientos (ORC-149).
+    func loadSixMonths() async {
+        let budgets = budgets, id = household.id, turn = nextTurn()
+        let range = ReportPeriod.last6Months.range(today: today(), monthStartDay: household.monthStartDay)
+        await perform(turn: turn) {
+            let list = try await budgets.movements(in: id, from: range.lowerBound, through: range.upperBound)
+            store(list, in: \.sixMonthMovements, turn: turn)
         }
     }
 

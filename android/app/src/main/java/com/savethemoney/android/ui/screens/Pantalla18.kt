@@ -74,11 +74,11 @@ fun Pantalla18(nav: Nav) {
     var period by remember { mutableStateOf(ReportPeriod.Last6Months) }
     var categoria by remember { mutableStateOf<String?>(null) }
     var selector by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(finance.recent) { tracking.loadMovements() }
+    LaunchedEffect(finance.recent) { tracking.loadReports() }
     val hoy = finance.today()
     val inicioMes = finance.household.monthStartDay
     val seis = ReportPeriod.Last6Months.range(hoy, inicioMes)
-    val movimientos = tracking.allMovements
+    val movimientos = tracking.reportMovements
     val categorias = finance.categories
     // Cada informe recorre todos los movimientos: se recuerdan y sólo se rehacen si cambian sus datos o los filtros.
     val ingresos = remember(movimientos, categorias, seis, inicioMes) { SpendingReport(movimientos, categorias, seis, ReportKind.Income, monthStartDay = inicioMes) }

@@ -9,6 +9,11 @@ movimientos se piden por cursor (cada página, detrás de la última fila de la 
   - movimientos, iOS: `allMovements` (STMData/SupabaseFinance.swift), orden booked_on.asc,id.asc;
   - movimientos, Android: `movements(householdId, from, through)` (data/SupabaseFinance.kt) que llama TrackingModel,
     con booked_on entre 1900-01-01 y 2999-12-31 y orden booked_on.desc,id.asc;
+  - movimientos, Patrimonio (ORC-149): `movementAmounts` en las dos apps, sólo id, cuenta, día e importe, con el
+    orden y el cursor de iOS;
+  - movimientos, Informes (ORC-149): en iOS los últimos seis meses (`BudgetService.movements`, con offset) y en Android
+    desde `reportWindowStart` (unos 25 meses), con las columnas completas. Los meses se cuentan hacia atrás desde el
+    último día con datos de prueba, no desde hoy;
   - precios: `holdingPrices` (iguales en las dos apps), orden priced_on.asc,id.asc;
   - operaciones: `trades` (iguales en las dos apps), orden traded_on.asc,id.asc;
   - saldos: la vista `account_balances`, orden account_id.asc.
@@ -237,6 +242,12 @@ def check(name, expected, received):
         failures.append(f"{name}: esperado {expected}, recibido {received}")
 
 
+LAST_DAY = FIRST_DAY + datetime.timedelta(days=SPAN_DAYS - 1)
+SIX_MONTHS = (LAST_DAY - datetime.timedelta(days=183)).isoformat()
+ANDROID_WINDOW = (LAST_DAY - datetime.timedelta(days=760)).isoformat()
+# Las peticiones que no bajan todas las filas de la tabla: no se comprueban contra el total cargado.
+PARTIAL = {"movimientos (Informes iOS, 6 meses)", "movimientos (Informes Android, ventana)"}
+
 REQUESTS = [
     # Los cursores son los de downloadAfterFilter (iOS) y movementDownloadAfterFilter (Android).
     ("movimientos (iOS, allMovements)", "transactions",
@@ -245,6 +256,18 @@ REQUESTS = [
                    ("or", f"(booked_on.gt.{last['booked_on']},id.gt.{last['id']})")] if last else []),
     ("movimientos (Android, TrackingModel)", "transactions",
      [("select", MOVEMENT), HOUSEHOLD, ("booked_on", "gte.1900-01-01"), ("order", "booked_on.desc,id.asc")],
+     lambda last: [("booked_on", f"lte.{last['booked_on']}"),
+                   ("or", f"(booked_on.lt.{last['booked_on']},id.gt.{last['id']})")] if last
+     else [("booked_on", "lte.2999-12-31")]),
+    ("movimientos (Patrimonio, movementAmounts)", "transactions",
+     [("select", "id,account_id,booked_on,amount_minor"), HOUSEHOLD, ("order", "booked_on.asc,id.asc")],
+     lambda last: [("booked_on", f"gte.{last['booked_on']}"),
+                   ("or", f"(booked_on.gt.{last['booked_on']},id.gt.{last['id']})")] if last else []),
+    ("movimientos (Informes iOS, 6 meses)", "transactions",
+     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", f"gte.{SIX_MONTHS}"), ("booked_on", f"lte.{LAST_DAY.isoformat()}"),
+      ("order", "booked_on.desc,id.asc")], None),
+    ("movimientos (Informes Android, ventana)", "transactions",
+     [("select", MOVEMENT), HOUSEHOLD, ("booked_on", f"gte.{ANDROID_WINDOW}"), ("order", "booked_on.desc,id.asc")],
      lambda last: [("booked_on", f"lte.{last['booked_on']}"),
                    ("or", f"(booked_on.lt.{last['booked_on']},id.gt.{last['id']})")] if last
      else [("booked_on", "lte.2999-12-31")]),
@@ -271,6 +294,10 @@ for n in SIZES:
             line = f"| {n} | {name} | {run} | {count} | {pages} | {ms:.1f} | {ms / pages:.1f} | {size} |"
             print(line, flush=True)
             lines.append(line)
+            if name in PARTIAL:
+                check(f"N={n}, {name}, ejecución {run}: baja una parte de las filas", True, 0 < count < loaded[table])
+                check(f"N={n}, {name}, ejecución {run}: ids distintos", count, len({r["id"] for r in rows}))
+                continue
             check(f"N={n}, {name}, ejecución {run}: filas", EXPECTED_ROWS[table](), count)
             if table == "transactions":
                 check(f"N={n}, {name}, ejecución {run}: ids distintos", count, len({r["id"] for r in rows}))
