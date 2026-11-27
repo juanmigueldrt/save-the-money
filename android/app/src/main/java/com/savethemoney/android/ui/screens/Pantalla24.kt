@@ -14,8 +14,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Goal
 import com.savethemoney.android.data.GoalKind
@@ -79,13 +83,14 @@ fun Pantalla24(nav: Nav, goalId: String?) {
     } else {
         null
     }
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val meta = Money.entered(target)?.takeIf { it > 0 } ?: falla(if (deuda) "Indica cuánto se debía." else "Indica cuánto quieres juntar.")
+        val meta = Money.entered(target)?.takeIf { it > 0 } ?: falla(if (deuda) resources.getString(R.string.form_meta_indica_cuanto_se_debia) else resources.getString(R.string.form_meta_indica_cuanto_quieres_juntar))
         // Un campo vacío es cero o nada; lo que no se entiende, se avisa.
-        val inicio = if (starting.isBlank()) 0 else Money.entered(starting) ?: falla("Algún importe no es válido.")
-        val previsto = if (plan.isBlank()) null else Money.entered(plan) ?: falla("Algún importe no es válido.")
+        val inicio = if (starting.isBlank()) 0 else Money.entered(starting) ?: falla(resources.getString(R.string.form_meta_algun_importe_no_es_valido))
+        val previsto = if (plan.isBlank()) null else Money.entered(plan) ?: falla(resources.getString(R.string.form_meta_algun_importe_no_es_valido))
         val item = (editando ?: Goal(idMeta, planning.household.id, name, targetMinor = meta)).copy(
             name = name, kind = if (deuda) GoalKind.Debt else GoalKind.Savings, targetMinor = meta, startingMinor = inicio,
             monthlyPlanMinor = previsto, targetOn = fecha?.toString(), accountId = cuenta,
@@ -96,8 +101,8 @@ fun Pantalla24(nav: Nav, goalId: String?) {
 
     StmScreen(
         topBar = {
-            TopBar(if (editando != null) "Editar meta" else "Nueva meta", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (editando != null) stringResource(R.string.form_meta_editar_meta) else stringResource(R.string.form_meta_nueva_meta), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -105,13 +110,13 @@ fun Pantalla24(nav: Nav, goalId: String?) {
             confirmar && editando != null -> {
                 {
                     StmDialog(
-                        "¿Borrar esta meta?",
-                        "Se borran también sus aportaciones, para todo el hogar. No se puede deshacer.",
+                        stringResource(R.string.metas_borrar_esta_meta),
+                        stringResource(R.string.metas_se_borran_tambien_sus_aportaciones),
                         icon = StmIcons.deleteForever,
                         onDismiss = { confirmar = false },
                         actions = {
-                            Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text)
-                            Btn("Borrar", {
+                            Btn(stringResource(R.string.comun_cancelar), { confirmar = false }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.comun_borrar), {
                                 action.run {
                                     planning.delete(editando)
                                     // Se sale también del detalle, que ya no existe.
@@ -126,8 +131,8 @@ fun Pantalla24(nav: Nav, goalId: String?) {
             eligeCuenta -> {
                 {
                     SelectorSheet(
-                        "Cuenta asociada",
-                        listOf<Pair<String, () -> Unit>>("Ninguna" to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
+                        stringResource(R.string.form_meta_cuenta_asociada),
+                        listOf<Pair<String, () -> Unit>>(stringResource(R.string.form_meta_ninguna) to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
                         { eligeCuenta = false },
                     )
                 }
@@ -136,39 +141,39 @@ fun Pantalla24(nav: Nav, goalId: String?) {
         },
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Segmented(listOf("Ahorro", "Pagar deuda"), kind, { kind = it })
-            FilledField("Nombre de la meta", name, { name = it }, supporting = "Lo verás en tu lista de metas")
+            Segmented(listOf(stringResource(R.string.form_meta_ahorro), stringResource(R.string.form_meta_pagar_deuda)), kind, { kind = it })
+            FilledField(stringResource(R.string.form_meta_nombre_de_la_meta), name, { name = it }, supporting = stringResource(R.string.form_meta_lo_veras_en_tu_lista_de))
             FilledField(
-                if (deuda) "Cuánto se debía al empezar" else "Importe objetivo", target, { target = it }, keyboard = KeyboardType.Decimal, calculator = true,
+                if (deuda) stringResource(R.string.form_meta_cuanto_se_debia_al_empezar) else stringResource(R.string.form_meta_importe_objetivo), target, { target = it }, keyboard = KeyboardType.Decimal, calculator = true,
                 trailing = if (invalid) StmIcons.error else null,
-                supporting = if (invalid) "Escribe un importe, por ejemplo 150" else null,
+                supporting = if (invalid) stringResource(R.string.form_meta_escribe_un_importe_por_ejemplo_150) else null,
                 error = invalid,
             )
             FilledField(
-                "Fecha límite", limite?.let { "${Fechas.mesTitulo(it)} ${it.year}" } ?: "Sin fecha",
+                stringResource(R.string.form_meta_fecha_limite), limite?.let { "${Fechas.mesTitulo(it)} ${it.year}" } ?: stringResource(R.string.form_meta_sin_fecha),
                 trailing = StmIcons.calendarToday, onClick = { eligeFecha = true },
             )
             if (necesario != null && limite != null) {
                 val meses = maxOf(1, ChronoUnit.MONTHS.between(YearMonth.from(hoy), YearMonth.from(limite)).toInt())
                 StmCard(color = c.surfaceContainerHighest) {
-                    Text("Aporte mensual necesario", style = StmType.labelMedium, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.form_meta_aporte_mensual_necesario), style = StmType.labelMedium, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
-                    Text("${importe(necesario)}/mes", style = StmType.titleLarge, color = c.onSurface)
+                    Text(stringResource(R.string.form_meta_mes, importe(necesario)), style = StmType.titleLarge, color = c.onSurface)
                     Spacer(Modifier.height(4.dp))
-                    Text(if (meses == 1) "durante 1 mes" else "durante $meses meses", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                    Text(pluralStringResource(R.plurals.form_meta_durante_meses, meses, meses), style = StmType.bodySmall, color = c.onSurfaceVariant)
                 }
             }
             ListCard {
-                ListItem("Se comparte con el hogar", "Todos podrán ver y aportar")
+                ListItem(stringResource(R.string.form_meta_se_comparte_con_el_hogar), stringResource(R.string.form_meta_todos_podran_ver_y_aportar))
             }
             // Lo que el diseño no dibuja y iOS sí permite va debajo, para no mover lo anterior.
-            if (limite != null) Btn("Quitar la fecha", { fecha = null }, kind = BtnKind.Text)
-            FilledField(if (deuda) "Lo que ya has pagado (opcional)" else "Lo que ya tienes (opcional)", starting, { starting = it }, keyboard = KeyboardType.Decimal, calculator = true)
-            FilledField("Aportación mensual prevista (opcional)", plan, { plan = it }, keyboard = KeyboardType.Decimal, calculator = true)
-            FilledField("Cuenta asociada", finance.account(cuenta)?.name ?: "Ninguna", trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
+            if (limite != null) Btn(stringResource(R.string.form_meta_quitar_la_fecha), { fecha = null }, kind = BtnKind.Text)
+            FilledField(if (deuda) stringResource(R.string.form_meta_lo_que_ya_has_pagado_opcional) else stringResource(R.string.form_meta_lo_que_ya_tienes_opcional), starting, { starting = it }, keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.form_meta_aportacion_mensual_prevista), plan, { plan = it }, keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.form_meta_cuenta_asociada), finance.account(cuenta)?.name ?: stringResource(R.string.form_meta_ninguna), trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
             if (editando != null) {
                 Btn(
-                    if (editando.isArchived) "Desarchivar" else "Archivar",
+                    if (editando.isArchived) stringResource(R.string.comun_desarchivar) else stringResource(R.string.comun_archivar),
                     {
                         action.run {
                             planning.setArchived(editando, !editando.isArchived)
@@ -177,7 +182,7 @@ fun Pantalla24(nav: Nav, goalId: String?) {
                     },
                     kind = BtnKind.Text,
                 )
-                Btn("Borrar meta y aportaciones", { confirmar = true }, kind = BtnKind.Text, color = c.error)
+                Btn(stringResource(R.string.metas_borrar_meta_y_aportaciones), { confirmar = true }, kind = BtnKind.Text, color = c.error)
             }
             Spacer(Modifier.height(8.dp))
         }

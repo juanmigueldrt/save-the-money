@@ -17,8 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.GoalProgress
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.Recurrence
@@ -32,17 +35,15 @@ import com.savethemoney.android.ui.theme.StmType
 internal fun importe(minor: Long) = Money.format(minor, decimals = minor % 100 != 0L)
 
 /** «1 mes», «3 meses», «1 año». */
-internal fun periodo(r: Recurrence): String = when (r.unit) {
-    RecurrenceUnit.Week -> if (r.every == 1) "1 semana" else "${r.every} semanas"
-    RecurrenceUnit.Month -> if (r.every == 1) "1 mes" else "${r.every} meses"
-    RecurrenceUnit.Year -> if (r.every == 1) "1 año" else "${r.every} años"
+@Composable internal fun periodo(r: Recurrence): String = when (r.unit) {
+    RecurrenceUnit.Week -> pluralStringResource(R.plurals.planes_semanas, r.every, r.every)
+    RecurrenceUnit.Month -> pluralStringResource(R.plurals.planes_meses, r.every, r.every)
+    RecurrenceUnit.Year -> pluralStringResource(R.plurals.planes_anos, r.every, r.every)
 }
 
-internal fun textoAviso(dias: Int) = when (dias) {
-    0 -> "el mismo día"
-    1 -> "1 día antes"
-    else -> "$dias días antes"
-}
+@Composable
+internal fun textoAviso(dias: Int) =
+    if (dias == 0) stringResource(R.string.planes_el_mismo_dia) else pluralStringResource(R.plurals.planes_dias_antes, dias, dias)
 
 /** «Contador» con borde: texto y botones − / + (56 dp). */
 @Composable
@@ -53,9 +54,9 @@ internal fun Stepper(text: String, onMinus: () -> Unit, onPlus: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(text, Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
-        IconBtn(StmIcons.remove, onMinus, contentDescription = "Menos")
+        IconBtn(StmIcons.remove, onMinus, contentDescription = stringResource(R.string.planes_menos))
         Spacer(Modifier.width(4.dp))
-        IconBtn(StmIcons.add, onPlus, contentDescription = "Más")
+        IconBtn(StmIcons.add, onPlus, contentDescription = stringResource(R.string.planes_mas))
     }
 }
 

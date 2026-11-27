@@ -13,7 +13,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.Fechas
 import com.savethemoney.android.ui.LocalSession
@@ -49,6 +52,7 @@ import com.savethemoney.android.ui.components.tap
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import kotlin.math.abs
 
 /** 04 Inicio: patrimonio, gastado, próximo cargo y últimos movimientos. */
@@ -71,38 +75,38 @@ fun Pantalla04(nav: Nav) {
             TopBar(null, navIcon = StmIcons.menu, onNav = { nav.tab(Tab.Mas) }) {
                 IconBtn(
                     if (Vista.incognito) StmIcons.visibilityOff else StmIcons.visibility, { Vista.setIncognito(!Vista.incognito) },
-                    contentDescription = if (Vista.incognito) "Mostrar importes" else "Ocultar importes",
+                    contentDescription = if (Vista.incognito) stringResource(R.string.comun_mostrar_importes) else stringResource(R.string.comun_ocultar_importes),
                 )
-                IconBtn(StmIcons.search, { nav.go(Route.Movimientos) }, contentDescription = "Buscar")
+                IconBtn(StmIcons.search, { nav.go(Route.Movimientos) }, contentDescription = stringResource(R.string.comun_buscar))
                 Box(Modifier.size(40.dp).tap(CircleShape) { nav.go(Route.Hogar) }, contentAlignment = Alignment.Center) {
                     Avatar(name.take(1).uppercase(), c.primaryContainer, c.onPrimaryContainer, size = 32.dp)
                 }
             }
-            LargeTitle("Hola, $name", "${Fechas.mesTitulo(hoy)} · ${cuentas.size} ${if (cuentas.size == 1) "cuenta" else "cuentas"}")
+            LargeTitle(stringResource(R.string.inicio_hola, name), pluralStringResource(R.plurals.inicio_mes_y_cuentas, cuentas.size, Fechas.mesTitulo(hoy), cuentas.size))
         },
         bottomBar = { NavBar(Tab.Inicio, nav::tab, badgeOnMore = true) },
-        fab = { Fab("Añadir movimiento", onClick = anadir) },
+        fab = { Fab(stringResource(R.string.inicio_anadir_movimiento), onClick = anadir) },
     ) {
         StmCard(onClick = { nav.go(Route.Patrimonio) }) {
-            Text("Patrimonio neto", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.patrimonio_patrimonio_neto), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(3.dp))
             Text(Money.format(total, decimals = false), style = StmType.displaySmall, color = c.onSurface)
             Spacer(Modifier.height(8.dp))
             if (variacion != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Pill(porcentaje(variacion) + " este mes", positive = variacion >= 0, icon = if (variacion >= 0) StmIcons.arrowUpward else null)
+                    Pill(stringResource(R.string.inicio_este_mes, porcentaje(variacion)), positive = variacion >= 0, icon = if (variacion >= 0) StmIcons.arrowUpward else null)
                     Spacer(Modifier.width(8.dp))
-                    Text("vs. ${Fechas.mes(hoy.minusMonths(1))}", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.inicio_vs, Fechas.mes(hoy.minusMonths(1))), style = StmType.bodySmall, color = c.onSurfaceVariant)
                 }
             }
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             // Presupuesto (paso 4) y tarjetas (paso 6) aún no calculan: en la app real no se inventan cifras.
-            Stat("Gastado", Money.format(finance.spentThisMonth, decimals = false), "este mes", Modifier.weight(1f)) { nav.tab(Tab.Presupuesto) }
+            Stat(stringResource(R.string.inicio_gastado), Money.format(finance.spentThisMonth, decimals = false), stringResource(R.string.inicio_este_mes_2), Modifier.weight(1f)) { nav.tab(Tab.Presupuesto) }
             Stat(
-                "Próximo cargo", proximo?.let { Money.format(it.amount, decimals = false) } ?: "—",
-                proximo?.let { "${it.series.trimmedName} · ${Fechas.corto(it.due)}" } ?: "Sin cargos a la vista",
+                stringResource(R.string.comun_proximo_cargo), proximo?.let { Money.format(it.amount, decimals = false) } ?: "—",
+                proximo?.let { "${it.series.trimmedName} · ${Fechas.corto(it.due)}" } ?: stringResource(R.string.inicio_sin_cargos_a_la_vista),
                 Modifier.weight(1f),
             ) { nav.go(Route.PagosFijos) }
         }
@@ -121,16 +125,16 @@ fun Pantalla04(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListItem(
-                "Calendario de pagos", "Lo que se cobra cada día",
+                stringResource(R.string.calendario_calendario_de_pagos), stringResource(R.string.inicio_lo_que_se_cobra_cada_dia),
                 leading = { LeadIcon(StmIcons.calendarMonth, c.secondaryContainer, c.onSecondaryContainer) },
                 trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) },
                 onClick = { nav.go(Route.Calendario) },
             )
         }
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Últimos movimientos", "Ver todo") { nav.go(Route.Movimientos) }
+        SectionHeader(stringResource(R.string.inicio_ultimos_movimientos), stringResource(R.string.inicio_ver_todo)) { nav.go(Route.Movimientos) }
         if (finance.recent.isEmpty()) {
-            Vacio("Todavía no hay movimientos.")
+            Vacio(stringResource(R.string.inicio_todavia_no_hay_movimientos))
         } else {
             ListaMovimientos(finance.recent.take(3), finance) { m ->
                 finance.tappedMovement = m
@@ -138,16 +142,16 @@ fun Pantalla04(nav: Nav) {
             }
         }
         Spacer(Modifier.height(16.dp))
-        SectionHeader("Cuentas", "Añadir") { nav.go(Route.FormCuenta()) }
+        SectionHeader(stringResource(R.string.inicio_cuentas), stringResource(R.string.comun_anadir)) { nav.go(Route.FormCuenta()) }
         if (cuentas.isEmpty()) {
-            Vacio("Añade tu primera cuenta para empezar a apuntar movimientos o importar un CSV del banco.")
+            Vacio(stringResource(R.string.inicio_anade_tu_primera_cuenta_para))
         } else {
             ListCard {
                 cuentas.forEachIndexed { i, cuenta ->
                     if (i > 0) Divider()
                     ListItem(
                         cuenta.name,
-                        if (cuenta.isShared) "${cuenta.kind.title} · compartida" else cuenta.kind.title,
+                        if (cuenta.isShared) stringResource(R.string.comun_tipo_cuenta_compartida, stringResource(cuenta.kind.titulo)) else stringResource(cuenta.kind.titulo),
                         trailingText = Money.format(finance.balance(cuenta)),
                         leading = { LeadIcon(iconoCuenta(cuenta.kind)) },
                         onClick = {
@@ -163,7 +167,7 @@ fun Pantalla04(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListItem(
-                    "Archivadas (${archivadas.size})", if (abiertas) null else "Ábrelas para verlas o desarchivarlas",
+                    stringResource(R.string.inicio_archivadas, archivadas.size), if (abiertas) null else stringResource(R.string.inicio_abrelas_para_verlas_o),
                     trailing = { StmIcon(if (abiertas) StmIcons.arrowDropDown else StmIcons.chevronRight, c.onSurfaceVariant) },
                     onClick = { abiertas = !abiertas },
                 )
@@ -171,7 +175,7 @@ fun Pantalla04(nav: Nav) {
                     archivadas.forEach { cuenta ->
                         Divider()
                         ListItem(
-                            cuenta.name, "${cuenta.kind.title} · archivada",
+                            cuenta.name, stringResource(R.string.inicio_archivada, stringResource(cuenta.kind.titulo)),
                             trailingText = Money.format(finance.balance(cuenta)),
                             trailingColor = c.onSurfaceVariant,
                             leading = { LeadIcon(iconoCuenta(cuenta.kind)) },
@@ -187,7 +191,7 @@ fun Pantalla04(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             Text(it, style = StmType.bodySmall, color = c.error)
             // Es un problema de carga (también tras guardar algo): se reintenta cargando, nunca guardando otra vez.
-            Btn("Reintentar", { recarga.run { finance.load() } }, kind = BtnKind.Text, enabled = !recarga.busy)
+            Btn(stringResource(R.string.comun_reintentar), { recarga.run { finance.load() } }, kind = BtnKind.Text, enabled = !recarga.busy)
         }
     }
 }

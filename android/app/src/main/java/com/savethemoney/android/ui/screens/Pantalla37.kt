@@ -19,8 +19,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.savethemoney.android.R
 import com.savethemoney.android.data.InviteCode
 import com.savethemoney.android.ui.CamaraQr
 import com.savethemoney.android.ui.LocalSession
@@ -38,20 +41,21 @@ fun Pantalla37(nav: Nav) {
     val session = LocalSession.current
     val c = Stm.colors
     val context = LocalContext.current
+    val resources = LocalResources.current
     var permiso by remember { mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) }
     var aviso by remember { mutableStateOf<String?>(null) }
     var leido by remember { mutableStateOf(false) }
     val pedir = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { concedido ->
         permiso = concedido
-        if (!concedido) aviso = "Sin permiso de cámara no se puede escanear. Puedes escribir el código a mano."
+        if (!concedido) aviso = resources.getString(R.string.escaner_qr_sin_permiso_de_camara_no_se)
     }
     LaunchedEffect(Unit) { if (!permiso) pedir.launch(Manifest.permission.CAMERA) }
     StmScreen(
-        topBar = { TopBar("Escanear QR", navIcon = StmIcons.close, onNav = nav::back) },
+        topBar = { TopBar(stringResource(R.string.escaner_qr_escanear_qr), navIcon = StmIcons.close, onNav = nav::back) },
         scroll = false,
     ) {
         if (permiso && aviso == null) {
-            Text("Apunta al QR de tu pareja.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.escaner_qr_apunta_al_qr_de_tu_pareja), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(16.dp))
             CamaraQr(
                 Modifier.fillMaxWidth().weight(1f).padding(bottom = 16.dp),
@@ -63,7 +67,7 @@ fun Pantalla37(nav: Nav) {
                         nav.back()
                     }
                 },
-                onError = { aviso = "Este dispositivo no tiene cámara trasera. Puedes escribir el código a mano." },
+                onError = { aviso = resources.getString(R.string.escaner_qr_este_dispositivo_no_tiene_camara) },
             )
         } else {
             Box(Modifier.fillMaxSize()) {

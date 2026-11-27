@@ -19,8 +19,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BudgetTemplate
 import com.savethemoney.android.data.CategoryLine
@@ -73,21 +75,21 @@ fun Pantalla14(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null) {
-                IconBtn(StmIcons.edit, { nav.go(Route.EditarPresupuesto) }, contentDescription = "Editar presupuesto")
-                IconBtn(StmIcons.moreVert, { eligiendo = true }, contentDescription = "Más opciones")
+                IconBtn(StmIcons.edit, { nav.go(Route.EditarPresupuesto) }, contentDescription = stringResource(R.string.presupuesto_editar_presupuesto))
+                IconBtn(StmIcons.moreVert, { eligiendo = true }, contentDescription = stringResource(R.string.comun_mas_opciones))
             }
-            LargeTitle("Presupuesto", "${budgets.period.title} · plantilla ${template.needs}/${template.wants}/${template.savings}")
+            LargeTitle(stringResource(R.string.presupuesto_presupuesto), stringResource(R.string.presupuesto_plantilla, budgets.period.title, template.needs, template.wants, template.savings))
         },
         bottomBar = { NavBar(Tab.Presupuesto, nav::tab) },
         snackbar = budgets.error?.let { e -> { Snackbar(e) } },
         overlay = if (eligiendo) {
             {
                 SelectorSheet(
-                    "Presupuesto",
+                    stringResource(R.string.presupuesto_presupuesto),
                     listOf(
-                        "Día de cobro" to { nav.go(Route.DiaDeCobro) },
-                        "Nuevo presupuesto extra" to { nav.go(Route.FormExtra()) },
-                        "Elegir periodo" to { eligiendoPeriodo = true },
+                        stringResource(R.string.dia_de_cobro_dia_de_cobro) to { nav.go(Route.DiaDeCobro) },
+                        stringResource(R.string.form_extra_nuevo_presupuesto_extra) to { nav.go(Route.FormExtra()) },
+                        stringResource(R.string.analisis_elegir_periodo) to { eligiendoPeriodo = true },
                     ),
                     { eligiendo = false },
                 )
@@ -105,12 +107,12 @@ fun Pantalla14(nav: Nav) {
         if (budgets.budget == null) {
             StmCard {
                 Text(
-                    budgets.proposal?.let { "Aún no hay presupuesto para este periodo. Puedes partir del de ${it.period.title.lowercase()}." }
-                        ?: "Aún no hay presupuesto para este periodo. Mientras tanto, se reparten los ingresos reales con 50/30/20.",
+                    budgets.proposal?.let { stringResource(R.string.presupuesto_aun_no_hay_presupuesto_para_este, it.period.title.lowercase()) }
+                        ?: stringResource(R.string.presupuesto_aun_no_hay_presupuesto_para_este_2),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(12.dp))
-                Btn("Crear presupuesto", { nav.go(Route.EditarPresupuesto) })
+                Btn(stringResource(R.string.presupuesto_crear_presupuesto), { nav.go(Route.EditarPresupuesto) })
             }
             Spacer(Modifier.height(16.dp))
         }
@@ -121,7 +123,7 @@ fun Pantalla14(nav: Nav) {
                     Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(Money.format(report.totalSpent, decimals = false), style = StmType.displaySmall, color = c.onSurface)
                         Text(
-                            "de ${Money.format(report.base, decimals = false)}" + if (restantes != null) " · quedan $restantes días" else "",
+                            if (restantes != null) stringResource(R.string.presupuesto_de_quedan_dias, Money.format(report.base, decimals = false), restantes) else stringResource(R.string.presupuesto_de, Money.format(report.base, decimals = false)),
                             style = StmType.bodySmall, color = c.onSurfaceVariant,
                         )
                     }
@@ -137,12 +139,12 @@ fun Pantalla14(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             ListCard {
                 ListItem(
-                    if (insights.unbudgeted < 0) "Límites por encima de lo previsto" else "Queda por presupuestar",
+                    if (insights.unbudgeted < 0) stringResource(R.string.presupuesto_limites_por_encima_de_lo_previsto) else stringResource(R.string.presupuesto_queda_por_presupuestar),
                     trailingText = Money.format(insights.unbudgeted),
                 )
                 if (budgets.isCurrentPeriod) {
                     Divider(inset = 16.dp)
-                    ListItem("Al ritmo de hoy gastarás", trailingText = Money.format(insights.projectedSpent))
+                    ListItem(stringResource(R.string.presupuesto_al_ritmo_de_hoy_gastaras), trailingText = Money.format(insights.projectedSpent))
                 }
             }
         }
@@ -159,11 +161,11 @@ fun Pantalla14(nav: Nav) {
             Spacer(Modifier.height(16.dp))
             StmCard(onClick = { nav.go(Route.Movimientos) }) {
                 Row(Modifier.fillMaxWidth()) {
-                    Text("Gastos sin categoría", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Text(stringResource(R.string.presupuesto_gastos_sin_categoria), Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
                     Text(Money.format(report.uncategorized), style = StmType.labelLarge, color = c.onSurface)
                 }
                 Spacer(Modifier.height(4.dp))
-                Text("Ponles categoría en Movimientos para que cuenten en su grupo.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.presupuesto_ponles_categoria_en_movimientos), style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
         }
         Spacer(Modifier.height(16.dp))
@@ -179,8 +181,8 @@ private fun CategoryLine(line: CategoryLine, onClick: () -> Unit) {
     val limit = line.available
     val detail = when {
         limit == null -> Money.format(line.spent, decimals = false)
-        line.isOver -> "${Money.format(line.spent - limit, decimals = false)} por encima"
-        else -> "${Money.format(line.spent, decimals = false, symbol = false)} de ${Money.format(limit, decimals = false)}"
+        line.isOver -> stringResource(R.string.presupuesto_por_encima, Money.format(line.spent - limit, decimals = false))
+        else -> stringResource(R.string.presupuesto_de_2, Money.format(line.spent, decimals = false, symbol = false), Money.format(limit, decimals = false))
     }
     Column(Modifier.fillMaxWidth().tap(onClick = onClick)) {
         Row(Modifier.fillMaxWidth().height(40.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -200,8 +202,8 @@ private fun CategoryLine(line: CategoryLine, onClick: () -> Unit) {
         if (line.carried != 0L) {
             Spacer(Modifier.height(4.dp))
             Text(
-                if (line.carried < 0) "Incluye ${Money.format(-line.carried)} de menos del periodo anterior"
-                else "Incluye ${Money.format(line.carried)} que sobró del periodo anterior",
+                if (line.carried < 0) stringResource(R.string.presupuesto_incluye_de_menos_del_periodo, Money.format(-line.carried))
+                else stringResource(R.string.presupuesto_incluye_que_sobro_del_periodo, Money.format(line.carried)),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
         }

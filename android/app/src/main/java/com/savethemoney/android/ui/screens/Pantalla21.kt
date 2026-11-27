@@ -17,8 +17,12 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.Money
@@ -80,12 +84,13 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
     val action = rememberAction()
     val esIngreso = tipos[kind] == RecurringKind.Income
     val tipoCategoria = if (esIngreso) CategoryKind.Income else CategoryKind.Expense
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: falla("El importe no es válido.")
+        val dinero = Money.entered(amount)?.takeIf { it > 0 } ?: falla(resources.getString(R.string.comun_el_importe_no_es_valido))
         val conOferta = offer && !esIngreso
-        val oferta = if (conOferta) Money.entered(offerPrice)?.takeIf { it > 0 } ?: falla("El precio de oferta no es válido.") else null
+        val oferta = if (conOferta) Money.entered(offerPrice)?.takeIf { it > 0 } ?: falla(resources.getString(R.string.form_pago_fijo_el_precio_de_oferta_no_es)) else null
         val item = (editando ?: RecurringSeries(idPago, planning.household.id, name, amountMinor = dinero, startsOn = fecha.toString())).copy(
             name = name, kind = tipos[kind], amountMinor = dinero, accountId = cuenta, categoryId = categoria,
             every = cada.every, unit = cada.unit, startsOn = fecha.toString(), endsOn = if (conFin) fin.toString() else null,
@@ -98,8 +103,8 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
 
     StmScreen(
         topBar = {
-            TopBar(if (editando != null) "Editar pago fijo" else "Nuevo pago fijo", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (editando != null) stringResource(R.string.form_pago_fijo_editar_pago_fijo) else stringResource(R.string.form_pago_fijo_nuevo_pago_fijo), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -107,22 +112,21 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
             confirmar && editando != null -> {
                 {
                     StmDialog(
-                        "¿Qué quieres hacer con este pago fijo?",
-                        "Si dejas de pagarlo, se guarda con fecha de fin y no habrá más cargos ni avisos. Si lo borras, " +
-                            "desaparece con sus cargos pendientes. Los movimientos ya apuntados no se tocan en ningún caso.",
+                        stringResource(R.string.form_pago_fijo_que_quieres_hacer_con_este_pago),
+                        stringResource(R.string.form_pago_fijo_si_dejas_de_pagarlo_se_guarda),
                         icon = StmIcons.deleteForever,
                         onDismiss = { confirmar = false },
-                        actions = { Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text) },
+                        actions = { Btn(stringResource(R.string.comun_cancelar), { confirmar = false }, kind = BtnKind.Text) },
                     ) {
                         Spacer(Modifier.height(16.dp))
-                        Btn("Dejar de pagarlo desde hoy", {
+                        Btn(stringResource(R.string.form_pago_fijo_dejar_de_pagarlo_desde_hoy), {
                             action.run {
                                 planning.save(editando.copy(endsOn = maxOf(editando.startDay, finance.today()).toString()))
                                 nav.back()
                             }
                         }, Modifier.fillMaxWidth(), kind = BtnKind.Tonal)
                         Spacer(Modifier.height(8.dp))
-                        Btn("Borrarlo con sus pendientes", {
+                        Btn(stringResource(R.string.form_pago_fijo_borrarlo_con_sus_pendientes), {
                             action.run {
                                 planning.delete(editando)
                                 nav.back()
@@ -136,18 +140,18 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
                     val cerrar = { selector = null }
                     when (selector) {
                         "cada" -> SelectorSheet(
-                            "Frecuencia",
+                            stringResource(R.string.form_movimiento_frecuencia),
                             (if (cada in Recurrence.Common) Recurrence.Common else Recurrence.Common + cada).map { r -> r.title to { cada = r } },
                             cerrar,
                         )
                         "cuenta" -> SelectorSheet(
-                            "Cuenta",
-                            listOf<Pair<String, () -> Unit>>("Sin cuenta" to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
+                            stringResource(R.string.comun_cuenta),
+                            listOf<Pair<String, () -> Unit>>(stringResource(R.string.form_pago_fijo_sin_cuenta) to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
                             cerrar,
                         )
                         else -> SelectorSheet(
-                            "Categoría",
-                            listOf<Pair<String, () -> Unit>>("Sin categoría" to { categoria = null }) + finance.categories(tipoCategoria).map { x -> x.name to { categoria = x.id } },
+                            stringResource(R.string.comun_categoria),
+                            listOf<Pair<String, () -> Unit>>(stringResource(R.string.comun_sin_categoria) to { categoria = null }) + finance.categories(tipoCategoria).map { x -> x.name to { categoria = x.id } },
                             cerrar,
                         )
                     }
@@ -166,64 +170,63 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
                     if (finance.category(categoria)?.kind != quiere) categoria = null
                 },
             )
-            FilledField("Nombre", name, { name = it })
+            FilledField(stringResource(R.string.comun_nombre), name, { name = it })
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledField("Importe", amount, { amount = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
-                FilledField("Cada", periodo(cada), modifier = Modifier.weight(1f), trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
+                FilledField(stringResource(R.string.comun_importe), amount, { amount = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+                FilledField(stringResource(R.string.comun_cada), periodo(cada), modifier = Modifier.weight(1f), trailing = StmIcons.arrowDropDown, onClick = { selector = "cada" })
             }
             FilledField(
-                if (editando != null) "Desde" else "Próximo cargo", Fechas.largo(fecha, finance.today()),
+                if (editando != null) stringResource(R.string.form_pago_fijo_desde) else stringResource(R.string.comun_proximo_cargo), Fechas.largo(fecha, finance.today()),
                 trailing = StmIcons.calendarToday, onClick = { eligeFecha = "inicio" },
             )
             if (!esIngreso) {
                 ListCard {
                     ListItem(
-                        "Precio de oferta al principio", "Por ejemplo, 3 meses a 5,99 €",
+                        stringResource(R.string.form_pago_fijo_precio_de_oferta_al_principio), stringResource(R.string.form_pago_fijo_por_ejemplo_3_meses_a_5),
                         trailing = { StmSwitch(offer) { offer = it } },
                     )
                 }
                 if (offer) {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         FilledField(
-                            "Precio de oferta", offerPrice, { offerPrice = it }, Modifier.weight(1f),
+                            stringResource(R.string.form_pago_fijo_precio_de_oferta), offerPrice, { offerPrice = it }, Modifier.weight(1f),
                             suffix = "€", keyboard = KeyboardType.Decimal, calculator = true,
                         )
-                        Stepper(if (charges == 1) "1 cargo" else "$charges cargos", { charges = (charges - 1).coerceAtLeast(1) }, { charges = (charges + 1).coerceAtMost(36) })
+                        Stepper(pluralStringResource(R.plurals.form_pago_fijo_cargos, charges, charges), { charges = (charges - 1).coerceAtLeast(1) }, { charges = (charges + 1).coerceAtMost(36) })
                     }
                 }
             }
             ListCard {
-                ListItem("Se comparte con todo el hogar")
+                ListItem(stringResource(R.string.form_pago_fijo_se_comparte_con_todo_el_hogar))
                 Divider(inset = 16.dp)
-                ListItem("Avisarme ${textoAviso(dias)}", trailing = { StmSwitch(remind) { remind = it } })
+                ListItem(stringResource(R.string.form_pago_fijo_avisarme, textoAviso(dias)), trailing = { StmSwitch(remind) { remind = it } })
             }
             // Lo que el diseño no dibuja y iOS sí permite va debajo, para no mover lo anterior.
             if (remind) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Cuándo avisar", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
-                    Stepper(when (dias) { 0 -> "Mismo día"; 1 -> "1 día"; else -> "$dias días" }, { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
+                    Text(stringResource(R.string.form_pago_fijo_cuando_avisar), Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Stepper(if (dias == 0) stringResource(R.string.form_pago_fijo_mismo_dia) else pluralStringResource(R.plurals.form_pago_fijo_dias, dias, dias), { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
                 }
             }
-            FilledField("Cuenta", finance.account(cuenta)?.name ?: "Sin cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
-            FilledField("Categoría", finance.category(categoria)?.name ?: "Sin categoría", trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+            FilledField(stringResource(R.string.comun_cuenta), finance.account(cuenta)?.name ?: stringResource(R.string.form_pago_fijo_sin_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+            FilledField(stringResource(R.string.comun_categoria), finance.category(categoria)?.name ?: stringResource(R.string.comun_sin_categoria), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
             ListCard {
                 ListItem(
-                    "Apuntarlo como pendiente al llegar el día",
-                    "El día del cargo aparece en Resumen para confirmarlo con el importe real. Hasta entonces no cuenta en saldos " +
-                        "ni presupuesto, y si llega antes por CSV se empareja solo.",
+                    stringResource(R.string.form_pago_fijo_apuntarlo_como_pendiente_al_llegar),
+                    stringResource(R.string.form_pago_fijo_el_dia_del_cargo_aparece_en),
                     supportingLines = 4,
                     trailing = { StmSwitch(pendiente) { pendiente = it } },
                 )
             }
             ListCard {
-                ListItem("Tiene fecha de fin", trailing = { StmSwitch(conFin) { conFin = it } })
+                ListItem(stringResource(R.string.form_pago_fijo_tiene_fecha_de_fin), trailing = { StmSwitch(conFin) { conFin = it } })
             }
             if (conFin) {
-                FilledField("Último cargo", Fechas.largo(fin, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "fin" })
+                FilledField(stringResource(R.string.form_pago_fijo_ultimo_cargo), Fechas.largo(fin, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "fin" })
             }
             if (editando != null) {
                 Btn(
-                    if (editando.isArchived) "Reactivar" else "Archivar (ya no se paga)",
+                    if (editando.isArchived) stringResource(R.string.form_pago_fijo_reactivar) else stringResource(R.string.form_pago_fijo_archivar_ya_no_se_paga),
                     {
                         action.run {
                             planning.setArchived(editando, !editando.isArchived)
@@ -232,7 +235,7 @@ fun Pantalla21(nav: Nav, seriesId: String?) {
                     },
                     kind = BtnKind.Text,
                 )
-                Btn("Borrar", { confirmar = true }, kind = BtnKind.Text, color = c.error)
+                Btn(stringResource(R.string.comun_borrar), { confirmar = true }, kind = BtnKind.Text, color = c.error)
             }
             Spacer(Modifier.height(8.dp))
         }

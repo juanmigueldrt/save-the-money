@@ -100,8 +100,8 @@ data class CsvTable(val rows: List<List<String>>, val delimiter: Char) {
 }
 
 /** Orden de día, mes y año en las fechas del archivo. */
-enum class DateOrder(val title: String) {
-    DayMonthYear("Día/mes/año"), YearMonthDay("Año-mes-día"), MonthDayYear("Mes/día/año");
+enum class DateOrder {
+    DayMonthYear, YearMonthDay, MonthDayYear;
 
     /** Lee "28/10/2026", "28-10-26", "2026-10-28" o "28.10.2026"; ignora la hora si la hay. */
     fun parse(text: String): LocalDate? {
@@ -345,7 +345,7 @@ object CsvImporter {
 }
 
 /** Lo que se puede marcar en una fila de la vista previa. Solo los gastos se marcan. */
-enum class ImportMark(val title: String) { None("Sin marcar"), Recurring("Recurrente"), Subscription("Suscripción"), Card("Compra con tarjeta") }
+enum class ImportMark { None, Recurring, Subscription, Card }
 
 object ImportMarks {
     /** Los movimientos a guardar: las compras con tarjeta van a la cuenta de la tarjeta en vez de a la del CSV. */

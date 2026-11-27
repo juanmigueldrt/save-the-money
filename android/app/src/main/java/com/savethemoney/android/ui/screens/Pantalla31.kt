@@ -12,8 +12,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.BudgetCategory
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.CategoryKind
@@ -52,20 +54,20 @@ fun Pantalla31(nav: Nav) {
     val lista = finance.categories(kind)
     StmScreen(
         topBar = {
-            TopBar("Categorías", onNav = nav::back) {
+            TopBar(stringResource(R.string.categorias_categorias), onNav = nav::back) {
                 IconBtn(StmIcons.add, {
                     editando = BudgetCategory(
                         UUID.randomUUID().toString(), finance.household.id, "", kind,
                         if (income) null else BudgetGroup.Needs,
                     )
-                }, contentDescription = "Añadir categoría")
+                }, contentDescription = stringResource(R.string.categorias_anadir_categoria))
             }
         },
         overlay = editando?.let { cat -> { DialogoCategoria(cat, finance) { editando = null } } },
     ) {
         ChipRow {
-            Chip("Gastos", selected = !income, onClick = { income = false })
-            Chip("Ingresos", selected = income, onClick = { income = true })
+            Chip(stringResource(R.string.categorias_gastos), selected = !income, onClick = { income = false })
+            Chip(stringResource(R.string.categorias_ingresos), selected = income, onClick = { income = true })
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
@@ -74,7 +76,7 @@ fun Pantalla31(nav: Nav) {
                 val filas = grupos[grupo] ?: return@forEach
                 when {
                     grupo != null -> ListHeader(grupo.title)
-                    !income -> ListHeader("Sin grupo")
+                    !income -> ListHeader(stringResource(R.string.categorias_sin_grupo))
                 }
                 filas.forEach { cat ->
                     val deseo = grupo == BudgetGroup.Wants
@@ -101,13 +103,13 @@ private fun BoxScope.DialogoCategoria(inicial: BudgetCategory, finance: FinanceM
     if (borrando) {
         val usos = finance.recent.count { it.categoryId == inicial.id }
         StmDialog(
-            "¿Borrar «${inicial.name}»?",
-            if (usos > 0) "$usos movimientos recientes se quedarán sin categoría." else "No hay movimientos recientes con esta categoría.",
+            stringResource(R.string.categorias_borrar, inicial.name),
+            if (usos > 0) stringResource(R.string.categorias_movimientos_recientes_se_quedaran, usos) else stringResource(R.string.categorias_no_hay_movimientos_recientes_con),
             icon = StmIcons.deleteForever,
             onDismiss = { borrando = false },
             actions = {
-                Btn("Cancelar", { borrando = false }, kind = BtnKind.Text)
-                Btn("Borrar", {
+                Btn(stringResource(R.string.comun_cancelar), { borrando = false }, kind = BtnKind.Text)
+                Btn(stringResource(R.string.comun_borrar), {
                     action.run {
                         finance.delete(inicial)
                         onDismiss()
@@ -118,12 +120,12 @@ private fun BoxScope.DialogoCategoria(inicial: BudgetCategory, finance: FinanceM
         return
     }
     StmDialog(
-        if (existe) "Editar categoría" else "Nueva categoría",
+        if (existe) stringResource(R.string.categorias_editar_categoria) else stringResource(R.string.categorias_nueva_categoria),
         onDismiss = onDismiss,
         actions = {
-            if (existe) Btn("Borrar", { borrando = true }, kind = BtnKind.Error)
-            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
-            Btn("Guardar", {
+            if (existe) Btn(stringResource(R.string.comun_borrar), { borrando = true }, kind = BtnKind.Error)
+            Btn(stringResource(R.string.comun_cancelar), onDismiss, kind = BtnKind.Text)
+            Btn(stringResource(R.string.comun_guardar), {
                 action.run {
                     finance.save(inicial.copy(name = nombre, budgetGroup = grupo))
                     onDismiss()
@@ -133,7 +135,7 @@ private fun BoxScope.DialogoCategoria(inicial: BudgetCategory, finance: FinanceM
     ) {
         Spacer(Modifier.height(16.dp))
         OutlinedField(
-            "Nombre", nombre, { nombre = it }, labelBackground = c.surfaceContainerHigh, autoFocus = !existe,
+            stringResource(R.string.comun_nombre), nombre, { nombre = it }, labelBackground = c.surfaceContainerHigh, autoFocus = !existe,
             error = action.error != null, supporting = action.error,
         )
         if (inicial.kind == CategoryKind.Expense) {
@@ -158,6 +160,6 @@ private fun CategoryRow(
         label,
         onClick = onClick,
         leading = { LeadIcon(icon, container, tint) },
-        trailing = { StmIcon(StmIcons.dragIndicator, Stm.colors.onSurfaceVariant, contentDescription = "Reordenar") },
+        trailing = { StmIcon(StmIcons.dragIndicator, Stm.colors.onSurfaceVariant, contentDescription = stringResource(R.string.categorias_reordenar)) },
     )
 }

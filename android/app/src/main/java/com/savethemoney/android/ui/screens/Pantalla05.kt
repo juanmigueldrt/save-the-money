@@ -24,7 +24,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.Change
@@ -63,6 +66,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import kotlinx.coroutines.delay
 
 /** 05 Movimientos: búsqueda, filtros (cuenta, tipo, categoría y fechas), lista por días y aviso de borrado. */
@@ -103,7 +107,7 @@ fun Pantalla05(nav: Nav) {
     StmScreen(
         topBar = {
             MovimientosTopBar(nav, filtro.activeCount, onFiltros = { hoja = "filtros" }, onMas = { hoja = "mas" })
-            CampoBusqueda(filtro.search, { finance.movementFilter = filtro.copy(search = it) }, "Concepto, beneficiario, #etiqueta o importe")
+            CampoBusqueda(filtro.search, { finance.movementFilter = filtro.copy(search = it) }, stringResource(R.string.movimientos_concepto_beneficiario_etiqueta_o))
             Spacer(Modifier.height(12.dp))
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp).horizontalScroll(rememberScrollState()),
@@ -130,14 +134,14 @@ fun Pantalla05(nav: Nav) {
                 NavBar(Tab.Inicio, nav::tab)
             }
         },
-        fab = if (seleccionando) null else { { Fab("Añadir") { nav.go(if (finance.activeAccounts.isEmpty()) Route.FormCuenta() else Route.FormMovimiento()) } } },
+        fab = if (seleccionando) null else { { Fab(stringResource(R.string.comun_anadir)) { nav.go(if (finance.activeAccounts.isEmpty()) Route.FormCuenta() else Route.FormMovimiento()) } } },
         snackbar = if (action.error != null) {
             { Snackbar(action.error!!) }
         } else if (!seleccionando && borrado != null) {
             {
                 // El diseño deja 16 dp entre FAB y snackbar; StmScreen pone 12.
                 Spacer(Modifier.height(4.dp))
-                Snackbar("Movimiento eliminado", "Deshacer") {
+                Snackbar(stringResource(R.string.movimientos_movimiento_eliminado), stringResource(R.string.comun_deshacer)) {
                     action.run { finance.undoDelete() }
                 }
             }
@@ -147,8 +151,8 @@ fun Pantalla05(nav: Nav) {
             "categoria" -> {
                 {
                     SelectorSheet(
-                        "Categoría",
-                        listOf<Pair<String, () -> Unit>>("Todas las categorías" to { finance.movementFilter = finance.movementFilter.copy(categoryId = null) }) +
+                        stringResource(R.string.comun_categoria),
+                        listOf<Pair<String, () -> Unit>>(stringResource(R.string.movimientos_todas_las_categorias) to { finance.movementFilter = finance.movementFilter.copy(categoryId = null) }) +
                             (finance.categories(CategoryKind.Expense) + finance.categories(CategoryKind.Income) + finance.categories(CategoryKind.Transfer))
                                 .map { cat -> cat.name to { finance.movementFilter = finance.movementFilter.copy(categoryId = cat.id) } },
                     ) { hoja = "filtros" }
@@ -158,17 +162,17 @@ fun Pantalla05(nav: Nav) {
             "borrar" -> {
                 {
                     StmDialog(
-                        if (marcados.size == 1) "¿Borrar 1 movimiento?" else "¿Borrar ${marcados.size} movimientos?",
+                        pluralStringResource(R.plurals.movimientos_borrar_movimientos, marcados.size, marcados.size),
                         if (marcados.any { it.transferId != null }) {
-                            "Las transferencias se borran con sus dos movimientos, el de cada cuenta. No se puede deshacer."
+                            stringResource(R.string.movimientos_las_transferencias_se_borran_con)
                         } else {
-                            "No se puede deshacer."
+                            stringResource(R.string.movimientos_no_se_puede_deshacer)
                         },
                         icon = StmIcons.deleteForever,
                         onDismiss = { hoja = null },
                         actions = {
-                            Btn("Cancelar", { hoja = null }, kind = BtnKind.Text)
-                            Btn("Borrar", {
+                            Btn(stringResource(R.string.comun_cancelar), { hoja = null }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.comun_borrar), {
                                 hoja = null
                                 action.run {
                                     finance.delete(marcados)
@@ -181,24 +185,24 @@ fun Pantalla05(nav: Nav) {
             }
             "mas" -> {
                 {
-                    BottomSheet("Movimientos", onDismiss = { hoja = null }) {
+                    BottomSheet(stringResource(R.string.movimientos_movimientos), onDismiss = { hoja = null }) {
                         if (finance.recent.isNotEmpty()) {
-                            SheetItem(StmIcons.check, if (seleccionando) "Terminar selección" else "Seleccionar") {
+                            SheetItem(StmIcons.check, if (seleccionando) stringResource(R.string.movimientos_terminar_seleccion) else stringResource(R.string.movimientos_seleccionar)) {
                                 hoja = null
                                 if (seleccionando) terminaSeleccion() else seleccionando = true
                             }
                         }
                         if (filtrando) {
-                            SheetItem(StmIcons.close, "Quitar filtros y búsqueda") {
+                            SheetItem(StmIcons.close, stringResource(R.string.movimientos_quitar_filtros_y_busqueda)) {
                                 hoja = null
                                 finance.movementFilter = MovementFilter()
                             }
                         }
-                        SheetItem(if (Vista.incognito) StmIcons.visibility else StmIcons.visibilityOff, if (Vista.incognito) "Mostrar importes" else "Ocultar importes") {
+                        SheetItem(if (Vista.incognito) StmIcons.visibility else StmIcons.visibilityOff, if (Vista.incognito) stringResource(R.string.comun_mostrar_importes) else stringResource(R.string.comun_ocultar_importes)) {
                             hoja = null
                             Vista.setIncognito(!Vista.incognito)
                         }
-                        SheetItem(StmIcons.uploadFile, "Importar CSV") {
+                        SheetItem(StmIcons.uploadFile, stringResource(R.string.importar_csv_importar_csv)) {
                             hoja = null
                             nav.go(Route.ImportarCsv())
                         }
@@ -215,9 +219,9 @@ fun Pantalla05(nav: Nav) {
         if (visibles.isEmpty()) {
             when {
                 finance.listError != null -> Unit
-                cargados.isEmpty() && (finance.isLoading || finance.isLoadingList || finance.list.accountId != null) -> Vacio("Cargando…")
-                cargados.isEmpty() && filtro.search.isBlank() -> Vacio("No hay movimientos. Apunta uno con Añadir o importa un CSV desde Más opciones.")
-                else -> Vacio("Nada coincide con la búsqueda o los filtros.")
+                cargados.isEmpty() && (finance.isLoading || finance.isLoadingList || finance.list.accountId != null) -> Vacio(stringResource(R.string.comun_cargando))
+                cargados.isEmpty() && filtro.search.isBlank() -> Vacio(stringResource(R.string.movimientos_no_hay_movimientos_apunta_uno_con))
+                else -> Vacio(stringResource(R.string.movimientos_nada_coincide_con_la_busqueda_o))
             }
         } else {
             ListaMovimientos(visibles, finance, seleccion = if (seleccionando) elegidos else null) { m ->
@@ -245,35 +249,35 @@ private fun BoxScope.HojaFiltros(finance: FinanceModel, abrir: (String?) -> Unit
     val c = Stm.colors
     val filtro = finance.movementFilter
     fun cambia(nuevo: MovementFilter) { finance.movementFilter = nuevo }
-    BottomSheet("Filtros", onDismiss = { abrir(null) }) {
+    BottomSheet(stringResource(R.string.movimientos_filtros_2), onDismiss = { abrir(null) }) {
         Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
-            Text("Cuenta", style = StmType.labelLarge, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.comun_cuenta), style = StmType.labelLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             ChipRow(Modifier.fillMaxWidth()) {
-                Chip("Todas", selected = filtro.accountId == null, onClick = { cambia(filtro.copy(accountId = null)) })
+                Chip(stringResource(R.string.movimientos_todas), selected = filtro.accountId == null, onClick = { cambia(filtro.copy(accountId = null)) })
                 finance.accounts.forEach { a ->
                     Chip(a.name, selected = filtro.accountId == a.id, onClick = { cambia(filtro.copy(accountId = a.id)) })
                 }
             }
             Spacer(Modifier.height(16.dp))
-            Text("Tipo", style = StmType.labelLarge, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.movimientos_tipo), style = StmType.labelLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             ChipRow(Modifier.fillMaxWidth()) {
-                MovementKindFilter.entries.forEach { k -> Chip(k.title, selected = filtro.kind == k, onClick = { cambia(filtro.copy(kind = k)) }) }
+                MovementKindFilter.entries.forEach { k -> Chip(stringResource(k.titulo), selected = filtro.kind == k, onClick = { cambia(filtro.copy(kind = k)) }) }
             }
             Spacer(Modifier.height(16.dp))
-            Text("Estado", style = StmType.labelLarge, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.movimientos_estado), style = StmType.labelLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             ChipRow(Modifier.fillMaxWidth()) {
-                MovementStatusFilter.entries.forEach { e -> Chip(e.title, selected = filtro.status == e, onClick = { cambia(filtro.copy(status = e)) }) }
+                MovementStatusFilter.entries.forEach { e -> Chip(stringResource(e.titulo), selected = filtro.status == e, onClick = { cambia(filtro.copy(status = e)) }) }
             }
             val etiquetas = finance.knownTags
             if (etiquetas.isNotEmpty() || filtro.tag != null) {
                 Spacer(Modifier.height(16.dp))
-                Text("Etiqueta", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.movimientos_etiqueta), style = StmType.labelLarge, color = c.onSurfaceVariant)
                 Spacer(Modifier.height(8.dp))
                 ChipRow(Modifier.fillMaxWidth()) {
-                    Chip("Todas las etiquetas", selected = filtro.tag == null, onClick = { cambia(filtro.copy(tag = null)) })
+                    Chip(stringResource(R.string.movimientos_todas_las_etiquetas), selected = filtro.tag == null, onClick = { cambia(filtro.copy(tag = null)) })
                     (etiquetas + listOfNotNull(filtro.tag)).distinct().forEach { t ->
                         Chip("#$t", selected = filtro.tag == t, onClick = { cambia(filtro.copy(tag = t)) })
                     }
@@ -281,16 +285,16 @@ private fun BoxScope.HojaFiltros(finance: FinanceModel, abrir: (String?) -> Unit
             }
             Spacer(Modifier.height(16.dp))
             FilledField(
-                "Categoría", finance.category(filtro.categoryId)?.name ?: "Todas las categorías",
+                stringResource(R.string.comun_categoria), finance.category(filtro.categoryId)?.name ?: stringResource(R.string.movimientos_todas_las_categorias),
                 leading = filtro.categoryId?.let { iconoCategoria(finance.category(it)) },
                 trailing = StmIcons.arrowDropDown, onClick = { abrir("categoria") },
             )
             Spacer(Modifier.height(16.dp))
-            Text("Fechas", style = StmType.labelLarge, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.movimientos_fechas), style = StmType.labelLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
             ChipRow(Modifier.fillMaxWidth()) {
                 MovementDateFilter.entries.forEach { d ->
-                    Chip(d.title, selected = filtro.dates == d, onClick = {
+                    Chip(stringResource(d.titulo), selected = filtro.dates == d, onClick = {
                         val hoy = finance.today()
                         cambia(
                             if (d == MovementDateFilter.Custom && filtro.customFrom == null) {
@@ -304,14 +308,14 @@ private fun BoxScope.HojaFiltros(finance: FinanceModel, abrir: (String?) -> Unit
                 val hoy = finance.today()
                 Spacer(Modifier.height(16.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilledField("Desde", Fechas.largo(filtro.customFrom ?: hoy, hoy), modifier = Modifier.weight(1f), trailing = StmIcons.calendarToday, onClick = { eligeFecha("desde") })
-                    FilledField("Hasta", Fechas.largo(filtro.customThrough ?: hoy, hoy), modifier = Modifier.weight(1f), trailing = StmIcons.calendarToday, onClick = { eligeFecha("hasta") })
+                    FilledField(stringResource(R.string.movimientos_desde_2), Fechas.largo(filtro.customFrom ?: hoy, hoy), modifier = Modifier.weight(1f), trailing = StmIcons.calendarToday, onClick = { eligeFecha("desde") })
+                    FilledField(stringResource(R.string.movimientos_hasta), Fechas.largo(filtro.customThrough ?: hoy, hoy), modifier = Modifier.weight(1f), trailing = StmIcons.calendarToday, onClick = { eligeFecha("hasta") })
                 }
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                if (filtro.activeCount > 0) Btn("Quitar filtros", { cambia(MovementFilter(search = filtro.search)) }, kind = BtnKind.Text)
-                Btn("Ver movimientos", { abrir(null) })
+                if (filtro.activeCount > 0) Btn(stringResource(R.string.movimientos_quitar_filtros), { cambia(MovementFilter(search = filtro.search)) }, kind = BtnKind.Text)
+                Btn(stringResource(R.string.movimientos_ver_movimientos), { abrir(null) })
             }
         }
     }
@@ -327,13 +331,13 @@ private fun ResumenFiltro(items: List<Movement>, finance: FinanceModel, quitar: 
     StmCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(if (items.size == 1) "1 movimiento" else "${items.size} movimientos", style = StmType.titleMedium, color = c.onSurface)
+                Text(pluralStringResource(R.plurals.movimientos_movimientos_2, items.size, items.size), style = StmType.titleMedium, color = c.onSurface)
                 Text(
-                    "Gastos ${Money.format(gastos, signed = true)} · Ingresos ${Money.format(ingresos, signed = true)}",
+                    stringResource(R.string.movimientos_gastos_ingresos, Money.format(gastos, signed = true), Money.format(ingresos, signed = true)),
                     style = StmType.bodySmall, color = c.onSurfaceVariant,
                 )
             }
-            Btn("Quitar filtros", quitar, kind = BtnKind.Text)
+            Btn(stringResource(R.string.movimientos_quitar_filtros), quitar, kind = BtnKind.Text)
         }
     }
 }
@@ -351,15 +355,15 @@ private fun BarraSeleccion(
     val c = Stm.colors
     Column(Modifier.fillMaxWidth().background(c.surfaceContainer).navigationBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(if (cuantos == 1) "1 seleccionado" else "$cuantos seleccionados", Modifier.weight(1f), style = StmType.titleSmall, color = c.onSurface)
-            Btn(if (todos) "Ninguno" else "Todos", onTodos, kind = BtnKind.Text)
+            Text(pluralStringResource(R.plurals.movimientos_seleccionados, cuantos, cuantos), Modifier.weight(1f), style = StmType.titleSmall, color = c.onSurface)
+            Btn(if (todos) stringResource(R.string.movimientos_ninguno) else stringResource(R.string.movimientos_todos), onTodos, kind = BtnKind.Text)
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Btn("Revisado", onRevisado, kind = BtnKind.Tonal, icon = StmIcons.check, enabled = cuantos > 0)
-            Btn("Editar", onEditar, kind = BtnKind.Outlined, icon = StmIcons.tune, enabled = cuantos > 0)
+            Btn(stringResource(R.string.movimientos_revisado), onRevisado, kind = BtnKind.Tonal, icon = StmIcons.check, enabled = cuantos > 0)
+            Btn(stringResource(R.string.comun_editar), onEditar, kind = BtnKind.Outlined, icon = StmIcons.tune, enabled = cuantos > 0)
             Spacer(Modifier.weight(1f))
-            Btn("Borrar", onBorrar, kind = BtnKind.Error, icon = StmIcons.delete, enabled = cuantos > 0)
+            Btn(stringResource(R.string.comun_borrar), onBorrar, kind = BtnKind.Error, icon = StmIcons.delete, enabled = cuantos > 0)
         }
     }
 }
@@ -396,49 +400,49 @@ private fun BoxScope.HojaEdicionMasiva(finance: FinanceModel, movimientos: List<
     )
     when (selector) {
         "categoria" -> SelectorSheet(
-            "Categoría",
-            listOf<Pair<String, () -> Unit>>("Sin categoría" to { categoria = null }) + finance.categories.map { cat -> cat.name to { categoria = cat.id } },
+            stringResource(R.string.comun_categoria),
+            listOf<Pair<String, () -> Unit>>(stringResource(R.string.comun_sin_categoria) to { categoria = null }) + finance.categories.map { cat -> cat.name to { categoria = cat.id } },
         ) { selector = null }
-        "cuenta" -> SelectorSheet("Cuenta", finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }) { selector = null }
-        else -> BottomSheet(if (movimientos.size == 1) "Editar 1 movimiento" else "Editar ${movimientos.size} movimientos", onDismiss = cerrar) {
+        "cuenta" -> SelectorSheet(stringResource(R.string.comun_cuenta), finance.activeAccounts.map { a -> a.name to { cuenta = a.id } }) { selector = null }
+        else -> BottomSheet(pluralStringResource(R.plurals.movimientos_editar_movimientos, movimientos.size, movimientos.size), onDismiss = cerrar) {
             Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState())) {
-                FilaInterruptor("Cambiar la fecha", null, cambiaFecha) { cambiaFecha = it }
+                FilaInterruptor(stringResource(R.string.movimientos_cambiar_la_fecha), null, cambiaFecha) { cambiaFecha = it }
                 if (cambiaFecha) {
-                    FilledField("Fecha", Fechas.largo(fecha, finance.today()), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+                    FilledField(stringResource(R.string.comun_fecha), Fechas.largo(fecha, finance.today()), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
                 }
-                FilaInterruptor("Cambiar la categoría", null, cambiaCategoria) { cambiaCategoria = it }
+                FilaInterruptor(stringResource(R.string.movimientos_cambiar_la_categoria), null, cambiaCategoria) { cambiaCategoria = it }
                 if (cambiaCategoria) {
-                    FilledField("Categoría", finance.category(categoria)?.name ?: "Sin categoría", modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+                    FilledField(stringResource(R.string.comun_categoria), finance.category(categoria)?.name ?: stringResource(R.string.comun_sin_categoria), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
                 }
-                FilaInterruptor("Cambiar la cuenta", null, cambiaCuenta) { cambiaCuenta = it }
+                FilaInterruptor(stringResource(R.string.movimientos_cambiar_la_cuenta), null, cambiaCuenta) { cambiaCuenta = it }
                 if (cambiaCuenta) {
-                    FilledField("Cuenta", finance.account(cuenta)?.name ?: "Elige una cuenta", modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+                    FilledField(stringResource(R.string.comun_cuenta), finance.account(cuenta)?.name ?: stringResource(R.string.comun_elige_una_cuenta), modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
                 }
-                FilaInterruptor("Cambiar el beneficiario", null, cambiaBeneficiario) { cambiaBeneficiario = it }
+                FilaInterruptor(stringResource(R.string.movimientos_cambiar_el_beneficiario), null, cambiaBeneficiario) { cambiaBeneficiario = it }
                 if (cambiaBeneficiario) {
-                    FilledField("Beneficiario (vacío lo quita)", beneficiario, { beneficiario = it }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
+                    FilledField(stringResource(R.string.movimientos_beneficiario_vacio_lo_quita), beneficiario, { beneficiario = it }, Modifier.padding(horizontal = 16.dp).fillMaxWidth())
                 }
                 Column(Modifier.padding(16.dp)) {
                     val usadas = MovementTags.all(movimientos)
                     FilledField(
-                        "Añadir etiquetas, p. ej. viaje", anadir, { anadir = it },
-                        supporting = if (usadas.isEmpty()) null else "Ahora llevan: " + usadas.joinToString(" ") { "#$it" },
+                        stringResource(R.string.movimientos_anadir_etiquetas_p_ej_viaje), anadir, { anadir = it },
+                        supporting = if (usadas.isEmpty()) null else stringResource(R.string.movimientos_ahora_llevan, usadas.joinToString(" ") { "#$it" }),
                     )
                     Spacer(Modifier.height(16.dp))
-                    FilledField("Quitar etiquetas", quitar, { quitar = it })
+                    FilledField(stringResource(R.string.movimientos_quitar_etiquetas), quitar, { quitar = it })
                     Spacer(Modifier.height(16.dp))
-                    Text("Revisado", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.movimientos_revisado), style = StmType.labelLarge, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     ChipRow(Modifier.fillMaxWidth()) {
-                        listOf(null to "No cambiar", true to "Marcar revisados", false to "Marcar sin revisar").forEach { (v, t) ->
+                        listOf(null to stringResource(R.string.movimientos_no_cambiar), true to stringResource(R.string.movimientos_marcar_revisados), false to stringResource(R.string.acciones_movimiento_marcar_sin_revisar)).forEach { (v, t) ->
                             Chip(t, selected = revisado == v, onClick = { revisado = v })
                         }
                     }
                     Spacer(Modifier.height(16.dp))
-                    Text("Presupuesto e informes", style = StmType.labelLarge, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.movimientos_presupuesto_e_informes), style = StmType.labelLarge, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(8.dp))
                     ChipRow(Modifier.fillMaxWidth()) {
-                        listOf(null to "No cambiar", true to "Excluir", false to "Volver a contar").forEach { (v, t) ->
+                        listOf(null to stringResource(R.string.movimientos_no_cambiar), true to stringResource(R.string.movimientos_excluir), false to stringResource(R.string.movimientos_volver_a_contar)).forEach { (v, t) ->
                             Chip(t, selected = excluido == v, onClick = { excluido = v })
                         }
                     }
@@ -448,8 +452,8 @@ private fun BoxScope.HojaEdicionMasiva(finance: FinanceModel, movimientos: List<
                     }
                     Spacer(Modifier.height(16.dp))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                        Btn("Cancelar", cerrar, kind = BtnKind.Text)
-                        Btn("Guardar", {
+                        Btn(stringResource(R.string.comun_cancelar), cerrar, kind = BtnKind.Text)
+                        Btn(stringResource(R.string.comun_guardar), {
                             action.run {
                                 MovementTags.issue(edicion.addTags)?.let { throw AppError.InvalidInput(it) }
                                 finance.update(edicion.changes(movimientos))

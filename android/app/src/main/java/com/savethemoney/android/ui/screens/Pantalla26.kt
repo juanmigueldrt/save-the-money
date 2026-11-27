@@ -18,8 +18,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.BudgetGroup
 import com.savethemoney.android.data.BuyQuote
@@ -57,6 +60,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import java.math.BigDecimal
 
 /** 26 Activo: precio, evolución, posición, compra y operaciones. */
@@ -66,7 +70,7 @@ fun Pantalla26(nav: Nav, holdingId: String) {
     val finance = session.finance ?: return
     val inv = finance.investments
     val h = inv.holding(holdingId) ?: return run {
-        StmScreen(topBar = { TopBar("Activo", onNav = nav::back) }) { Aviso("Este activo ya no existe.") }
+        StmScreen(topBar = { TopBar(stringResource(R.string.activo_activo), onNav = nav::back) }) { Aviso(stringResource(R.string.activo_este_activo_ya_no_existe)) }
     }
     val c = Stm.colors
     val hoy = finance.today()
@@ -88,6 +92,7 @@ fun Pantalla26(nav: Nav, holdingId: String) {
     val quote = tasa?.let { t ->
         if (mode == 0) Money.entered(amount)?.let { BuyQuote.byAmount(it, h.price, t) } else parseDecimal(amount)?.let { BuyQuote.byQuantity(it, h.price, t) }
     }
+    val resources = LocalResources.current
 
     fun comprar(q: BuyQuote) = action.run {
         hecho = null
@@ -99,14 +104,14 @@ fun Pantalla26(nav: Nav, holdingId: String) {
         idCompra = java.util.UUID.randomUUID().toString()
         amount = ""
         repetir = false
-        hecho = "Compra apuntada: ${InvestmentText.quantity(q.quantity)} participaciones."
+        hecho = resources.getString(R.string.activo_compra_apuntada_participaciones, InvestmentText.quantity(q.quantity))
         // El plan va aparte: la compra ya está guardada entera, y si el plan falla se dice solo eso.
         if (mensual) {
             try {
                 // Con el id de la compra (uno por cada vez que se pulsa «Comprar»): el plan no se crea dos veces.
                 inv.save(InvestmentPlan(compra.id, h.householdId, h.id, cuenta, q.amount, startsOn = fecha.plusMonths(1).toString()))
             } catch (_: AppError) {
-                throw AppError.InvalidInput("La compra está apuntada, pero no se pudo crear la aportación mensual. Créala en Aportaciones automáticas.")
+                throw AppError.InvalidInput(resources.getString(R.string.activo_la_compra_esta_apuntada_pero_no))
             }
         }
     }
@@ -116,7 +121,7 @@ fun Pantalla26(nav: Nav, holdingId: String) {
             TopBar(h.trimmedName, onNav = nav::back) {
                 IconBtn(StmIcons.edit, {
                     nav.go(Route.FormActivo(h.id))
-                }, contentDescription = "Editar")
+                }, contentDescription = stringResource(R.string.comun_editar))
             }
         },
         snackbar = (action.error ?: inv.error)?.let { e -> { Snackbar(e) } },
@@ -124,18 +129,18 @@ fun Pantalla26(nav: Nav, holdingId: String) {
             eligeCuenta -> {
                 {
                     SelectorSheet(
-                        "Desde",
-                        listOf<Pair<String, () -> Unit>>(SIN_CUENTA to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
+                        stringResource(R.string.activo_desde),
+                        listOf<Pair<String, () -> Unit>>(sinCuenta() to { cuenta = null }) + finance.activeAccounts.map { a -> a.name to { cuenta = a.id } },
                     ) { eligeCuenta = false }
                 }
             }
             borrando != null -> {
                 {
                     val t = borrando!!
-                    BottomSheet("¿Borrar esta operación?", "No borra el movimiento de la cuenta, si lo había.", onDismiss = { borrando = null }) {
+                    BottomSheet(stringResource(R.string.activo_borrar_esta_operacion), stringResource(R.string.activo_no_borra_el_movimiento_de_la), onDismiss = { borrando = null }) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                            Btn("Cancelar", { borrando = null }, kind = BtnKind.Text)
-                            Btn("Borrar", {
+                            Btn(stringResource(R.string.comun_cancelar), { borrando = null }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.comun_borrar), {
                                 action.run {
                                     inv.delete(t)
                                     borrando = null
@@ -151,14 +156,14 @@ fun Pantalla26(nav: Nav, holdingId: String) {
         val historia = inv.priceHistory(h, ChartRange.Year)
         val previo = historia.dropLast(1).lastOrNull()?.second
         Spacer(Modifier.height(8.dp))
-        val apuntado = h.priceDay?.let { if (it == hoy) "Precio · apuntado hoy" else "Precio · apuntado el ${Fechas.corto(it)}" } ?: "Aún no has apuntado ningún precio"
+        val apuntado = h.priceDay?.let { if (it == hoy) stringResource(R.string.activo_precio_apuntado_hoy) else stringResource(R.string.activo_precio_apuntado_el, Fechas.corto(it)) } ?: stringResource(R.string.activo_aun_no_has_apuntado_ningun_precio)
         Text(apuntado, style = StmType.labelMedium, color = c.onSurfaceVariant)
         Spacer(Modifier.height(3.5.dp))
         Text(InvestmentText.price(h.price, h.currency), style = StmType.displaySmall, color = c.onSurface)
         if (previo != null && previo.signum() > 0) {
             val cambio = h.price.toDouble() / previo.toDouble() - 1
             Spacer(Modifier.height(4.5.dp))
-            Pill("${InvestmentText.percent(cambio)} desde el precio anterior", positive = cambio >= 0, icon = if (cambio >= 0) StmIcons.arrowUpward else null)
+            Pill(stringResource(R.string.activo_desde_el_precio_anterior, InvestmentText.percent(cambio)), positive = cambio >= 0, icon = if (cambio >= 0) StmIcons.arrowUpward else null)
         }
         Spacer(Modifier.height(20.dp))
         if (historia.size >= 2) {
@@ -166,68 +171,68 @@ fun Pantalla26(nav: Nav, holdingId: String) {
             Spacer(Modifier.height(16.dp))
         }
         StmCard {
-            Text("Tu posición", style = StmType.titleMedium, color = c.onSurface)
+            Text(stringResource(R.string.activo_tu_posicion), style = StmType.titleMedium, color = c.onSurface)
             Spacer(Modifier.height(8.dp))
             if (p.quantity.signum() > 0) {
-                DataRow("Participaciones", InvestmentText.quantity(p.quantity))
+                DataRow(stringResource(R.string.activo_participaciones), InvestmentText.quantity(p.quantity))
                 Spacer(Modifier.height(8.dp))
-                DataRow("Precio medio", InvestmentText.price(p.averagePrice, h.currency))
+                DataRow(stringResource(R.string.activo_precio_medio), InvestmentText.price(p.averagePrice, h.currency))
                 Spacer(Modifier.height(8.dp))
-                DataRow("Valor", euros(p.value))
+                DataRow(stringResource(R.string.activo_valor), euros(p.value))
                 Spacer(Modifier.height(8.dp))
                 val rentabilidad = euros(p.gain, signed = true) + (p.gainFraction?.let { " (${InvestmentText.percent(it)})" } ?: "")
-                DataRow("Rentabilidad", rentabilidad, if (p.gain < 0) c.error else c.success)
+                DataRow(stringResource(R.string.activo_rentabilidad), rentabilidad, if (p.gain < 0) c.error else c.success)
             } else {
-                Text("Todavía no tienes participaciones. Apunta tu primera compra.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.activo_todavia_no_tienes_participaciones), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             }
             if (p.realized != 0L) {
                 Spacer(Modifier.height(8.dp))
-                Aviso("Ganancia ya hecha con ventas: ${euros(p.realized, signed = true)}")
+                Aviso(stringResource(R.string.activo_ganancia_ya_hecha_con_ventas, euros(p.realized, signed = true)))
             }
             inv.yearRange(h)?.let { (min, max) ->
                 Spacer(Modifier.height(8.dp))
-                DataRow("Mín. 1 año", InvestmentText.price(min, h.currency))
+                DataRow(stringResource(R.string.activo_min_1_ano), InvestmentText.price(min, h.currency))
                 Spacer(Modifier.height(8.dp))
-                DataRow("Máx. 1 año", InvestmentText.price(max, h.currency))
+                DataRow(stringResource(R.string.activo_max_1_ano), InvestmentText.price(max, h.currency))
             }
             Spacer(Modifier.height(12.dp))
-            Btn("Apuntar precio", { nav.go(Route.ApuntarPrecio(h.id)) }, Modifier.fillMaxWidth(), kind = BtnKind.Outlined)
+            Btn(stringResource(R.string.apuntar_precio_apuntar_precio), { nav.go(Route.ApuntarPrecio(h.id)) }, Modifier.fillMaxWidth(), kind = BtnKind.Outlined)
         }
         Spacer(Modifier.height(16.dp))
         StmCard {
-            Text("Comprar", style = StmType.titleMedium, color = c.onSurface)
+            Text(stringResource(R.string.activo_comprar), style = StmType.titleMedium, color = c.onSurface)
             Spacer(Modifier.height(12.dp))
             if (h.price.signum() <= 0) {
-                Text("Apunta primero el precio de hoy para calcular la compra.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.activo_apunta_primero_el_precio_de_hoy), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             } else {
-                Segmented(listOf("Por importe", "Por participaciones"), mode, {
+                Segmented(listOf(stringResource(R.string.activo_por_importe), stringResource(R.string.activo_por_participaciones)), mode, {
                     mode = it
                     amount = ""
                 })
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SuffixField(if (mode == 0) "Importe" else "Participaciones", amount, { amount = it }, if (mode == 0) "€" else "uds.", Modifier.weight(1f))
-                    SuffixField("Comisión", fee, { fee = it }, "%", Modifier.weight(1f))
+                    SuffixField(if (mode == 0) stringResource(R.string.comun_importe) else stringResource(R.string.activo_participaciones), amount, { amount = it }, if (mode == 0) "€" else stringResource(R.string.activo_uds), Modifier.weight(1f))
+                    SuffixField(stringResource(R.string.activo_comision), fee, { fee = it }, "%", Modifier.weight(1f))
                 }
                 if (quote != null) {
                     Spacer(Modifier.height(12.dp))
-                    val cifra = if (mode == 0) "≈ ${InvestmentText.quantity(quote.quantity)} participaciones" else Money.format(quote.amount)
-                    Aviso("$cifra · comisión ${Money.format(quote.fee)}")
+                    val cifra = if (mode == 0) stringResource(R.string.activo_participaciones_2, InvestmentText.quantity(quote.quantity)) else Money.format(quote.amount)
+                    Aviso(stringResource(R.string.activo_fecha_y_comision, cifra, Money.format(quote.fee)))
                 } else if (mode == 1 && amount.isNotBlank() && parseDecimal(amount) == null) {
                     Spacer(Modifier.height(12.dp))
-                    Text("Escribe las participaciones con coma para los decimales, p. ej. 0,125.", style = StmType.bodySmall, color = c.error)
+                    Text(stringResource(R.string.activo_escribe_las_participaciones_con), style = StmType.bodySmall, color = c.error)
                 }
                 Spacer(Modifier.height(12.dp))
-                FilledField("Desde", finance.account(cuenta)?.name ?: SIN_CUENTA, trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
+                FilledField(stringResource(R.string.activo_desde), finance.account(cuenta)?.name ?: sinCuenta(), trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true })
                 Spacer(Modifier.height(12.dp))
-                FilledField("Fecha", Fechas.largo(fecha, hoy), trailing = StmIcons.arrowDropDown, onClick = { eligeFecha = true })
+                FilledField(stringResource(R.string.comun_fecha), Fechas.largo(fecha, hoy), trailing = StmIcons.arrowDropDown, onClick = { eligeFecha = true })
                 Spacer(Modifier.height(12.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Repetir cada mes", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Text(stringResource(R.string.activo_repetir_cada_mes), Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
                     StmSwitch(repetir) { repetir = it }
                 }
                 Spacer(Modifier.height(12.dp))
-                Btn(quote?.let { "Comprar ${Money.format(it.total)}" } ?: "Comprar", { quote?.let(::comprar) }, Modifier.fillMaxWidth())
+                Btn(quote?.let { stringResource(R.string.activo_comprar_2, Money.format(it.total)) } ?: stringResource(R.string.activo_comprar), { quote?.let(::comprar) }, Modifier.fillMaxWidth())
                 hecho?.let {
                     Spacer(Modifier.height(8.dp))
                     Text(it, style = StmType.bodyMedium, color = c.success)
@@ -239,19 +244,19 @@ fun Pantalla26(nav: Nav, holdingId: String) {
         if (lista.isNotEmpty()) {
             ListCard {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.weight(1f)) { ListHeader("Operaciones") }
-                    if (p.quantity.signum() > 0) Btn("Vender", { nav.go(Route.Vender(h.id)) }, kind = BtnKind.Text)
+                    Box(Modifier.weight(1f)) { ListHeader(stringResource(R.string.activo_operaciones)) }
+                    if (p.quantity.signum() > 0) Btn(stringResource(R.string.vender_vender), { nav.go(Route.Vender(h.id)) }, kind = BtnKind.Text)
                 }
                 lista.forEachIndexed { i, t ->
                     if (i > 0) Divider()
-                    val cantidad = "${t.side.title} · ${InvestmentText.quantity(t.quantity)} a ${InvestmentText.price(t.price, h.currency)}"
-                    val detalle = Fechas.largo(t.day, hoy) + if (t.feeMinor > 0) " · comisión ${Money.format(t.feeMinor)}" else ""
+                    val cantidad = stringResource(R.string.activo_a, stringResource(t.side.titulo), InvestmentText.quantity(t.quantity), InvestmentText.price(t.price, h.currency))
+                    val detalle = Fechas.largo(t.day, hoy).let { if (t.feeMinor > 0) stringResource(R.string.activo_fecha_y_comision, it, Money.format(t.feeMinor)) else it }
                     ListItem(cantidad, detalle, trailingText = Money.format(t.cashImpact), onClick = { borrando = t })
                 }
             }
             Spacer(Modifier.height(16.dp))
         }
-        Aviso("Esto no es asesoramiento de inversión. La compra se apunta en la app; tu bróker no recibe ninguna orden.")
+        Aviso(stringResource(R.string.activo_esto_no_es_asesoramiento_de))
     }
     if (eligeFecha) SelectorFecha(fecha, { if (!it.isAfter(hoy)) fecha = it }) { eligeFecha = false }
 }

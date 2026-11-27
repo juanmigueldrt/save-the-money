@@ -20,8 +20,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.Recurrence
 import com.savethemoney.android.data.RecurringKind
@@ -76,64 +79,64 @@ fun Pantalla20(nav: Nav) {
             // En el diseño la fila mide 60 (no 64) y el título va justo debajo, sin subtítulo.
             Box(Modifier.fillMaxWidth().height(60.dp)) {
                 TopBar(null, onNav = nav::back) {
-                    IconBtn(StmIcons.calendarMonth, { nav.go(Route.Calendario) }, contentDescription = "Calendario de pagos")
+                    IconBtn(StmIcons.calendarMonth, { nav.go(Route.Calendario) }, contentDescription = stringResource(R.string.calendario_calendario_de_pagos))
                     IconBtn(if (buscando) StmIcons.close else StmIcons.search, {
                         buscando = !buscando
                         busqueda = ""
-                    }, contentDescription = if (buscando) "Cerrar búsqueda" else "Buscar")
+                    }, contentDescription = if (buscando) stringResource(R.string.pagos_fijos_cerrar_busqueda) else stringResource(R.string.comun_buscar))
                 }
             }
-            Text("Pagos fijos", Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
+            Text(stringResource(R.string.pagos_fijos_pagos_fijos), Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp), style = StmType.headlineMedium, color = c.onSurface)
             if (buscando) {
-                CampoBusqueda(busqueda, { busqueda = it }, "Nombre del pago", autoFocus = true)
+                CampoBusqueda(busqueda, { busqueda = it }, stringResource(R.string.pagos_fijos_nombre_del_pago), autoFocus = true)
                 Spacer(Modifier.height(16.dp))
             }
         },
         bottomBar = { NavBar(Tab.Mas, nav::tab) },
-        fab = { Fab("Nuevo pago") { editar(null) } },
+        fab = { Fab(stringResource(R.string.pagos_fijos_nuevo_pago)) { editar(null) } },
         snackbar = planning.error?.let { e -> { Snackbar(e) } },
     ) {
         StmCard {
             Row(Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f).padding(top = 4.dp)) {
-                    Text("Este mes", style = StmType.labelMedium, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.pagos_fijos_este_mes), style = StmType.labelMedium, color = c.onSurfaceVariant)
                     Spacer(Modifier.height(4.dp))
                     Text(Money.format(total), style = StmType.titleLarge, color = c.onSurface)
                     if (anual > 0) {
-                        Text("${Money.format(anual)} en los próximos 12 meses", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                        Text(stringResource(R.string.pagos_fijos_en_los_proximos_12_meses, Money.format(anual)), style = StmType.bodySmall, color = c.onSurfaceVariant)
                     }
                 }
-                Tag(if (gastos.size == 1) "1 pago" else "${gastos.size} pagos")
+                Tag(pluralStringResource(R.plurals.pagos_fijos_pagos, gastos.size, gastos.size))
             }
         }
         Spacer(Modifier.height(16.dp))
         if (texto.isNotEmpty() && porFecha.isEmpty() && archivados.isEmpty()) {
-            Vacio("Ningún pago fijo se llama así.")
+            Vacio(stringResource(R.string.pagos_fijos_ningun_pago_fijo_se_llama_asi))
         } else if (porFecha.isEmpty() && archivados.isEmpty()) {
             StmCard {
                 Text(
-                    "Apunta suscripciones, alquiler, luz o tu nómina para ver cuánto suman y recibir un aviso antes de cada cobro.",
+                    stringResource(R.string.pagos_fijos_apunta_suscripciones_alquiler_luz),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
             }
         } else {
             ListCard {
                 if (gastos.isNotEmpty()) {
-                    ListHeader("Próximos")
+                    ListHeader(stringResource(R.string.pagos_fijos_proximos))
                     gastos.forEachIndexed { i, s ->
                         if (i > 0) Divider()
                         FilaPago(s, hoy) { editar(s) }
                     }
                 }
                 if (ingresos.isNotEmpty()) {
-                    ListHeader("Ingresos")
+                    ListHeader(stringResource(R.string.pagos_fijos_ingresos))
                     ingresos.forEachIndexed { i, s ->
                         if (i > 0) Divider()
                         FilaPago(s, hoy) { editar(s) }
                     }
                 }
                 if (archivados.isNotEmpty()) {
-                    ListHeader("Archivados")
+                    ListHeader(stringResource(R.string.pagos_fijos_archivados))
                     archivados.forEachIndexed { i, s ->
                         if (i > 0) Divider()
                         FilaPago(s, hoy) { editar(s) }
@@ -144,12 +147,12 @@ fun Pantalla20(nav: Nav) {
     }
 }
 
-private fun detallePago(s: RecurringSeries, hoy: LocalDate): String {
-    if (s.isArchived) return "Archivado"
-    val due = s.nextDue(hoy) ?: return "Terminado"
+@Composable private fun detallePago(s: RecurringSeries, hoy: LocalDate): String {
+    if (s.isArchived) return stringResource(R.string.pagos_fijos_archivado)
+    val due = s.nextDue(hoy) ?: return stringResource(R.string.pagos_fijos_terminado)
     val partes = mutableListOf(Fechas.corto(due))
     if (s.isIntro(due)) {
-        partes += "oferta " + periodo(Recurrence(s.every * (s.introCharges ?: 1), s.unit))
+        partes += stringResource(R.string.pagos_fijos_oferta, periodo(Recurrence(s.every * (s.introCharges ?: 1), s.unit)))
     } else if (s.kind != RecurringKind.Income) {
         partes += s.kind.title
     }
@@ -188,7 +191,7 @@ private fun FilaPago(s: RecurringSeries, hoy: LocalDate, onClick: () -> Unit) {
             {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(texto, style = StmType.labelLarge, color = c.onSurface)
-                    Text("luego ${Money.format(s.amountMinor)}", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                    Text(stringResource(R.string.pagos_fijos_luego, Money.format(s.amountMinor)), style = StmType.bodySmall, color = c.onSurfaceVariant)
                 }
             }
         } else {

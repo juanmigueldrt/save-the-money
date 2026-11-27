@@ -143,10 +143,10 @@ data class ChangePasswordForm(
 fun validHouseholdName(raw: String): String? = raw.trim().takeIf { it.length in 1..80 }
 
 @Serializable
-enum class AppTheme(val title: String) {
-    @SerialName("system") System("Automático"),
-    @SerialName("light") Light("Claro"),
-    @SerialName("dark") Dark("Oscuro"),
+enum class AppTheme {
+    @SerialName("system") System,
+    @SerialName("light") Light,
+    @SerialName("dark") Dark,
 }
 
 @Serializable

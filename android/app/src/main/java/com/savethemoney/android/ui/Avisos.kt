@@ -99,7 +99,7 @@ class LocalNotifier(private val context: Context) : Notifier {
     /** Devuelve false si Android no deja mostrarla. */
     fun show(id: String, title: String, body: String): Boolean {
         val manager = context.getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(NotificationChannel(CHANNEL, "Avisos", NotificationManager.IMPORTANCE_DEFAULT))
+        manager.createNotificationChannel(NotificationChannel(CHANNEL, context.getString(R.string.avisos_canal), NotificationManager.IMPORTANCE_DEFAULT))
         if (!canShow) return false
         val open = PendingIntent.getActivity(
             context, 0, Intent(context, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

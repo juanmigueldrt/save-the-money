@@ -223,7 +223,7 @@ class WeeklySummary(
 
 /** Recordatorio para apuntar gastos y resumen semanal: se eligen en Más opciones y se guardan sólo en este dispositivo. */
 data class HabitSettings(val logReminder: LogReminder = LogReminder.Off, val logHour: Int = 21, val weeklySummary: Boolean = true) {
-    enum class LogReminder(val title: String) { Off("No"), Daily("Cada día"), Weekly("Los domingos") }
+    enum class LogReminder { Off, Daily, Weekly }
 
     fun plan(today: LocalDate): List<PlannedReminder> =
         (if (logReminder == LogReminder.Off) emptyList() else HabitReminderPlanner.logReminders(today, logHour, logReminder == LogReminder.Weekly)) +

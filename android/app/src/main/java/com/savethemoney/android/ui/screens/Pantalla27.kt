@@ -17,8 +17,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.InvestmentKind
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.RecurrenceUnit
@@ -61,8 +64,8 @@ fun Pantalla27(nav: Nav) {
     }
     StmScreen(
         topBar = {
-            TopBar("Inversiones recurrentes", onNav = nav::back) {
-                if (inv.activeHoldings.isNotEmpty()) IconBtn(StmIcons.add, nuevo, contentDescription = "Añadir")
+            TopBar(stringResource(R.string.inversiones_recurrentes_inversiones_recurrentes), onNav = nav::back) {
+                if (inv.activeHoldings.isNotEmpty()) IconBtn(StmIcons.add, nuevo, contentDescription = stringResource(R.string.comun_anadir))
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -71,7 +74,7 @@ fun Pantalla27(nav: Nav) {
             Text(Fechas.mesTitulo(hoy), style = StmType.titleMedium, color = c.onSurface)
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("L", "M", "X", "J", "V", "S", "D").forEach {
+                listOf(stringResource(R.string.comun_inicial_lunes), stringResource(R.string.comun_inicial_martes), stringResource(R.string.comun_inicial_miercoles), stringResource(R.string.comun_inicial_jueves), stringResource(R.string.comun_inicial_viernes), stringResource(R.string.comun_inicial_sabado), stringResource(R.string.comun_inicial_domingo)).forEach {
                     Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
                         Text(it, style = StmType.labelMedium, color = c.onSurfaceVariant)
                     }
@@ -99,17 +102,19 @@ fun Pantalla27(nav: Nav) {
         }
         Spacer(Modifier.height(16.dp))
         val (activos, pausados) = inv.planCounts
-        val planes = (if (activos == 1) "1 plan activo" else "$activos planes activos") + if (pausados > 0) " y $pausados en pausa" else ""
-        Aviso("${Money.format(inv.monthlyPlanned)} al mes en $planes")
+        Aviso(
+            if (pausados > 0) pluralStringResource(R.plurals.inversiones_recurrentes_al_mes_en_planes_y_pausa, activos, Money.format(inv.monthlyPlanned), activos, pausados)
+            else pluralStringResource(R.plurals.inversiones_recurrentes_al_mes_en_planes, activos, Money.format(inv.monthlyPlanned), activos),
+        )
         Spacer(Modifier.height(16.dp))
         if (inv.livePlans.isNotEmpty()) {
             ListCard {
                 inv.livePlans.forEachIndexed { i, plan ->
                     if (i > 0) Divider()
                     val h = inv.holding(plan.holdingId)
-                    val cuando = if (plan.unit == RecurrenceUnit.Month && plan.every == 1) "el día ${plan.startDay.dayOfMonth} de cada mes" else plan.recurrence.title.lowercase()
+                    val cuando = if (plan.unit == RecurrenceUnit.Month && plan.every == 1) stringResource(R.string.inversiones_recurrentes_el_dia_de_cada_mes, plan.startDay.dayOfMonth) else plan.recurrence.title.lowercase()
                     ListItem(
-                        h?.trimmedName ?: "Activo", "${euros(plan.amountMinor)} $cuando" + if (plan.isPaused) " · en pausa" else "",
+                        h?.trimmedName ?: stringResource(R.string.inversiones_recurrentes_activo), "${euros(plan.amountMinor)} $cuando".let { if (plan.isPaused) stringResource(R.string.inversiones_recurrentes_en_pausa, it) else it },
                         leading = {
                             if (plan.isPaused) LeadIcon(iconoActivo(h?.kind ?: InvestmentKind.Fund), c.surfaceContainerHighest, c.onSurfaceVariant)
                             else LeadIcon(iconoActivo(h?.kind ?: InvestmentKind.Fund), c.tertiaryContainer, c.onTertiaryContainer)
@@ -123,15 +128,15 @@ fun Pantalla27(nav: Nav) {
             }
             Spacer(Modifier.height(16.dp))
         } else if (inv.activeHoldings.isEmpty()) {
-            Aviso("Añade antes un activo en la cartera.")
+            Aviso(stringResource(R.string.inversiones_recurrentes_anade_antes_un_activo_en_la))
             Spacer(Modifier.height(16.dp))
         } else {
-            Btn("Nuevo plan", nuevo, Modifier.fillMaxWidth())
+            Btn(stringResource(R.string.form_plan_nuevo_plan), nuevo, Modifier.fillMaxWidth())
             Spacer(Modifier.height(16.dp))
         }
         if (cargos.isNotEmpty()) {
             ListCard {
-                ListHeader("Este mes")
+                ListHeader(stringResource(R.string.inversiones_recurrentes_este_mes))
                 cargos.forEachIndexed { i, cargo ->
                     if (i > 0) Divider()
                     ListItem(Fechas.dia(cargo.due, hoy), inv.holding(cargo.plan.holdingId)?.trimmedName, trailingText = euros(cargo.plan.amountMinor))
@@ -139,6 +144,6 @@ fun Pantalla27(nav: Nav) {
             }
             Spacer(Modifier.height(16.dp))
         }
-        Aviso("Un plan no compra nada solo: te avisa el día que toca y tú confirmas la compra en la app.")
+        Aviso(stringResource(R.string.inversiones_recurrentes_un_plan_no_compra_nada_solo))
     }
 }

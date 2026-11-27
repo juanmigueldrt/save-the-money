@@ -9,7 +9,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Route
@@ -40,31 +42,31 @@ fun Pantalla33(nav: Nav) {
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = {
             StmDialog(
-                "¿Borrar lo que creaste?",
-                "Borra lo que creaste tú: cuentas, tarjetas, movimientos, presupuestos, pagos fijos, metas e inversiones. Lo que crearon otros miembros se queda, salvo lo que cuelga de algo tuyo. Esta acción no se puede deshacer.",
+                stringResource(R.string.borrar_datos_borrar_lo_que_creaste),
+                stringResource(R.string.borrar_datos_borra_lo_que_creaste_tu_cuentas),
                 icon = StmIcons.deleteForever,
                 onDismiss = nav::back,
                 actions = {
-                    Btn("Cancelar", nav::back, kind = BtnKind.Text)
+                    Btn(stringResource(R.string.comun_cancelar), nav::back, kind = BtnKind.Text)
                     Btn(
-                        "Borrar",
+                        stringResource(R.string.comun_borrar),
                         {
                             action.run {
                                 finance?.resetHousehold()
                                 nav.reset(Route.Inicio)
                             }
                         },
-                        kind = BtnKind.Error, enabled = confirm.trim().lowercase() == "borrar" && !action.busy,
+                        kind = BtnKind.Error, enabled = confirm.trim().lowercase() == stringResource(R.string.borrar_datos_palabra) && !action.busy,
                     )
                 },
             ) {
                 Spacer(Modifier.height(16.dp))
-                OutlinedField("Escribe «borrar» para confirmar", confirm, { confirm = it }, labelBackground = c.surfaceContainerHigh, autoFocus = true)
+                OutlinedField(stringResource(R.string.borrar_datos_escribe_para_confirmar, stringResource(R.string.borrar_datos_palabra)), confirm, { confirm = it }, labelBackground = c.surfaceContainerHigh, autoFocus = true)
             }
         },
     ) {
         ListCard {
-            MenuRow(StmIcons.restartAlt, "Borrar datos y empezar de cero", chevron = false, onClick = null)
+            MenuRow(StmIcons.restartAlt, stringResource(R.string.borrar_datos_borrar_datos_y_empezar_de_cero), chevron = false, onClick = null)
         }
     }
 }

@@ -15,8 +15,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.ExtraBudget
@@ -66,9 +69,10 @@ fun Pantalla45(nav: Nav, extraId: String?) {
     var favorito by rememberSaveable { mutableStateOf(extra.isFavorite) }
     var eligeFecha by remember { mutableStateOf<String?>(null) }
     var confirmar by remember { mutableStateOf(false) }
+    val resources = LocalResources.current
     val guardar = {
         action.run {
-            val amount = Money.entered(limite)?.takeIf { it > 0 } ?: throw AppError.InvalidInput("Escribe un límite, por ejemplo 800,00.")
+            val amount = Money.entered(limite)?.takeIf { it > 0 } ?: throw AppError.InvalidInput(resources.getString(R.string.form_extra_escribe_un_limite_por_ejemplo_800))
             val updated = extra.copy(
                 name = nombre, limit = amount, startsOn = desde, endsOn = if (conFin) hasta else null,
                 categoryIds = categorias.sorted(), accountIds = cuentas.sorted(), isFavorite = favorito,
@@ -80,19 +84,19 @@ fun Pantalla45(nav: Nav, extraId: String?) {
     }
     StmScreen(
         topBar = {
-            TopBar(if (editando == null) "Nuevo presupuesto extra" else editando.name, navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", guardar, kind = BtnKind.Text, enabled = !action.busy)
+            TopBar(if (editando == null) stringResource(R.string.form_extra_nuevo_presupuesto_extra) else editando.name, navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), guardar, kind = BtnKind.Text, enabled = !action.busy)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = if (confirmar && editando != null) {
             {
                 StmDialog(
-                    "¿Borrar «${editando.name}»?", "Los movimientos no se borran.", icon = StmIcons.deleteForever,
+                    stringResource(R.string.form_extra_borrar, editando.name), stringResource(R.string.form_extra_los_movimientos_no_se_borran), icon = StmIcons.deleteForever,
                     onDismiss = { confirmar = false },
                     actions = {
-                        Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text)
-                        Btn("Borrar", {
+                        Btn(stringResource(R.string.comun_cancelar), { confirmar = false }, kind = BtnKind.Text)
+                        Btn(stringResource(R.string.comun_borrar), {
                             action.run {
                                 budgets.delete(editando)
                                 nav.back()
@@ -104,17 +108,17 @@ fun Pantalla45(nav: Nav, extraId: String?) {
         } else null,
     ) {
         Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            FilledField("Nombre, p. ej. Vacaciones", nombre, { nombre = it })
-            FilledField("Límite, p. ej. 800,00", limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.form_extra_nombre_p_ej_vacaciones), nombre, { nombre = it })
+            FilledField(stringResource(R.string.form_extra_limite_p_ej_800_00), limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
             ListCard {
-                ListItem("Favorito (sale en Resumen)", trailing = { StmSwitch(favorito) { favorito = it } })
+                ListItem(stringResource(R.string.form_extra_favorito_sale_en_resumen), trailing = { StmSwitch(favorito) { favorito = it } })
                 Divider(inset = 16.dp)
-                ListItem("Con fecha de fin", trailing = { StmSwitch(conFin) { conFin = it } })
+                ListItem(stringResource(R.string.form_extra_con_fecha_de_fin), trailing = { StmSwitch(conFin) { conFin = it } })
             }
-            FilledField("Desde", Fechas.largo(desde, hoy), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "desde" })
-            if (conFin) FilledField("Hasta", Fechas.largo(hasta, hoy), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "hasta" })
+            FilledField(stringResource(R.string.form_extra_desde), Fechas.largo(desde, hoy), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "desde" })
+            if (conFin) FilledField(stringResource(R.string.form_extra_hasta), Fechas.largo(hasta, hoy), trailing = StmIcons.calendarToday, onClick = { eligeFecha = "hasta" })
             ListCard {
-                ListHeader("Categorías")
+                ListHeader(stringResource(R.string.categorias_categorias))
                 finance.categories(CategoryKind.Expense).forEachIndexed { i, category ->
                     if (i > 0) Divider(inset = 16.dp)
                     ListItem(category.name, trailing = {
@@ -123,11 +127,11 @@ fun Pantalla45(nav: Nav, extraId: String?) {
                 }
             }
             Text(
-                if (categorias.isEmpty()) "Si no eliges ninguna, cuenta todo el gasto." else "${categorias.size} elegidas.",
+                if (categorias.isEmpty()) stringResource(R.string.form_extra_si_no_eliges_ninguna_cuenta_todo) else stringResource(R.string.form_extra_elegidas, categorias.size),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
             ListCard {
-                ListHeader("Cuentas")
+                ListHeader(stringResource(R.string.form_extra_cuentas))
                 finance.activeAccounts.forEachIndexed { i, account ->
                     if (i > 0) Divider(inset = 16.dp)
                     ListItem(account.name, trailing = {
@@ -136,10 +140,10 @@ fun Pantalla45(nav: Nav, extraId: String?) {
                 }
             }
             Text(
-                if (cuentas.isEmpty()) "Si no eliges ninguna, cuentan todas." else "${cuentas.size} elegidas.",
+                if (cuentas.isEmpty()) stringResource(R.string.form_extra_si_no_eliges_ninguna_cuentan_todas) else stringResource(R.string.form_extra_elegidas, cuentas.size),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
-            if (editando != null) Btn("Borrar presupuesto extra", { confirmar = true }, kind = BtnKind.Text, color = c.error)
+            if (editando != null) Btn(stringResource(R.string.form_extra_borrar_presupuesto_extra), { confirmar = true }, kind = BtnKind.Text, color = c.error)
             Spacer(Modifier.height(8.dp))
         }
     }

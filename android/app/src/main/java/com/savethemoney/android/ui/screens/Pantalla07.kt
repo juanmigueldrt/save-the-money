@@ -23,9 +23,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CardInstallment
@@ -108,17 +112,18 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
     val enTarjeta = form.movement == null && tipo == 0 && finance.account(cuenta)?.kind == AccountKind.CreditCard
     val tipoCategoria = if (tipo == 1) CategoryKind.Income else CategoryKind.Expense
     val elegida = finance.category(categoria)
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val valor = Money.entered(importe)?.takeIf { it != 0L }?.let(::abs) ?: falla("Escribe un importe, por ejemplo 12,50.")
-        val origen = cuenta ?: falla("Elige una cuenta.")
+        val valor = Money.entered(importe)?.takeIf { it != 0L }?.let(::abs) ?: falla(resources.getString(R.string.form_movimiento_escribe_un_importe_por_ejemplo_12))
+        val origen = cuenta ?: falla(resources.getString(R.string.form_movimiento_elige_una_cuenta))
         val nota = notas.trim().ifEmpty { null }
         val quien = Payee.clean(beneficiario)
         val marcas = MovementTags.normalize(etiquetas)
         if (tipo == 2) {
-            val hacia = destino ?: falla("Elige la cuenta de destino.")
-            if (hacia == origen) falla("Elige dos cuentas distintas.")
+            val hacia = destino ?: falla(resources.getString(R.string.form_movimiento_elige_la_cuenta_de_destino))
+            if (hacia == origen) falla(resources.getString(R.string.form_movimiento_elige_dos_cuentas_distintas))
             val cat = finance.categories(CategoryKind.Transfer).firstOrNull()?.id
             val texto = concepto.ifBlank { "Transferencia" }
             finance.transfer(
@@ -159,21 +164,21 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
 
     StmScreen(
         topBar = {
-            TopBar(if (form.movement != null) "Editar movimiento" else "Nuevo movimiento", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(if (form.movement != null) stringResource(R.string.form_movimiento_editar_movimiento) else stringResource(R.string.form_movimiento_nuevo_movimiento), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = if (parecidos.isNotEmpty()) {
             {
                 StmDialog(
-                    if (parecidos.size == 1) "Hay 1 movimiento con el mismo concepto" else "Hay ${parecidos.size} movimientos con el mismo concepto",
-                    "¿Quieres cambiar también su categoría a «${elegida?.name ?: "Sin categoría"}»?",
+                    pluralStringResource(R.plurals.form_movimiento_hay_movimientos_con_el_mismo, parecidos.size, parecidos.size),
+                    stringResource(R.string.form_movimiento_cambiar_tambien_su_categoria, elegida?.name ?: stringResource(R.string.comun_sin_categoria)),
                     icon = StmIcons.category,
                     onDismiss = nav::back,
                     actions = {
-                        Btn("Sólo este", nav::back, kind = BtnKind.Text)
-                        Btn("Ponerles la misma categoría", {
+                        Btn(stringResource(R.string.form_movimiento_solo_este), nav::back, kind = BtnKind.Text)
+                        Btn(stringResource(R.string.form_movimiento_ponerles_la_misma_categoria), {
                             action.run {
                                 finance.update(parecidos.map { it.copy(categoryId = categoria) })
                                 nav.back()
@@ -187,21 +192,21 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
                 val cerrar = { selector = null }
                 when (campo) {
                     "categoria" -> SelectorSheet(
-                        "Categoría",
-                        listOf<Pair<String, () -> Unit>>("Sin categoría" to { categoria = null }) +
+                        stringResource(R.string.comun_categoria),
+                        listOf<Pair<String, () -> Unit>>(stringResource(R.string.comun_sin_categoria) to { categoria = null }) +
                             (finance.categories(tipoCategoria) + finance.categories(CategoryKind.Transfer)).map { cat -> cat.name to { categoria = cat.id } },
                         cerrar,
                     )
-                    "cuenta" -> SelectorSheet("Cuenta", cuentas.map { (n, id) -> n to { cuenta = id } }, cerrar)
-                    "cadaCompra" -> SelectorSheet("Frecuencia", Recurrence.Common.map { rec -> rec.title to { cadaCompra = rec } }, cerrar)
-                    else -> SelectorSheet("Cuenta de destino", cuentas.map { (n, id) -> n to { destino = id } }, cerrar)
+                    "cuenta" -> SelectorSheet(stringResource(R.string.comun_cuenta), cuentas.map { (n, id) -> n to { cuenta = id } }, cerrar)
+                    "cadaCompra" -> SelectorSheet(stringResource(R.string.form_movimiento_frecuencia), Recurrence.Common.map { rec -> rec.title to { cadaCompra = rec } }, cerrar)
+                    else -> SelectorSheet(stringResource(R.string.form_movimiento_cuenta_de_destino), cuentas.map { (n, id) -> n to { destino = id } }, cerrar)
                 }
             }
         },
     ) {
         Spacer(Modifier.height(8.dp))
         Segmented(
-            if (form.movement != null) listOf("Gasto", "Ingreso") else listOf("Gasto", "Ingreso", "Transferencia"),
+            if (form.movement != null) listOf(stringResource(R.string.form_movimiento_gasto), stringResource(R.string.form_movimiento_ingreso)) else listOf(stringResource(R.string.form_movimiento_gasto), stringResource(R.string.form_movimiento_ingreso), stringResource(R.string.form_movimiento_transferencia)),
             tipo,
             { nuevo ->
                 // En una transferencia la salida es siempre un gasto y la entrada un ingreso.
@@ -214,7 +219,7 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
         )
         if (base?.transferId != null) {
             Spacer(Modifier.height(8.dp))
-            Text(com.savethemoney.android.data.TransferDraft.EDIT_NOTE, style = StmType.bodySmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.form_movimiento_nota_transferencia), style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         Spacer(Modifier.height(16.dp))
         var enfocado by remember { mutableStateOf(false) }
@@ -222,7 +227,7 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
             Modifier.fillMaxWidth().heightIn(min = 116.dp).padding(top = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Importe", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.comun_importe), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             Box(contentAlignment = Alignment.Center) {
                 if (importe.isEmpty()) Text("0,00 €", style = StmType.displayLarge, color = c.onSurfaceVariant)
@@ -236,7 +241,7 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
             Calculadora(importe, { importe = it }, enfocado)
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Concepto", concepto, { texto ->
+        FilledField(stringResource(R.string.comun_concepto), concepto, { texto ->
             concepto = MovementText.display(texto)
             // Comercio conocido o concepto ya usado: pone la categoría sola si no la elegiste a mano.
             if (tipo == 0 && (categoria == null || categoria == autoCategoria)) {
@@ -247,57 +252,56 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
         })
         Spacer(Modifier.height(16.dp))
         if (tipo == 2) {
-            FilledField("Cuenta de destino", finance.account(destino)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "destino" })
+            FilledField(stringResource(R.string.form_movimiento_cuenta_de_destino), finance.account(destino)?.name ?: stringResource(R.string.comun_elige_una_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "destino" })
         } else {
-            FilledField("Categoría", elegida?.name ?: "Sin categoría", leading = iconoCategoria(elegida), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
+            FilledField(stringResource(R.string.comun_categoria), elegida?.name ?: stringResource(R.string.comun_sin_categoria), leading = iconoCategoria(elegida), trailing = StmIcons.arrowDropDown, onClick = { selector = "categoria" })
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Cuenta", finance.account(cuenta)?.name ?: "Elige una cuenta", trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
+        FilledField(stringResource(R.string.comun_cuenta), finance.account(cuenta)?.name ?: stringResource(R.string.comun_elige_una_cuenta), trailing = StmIcons.arrowDropDown, onClick = { selector = "cuenta" })
         if (enTarjeta) {
             Spacer(Modifier.height(16.dp))
-            Text("Tipo de compra", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.form_movimiento_tipo_de_compra), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
-            Segmented(listOf("Normal", "A plazos", "Recurrente"), compra, { compra = it })
+            Segmented(listOf(stringResource(R.string.form_movimiento_normal), stringResource(R.string.form_movimiento_a_plazos), stringResource(R.string.form_movimiento_recurrente)), compra, { compra = it })
             if (compra == 1) {
                 Spacer(Modifier.height(16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Plazos", Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
+                    Text(stringResource(R.string.form_movimiento_plazos), Modifier.weight(1f), style = StmType.bodyLarge, color = c.onSurface)
                     Stepper(
-                        "$plazos meses",
+                        stringResource(R.string.form_movimiento_meses, plazos),
                         { plazos = (plazos - 1).coerceAtLeast(CardPurchase.MONTHS.first) },
                         { plazos = (plazos + 1).coerceAtMost(CardPurchase.MONTHS.last) },
                     )
                 }
                 Spacer(Modifier.height(8.dp))
                 ChipRow(Modifier.fillMaxWidth()) {
-                    CardInstallment.commonMonths.forEach { m -> Chip("$m meses", selected = m == plazos, onClick = { plazos = m }) }
+                    CardInstallment.commonMonths.forEach { m -> Chip(stringResource(R.string.form_movimiento_meses, m), selected = m == plazos, onClick = { plazos = m }) }
                 }
                 val principal = Money.entered(importe)?.let(::abs) ?: 0L
                 val tin = finance.cards.terms[cuenta]?.installmentRate ?: 14.0
                 val cuota = CardPurchase.quote(principal, plazos, tin)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "${Money.format(cuota.monthly)} al mes · total ${Money.format(cuota.total)} · intereses ${Money.format(cuota.interest)} " +
-                        "(TIN ${tin.toString().removeSuffix(".0").replace('.', ',')} %)",
+                    stringResource(R.string.form_movimiento_al_mes_total_intereses_tin, Money.format(cuota.monthly), Money.format(cuota.total), Money.format(cuota.interest), tin.toString().removeSuffix(".0").replace('.', ',')),
                     style = StmType.bodyMedium, color = c.onSurface,
                 )
                 if (principal in 1 until CardPurchase.USUAL_MINIMUM) {
-                    Text("Muchos contratos sólo aplazan compras de 50 € o más", style = StmType.bodySmall, color = c.error)
+                    Text(stringResource(R.string.form_movimiento_muchos_contratos_solo_aplazan), style = StmType.bodySmall, color = c.error)
                 }
             } else if (compra == 2) {
                 Spacer(Modifier.height(16.dp))
-                FilledField("Cada", cadaCompra.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cadaCompra" })
+                FilledField(stringResource(R.string.comun_cada), cadaCompra.title, trailing = StmIcons.arrowDropDown, onClick = { selector = "cadaCompra" })
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "Se crea un pago fijo con este concepto, importe y categoría. Los próximos cargos saldrán como pendientes de confirmar.",
+                    stringResource(R.string.form_movimiento_se_crea_un_pago_fijo_con),
                     style = StmType.bodySmall, color = c.onSurfaceVariant,
                 )
             }
         }
         Spacer(Modifier.height(16.dp))
-        FilledField("Fecha", Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
+        FilledField(stringResource(R.string.comun_fecha), Fechas.largo(fecha, finance.today()), trailing = StmIcons.calendarToday, onClick = { eligeFecha = true })
         Spacer(Modifier.height(16.dp))
-        FilledField("Beneficiario (opcional)", beneficiario, { beneficiario = it })
+        FilledField(stringResource(R.string.form_movimiento_beneficiario_opcional), beneficiario, { beneficiario = it })
         val propuestos = if (beneficiario.isBlank()) emptyList() else finance.knownPayees
             .filter { it.contains(beneficiario.trim(), ignoreCase = true) && !it.equals(beneficiario.trim(), ignoreCase = true) }.take(4)
         if (propuestos.isNotEmpty()) {
@@ -306,8 +310,8 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
         }
         Spacer(Modifier.height(16.dp))
         FilledField(
-            "Etiquetas, p. ej. viaje, regalos", etiquetas, { etiquetas = it },
-            supporting = "Las etiquetas sirven para juntar gastos de distintas categorías, como un viaje. Sepáralas con comas.",
+            stringResource(R.string.form_movimiento_etiquetas_p_ej_viaje_regalos), etiquetas, { etiquetas = it },
+            supporting = stringResource(R.string.form_movimiento_las_etiquetas_sirven_para_juntar),
         )
         val puestas = MovementTags.normalize(etiquetas)
         val sugeridas = finance.knownTags.filter { it !in puestas }.take(6)
@@ -321,17 +325,17 @@ fun Pantalla07(nav: Nav, route: Route.FormMovimiento) {
         ChipsMovimiento(conNotas) { conNotas = !conNotas }
         if (conNotas) {
             Spacer(Modifier.height(16.dp))
-            FilledField("Notas", notas, { notas = it })
+            FilledField(stringResource(R.string.form_movimiento_notas), notas, { notas = it })
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
             if (form.movement != null) {
-                FilaInterruptor("Revisado", null, revisado) { revisado = it }
+                FilaInterruptor(stringResource(R.string.form_movimiento_revisado), null, revisado) { revisado = it }
                 Divider(inset = 16.dp)
             }
             FilaInterruptor(
-                "Excluir del presupuesto e informes",
-                "Un movimiento excluido sigue contando en el saldo de la cuenta, pero no en el presupuesto, los informes ni el flujo de caja.",
+                stringResource(R.string.form_movimiento_excluir_del_presupuesto_e_informes),
+                stringResource(R.string.form_movimiento_un_movimiento_excluido_sigue),
                 excluido,
             ) { excluido = it }
         }

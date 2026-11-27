@@ -21,10 +21,10 @@ import kotlin.math.min
 internal fun Double.exact(): BigDecimal = BigDecimal.valueOf(this)
 
 @Serializable
-enum class CardPaymentMode(val title: String, val detail: String) {
-    @SerialName("full") Full("Todo a fin de mes", "Pagas el extracto entero cada mes, sin intereses."),
-    @SerialName("fixed") Fixed("Cuota fija", "Pagas la misma cantidad cada mes; lo que queda genera intereses."),
-    @SerialName("minimum") Minimum("Pago mínimo", "Pagas lo mínimo que pide el banco; lo que queda genera intereses.");
+enum class CardPaymentMode {
+    @SerialName("full") Full,
+    @SerialName("fixed") Fixed,
+    @SerialName("minimum") Minimum;
 
     /** Las formas que dejan deuda pendiente con intereses (revolving). */
     val isRevolving: Boolean get() = this != Full

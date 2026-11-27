@@ -16,7 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.InviteCode
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
@@ -47,7 +49,7 @@ fun Pantalla03(nav: Nav) {
     StmScreen(
         topBar = {
             TopBar(null, navIcon = null)
-            LargeTitle("Tu hogar", "Un hogar reúne las cuentas que compartís")
+            LargeTitle(stringResource(R.string.tu_hogar_tu_hogar), stringResource(R.string.tu_hogar_un_hogar_reune_las_cuentas_que))
         },
         overlay = if (borraCuenta) {
             { HojaBorrarCuenta { borraCuenta = false } }
@@ -55,28 +57,28 @@ fun Pantalla03(nav: Nav) {
             null
         },
     ) {
-        OptionCard(StmIcons.homeWork, c.secondaryContainer, c.onSecondaryContainer, "Crear un hogar nuevo",
-            "Empieza de cero y después invita a tu pareja con un código o un QR.") {
+        OptionCard(StmIcons.homeWork, c.secondaryContainer, c.onSecondaryContainer, stringResource(R.string.tu_hogar_crear_un_hogar_nuevo),
+            stringResource(R.string.tu_hogar_empieza_de_cero_y_despues_invita)) {
             create.error?.let { Text(it, Modifier.weight(1f), style = StmType.bodySmall, color = c.error) }
-            Btn("Crear hogar", { create.run { session.createHousehold("Casa de ${session.profile?.name ?: "todos"}") } }, enabled = !create.busy)
+            Btn(stringResource(R.string.tu_hogar_crear_hogar), { create.run { session.createHousehold("Casa de ${session.profile?.name ?: "todos"}") } }, enabled = !create.busy)
         }
         Spacer(Modifier.height(16.dp))
-        OptionCard(StmIcons.qrCodeScanner, c.tertiaryContainer, c.onTertiaryContainer, "Unirme a un hogar",
-            "Escanea el QR de tu pareja o escribe su código de 6 letras.",
+        OptionCard(StmIcons.qrCodeScanner, c.tertiaryContainer, c.onTertiaryContainer, stringResource(R.string.tu_hogar_unirme_a_un_hogar),
+            stringResource(R.string.tu_hogar_escanea_el_qr_de_tu_pareja),
             field = {
                 OutlinedField(
-                    "Código", code, { code = it }, labelBackground = c.surfaceContainerLowest,
+                    stringResource(R.string.tu_hogar_codigo), code, { code = it }, labelBackground = c.surfaceContainerLowest,
                     error = join.error != null, supporting = join.error,
                 )
             },
         ) {
-            Btn("Escanear QR", { nav.go(Route.EscanerQr) }, kind = BtnKind.Outlined, icon = StmIcons.qrCodeScanner)
-            Btn("Unirme", { parsed?.let { join.run { session.join(it) } } }, kind = BtnKind.Tonal, enabled = parsed != null && !join.busy)
+            Btn(stringResource(R.string.escaner_qr_escanear_qr), { nav.go(Route.EscanerQr) }, kind = BtnKind.Outlined, icon = StmIcons.qrCodeScanner)
+            Btn(stringResource(R.string.tu_hogar_unirme), { parsed?.let { join.run { session.join(it) } } }, kind = BtnKind.Tonal, enabled = parsed != null && !join.busy)
         }
         HogaresAnteriores()
         Spacer(Modifier.height(16.dp))
         // Quien aún no tiene hogar también tiene que poder borrar su cuenta (ORC-74).
-        Btn("Borrar mi cuenta", { borraCuenta = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
+        Btn(stringResource(R.string.mas_borrar_mi_cuenta), { borraCuenta = true }, Modifier.fillMaxWidth(), kind = BtnKind.Error)
     }
 }
 

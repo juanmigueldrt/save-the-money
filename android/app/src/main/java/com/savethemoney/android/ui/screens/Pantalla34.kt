@@ -26,8 +26,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AccountKind
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.MovementBulkEdit
@@ -64,8 +66,8 @@ fun Pantalla34(nav: Nav, movementId: String) {
     StmScreen(
         topBar = {
             TopBar(MovementText.display(m.description), onNav = nav::back) {
-                IconBtn(StmIcons.edit, editar, contentDescription = "Editar")
-                IconBtn(StmIcons.moreVert, { menu = !menu }, contentDescription = "Más opciones")
+                IconBtn(StmIcons.edit, editar, contentDescription = stringResource(R.string.comun_editar))
+                IconBtn(StmIcons.moreVert, { menu = !menu }, contentDescription = stringResource(R.string.comun_mas_opciones))
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -79,32 +81,32 @@ fun Pantalla34(nav: Nav, movementId: String) {
                 )
                 // Barra superior (64) + 96 del diseño, a 12 dp del borde derecho.
                 MenuDesplegable(Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(top = 160.dp, end = 12.dp)) {
-                    ElementoMenu(StmIcons.edit, "Editar", onClick = editar)
+                    ElementoMenu(StmIcons.edit, stringResource(R.string.comun_editar), onClick = editar)
                     // Duplicar una pata apuntaría solo un lado de la transferencia.
                     if (m.transferId == null) {
-                        ElementoMenu(StmIcons.contentCopy, "Duplicar") {
+                        ElementoMenu(StmIcons.contentCopy, stringResource(R.string.detalle_movimiento_duplicar)) {
                             action.run {
                                 finance.add(m.toDraft().copy(importHash = null))
                                 nav.back()
                             }
                         }
                     }
-                    ElementoMenu(StmIcons.check, if (m.isReviewed) "Sin revisar" else "Marcar revisado") {
+                    ElementoMenu(StmIcons.check, if (m.isReviewed) stringResource(R.string.detalle_movimiento_sin_revisar) else stringResource(R.string.acciones_movimiento_marcar_revisado)) {
                         menu = false
                         action.run { finance.update(MovementBulkEdit(reviewed = !m.isReviewed).changes(listOf(m))) }
                     }
-                    ElementoMenu(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) "Volver a contar" else "Excluir") {
+                    ElementoMenu(if (m.excluded) StmIcons.visibility else StmIcons.visibilityOff, if (m.excluded) stringResource(R.string.movimientos_volver_a_contar) else stringResource(R.string.movimientos_excluir)) {
                         menu = false
                         action.run { finance.update(MovementBulkEdit(excluded = !m.excluded).changes(listOf(m))) }
                     }
-                    ElementoMenu(StmIcons.eventRepeat, "Aplazar") {
+                    ElementoMenu(StmIcons.eventRepeat, stringResource(R.string.detalle_movimiento_aplazar)) {
                         // Como antes: si no es de una tarjeta, se abre la primera tarjeta.
                         nav.go(Route.AplazarCompra(m.accountId.takeIf { finance.account(it)?.kind == AccountKind.CreditCard }, m.id))
                     }
                     Spacer(Modifier.height(8.dp))
                     Divider(inset = 0.dp, endInset = 0.dp)
                     Spacer(Modifier.height(8.dp))
-                    ElementoMenu(StmIcons.delete, "Eliminar", Stm.colors.error, Stm.colors.error) {
+                    ElementoMenu(StmIcons.delete, stringResource(R.string.comun_eliminar), Stm.colors.error, Stm.colors.error) {
                         if (m.transferId != null) {
                             menu = false
                             confirmaTransferencia = true
@@ -121,7 +123,7 @@ fun Pantalla34(nav: Nav, movementId: String) {
         } else null,
     ) {
         CifraCuenta(
-            listOfNotNull(cat?.name ?: "Sin categoría", finance.account(m.accountId)?.name).joinToString(" · "),
+            listOfNotNull(cat?.name ?: stringResource(R.string.comun_sin_categoria), finance.account(m.accountId)?.name).joinToString(" · "),
             Money.format(m.amountMinor, signed = true),
             Fechas.largo(m.day, finance.today()),
         )
@@ -134,8 +136,8 @@ fun Pantalla34(nav: Nav, movementId: String) {
         val extra = listOfNotNull(
             m.payee,
             m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
-            if (m.isReviewed) "Revisado" else null,
-            if (m.excluded) "Excluido del presupuesto" else null,
+            if (m.isReviewed) stringResource(R.string.detalle_movimiento_revisado) else null,
+            if (m.excluded) stringResource(R.string.movimientos_excluido_del_presupuesto) else null,
         )
         if (extra.isNotEmpty()) {
             Spacer(Modifier.height(16.dp))

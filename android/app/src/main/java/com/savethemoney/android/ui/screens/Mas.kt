@@ -36,10 +36,13 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.ui.components.IconBtn
 import com.savethemoney.android.ui.components.ListItem
 import com.savethemoney.android.ui.components.StmIcon
@@ -48,7 +51,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
 
-internal fun tituloImportar(validas: Int) = if (validas == 1) "Importar 1 movimiento" else "Importar $validas movimientos"
+@Composable internal fun tituloImportar(validas: Int) = pluralStringResource(R.plurals.mas_importar_movimientos, validas, validas)
 
 // ───────────────────────── Piezas de estas pantallas ─────────────────────────
 
@@ -56,7 +59,7 @@ internal fun tituloImportar(validas: Int) = if (validas == 1) "Importar 1 movimi
 @Composable
 internal fun MasHeader() {
     Spacer(Modifier.height(88.dp))
-    Text("Más opciones", Modifier.padding(start = 16.dp), style = StmType.headlineLarge, color = Stm.colors.onSurface)
+    Text(stringResource(R.string.comun_mas_opciones), Modifier.padding(start = 16.dp), style = StmType.headlineLarge, color = Stm.colors.onSurface)
     Spacer(Modifier.height(24.dp))
 }
 
@@ -64,7 +67,7 @@ internal fun MasHeader() {
 @Composable
 internal fun MediumTopBar(title: String, onBack: () -> Unit, actions: @Composable RowScope.() -> Unit) {
     Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        IconBtn(StmIcons.arrowBack, onBack, contentDescription = "Atrás")
+        IconBtn(StmIcons.arrowBack, onBack, contentDescription = stringResource(R.string.comun_atras))
         Spacer(Modifier.weight(1f))
         actions()
     }

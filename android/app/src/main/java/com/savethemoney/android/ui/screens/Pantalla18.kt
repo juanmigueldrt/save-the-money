@@ -28,8 +28,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.CategoryKind
 import com.savethemoney.android.data.GroupedSpending
 import com.savethemoney.android.data.Money
@@ -61,6 +64,8 @@ import com.savethemoney.android.ui.iconoCategoria
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
+import com.savethemoney.android.ui.tituloAnterior
 
 /** 18 Informes: filtros, barras de ingresos y gastos de los últimos 6 meses y resumen. */
 @Composable
@@ -100,23 +105,24 @@ fun Pantalla18(nav: Nav) {
         agrupacion?.let { GroupedSpending.report(it, movimientos, categorias, period.range(hoy)) }.orEmpty()
     }
     val context = LocalContext.current
+    val resources = LocalResources.current
     val compartirInforme = {
         val texto = if (agrupacion != null) {
-            "${agrupacion.title} · ${period.title.lowercase()}\n" + agrupado.joinToString("\n") {
+            "${resources.getString(agrupacion.titulo)} · ${resources.getString(period.titulo).lowercase()}\n" + agrupado.joinToString("\n") {
                 (if (agrupacion == GroupedSpending.Grouping.Tag) "#" else "") + "${it.title}: ${Money.format(it.spent)}"
             }
         } else if (filter == 1) {
-            textoInforme(informe, anterior, period, finance.category(categoria)?.name)
+            textoInforme(informe, anterior, period, finance.category(categoria)?.name, resources)
         } else {
-            textoIngresosGastos(ingresos, gastos)
+            textoIngresosGastos(ingresos, gastos, resources)
         }
-        val envio = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, "Informe de Save the Money").putExtra(Intent.EXTRA_TEXT, texto)
-        context.startActivity(Intent.createChooser(envio, "Compartir informe"))
+        val envio = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_SUBJECT, resources.getString(R.string.informes_informe_de_save_the_money)).putExtra(Intent.EXTRA_TEXT, texto)
+        context.startActivity(Intent.createChooser(envio, resources.getString(R.string.informes_compartir_informe)))
     }
     StmScreen(
         topBar = {
-            TopBar("Informes", onNav = nav::back) {
-                IconBtn(StmIcons.iosShare, compartirInforme, contentDescription = "Compartir")
+            TopBar(stringResource(R.string.informes_informes), onNav = nav::back) {
+                IconBtn(StmIcons.iosShare, compartirInforme, contentDescription = stringResource(R.string.informes_compartir))
             }
         },
         snackbar = tracking.error?.let { e -> { Snackbar(e) } },
@@ -124,21 +130,21 @@ fun Pantalla18(nav: Nav) {
             {
                 val cerrar = { selector = null }
                 if (campo == "periodo") {
-                    SelectorSheet("Periodo", ReportPeriod.entries.map { p -> p.title to { period = p } }, cerrar)
+                    SelectorSheet(stringResource(R.string.informes_periodo), ReportPeriod.entries.map { p -> stringResource(p.titulo) to { period = p } }, cerrar)
                 } else {
                     val lista = finance.categories(if (kind == ReportKind.Expense) CategoryKind.Expense else CategoryKind.Income)
-                    SelectorSheet("Categoría", listOf<Pair<String, () -> Unit>>("Todas" to { categoria = null }) + lista.map { x -> x.name to { categoria = x.id } }, cerrar)
+                    SelectorSheet(stringResource(R.string.comun_categoria), listOf<Pair<String, () -> Unit>>(stringResource(R.string.informes_todas) to { categoria = null }) + lista.map { x -> x.name to { categoria = x.id } }, cerrar)
                 }
             }
         },
     ) {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Chip("Ingresos y gastos", selected = filter == 0, onClick = { filter = 0 })
-            Chip("Por categoría", selected = filter == 1, onClick = { filter = 1 })
-            Chip("Por etiqueta", selected = filter == 2, onClick = { filter = 2 })
-            Chip("Por beneficiario", selected = filter == 3, onClick = { filter = 3 })
-            if (filter >= 1) Chip(period.title, onClick = { selector = "periodo" })
-            if (filter == 1) Chip(finance.category(categoria)?.name ?: "Todas", onClick = { selector = "categoria" })
+            Chip(stringResource(R.string.informes_ingresos_y_gastos), selected = filter == 0, onClick = { filter = 0 })
+            Chip(stringResource(R.string.informes_por_categoria), selected = filter == 1, onClick = { filter = 1 })
+            Chip(stringResource(R.string.informes_por_etiqueta), selected = filter == 2, onClick = { filter = 2 })
+            Chip(stringResource(R.string.informes_por_beneficiario), selected = filter == 3, onClick = { filter = 3 })
+            if (filter >= 1) Chip(stringResource(period.titulo), onClick = { selector = "periodo" })
+            if (filter == 1) Chip(finance.category(categoria)?.name ?: stringResource(R.string.informes_todas), onClick = { selector = "categoria" })
         }
         Spacer(Modifier.height(16.dp))
         if (agrupacion != null) {
@@ -146,8 +152,8 @@ fun Pantalla18(nav: Nav) {
             val top = agrupado.maxOfOrNull { it.spent }?.coerceAtLeast(1) ?: 1
             if (agrupado.isEmpty()) {
                 Text(
-                    if (esEtiqueta) "No hay movimientos con etiquetas en este periodo. Añádelas al editar un movimiento."
-                    else "No hay movimientos con beneficiario en este periodo. Añádelo al editar un movimiento.",
+                    if (esEtiqueta) stringResource(R.string.informes_no_hay_movimientos_con_etiquetas)
+                    else stringResource(R.string.informes_no_hay_movimientos_con),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
             } else {
@@ -161,7 +167,7 @@ fun Pantalla18(nav: Nav) {
                                 Column(Modifier.weight(1f)) {
                                     Text(if (esEtiqueta) "#${fila.title}" else fila.title, style = StmType.bodyLarge, color = c.onSurface)
                                     Text(
-                                        if (fila.income > 0) "${fila.count} movimientos · ingresos ${Money.format(fila.income)}" else "${fila.count} movimientos",
+                                        if (fila.income > 0) stringResource(R.string.informes_movimientos_ingresos, fila.count, Money.format(fila.income)) else stringResource(R.string.informes_movimientos, fila.count),
                                         style = StmType.bodySmall, color = c.onSurfaceVariant,
                                     )
                                 }
@@ -175,34 +181,34 @@ fun Pantalla18(nav: Nav) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                "Un movimiento con varias etiquetas cuenta en cada una. No se incluyen transferencias ni excluidos.",
+                stringResource(R.string.informes_un_movimiento_con_varias_etiquetas),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
             return@StmScreen
         }
         if (filter == 1) {
-            Segmented(ReportKind.entries.map { it.title }, kind.ordinal, {
+            Segmented(ReportKind.entries.map { stringResource(it.titulo) }, kind.ordinal, {
                 kind = ReportKind.entries[it]
                 categoria = null
             })
             Spacer(Modifier.height(16.dp))
             StmCard {
-                Text("${kind.title} · ${period.title.lowercase()}", style = StmType.labelMedium, color = c.onSurfaceVariant)
+                Text("${stringResource(kind.titulo)} · ${stringResource(period.titulo).lowercase()}", style = StmType.labelMedium, color = c.onSurfaceVariant)
                 Spacer(Modifier.height(4.dp))
                 Text(Money.format(informe.total), style = StmType.displaySmall, color = c.onSurface)
-                comparacion(informe, anterior, period)?.let { (texto, bueno) ->
+                comparacion(informe, anterior, period, resources)?.let { (texto, bueno) ->
                     Spacer(Modifier.height(4.dp))
                     Text(texto, style = StmType.labelLarge, color = when (bueno) { null -> c.onSurfaceVariant; true -> c.success; false -> c.error })
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    (if (informe.byMonth.size > 1) "Media de ${Money.format(informe.averagePerMonth)} al mes · " else "") + "${Money.format(informe.averagePerDay)} al día",
+                    if (informe.byMonth.size > 1) stringResource(R.string.informes_media_al_mes_y_al_dia, Money.format(informe.averagePerMonth), Money.format(informe.averagePerDay)) else stringResource(R.string.informes_al_dia, Money.format(informe.averagePerDay)),
                     style = StmType.bodyMedium, color = c.onSurfaceVariant,
                 )
             }
             Spacer(Modifier.height(16.dp))
             if (informe.byCategory.isEmpty()) {
-                Text("No hay movimientos en este periodo.", style = StmType.bodyMedium, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.informes_no_hay_movimientos_en_este_periodo), style = StmType.bodyMedium, color = c.onSurfaceVariant)
             } else {
                 ListCard {
                     informe.byCategory.forEachIndexed { i, fila ->
@@ -213,7 +219,7 @@ fun Pantalla18(nav: Nav) {
                                 Spacer(Modifier.width(12.dp))
                                 Column(Modifier.weight(1f)) {
                                     Text(fila.title, style = StmType.bodyLarge, color = c.onSurface)
-                                    Text("${Math.round(fila.share * 100)} % · ${fila.count} movimientos", style = StmType.bodySmall, color = c.onSurfaceVariant)
+                                    Text(stringResource(R.string.informes_movimientos_2, Math.round(fila.share * 100), fila.count), style = StmType.bodySmall, color = c.onSurfaceVariant)
                                 }
                                 Text(Money.format(fila.amount), style = StmType.labelLarge, color = c.onSurface)
                             }
@@ -227,8 +233,8 @@ fun Pantalla18(nav: Nav) {
         }
         StmCard {
             Row(Modifier.fillMaxWidth()) {
-                Text("Ingresos y gastos", Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
-                Text("últimos 6 meses", Modifier.padding(top = 5.dp), style = StmType.bodySmall, color = c.onSurfaceVariant)
+                Text(stringResource(R.string.informes_ingresos_y_gastos), Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface)
+                Text(stringResource(R.string.informes_ultimos_6_meses), Modifier.padding(top = 5.dp), style = StmType.bodySmall, color = c.onSurfaceVariant)
             }
             Spacer(Modifier.height(12.dp))
             GroupedBars(ingresos.byMonth.map { maxOf(it.amount, 0L) * 140f / tope }, gastos.byMonth.map { maxOf(it.amount, 0L) * 140f / tope })
@@ -240,25 +246,25 @@ fun Pantalla18(nav: Nav) {
             }
             Spacer(Modifier.height(12.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LegendItem(c.tertiary, "Ingresos")
-                LegendItem(c.primary, "Gastos")
+                LegendItem(c.tertiary, stringResource(R.string.informes_ingresos))
+                LegendItem(c.primary, stringResource(R.string.informes_gastos))
             }
         }
         Spacer(Modifier.height(16.dp))
         ListCard {
             ListItem(
-                "Ahorro medio", "Lo que te queda cada mes",
+                stringResource(R.string.informes_ahorro_medio), stringResource(R.string.informes_lo_que_te_queda_cada_mes),
                 leading = { LeadIcon(StmIcons.savings, c.successContainer, c.onSuccessContainer) },
                 trailingText = euros(ingresos.averagePerMonth - gastos.averagePerMonth, signed = true),
             )
             val texto = when {
                 sube == null -> null
-                else -> sube.title + (sube.percent?.let { ", +$it %" } ?: "") + " vs. ${Fechas.mes(sube.previous.atDay(1))}"
+                else -> sube.percent?.let { stringResource(R.string.informes_sube_con_porcentaje, sube.title, it, Fechas.mes(sube.previous.atDay(1))) } ?: stringResource(R.string.informes_sube, sube.title, Fechas.mes(sube.previous.atDay(1)))
             }
             if (texto != null) {
                 Divider()
                 ListItem(
-                    "Categoría que más sube", texto,
+                    stringResource(R.string.informes_categoria_que_mas_sube), texto,
                     leading = { LeadIcon(StmIcons.trendingUp, c.errorContainer, c.onErrorContainer) },
                     trailing = { StmIcon(StmIcons.chevronRight, c.onSurfaceVariant) }, onClick = { nav.go(Route.Presupuesto) },
                 )
@@ -271,40 +277,40 @@ fun Pantalla18(nav: Nav) {
  * "+12 % · +40,00 € frente al mes pasado a estas alturas". En gastos, subir es malo; en ingresos, bueno.
  * Devuelve el texto y si es buena noticia (nulo si no cambia), o nulo si no hay nada que comparar.
  */
-private fun comparacion(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod): Pair<String, Boolean?>? {
+private fun comparacion(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod, resources: android.content.res.Resources): Pair<String, Boolean?>? {
     if (informe.total <= 0 && anterior.total <= 0) return null
     val (diferencia, porcentaje) = informe.change(anterior)
-    if (diferencia == 0L) return "Igual que ${period.previousTitle}" to null
+    if (diferencia == 0L) return resources.getString(R.string.informes_igual_que, resources.getString(period.tituloAnterior)) to null
     val sube = diferencia > 0
     val pct = porcentaje?.let { (if (it > 0) "+" else "") + "$it % · " } ?: ""
-    return "$pct${Money.format(diferencia, signed = true, options = Money.display.copy(plusSign = true))} frente a ${period.previousTitle}" to
+    return resources.getString(R.string.informes_frente_a, pct + Money.format(diferencia, signed = true, options = Money.display.copy(plusSign = true)), resources.getString(period.tituloAnterior)) to
         (if (informe.kind == ReportKind.Expense) !sube else sube)
 }
 
 /** El informe por categorías en texto, siempre con importes completos (no respeta el modo incógnito). */
-private fun textoInforme(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod, categoria: String?): String {
+private fun textoInforme(informe: SpendingReport, anterior: SpendingReport, period: ReportPeriod, categoria: String?, resources: android.content.res.Resources): String {
     val e = { minor: Long -> Money.format(minor, options = Money.Display.Standard) }
     val (diferencia, porcentaje) = informe.change(anterior)
     return buildString {
-        appendLine("${informe.kind.title} · ${period.title}" + (categoria?.let { " · $it" } ?: ""))
-        appendLine("Del ${Fechas.numerica(informe.range.start)} al ${Fechas.numerica(informe.range.endInclusive)}")
-        appendLine("Total: ${e(informe.total)}")
-        appendLine("Media por día: ${e(informe.averagePerDay)}")
-        appendLine("Frente a ${period.previousTitle}: ${Money.format(diferencia, signed = true, options = Money.Display.Standard)}" + (porcentaje?.let { " ($it %)" } ?: ""))
+        appendLine("${resources.getString(informe.kind.titulo)} · ${resources.getString(period.titulo)}" + (categoria?.let { " · $it" } ?: ""))
+        appendLine(resources.getString(R.string.informes_del_al, Fechas.numerica(informe.range.start), Fechas.numerica(informe.range.endInclusive)))
+        appendLine(resources.getString(R.string.informes_total, e(informe.total)))
+        appendLine(resources.getString(R.string.informes_media_por_dia, e(informe.averagePerDay)))
+        appendLine(resources.getString(R.string.informes_frente_a_2, resources.getString(period.tituloAnterior), Money.format(diferencia, signed = true, options = Money.Display.Standard)) + (porcentaje?.let { " ($it %)" } ?: ""))
         if (informe.byCategory.isNotEmpty()) appendLine()
-        informe.byCategory.forEach { appendLine("${it.title}: ${e(it.amount)} (${Math.round(it.share * 100)} %, ${it.count} movimientos)") }
+        informe.byCategory.forEach { appendLine(resources.getString(R.string.informes_movimientos_3, it.title, e(it.amount), Math.round(it.share * 100), it.count.toString())) }
     }.trimEnd()
 }
 
 /** Ingresos y gastos de los últimos 6 meses en texto, con importes completos. */
-private fun textoIngresosGastos(ingresos: SpendingReport, gastos: SpendingReport): String {
+private fun textoIngresosGastos(ingresos: SpendingReport, gastos: SpendingReport, resources: android.content.res.Resources): String {
     val e = { minor: Long -> Money.format(minor, options = Money.Display.Standard) }
     return buildString {
-        appendLine("Ingresos y gastos · últimos 6 meses")
+        appendLine(resources.getString(R.string.informes_ingresos_y_gastos_ultimos_6_meses))
         ingresos.byMonth.zip(gastos.byMonth).forEach { (i, g) ->
-            appendLine("${Fechas.mesTitulo(i.month.atDay(1))} ${i.month.year}: ingresos ${e(i.amount)}, gastos ${e(g.amount)}")
+            appendLine(resources.getString(R.string.informes_ingresos_gastos, Fechas.mesTitulo(i.month.atDay(1)), i.month.year, e(i.amount), e(g.amount)))
         }
-        appendLine("Ahorro medio al mes: ${Money.format(ingresos.averagePerMonth - gastos.averagePerMonth, signed = true, options = Money.Display.Standard)}")
+        appendLine(resources.getString(R.string.informes_ahorro_medio_al_mes, Money.format(ingresos.averagePerMonth - gastos.averagePerMonth, signed = true, options = Money.Display.Standard)))
     }.trimEnd()
 }
 

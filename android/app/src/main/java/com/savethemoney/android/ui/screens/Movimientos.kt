@@ -31,10 +31,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.Movement
 import com.savethemoney.android.data.MovementDay
@@ -93,10 +95,10 @@ internal fun PieLista(finance: FinanceModel) {
     val action = rememberAction()
     val error = finance.listError
     if (error != null) {
-        Text(error, Modifier.padding(vertical = 8.dp), style = StmType.bodyMedium, color = Stm.colors.error)
-        Btn("Reintentar", { action.run { finance.retryList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
+        Text(stringResource(R.string.movimientos_no_se_han_podido_cargar, error), Modifier.padding(vertical = 8.dp), style = StmType.bodyMedium, color = Stm.colors.error)
+        Btn(stringResource(R.string.comun_reintentar), { action.run { finance.retryList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
     } else if (finance.list.hasMore) {
-        Btn(if (finance.isLoadingList) "Cargando…" else "Cargar más movimientos", { action.run { finance.loadMoreList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
+        Btn(if (finance.isLoadingList) stringResource(R.string.comun_cargando) else stringResource(R.string.movimientos_cargar_mas_movimientos), { action.run { finance.loadMoreList() } }.takeIf { !finance.isLoadingList }, kind = BtnKind.Outlined)
     }
     Spacer(Modifier.height(16.dp))
 }
@@ -104,9 +106,9 @@ internal fun PieLista(finance: FinanceModel) {
 /** Barra de 05 y 08: atrás, título, filtros (con cuántos hay puestos) y más opciones. */
 @Composable
 internal fun MovimientosTopBar(nav: Nav, filtros: Int = 0, onFiltros: (() -> Unit)? = null, onMas: (() -> Unit)? = null) {
-    TopBar("Movimientos", onNav = nav::back) {
+    TopBar(stringResource(R.string.movimientos_movimientos), onNav = nav::back) {
         Box {
-            IconBtn(StmIcons.tune, onFiltros, tint = if (filtros > 0) Stm.colors.primary else Stm.colors.onSurfaceVariant, contentDescription = if (filtros > 0) "Filtros ($filtros)" else "Filtros")
+            IconBtn(StmIcons.tune, onFiltros, tint = if (filtros > 0) Stm.colors.primary else Stm.colors.onSurfaceVariant, contentDescription = if (filtros > 0) stringResource(R.string.movimientos_filtros, filtros) else stringResource(R.string.movimientos_filtros_2))
             if (filtros > 0) {
                 Box(
                     Modifier.align(Alignment.TopEnd).padding(top = 4.dp, end = 2.dp).height(16.dp).width(16.dp).clip(RoundedCornerShape(8.dp)).background(Stm.colors.primary),
@@ -114,7 +116,7 @@ internal fun MovimientosTopBar(nav: Nav, filtros: Int = 0, onFiltros: (() -> Uni
                 ) { Text("$filtros", style = StmType.labelSmall, color = Stm.colors.onPrimary) }
             }
         }
-        IconBtn(StmIcons.moreVert, onMas, contentDescription = "Más opciones")
+        IconBtn(StmIcons.moreVert, onMas, contentDescription = stringResource(R.string.comun_mas_opciones))
     }
 }
 
@@ -150,11 +152,11 @@ internal fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String?
     val cat = finance.category(m.categoryId)
     val icono = iconoCategoria(cat)
     val partes = listOfNotNull(
-        detalle ?: cat?.name ?: "Sin categoría",
+        detalle ?: cat?.name ?: stringResource(R.string.comun_sin_categoria),
         if (detalle == null) finance.account(m.accountId)?.name else null,
         // En una pata de transferencia, la cuenta de la otra pata: «Hacia Ahorro» o «Desde Nómina».
         m.transferId?.let { t -> (finance.recent.firstOrNull { it.transferId == t && it.id != m.id } ?: finance.list.rows.firstOrNull { it.transferId == t && it.id != m.id }) }
-            ?.let { otra -> finance.account(otra.accountId)?.name }?.let { (if (m.isExpense) "Hacia " else "Desde ") + it },
+            ?.let { otra -> finance.account(otra.accountId)?.name }?.let { if (m.isExpense) stringResource(R.string.movimientos_hacia, it) else stringResource(R.string.movimientos_desde, it) },
         m.payee,
         m.tags.takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
     )
@@ -174,8 +176,8 @@ internal fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String?
                 )
                 if (m.excluded || m.isReviewed) {
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        if (m.excluded) StmIcon(StmIcons.visibilityOff, c.onSurfaceVariant, size = 16.dp, contentDescription = "Excluido del presupuesto")
-                        if (m.isReviewed) StmIcon(StmIcons.check, c.success, size = 16.dp, contentDescription = "Revisado")
+                        if (m.excluded) StmIcon(StmIcons.visibilityOff, c.onSurfaceVariant, size = 16.dp, contentDescription = stringResource(R.string.movimientos_excluido_del_presupuesto))
+                        if (m.isReviewed) StmIcon(StmIcons.check, c.success, size = 16.dp, contentDescription = stringResource(R.string.movimientos_revisado))
                     }
                 }
             }
@@ -187,7 +189,7 @@ internal fun FilaMovimiento(m: Movement, finance: FinanceModel, detalle: String?
                         Modifier.width(24.dp).height(24.dp).clip(CircleShape)
                             .let { if (elegido) it.background(c.primary) else it.border(2.dp, c.outline, CircleShape) },
                         contentAlignment = Alignment.Center,
-                    ) { if (elegido) StmIcon(StmIcons.check, c.onPrimary, size = 16.dp, contentDescription = "Elegido") }
+                    ) { if (elegido) StmIcon(StmIcons.check, c.onPrimary, size = 16.dp, contentDescription = stringResource(R.string.movimientos_elegido)) }
                     Spacer(Modifier.width(12.dp))
                 }
                 if (m.isExpense) MerchantLogo(m.description, icono)
@@ -220,13 +222,13 @@ internal fun BoxScope.DialogoBorrarTransferencia(
     onDeleted: () -> Unit,
 ) {
     StmDialog(
-        "¿Borrar la transferencia?",
-        com.savethemoney.android.data.TransferDraft.DELETE_WARNING,
+        stringResource(R.string.movimientos_borrar_la_transferencia),
+        stringResource(R.string.movimientos_aviso_borrar_transferencia),
         icon = StmIcons.deleteForever,
         onDismiss = onDismiss,
         actions = {
-            Btn("Cancelar", onDismiss, kind = BtnKind.Text)
-            Btn("Borrar los dos movimientos", {
+            Btn(stringResource(R.string.comun_cancelar), onDismiss, kind = BtnKind.Text)
+            Btn(stringResource(R.string.movimientos_borrar_los_dos_movimientos), {
                 onDismiss()
                 action.run {
                     finance.delete(m)
@@ -252,12 +254,12 @@ fun SelectorFecha(inicial: LocalDate, onPick: (LocalDate) -> Unit, onDismiss: ()
     DatePickerDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Btn("Aceptar", {
+            Btn(stringResource(R.string.comun_aceptar), {
                 state.selectedDateMillis?.let { onPick(Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()) }
                 onDismiss()
             }, kind = BtnKind.Text)
         },
-        dismissButton = { Btn("Cancelar", onDismiss, kind = BtnKind.Text) },
+        dismissButton = { Btn(stringResource(R.string.comun_cancelar), onDismiss, kind = BtnKind.Text) },
     ) { DatePicker(state) }
 }
 
@@ -302,6 +304,6 @@ internal fun CifraCuenta(label: String, value: String, note: String) {
 internal fun ChipsMovimiento(conNota: Boolean, onNota: () -> Unit) {
     val c = Stm.colors
     ChipRow(Modifier.fillMaxWidth()) {
-        Chip("Añadir nota", selected = conNota, onClick = onNota, icon = StmIcons.stickyNote2, labelColor = c.onSurface)
+        Chip(stringResource(R.string.movimientos_anadir_nota), selected = conNota, onClick = onNota, icon = StmIcons.stickyNote2, labelColor = c.onSurface)
     }
 }

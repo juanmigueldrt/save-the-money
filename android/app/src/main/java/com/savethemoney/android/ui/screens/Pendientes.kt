@@ -9,7 +9,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.WeeklySummary
 import com.savethemoney.android.ui.Fechas
@@ -36,8 +38,8 @@ internal fun PendientesCard(finance: FinanceModel, nav: Nav) {
     if (pendientes.isEmpty()) return
     val action = rememberAction()
     StmCard {
-        Text("Pendientes de confirmar", style = StmType.titleMedium, color = c.onSurface)
-        Text("Aún no cuentan en tus saldos ni en el presupuesto.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+        Text(stringResource(R.string.pendientes_pendientes_de_confirmar), style = StmType.titleMedium, color = c.onSurface)
+        Text(stringResource(R.string.pendientes_aun_no_cuentan_en_tus_saldos), style = StmType.bodySmall, color = c.onSurfaceVariant)
         pendientes.take(5).forEach { item ->
             Spacer(Modifier.height(12.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -50,15 +52,15 @@ internal fun PendientesCard(finance: FinanceModel, nav: Nav) {
             )
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Btn("Confirmar", {
+                Btn(stringResource(R.string.comun_confirmar), {
                     nav.go(Route.ConfirmarCargo(item.id))
                 })
-                Btn("No se ha cobrado", { action.run { planning.skip(item) } }, kind = BtnKind.Outlined, enabled = !action.busy)
+                Btn(stringResource(R.string.pendientes_no_se_ha_cobrado), { action.run { planning.skip(item) } }, kind = BtnKind.Outlined, enabled = !action.busy)
             }
         }
         if (pendientes.size > 5) {
             Spacer(Modifier.height(8.dp))
-            Text("Y ${pendientes.size - 5} más.", style = StmType.bodySmall, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.pendientes_y_mas, pendientes.size - 5), style = StmType.bodySmall, color = c.onSurfaceVariant)
         }
         action.error?.let {
             Spacer(Modifier.height(8.dp))
@@ -74,7 +76,7 @@ internal fun SemanaCard(finance: FinanceModel, nav: Nav) {
     val resumen = WeeklySummary(finance.recent, finance.categories, finance.today())
     StmCard(onClick = { nav.go(Route.ResumenSemanal) }) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("La semana pasada · ${resumen.title}", Modifier.weight(1f), style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.pendientes_la_semana_pasada, resumen.title), Modifier.weight(1f), style = StmType.labelMedium, color = c.onSurfaceVariant)
             StmIcon(StmIcons.chevronRight, c.onSurfaceVariant)
         }
         Text(Money.format(resumen.week.spent), style = StmType.displaySmall, color = c.onSurface)

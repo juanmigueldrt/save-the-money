@@ -2,6 +2,8 @@ package com.savethemoney.android.ui.screens
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.res.stringResource
+import com.savethemoney.android.R
 import com.savethemoney.android.ui.Nav
 import com.savethemoney.android.ui.Route
 import com.savethemoney.android.ui.components.StmScreen
@@ -84,6 +86,6 @@ internal fun <T : Any> rememberRow(id: String?, find: (String) -> T?): T? {
 @Composable
 internal fun NoEncontrado(nav: Nav) {
     StmScreen(topBar = { TopBar(null, onNav = nav::back) }) {
-        Vacio("No se encuentra. Puede que se haya borrado o que aún se esté cargando.")
+        Vacio(stringResource(R.string.pantallas_no_se_encuentra_puede_que_se))
     }
 }

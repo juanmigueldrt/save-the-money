@@ -27,12 +27,16 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.qrcode.QRCodeWriter
+import com.savethemoney.android.R
 import com.savethemoney.android.data.HouseholdInvite
 import com.savethemoney.android.data.InviteCode
 import com.savethemoney.android.data.Money
@@ -53,6 +57,7 @@ fun Pantalla29(nav: Nav) {
     val c = Stm.colors
     val session = LocalSession.current
     val context = LocalContext.current
+    val resources = LocalResources.current
     val clipboard = LocalClipboardManager.current
     // Reutiliza la invitación pendiente si la hay; si no, pide una nueva al servidor.
     val invite by produceState<HouseholdInvite?>(null, session.household) {
@@ -62,10 +67,10 @@ fun Pantalla29(nav: Nav) {
     }
     val code = invite?.code?.let(InviteCode::parse)
     val horas by produceState<Long?>(null, invite) { value = invite?.let { horasHasta(it.expiresAt) } }
-    StmScreen(topBar = { TopBar("Invitar", navIcon = StmIcons.close, onNav = nav::back) }) {
+    StmScreen(topBar = { TopBar(stringResource(R.string.invitar_invitar), navIcon = StmIcons.close, onNav = nav::back) }) {
         Spacer(Modifier.height(12.dp))
         Text(
-            "Escanea este código desde su móvil", Modifier.fillMaxWidth(),
+            stringResource(R.string.invitar_escanea_este_codigo_desde_su_movil), Modifier.fillMaxWidth(),
             style = StmType.headlineSmall, color = c.onSurface, textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(24.dp))
@@ -77,7 +82,7 @@ fun Pantalla29(nav: Nav) {
             if (code != null) QrCode(code.link)
         }
         Spacer(Modifier.height(24.dp))
-        Text("O escribe el código", Modifier.fillMaxWidth(), style = StmType.labelMedium, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(stringResource(R.string.invitar_o_escribe_el_codigo), Modifier.fillMaxWidth(), style = StmType.labelMedium, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(8.dp))
         Row(Modifier.align(Alignment.CenterHorizontally), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             (code?.value ?: "······").forEach { ch ->
@@ -90,15 +95,15 @@ fun Pantalla29(nav: Nav) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Text(if (horas == null) "" else "Caduca en $horas ${if (horas == 1L) "hora" else "horas"}", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
+        Text(horas?.let { pluralStringResource(R.plurals.invitar_caduca_en_horas, it.toInt(), it) } ?: "", Modifier.fillMaxWidth(), style = StmType.bodySmall, color = c.onSurfaceVariant, textAlign = TextAlign.Center)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.align(Alignment.CenterHorizontally), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn("Copiar código", code?.let { { clipboard.setText(AnnotatedString(it.value)) } }, kind = BtnKind.Tonal, icon = StmIcons.contentCopy)
-            Btn("Compartir enlace", code?.let {
+            Btn(stringResource(R.string.invitar_copiar_codigo), code?.let { { clipboard.setText(AnnotatedString(it.value)) } }, kind = BtnKind.Tonal, icon = StmIcons.contentCopy)
+            Btn(stringResource(R.string.invitar_compartir_enlace), code?.let {
                 {
                     val send = Intent(Intent.ACTION_SEND).setType("text/plain")
-                        .putExtra(Intent.EXTRA_TEXT, "Únete a nuestro hogar en Save the Money: ${it.link} (código ${it.value})")
-                    context.startActivity(Intent.createChooser(send, "Compartir enlace"))
+                        .putExtra(Intent.EXTRA_TEXT, resources.getString(R.string.invitar_unete_a_nuestro_hogar_en_save, it.link, it.value))
+                    context.startActivity(Intent.createChooser(send, resources.getString(R.string.invitar_compartir_enlace)))
                 }
             }, kind = BtnKind.Outlined, icon = StmIcons.share)
         }

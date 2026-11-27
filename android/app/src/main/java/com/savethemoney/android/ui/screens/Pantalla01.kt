@@ -15,7 +15,9 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.ui.LocalSession
 import com.savethemoney.android.ui.Nav
@@ -41,26 +43,26 @@ fun Pantalla01(nav: Nav) {
     val canSubmit = user.isNotBlank() && password.isNotEmpty() && !action.busy
     StmScreen {
         Column(Modifier.padding(start = 8.dp, end = 8.dp, top = 48.dp)) {
-            Text("Save the Money", style = StmType.labelLarge, color = c.primary)
+            Text(stringResource(R.string.app_name), style = StmType.labelLarge, color = c.primary)
             Spacer(Modifier.height(8.dp))
-            Text("Tu dinero, claro", style = StmType.displayMedium, color = c.onSurface)
+            Text(stringResource(R.string.iniciar_sesion_tu_dinero_claro), style = StmType.displayMedium, color = c.onSurface)
             Spacer(Modifier.height(8.dp))
-            Text("Entra con tu usuario y contraseña para ver las cuentas de tu hogar.", style = StmType.bodyLarge, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.iniciar_sesion_entra_con_tu_usuario_y_contrasena), style = StmType.bodyLarge, color = c.onSurfaceVariant)
             Spacer(Modifier.height(24.dp))
-            OutlinedField("Usuario", user, { user = it }, leading = StmIcons.person)
+            OutlinedField(stringResource(R.string.comun_usuario), user, { user = it }, leading = StmIcons.person)
             Spacer(Modifier.height(16.dp))
             OutlinedField(
-                "Contraseña", password, { password = it }, leading = StmIcons.lock,
+                stringResource(R.string.comun_contrasena), password, { password = it }, leading = StmIcons.lock,
                 trailing = if (hidden) StmIcons.visibility else StmIcons.visibilityOff, onTrailing = { hidden = !hidden },
                 password = hidden,
                 error = action.error != null, supporting = action.error,
             )
             Spacer(Modifier.height(24.dp))
-            Btn("Entrar", { action.run { session.signIn(user, password) } }, Modifier.fillMaxWidth(), large = true, enabled = canSubmit)
+            Btn(stringResource(R.string.iniciar_sesion_entrar), { action.run { session.signIn(user, password) } }, Modifier.fillMaxWidth(), large = true, enabled = canSubmit)
             session.signOutNotice?.let { Spacer(Modifier.height(8.dp)); Text(it, style = StmType.bodySmall, color = c.error) }
             Spacer(Modifier.height(24.dp))
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Btn("Crear cuenta", { nav.go(Route.CrearCuenta) }, kind = BtnKind.Text)
+                Btn(stringResource(R.string.acceso_crear_cuenta), { nav.go(Route.CrearCuenta) }, kind = BtnKind.Text)
             }
         }
     }

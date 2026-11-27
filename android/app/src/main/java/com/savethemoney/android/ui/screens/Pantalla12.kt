@@ -18,8 +18,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.CardPaymentMode
 import com.savethemoney.android.data.CreditCardTerms
@@ -38,6 +41,7 @@ import com.savethemoney.android.ui.components.Snackbar
 import com.savethemoney.android.ui.components.StmScreen
 import com.savethemoney.android.ui.components.StmSwitch
 import com.savethemoney.android.ui.components.TopBar
+import com.savethemoney.android.ui.detalle
 import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
@@ -71,6 +75,7 @@ fun Pantalla12(nav: Nav, cardId: String?) {
     var eligeCuenta by remember { mutableStateOf(false) }
     val action = rememberAction()
     val modo = CardPaymentMode.entries[forma]
+    val resources = LocalResources.current
 
     fun guardar() = action.run {
         if (cuenta == null) {
@@ -78,12 +83,12 @@ fun Pantalla12(nav: Nav, cardId: String?) {
             return@run
         }
         fun falla(texto: String): Nothing = throw AppError.InvalidInput(texto)
-        val limiteMinor = Money.entered(limite)?.takeIf { it > 0 } ?: falla("El límite no es un importe válido.")
-        val revolving = leerTasa(tinAplazado) ?: falla("Revisa los intereses y el pago mínimo.")
-        val plazos = leerTasa(tinPlazos) ?: falla("Revisa los intereses y el pago mínimo.")
-        val pct = leerTasa(minimoPct) ?: falla("Revisa los intereses y el pago mínimo.")
-        val suelo = Money.entered(minimo.ifBlank { "0" }) ?: falla("El pago mínimo no es un importe válido.")
-        val fija = if (modo == CardPaymentMode.Fixed) Money.entered(cuota)?.takeIf { it > 0 } ?: falla("La cuota no es un importe válido.") else null
+        val limiteMinor = Money.entered(limite)?.takeIf { it > 0 } ?: falla(resources.getString(R.string.condiciones_tarjeta_el_limite_no_es_un_importe))
+        val revolving = leerTasa(tinAplazado) ?: falla(resources.getString(R.string.condiciones_tarjeta_revisa_los_intereses_y_el_pago))
+        val plazos = leerTasa(tinPlazos) ?: falla(resources.getString(R.string.condiciones_tarjeta_revisa_los_intereses_y_el_pago))
+        val pct = leerTasa(minimoPct) ?: falla(resources.getString(R.string.condiciones_tarjeta_revisa_los_intereses_y_el_pago))
+        val suelo = Money.entered(minimo.ifBlank { "0" }) ?: falla(resources.getString(R.string.condiciones_tarjeta_el_pago_minimo_no_es_un))
+        val fija = if (modo == CardPaymentMode.Fixed) Money.entered(cuota)?.takeIf { it > 0 } ?: falla(resources.getString(R.string.condiciones_tarjeta_la_cuota_no_es_un_importe)) else null
         cards.save(
             CreditCardTerms(
                 cuenta.id, cuenta.householdId, limiteMinor, diaExtracto.toIntOrNull() ?: 0, diaCargo.toIntOrNull() ?: 0, retraso, modo, fija,
@@ -97,16 +102,16 @@ fun Pantalla12(nav: Nav, cardId: String?) {
 
     StmScreen(
         topBar = {
-            TopBar("Condiciones", navIcon = StmIcons.close, onNav = nav::back) {
-                Btn("Guardar", ::guardar, kind = BtnKind.Text)
+            TopBar(stringResource(R.string.condiciones_tarjeta_condiciones), navIcon = StmIcons.close, onNav = nav::back) {
+                Btn(stringResource(R.string.comun_guardar), ::guardar, kind = BtnKind.Text)
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
         overlay = if (eligeCuenta) {
             {
                 SelectorSheet(
-                    "Se paga desde",
-                    listOf<Pair<String, () -> Unit>>("Sin elegir" to { pagaDesde = null }) +
+                    stringResource(R.string.condiciones_tarjeta_se_paga_desde),
+                    listOf<Pair<String, () -> Unit>>(stringResource(R.string.condiciones_tarjeta_sin_elegir) to { pagaDesde = null }) +
                         finance.activeAccounts.filter { it.id != cuenta?.id && !it.kind.isLiability }.map { a -> a.name to { pagaDesde = a.id } },
                 ) { eligeCuenta = false }
             }
@@ -115,65 +120,65 @@ fun Pantalla12(nav: Nav, cardId: String?) {
         },
     ) {
         Spacer(Modifier.height(8.dp))
-        FilledField("Límite de crédito", limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+        FilledField(stringResource(R.string.condiciones_tarjeta_limite_de_credito), limite, { limite = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilledField("Día del extracto", diaExtracto, { diaExtracto = it }, Modifier.weight(1f), keyboard = KeyboardType.Number)
-            FilledField("Día del cargo", diaCargo, { diaCargo = it }, Modifier.weight(1f), keyboard = KeyboardType.Number)
+            FilledField(stringResource(R.string.condiciones_tarjeta_dia_del_extracto), diaExtracto, { diaExtracto = it }, Modifier.weight(1f), keyboard = KeyboardType.Number)
+            FilledField(stringResource(R.string.condiciones_tarjeta_dia_del_cargo), diaCargo, { diaCargo = it }, Modifier.weight(1f), keyboard = KeyboardType.Number)
         }
         Spacer(Modifier.height(16.dp))
-        Text("Forma de pago", style = StmType.labelLarge, color = c.onSurfaceVariant)
+        Text(stringResource(R.string.condiciones_tarjeta_forma_de_pago), style = StmType.labelLarge, color = c.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        Segmented(listOf("Todo", "Cuota fija", "Mínimo"), forma, { forma = it })
+        Segmented(listOf(stringResource(R.string.condiciones_tarjeta_todo), stringResource(R.string.condiciones_tarjeta_cuota_fija), stringResource(R.string.condiciones_tarjeta_minimo)), forma, { forma = it })
         // Solo aparecen al cambiar la forma de pago, así que el diseño no se mueve.
         if (modo == CardPaymentMode.Fixed) {
             Spacer(Modifier.height(16.dp))
-            FilledField("Cuota al mes", cuota, { cuota = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
+            FilledField(stringResource(R.string.condiciones_tarjeta_cuota_al_mes), cuota, { cuota = it }, suffix = "€", keyboard = KeyboardType.Decimal, calculator = true)
         }
         if (modo.isRevolving) {
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                FilledField("Mínimo: % deuda", minimoPct, { minimoPct = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
-                FilledField("Mínimo: al menos", minimo, { minimo = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal)
+                FilledField(stringResource(R.string.condiciones_tarjeta_minimo_deuda), minimoPct, { minimoPct = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
+                FilledField(stringResource(R.string.condiciones_tarjeta_minimo_al_menos), minimo, { minimo = it }, Modifier.weight(1f), suffix = "€", keyboard = KeyboardType.Decimal)
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                modo.detail + " El pago mínimo es el % de la deuda más los intereses, y nunca menos del importe mínimo.",
+                stringResource(R.string.condiciones_tarjeta_el_pago_minimo_es_el_de, stringResource(modo.detalle)),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            FilledField("TIN aplazado", tinAplazado, { tinAplazado = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
-            FilledField("TIN a plazos", tinPlazos, { tinPlazos = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
+            FilledField(stringResource(R.string.condiciones_tarjeta_tin_aplazado), tinAplazado, { tinAplazado = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
+            FilledField(stringResource(R.string.condiciones_tarjeta_tin_a_plazos), tinPlazos, { tinPlazos = it }, Modifier.weight(1f), suffix = "%", keyboard = KeyboardType.Decimal)
         }
         Spacer(Modifier.height(16.dp))
         FilledField(
-            "Paga desde", finance.account(pagaDesde)?.name ?: "Sin elegir",
+            stringResource(R.string.condiciones_tarjeta_paga_desde), finance.account(pagaDesde)?.name ?: stringResource(R.string.condiciones_tarjeta_sin_elegir),
             trailing = StmIcons.arrowDropDown, onClick = { eligeCuenta = true },
         )
         Spacer(Modifier.height(16.dp))
         ListCard {
-            ListItem("Recordar el cargo", textoAviso(dias).replaceFirstChar(Char::uppercase), trailing = { SwitchSlot(recordar) { recordar = it } })
+            ListItem(stringResource(R.string.condiciones_tarjeta_recordar_el_cargo), textoAviso(dias).replaceFirstChar(Char::uppercase), trailing = { SwitchSlot(recordar) { recordar = it } })
             Divider(inset = 16.dp)
-            ListItem("Avisar al $aviso % del límite", trailing = { SwitchSlot(avisar) { avisar = it } })
+            ListItem(stringResource(R.string.condiciones_tarjeta_avisar_al_del_limite, aviso), trailing = { SwitchSlot(avisar) { avisar = it } })
         }
         // Lo que el diseño no dibuja y iOS sí permite va debajo, para no mover lo anterior.
         Spacer(Modifier.height(16.dp))
         if (recordar) {
-            FilaStepper("Cuándo recordar", textoAviso(dias), { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
+            FilaStepper(stringResource(R.string.condiciones_tarjeta_cuando_recordar), textoAviso(dias), { dias = (dias - 1).coerceAtLeast(0) }, { dias = (dias + 1).coerceAtMost(14) })
             Spacer(Modifier.height(12.dp))
         }
         if (avisar) {
-            FilaStepper("Avisar al pasar del", "$aviso %", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
+            FilaStepper(stringResource(R.string.condiciones_tarjeta_avisar_al_pasar_del), "$aviso %", { aviso = (aviso - 5).coerceAtLeast(50) }, { aviso = (aviso + 5).coerceAtMost(100) })
             Spacer(Modifier.height(16.dp))
         }
-        Text("Se cobra", style = StmType.labelLarge, color = c.onSurfaceVariant)
+        Text(stringResource(R.string.condiciones_tarjeta_se_cobra), style = StmType.labelLarge, color = c.onSurfaceVariant)
         Spacer(Modifier.height(8.dp))
-        Segmented(listOf("Mismo mes", "Mes siguiente", "2 meses"), retraso, { retraso = it })
+        Segmented(listOf(stringResource(R.string.condiciones_tarjeta_mismo_mes), stringResource(R.string.condiciones_tarjeta_mes_siguiente), stringResource(R.string.condiciones_tarjeta_2_meses)), retraso, { retraso = it })
         Spacer(Modifier.height(8.dp))
         Text(
-            "Míralo en tu contrato. Por ejemplo: extracto el día 1 y cargo el día 1 del mes siguiente quiere decir que lo gastado en enero se cobra el 1 de marzo.",
+            stringResource(R.string.condiciones_tarjeta_miralo_en_tu_contrato_por_ejemplo),
             style = StmType.bodySmall, color = c.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))

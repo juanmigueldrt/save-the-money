@@ -6,19 +6,14 @@ import kotlin.math.abs
 // MovementFilter.swift de STMCore.
 
 /** Qué tipo de movimiento se quiere ver en la lista. */
-enum class MovementKindFilter(val title: String) {
-    All("Todos"), Expense("Gastos"), Income("Ingresos"), Transfer("Transferencias"),
-}
+enum class MovementKindFilter { All, Expense, Income, Transfer }
 
 /** Revisados, sin revisar o excluidos del presupuesto. */
-enum class MovementStatusFilter(val title: String) {
-    All("Todos"), Unreviewed("Sin revisar"), Reviewed("Revisados"), Excluded("Excluidos"),
-}
+enum class MovementStatusFilter { All, Unreviewed, Reviewed, Excluded }
 
 /** Fechas rápidas del filtro de movimientos. */
-enum class MovementDateFilter(val title: String) {
-    All("Cualquier fecha"), ThisMonth("Este mes"), LastMonth("El mes pasado"), Last30Days("Últimos 30 días"),
-    Last90Days("Últimos 90 días"), ThisYear("Este año"), Custom("Fechas a medida");
+enum class MovementDateFilter {
+    All, ThisMonth, LastMonth, Last30Days, Last90Days, ThisYear, Custom;
 
     /** Días incluidos; nulo = sin límite. [Custom] usa las fechas dadas. Los meses y el año siguen el mes del hogar. */
     fun range(today: LocalDate, custom: ClosedRange<LocalDate>? = null, monthStartDay: Int = 1): ClosedRange<LocalDate>? = when (this) {

@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.CalendarPayment
 import com.savethemoney.android.data.Money
 import com.savethemoney.android.data.PaymentCalendar
@@ -53,11 +55,12 @@ fun Pantalla43(nav: Nav) {
     var mes by remember { mutableStateOf(YearMonth.from(hoy)) }
     var dia by remember { mutableStateOf(hoy) }
     val inv = finance.investments
+    val inversion = stringResource(R.string.calendario_inversion)
     val calendario = PaymentCalendar(
         finance.planning.series,
         finance.cards.cardAccounts.mapNotNull { a -> finance.cards.summary(a)?.let { a.name to it } },
         inv.plans,
-    ) { id -> inv.holding(id)?.trimmedName ?: "Inversión" }
+    ) { id -> inv.holding(id)?.trimmedName ?: inversion }
     val delMes = calendario.month(mes)
     val conPagos = delMes.map { it.day }.toSet()
     val pagos = delMes.filter { it.amount < 0 }.sumOf { -it.amount }
@@ -67,27 +70,27 @@ fun Pantalla43(nav: Nav) {
         dia = if (mes == YearMonth.from(hoy)) hoy else mes.atDay(1)
     }
 
-    StmScreen(topBar = { TopBar("Calendario de pagos", onNav = nav::back) }) {
+    StmScreen(topBar = { TopBar(stringResource(R.string.calendario_calendario_de_pagos), onNav = nav::back) }) {
         StmCard {
-            Text("Pagos de ${Fechas.mes(mes.atDay(1))}", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.calendario_pagos_de, Fechas.mes(mes.atDay(1))), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             Text(Money.format(pagos), style = StmType.titleLarge, color = c.onSurface)
             if (ingresos > 0) {
                 Spacer(Modifier.height(4.dp))
-                Text("Ingresos previstos: ${Money.format(ingresos)}", style = StmType.bodySmall, color = c.success)
+                Text(stringResource(R.string.calendario_ingresos_previstos, Money.format(ingresos)), style = StmType.bodySmall, color = c.success)
             }
         }
         Spacer(Modifier.height(16.dp))
         StmCard {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconBtn(StmIcons.chevronLeft, { cambiarMes(-1) }, contentDescription = "Mes anterior")
+                IconBtn(StmIcons.chevronLeft, { cambiarMes(-1) }, contentDescription = stringResource(R.string.calendario_mes_anterior))
                 val titulo = Fechas.mesTitulo(mes.atDay(1)) + if (mes.year != hoy.year) " ${mes.year}" else ""
                 Text(titulo, Modifier.weight(1f), style = StmType.titleMedium, color = c.onSurface, textAlign = TextAlign.Center)
-                IconBtn(StmIcons.chevronRight, { cambiarMes(1) }, contentDescription = "Mes siguiente")
+                IconBtn(StmIcons.chevronRight, { cambiarMes(1) }, contentDescription = stringResource(R.string.calendario_mes_siguiente))
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                listOf("L", "M", "X", "J", "V", "S", "D").forEach {
+                listOf(stringResource(R.string.comun_inicial_lunes), stringResource(R.string.comun_inicial_martes), stringResource(R.string.comun_inicial_miercoles), stringResource(R.string.comun_inicial_jueves), stringResource(R.string.comun_inicial_viernes), stringResource(R.string.comun_inicial_sabado), stringResource(R.string.comun_inicial_domingo)).forEach {
                     Box(Modifier.width(44.dp), contentAlignment = Alignment.Center) {
                         Text(it, style = StmType.labelMedium, color = c.onSurfaceVariant)
                     }
@@ -127,7 +130,7 @@ fun Pantalla43(nav: Nav) {
         ListCard {
             ListHeader(Fechas.dia(dia, hoy))
             val delDia = delMes.filter { it.day == dia }
-            if (delDia.isEmpty()) ListItem("Sin pagos este día")
+            if (delDia.isEmpty()) ListItem(stringResource(R.string.calendario_sin_pagos_este_dia))
             delDia.forEachIndexed { i, p ->
                 if (i > 0) Divider(inset = 16.dp)
                 FilaPagoPrevisto(p, p.source)
@@ -136,8 +139,8 @@ fun Pantalla43(nav: Nav) {
         Spacer(Modifier.height(16.dp))
         val proximos = calendario.upcoming(dia)
         ListCard {
-            ListHeader("Próximos")
-            if (proximos.isEmpty()) ListItem("No hay pagos previstos")
+            ListHeader(stringResource(R.string.calendario_proximos))
+            if (proximos.isEmpty()) ListItem(stringResource(R.string.calendario_no_hay_pagos_previstos))
             proximos.forEachIndexed { i, p ->
                 if (i > 0) Divider(inset = 16.dp)
                 FilaPagoPrevisto(p, "${Fechas.dia(p.day, hoy)} · ${p.source}")

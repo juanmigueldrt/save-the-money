@@ -21,8 +21,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.edit
+import com.savethemoney.android.R
 import com.savethemoney.android.ui.components.Btn
 import com.savethemoney.android.ui.components.ListCard
 import com.savethemoney.android.ui.components.ListHeader
@@ -155,9 +157,9 @@ fun PantallaBloqueo(desbloquear: () -> Unit) {
     ) {
         StmIcon(StmIcons.lock, Stm.colors.onSurfaceVariant)
         Spacer(Modifier.height(16.dp))
-        Text("Save the Money está bloqueada", style = StmType.bodyLarge, color = Stm.colors.onSurface)
+        Text(stringResource(R.string.bloqueo_save_the_money_esta_bloqueada), style = StmType.bodyLarge, color = Stm.colors.onSurface)
         Spacer(Modifier.height(16.dp))
-        Btn("Desbloquear", desbloquear)
+        Btn(stringResource(R.string.bloqueo_desbloquear), desbloquear)
     }
 }
 
@@ -168,10 +170,10 @@ fun AjusteBloqueo() {
     val seguro = remember { Bloqueo.seguro(context) }
     val bloqueo = Bloqueo.app
     ListCard {
-        ListHeader("Seguridad")
+        ListHeader(stringResource(R.string.bloqueo_seguridad))
         ListItem(
-            "Pedir huella, cara o código",
-            if (seguro || bloqueo.activo) "Al abrir y al volver tras más de un minuto" else "Configura un bloqueo de pantalla en el dispositivo para usarlo",
+            stringResource(R.string.bloqueo_pedir_huella_cara_o_codigo),
+            if (seguro || bloqueo.activo) stringResource(R.string.bloqueo_al_abrir_y_al_volver_tras) else stringResource(R.string.bloqueo_configura_un_bloqueo_de_pantalla),
             leading = { StmIcon(StmIcons.lock, Stm.colors.onSurfaceVariant) },
             trailing = { StmSwitch(bloqueo.activo, if (seguro || bloqueo.activo) bloqueo::activar else null) },
             supportingLines = 2,
@@ -179,8 +181,7 @@ fun AjusteBloqueo() {
         )
     }
     Text(
-        "Sólo en este dispositivo. Tapa la app en las apps recientes y no deja hacer capturas de pantalla. " +
-            "Protege la pantalla, no los datos: tu hogar los sigue viendo en los suyos.",
+        stringResource(R.string.bloqueo_solo_en_este_dispositivo_tapa_la),
         Modifier.padding(start = 16.dp, top = 8.dp),
         style = StmType.bodySmall,
         color = Stm.colors.onSurfaceVariant,

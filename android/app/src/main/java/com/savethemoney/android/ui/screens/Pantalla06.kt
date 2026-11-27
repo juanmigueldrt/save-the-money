@@ -17,9 +17,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalResources
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.savethemoney.android.R
 import com.savethemoney.android.data.Account
 import com.savethemoney.android.data.AppError
 import com.savethemoney.android.data.Money
@@ -49,6 +52,7 @@ import com.savethemoney.android.ui.icons.StmIcons
 import com.savethemoney.android.ui.rememberAction
 import com.savethemoney.android.ui.theme.Stm
 import com.savethemoney.android.ui.theme.StmType
+import com.savethemoney.android.ui.titulo
 import java.time.Instant
 
 /** 06 Cuenta: saldo, acciones, evolución en 6 meses y sus movimientos por mes. */
@@ -58,6 +62,7 @@ fun Pantalla06(nav: Nav, accountId: String) {
     val finance = session.finance ?: return
     val account = finance.account(accountId) ?: return NoEncontrado(nav)
     val c = Stm.colors
+    val resources = LocalResources.current
     var lista by remember(account.id) { mutableStateOf(emptyList<Movement>()) }
     var opciones by remember { mutableStateOf(false) }
     var confirmar by remember { mutableStateOf(false) }
@@ -71,7 +76,7 @@ fun Pantalla06(nav: Nav, accountId: String) {
             fallo = null
         } catch (e: AppError) {
             // Se queda la lista que había, con el aviso: no es lo mismo que una cuenta sin movimientos.
-            fallo = "No se han podido cargar los movimientos del gráfico. ${e.message}"
+            fallo = resources.getString(R.string.cuenta_no_se_han_podido_cargar_los, e.message)
         }
     }
     val hoy = finance.today()
@@ -83,8 +88,8 @@ fun Pantalla06(nav: Nav, accountId: String) {
             TopBar(account.name, onNav = nav::back) {
                 IconBtn(StmIcons.edit, {
                     nav.go(Route.FormCuenta(account.id))
-                }, contentDescription = "Editar")
-                IconBtn(StmIcons.moreVert, { opciones = true }, contentDescription = "Más opciones")
+                }, contentDescription = stringResource(R.string.comun_editar))
+                IconBtn(StmIcons.moreVert, { opciones = true }, contentDescription = stringResource(R.string.comun_mas_opciones))
             }
         },
         snackbar = action.error?.let { e -> { Snackbar(e) } },
@@ -93,13 +98,13 @@ fun Pantalla06(nav: Nav, accountId: String) {
             confirmar -> {
                 {
                     StmDialog(
-                        "¿Borrar esta cuenta?",
-                        "Se borran también todos sus movimientos, para todo el hogar. No se puede deshacer.",
+                        stringResource(R.string.cuenta_borrar_esta_cuenta),
+                        stringResource(R.string.cuenta_se_borran_tambien_todos_sus),
                         icon = StmIcons.deleteForever,
                         onDismiss = { confirmar = false },
                         actions = {
-                            Btn("Cancelar", { confirmar = false }, kind = BtnKind.Text)
-                            Btn("Borrar", {
+                            Btn(stringResource(R.string.comun_cancelar), { confirmar = false }, kind = BtnKind.Text)
+                            Btn(stringResource(R.string.comun_borrar), {
                                 action.run {
                                     finance.deleteAccount(account)
                                     nav.back()
@@ -112,18 +117,18 @@ fun Pantalla06(nav: Nav, accountId: String) {
             opciones -> {
                 {
                     BottomSheet(account.name, onDismiss = { opciones = false }) {
-                        SheetItem(StmIcons.syncAlt, "Actualizar saldo") {
+                        SheetItem(StmIcons.syncAlt, stringResource(R.string.cuenta_actualizar_saldo)) {
                             opciones = false
                             ajustando = true
                         }
-                        SheetItem(StmIcons.visibilityOff, if (account.isArchived) "Desarchivar" else "Archivar") {
+                        SheetItem(StmIcons.visibilityOff, if (account.isArchived) stringResource(R.string.comun_desarchivar) else stringResource(R.string.comun_archivar)) {
                             opciones = false
                             action.run {
                                 finance.updateAccount(account.copy(archivedAt = if (account.isArchived) null else Instant.now().toString()))
                                 if (!account.isArchived) nav.back()
                             }
                         }
-                        SheetItem(StmIcons.delete, "Borrar cuenta y movimientos") {
+                        SheetItem(StmIcons.delete, stringResource(R.string.cuenta_borrar_cuenta_y_movimientos)) {
                             opciones = false
                             confirmar = true
                         }
@@ -133,19 +138,19 @@ fun Pantalla06(nav: Nav, accountId: String) {
             else -> null
         },
     ) {
-        CifraCuenta("Saldo", Money.format(finance.balance(account)), if (account.isShared) "${account.kind.title} · compartida" else account.kind.title)
+        CifraCuenta(stringResource(R.string.cuenta_saldo), Money.format(finance.balance(account)), if (account.isShared) stringResource(R.string.comun_tipo_cuenta_compartida, stringResource(account.kind.titulo)) else stringResource(account.kind.titulo))
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Btn("Importar CSV", {
+            Btn(stringResource(R.string.importar_csv_importar_csv), {
                 nav.go(Route.ImportarCsv(account.id))
             }, kind = BtnKind.Tonal, icon = StmIcons.uploadFile)
-            Btn("Transferir", {
+            Btn(stringResource(R.string.cuenta_transferir), {
                 nav.go(Route.FormMovimiento(accountId = account.id, transfer = true))
             }, kind = BtnKind.Outlined, icon = StmIcons.syncAlt)
         }
         Spacer(Modifier.height(16.dp))
         StmCard {
-            Text("Saldo en 6 meses", style = StmType.labelMedium, color = c.onSurfaceVariant)
+            Text(stringResource(R.string.cuenta_saldo_en_6_meses), style = StmType.labelMedium, color = c.onSurfaceVariant)
             Spacer(Modifier.height(4.dp))
             LineChart(serie.map { if (alto == bajo) 0.5f else (it - bajo).toFloat() / (alto - bajo) })
         }
@@ -154,7 +159,7 @@ fun Pantalla06(nav: Nav, accountId: String) {
         // La lista de la cuenta va por páginas (ORC-85); [lista] solo alimenta el gráfico.
         val filas = if (finance.list.accountId == account.id) finance.list.rows else emptyList()
         if (filas.isEmpty() && finance.listError == null) {
-            Vacio(if (finance.isLoadingList || finance.list.accountId != account.id) "Cargando…" else "Todavía no hay movimientos en esta cuenta.")
+            Vacio(if (finance.isLoadingList || finance.list.accountId != account.id) stringResource(R.string.comun_cargando) else stringResource(R.string.cuenta_todavia_no_hay_movimientos_en_esta))
         }
         filas.groupBy { it.day.withDayOfMonth(1) }.forEach { (mes, items) ->
             ListCard {
@@ -179,15 +184,16 @@ private fun BoxScope.HojaAjusteSaldo(finance: FinanceModel, account: Account, ce
     val c = Stm.colors
     var real by remember { mutableStateOf("") }
     val action = rememberAction()
+    val resources = LocalResources.current
     val actual = finance.balance(account)
     val diferencia = Money.entered(real)?.let { it - actual }
-    BottomSheet("Actualizar saldo", "Saldo en la app: ${Money.format(actual)}", onDismiss = cerrar) {
+    BottomSheet(stringResource(R.string.cuenta_actualizar_saldo), stringResource(R.string.cuenta_saldo_en_la_app, Money.format(actual)), onDismiss = cerrar) {
         Column(Modifier.padding(horizontal = 16.dp)) {
-            FilledField("Saldo real", real, { real = it }, suffix = "€", keyboard = KeyboardType.Decimal, autoFocus = true, calculator = true)
+            FilledField(stringResource(R.string.cuenta_saldo_real), real, { real = it }, suffix = "€", keyboard = KeyboardType.Decimal, autoFocus = true, calculator = true)
             Spacer(Modifier.height(8.dp))
             Text(
-                if (diferencia != null && diferencia != 0L) "Ajuste: ${Money.format(diferencia, signed = true, options = Money.display.copy(plusSign = true))}"
-                else "Se apunta un movimiento «Ajuste de saldo» por la diferencia, hoy. No cuenta como gasto ni como ingreso.",
+                if (diferencia != null && diferencia != 0L) stringResource(R.string.cuenta_ajuste, Money.format(diferencia, signed = true, options = Money.display.copy(plusSign = true)))
+                else stringResource(R.string.cuenta_se_apunta_un_movimiento_ajuste_de),
                 style = StmType.bodySmall, color = c.onSurfaceVariant,
             )
             action.error?.let {
@@ -196,10 +202,10 @@ private fun BoxScope.HojaAjusteSaldo(finance: FinanceModel, account: Account, ce
             }
             Spacer(Modifier.height(16.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-                Btn("Cancelar", cerrar, kind = BtnKind.Text)
-                Btn("Guardar", {
+                Btn(stringResource(R.string.comun_cancelar), cerrar, kind = BtnKind.Text)
+                Btn(stringResource(R.string.comun_guardar), {
                     action.run {
-                        val valor = Money.entered(real) ?: throw AppError.InvalidInput("Escribe el saldo, por ejemplo 1.250,00.")
+                        val valor = Money.entered(real) ?: throw AppError.InvalidInput(resources.getString(R.string.cuenta_escribe_el_saldo_por_ejemplo_1))
                         finance.adjustBalance(account, valor)
                         cerrar()
                     }
